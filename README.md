@@ -1,1 +1,1 @@
-# kindergartentManager
+# kindergartenManager
