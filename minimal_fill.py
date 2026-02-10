@@ -30,7 +30,7 @@ def normalize_label(label):
     return label.strip().rstrip("：:").strip()
 
 
-def append_by_labels(cell, label_to_text):
+def append_by_labels(cell, label_to_text, append_unmatched=True):
     """根据标签追加内容，新内容创建新段落并设置格式"""
     original_lines = cell.text.splitlines()
     if not original_lines:
@@ -72,21 +72,87 @@ def append_by_labels(cell, label_to_text):
                         apply_run_style(run)
     
     # 添加未匹配的新标签
-    for label, extra in pending.items():
-        if label not in matched:
-            # 创建标签行
-            p = cell.add_paragraph()
-            run = p.add_run(f"{label}：")
-            apply_run_style(run)
-            
-            # 创建内容段落
-            parts = extra.split('\n')
-            for part in parts:
-                if part.strip():
-                    new_p = cell.add_paragraph()
-                    new_p.paragraph_format.first_line_indent = Pt(24)
-                    run = new_p.add_run(part)
-                    apply_run_style(run)
+    if append_unmatched:
+        for label, extra in pending.items():
+            if label not in matched:
+                # 创建标签行
+                p = cell.add_paragraph()
+                run = p.add_run(f"{label}：")
+                apply_run_style(run)
+                
+                # 创建内容段落
+                parts = extra.split('\n')
+                for part in parts:
+                    if part.strip():
+                        new_p = cell.add_paragraph()
+                        new_p.paragraph_format.first_line_indent = Pt(24)
+                        run = new_p.add_run(part)
+                        apply_run_style(run)
+
+
+def flatten_plan_data(plan_data):
+    flat_data = {}
+    for key, value in plan_data.items():
+        if isinstance(value, dict):
+            for sub_key, sub_value in value.items():
+                if sub_value:
+                    flat_data[sub_key] = sub_value
+        else:
+            if value:
+                flat_data[key] = value
+    return flat_data
+
+
+def fill_table_by_labels(table, label_to_text, content_col=1):
+    for row in table.rows:
+        if len(row.cells) <= content_col:
+            continue
+        append_by_labels(
+            row.cells[content_col],
+            label_to_text,
+            append_unmatched=False,
+        )
+
+
+def fill_by_row_labels(table, label_to_text, label_col=0, content_col=1):
+    normalized_map = {
+        normalize_label(label): text
+        for label, text in label_to_text.items()
+        if text
+    }
+    for row in table.rows:
+        if len(row.cells) <= max(label_col, content_col):
+            continue
+        label_text = normalize_label(row.cells[label_col].text)
+        if label_text and label_text in normalized_map:
+            set_cell_text(row.cells[content_col], normalized_map[label_text])
+
+
+def fill_doc_by_labels(
+    doc,
+    plan_data,
+    week_text=None,
+    date_text=None,
+    content_col=1,
+    label_col=0,
+    header_table_index=0,
+):
+    flat_data = flatten_plan_data(plan_data)
+    for index, table in enumerate(doc.tables):
+        fill_table_by_labels(table, flat_data, content_col=content_col)
+
+        if index == header_table_index:
+            if week_text is not None and len(table.rows) > 0:
+                set_cell_text(table.cell(0, content_col), week_text)
+            if date_text is not None and len(table.rows) > 1:
+                set_cell_text(table.cell(1, content_col), date_text)
+
+        fill_by_row_labels(
+            table,
+            flat_data,
+            label_col=label_col,
+            content_col=content_col,
+        )
 
 
 def save_semester(db_path, start_date, end_date):
@@ -103,8 +169,14 @@ def save_semester(db_path, start_date, end_date):
             """
         )
         conn.execute(
-            "INSERT INTO semesters (start_date, end_date, created_at) VALUES (?, ?, ?)",
-            (start_date.isoformat(), end_date.isoformat(), datetime.now().isoformat(timespec="seconds")),
+            "INSERT INTO semesters "
+            "(start_date, end_date, created_at) "
+            "VALUES (?, ?, ?)",
+            (
+                start_date.isoformat(),
+                end_date.isoformat(),
+                datetime.now().isoformat(timespec="seconds"),
+            ),
         )
 
 
@@ -228,46 +300,22 @@ def export_schema_json(path):
         ]
     }
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(schema, ensure_ascii=False, indent=2), encoding="utf-8")
+    path.write_text(
+        json.dumps(schema, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
 
 def fill_teacher_plan(doc, plan_data, week_text, date_text):
-    table = doc.tables[0]
-
-    set_cell_text(table.cell(0, 1), plan_data.get("周次", week_text))
-    set_cell_text(table.cell(1, 1), plan_data.get("日期", date_text))
-
-    append_by_labels(table.cell(2, 1), plan_data.get("晨间活动", {}))
-    append_by_labels(table.cell(3, 1), plan_data.get("晨间活动指导", {}))
-    append_by_labels(table.cell(4, 1), {"话题": plan_data.get("晨间谈话", {}).get("话题")})
-    append_by_labels(table.cell(5, 1), {"问题设计": plan_data.get("晨间谈话", {}).get("问题设计")})
-
-    append_by_labels(table.cell(6, 1), {"活动主题": plan_data.get("集体活动", {}).get("活动主题")})
-    append_by_labels(table.cell(7, 1), {"活动目标": plan_data.get("集体活动", {}).get("活动目标")})
-    append_by_labels(table.cell(8, 1), {"活动准备": plan_data.get("集体活动", {}).get("活动准备")})
-    append_by_labels(table.cell(9, 1), {"活动重点": plan_data.get("集体活动", {}).get("活动重点")})
-    append_by_labels(table.cell(10, 1), {"活动难点": plan_data.get("集体活动", {}).get("活动难点")})
-    append_by_labels(table.cell(11, 1), {"活动过程": plan_data.get("集体活动", {}).get("活动过程")})
-
-    append_by_labels(table.cell(12, 1), {"游戏区域": plan_data.get("室内区域游戏", {}).get("游戏区域")})
-    append_by_labels(table.cell(13, 1), {
-        "重点指导": plan_data.get("室内区域游戏", {}).get("重点指导"),
-        "活动目标": plan_data.get("室内区域游戏", {}).get("活动目标"),
-        "指导要点": plan_data.get("室内区域游戏", {}).get("指导要点"),
-    })
-    append_by_labels(table.cell(14, 1), {"支持策略": plan_data.get("室内区域游戏", {}).get("支持策略")})
-
-    append_by_labels(table.cell(15, 1), {"游戏区域": plan_data.get("下午户外游戏", {}).get("游戏区域")})
-    append_by_labels(table.cell(16, 1), {
-        "重点观察": plan_data.get("下午户外游戏", {}).get("重点观察"),
-        "活动目标": plan_data.get("下午户外游戏", {}).get("活动目标"),
-        "指导要点": plan_data.get("下午户外游戏", {}).get("指导要点"),
-    })
-    append_by_labels(table.cell(17, 1), {"支持策略": plan_data.get("下午户外游戏", {}).get("支持策略")})
-
-    reflection = plan_data.get("一日活动反思")
-    if reflection:
-        set_cell_text(table.cell(18, 1), reflection)
+    fill_doc_by_labels(
+        doc,
+        plan_data,
+        week_text=plan_data.get("周次", week_text),
+        date_text=plan_data.get("日期", date_text),
+        content_col=1,
+        label_col=0,
+        header_table_index=0,
+    )
 
 
 def main():
@@ -287,7 +335,10 @@ def main():
 
     week_no = calculate_week_number(semester_start, target_date)
     week_text = f"第（{week_no}）周"
-    date_text = f"周（{weekday_cn(target_date)}） {target_date.month}月{target_date.day}日"
+    date_text = (
+        f"周（{weekday_cn(target_date)}） "
+        f"{target_date.month}月{target_date.day}日"
+    )
 
     doc = Document(src)
 
