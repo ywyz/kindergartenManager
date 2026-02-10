@@ -1,0 +1,220 @@
+{
+  "fields": [
+    {
+      "name": "周次",
+      "required": false,
+      "type": "text",
+      "widget": "textarea",
+      "placeholder": "请输入周次",
+      "subfields": []
+    },
+    {
+      "name": "日期",
+      "required": false,
+      "type": "text",
+      "widget": "textarea",
+      "placeholder": "请输入日期",
+      "subfields": []
+    },
+    {
+      "name": "晨间活动",
+      "required": true,
+      "type": "group",
+      "widget": "group",
+      "placeholder": "请输入晨间活动",
+      "subfields": [
+        {
+          "name": "集体游戏",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入集体游戏"
+        },
+        {
+          "name": "自主游戏",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入自主游戏"
+        }
+      ]
+    },
+    {
+      "name": "晨间活动指导",
+      "required": true,
+      "type": "group",
+      "widget": "group",
+      "placeholder": "请输入晨间活动指导",
+      "subfields": [
+        {
+          "name": "重点指导",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入重点指导"
+        },
+        {
+          "name": "活动目标",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入活动目标"
+        },
+        {
+          "name": "指导要点",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入指导要点"
+        }
+      ]
+    },
+    {
+      "name": "晨间谈话",
+      "required": true,
+      "type": "group",
+      "widget": "group",
+      "placeholder": "请输入晨间谈话",
+      "subfields": [
+        {
+          "name": "话题",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入话题"
+        },
+        {
+          "name": "问题设计",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入问题设计"
+        }
+      ]
+    },
+    {
+      "name": "集体活动",
+      "required": true,
+      "type": "group",
+      "widget": "group",
+      "placeholder": "请输入集体活动",
+      "subfields": [
+        {
+          "name": "活动主题",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入活动主题"
+        },
+        {
+          "name": "活动目标",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入活动目标"
+        },
+        {
+          "name": "活动准备",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入活动准备"
+        },
+        {
+          "name": "活动重点",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入活动重点"
+        },
+        {
+          "name": "活动难点",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入活动难点"
+        },
+        {
+          "name": "活动过程",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入活动过程"
+        }
+      ]
+    },
+    {
+      "name": "室内区域游戏",
+      "required": true,
+      "type": "group",
+      "widget": "group",
+      "placeholder": "请输入室内区域游戏",
+      "subfields": [
+        {
+          "name": "游戏区域",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入游戏区域"
+        },
+        {
+          "name": "重点指导",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入重点指导"
+        },
+        {
+          "name": "活动目标",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入活动目标"
+        },
+        {
+          "name": "指导要点",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入指导要点"
+        },
+        {
+          "name": "支持策略",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入支持策略"
+        }
+      ]
+    },
+    {
+      "name": "下午户外游戏",
+      "required": true,
+      "type": "group",
+      "widget": "group",
+      "placeholder": "请输入下午户外游戏",
+      "subfields": [
+        {
+          "name": "游戏区域",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入游戏区域"
+        },
+        {
+          "name": "重点观察",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入重点观察"
+        },
+        {
+          "name": "活动目标",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入活动目标"
+        },
+        {
+          "name": "指导要点",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入指导要点"
+        },
+        {
+          "name": "支持策略",
+          "type": "text",
+          "widget": "textarea",
+          "placeholder": "请输入支持策略"
+        }
+      ]
+    },
+    {
+      "name": "一日活动反思",
+      "required": false,
+      "type": "text",
+      "widget": "textarea",
+      "placeholder": "请输入一日活动反思",
+      "subfields": []
+    }
+  ]
+}

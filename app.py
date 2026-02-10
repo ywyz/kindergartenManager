@@ -5,13 +5,69 @@
 """
 
 import json
+import os
 from pathlib import Path
 from datetime import date, timedelta
 from nicegui import ui
 from docx import Document
 
 import kg_manager as kg
-from kg_manager import AI_SYSTEM_PROMPT
+
+
+class ConfigManager:
+    """AI和数据库配置管理"""
+
+    # LocalStorage 键
+    STORAGE_PREFIX = "kg_manager_"
+    AI_KEY = f"{STORAGE_PREFIX}ai_key"
+    AI_MODEL = f"{STORAGE_PREFIX}ai_model"
+    AI_BASE_URL = f"{STORAGE_PREFIX}ai_base_url"
+    DB_TYPE = f"{STORAGE_PREFIX}db_type"
+    MYSQL_HOST = f"{STORAGE_PREFIX}mysql_host"
+    MYSQL_PORT = f"{STORAGE_PREFIX}mysql_port"
+    MYSQL_DB = f"{STORAGE_PREFIX}mysql_db"
+    MYSQL_USER = f"{STORAGE_PREFIX}mysql_user"
+    MYSQL_PASSWORD = f"{STORAGE_PREFIX}mysql_password"
+
+    @staticmethod
+    def get_config_from_storage():
+        """从浏览器localStorage获取配置"""
+        return {
+            "ai_key": ui.run_javascript(
+                f"localStorage.getItem('{ConfigManager.AI_KEY}')"
+            ),
+            "ai_model": ui.run_javascript(
+                f"localStorage.getItem('{ConfigManager.AI_MODEL}')"
+            ),
+            "ai_base_url": ui.run_javascript(
+                f"localStorage.getItem('{ConfigManager.AI_BASE_URL}')"
+            ),
+            "db_type": ui.run_javascript(
+                f"localStorage.getItem('{ConfigManager.DB_TYPE}')"
+            ),
+            "mysql_config": {
+                "host": ui.run_javascript(
+                    f"localStorage.getItem('{ConfigManager.MYSQL_HOST}')"
+                ),
+                "port": ui.run_javascript(
+                    f"localStorage.getItem('{ConfigManager.MYSQL_PORT}')"
+                ),
+                "db": ui.run_javascript(
+                    f"localStorage.getItem('{ConfigManager.MYSQL_DB}')"
+                ),
+                "user": ui.run_javascript(
+                    f"localStorage.getItem('{ConfigManager.MYSQL_USER}')"
+                ),
+                "password": ui.run_javascript(
+                    f"localStorage.getItem('{ConfigManager.MYSQL_PASSWORD}')"
+                ),
+            },
+        }
+
+    @staticmethod
+    def save_to_storage(key, value):
+        """保存配置到浏览器localStorage"""
+        ui.run_javascript(f"localStorage.setItem('{key}', '{value}')")
 
 
 class TeacherPlanUI:
@@ -33,6 +89,21 @@ class TeacherPlanUI:
         self.default_semester_start = "2026-02-23"
         self.default_semester_end = "2026-07-10"
 
+        # AI配置
+        self.ai_key = None
+        self.ai_model = "gpt-4o-mini"
+        self.ai_base_url = None
+        
+        # 数据库配置
+        self.db_type = "sqlite"
+        self.mysql_config = {
+            "host": "",
+            "port": 3306,
+            "db": "",
+            "user": "",
+            "password": "",
+        }
+
         latest_semester = kg.load_latest_semester(self.semester_db_path)
         if latest_semester:
             self.default_semester_start = latest_semester[0].isoformat()
@@ -43,18 +114,220 @@ class TeacherPlanUI:
     def load_schema(self):
         """加载字段 schema"""
         if not self.schema_path.exists():
-            ui.notify("schema 文件不存在，请先运行 minimal_fill.py", position="top", type="negative")
+            msg = "schema 文件不存在，请先运行 minimal_fill.py"
+            ui.notify(msg, position="top", type="negative")
             return
         
         with open(self.schema_path, "r", encoding="utf-8") as f:
             self.schema = json.load(f)
+
+    def build_config_panel(self):
+        """构建配置面板（AI和数据库配置）"""
+        with ui.card().classes("w-full"):
+            ui.label("系统配置").classes("text-2xl font-bold mb-4")
+            
+            # 标签页
+            with ui.tabs().classes("w-full") as tabs:
+                ai_tab = ui.tab("AI配置")
+                db_tab = ui.tab("数据库配置")
+            
+            with ui.tab_panels(tabs).classes("w-full"):
+                # AI配置标签页
+                with ui.tab_panel(ai_tab):
+                    with ui.column().classes("w-full gap-4"):
+                        ui.label("OpenAI API 配置").classes(
+                            "text-lg font-semibold"
+                        )
+                        
+                        ai_key_input = ui.input(
+                            label="API Key",
+                            password=True,
+                            placeholder="sk-..."
+                        ).classes("w-full")
+                        
+                        ai_model_input = ui.input(
+                            label="AI模型",
+                            value=self.ai_model,
+                            placeholder="gpt-4o-mini"
+                        ).classes("w-full")
+                        
+                        ai_url_input = ui.input(
+                            label="API地址 (可选)",
+                            placeholder="https://api.openai.com/v1"
+                        ).classes("w-full")
+                        
+                        def save_ai_config():
+                            """保存AI配置"""
+                            key = ai_key_input.value
+                            model = ai_model_input.value
+                            url = ai_url_input.value or None
+                            
+                            if not key:
+                                ui.notify(
+                                    "请输入 API Key",
+                                    position="top",
+                                    type="warning"
+                                )
+                                return
+                            
+                            self.ai_key = key
+                            self.ai_model = model or "gpt-4o-mini"
+                            self.ai_base_url = url
+                            
+                            # 保存到localStorage
+                            ConfigManager.save_to_storage(
+                                ConfigManager.AI_KEY, key
+                            )
+                            ConfigManager.save_to_storage(
+                                ConfigManager.AI_MODEL, self.ai_model
+                            )
+                            if url:
+                                ConfigManager.save_to_storage(
+                                    ConfigManager.AI_BASE_URL, url
+                                )
+                            
+                            ui.notify(
+                                "AI配置已保存",
+                                position="top",
+                                type="positive"
+                            )
+                        
+                        ui.button(
+                            "保存配置",
+                            on_click=save_ai_config
+                        ).classes("bg-blue-600 text-white w-full")
+                
+                # 数据库配置标签页
+                with ui.tab_panel(db_tab):
+                    with ui.column().classes("w-full gap-4"):
+                        ui.label("数据库选择").classes(
+                            "text-lg font-semibold"
+                        )
+                        
+                        db_type_select = ui.select(
+                            label="数据库类型",
+                            value=self.db_type,
+                            options={
+                                "sqlite": "SQLite (本地)",
+                                "mysql": "MySQL (云部署)",
+                            }
+                        ).classes("w-full")
+                        
+                        # SQLite配置区域
+                        sqlite_info = ui.html(
+                            "<p class='text-sm text-gray-600'>"
+                            "✓ SQLite: 使用本地数据库 "
+                            "(examples/plan.db)</p>"
+                        )
+                        
+                        # MySQL配置区域
+                        mysql_panel = ui.column().classes("w-full gap-3")
+                        with mysql_panel:
+                            mysql_host = ui.input(
+                                label="数据库地址",
+                                placeholder="localhost"
+                            ).classes("w-full")
+                            
+                            mysql_port = ui.input(
+                                label="端口",
+                                value="3306",
+                                placeholder="3306"
+                            ).classes("w-full")
+                            
+                            mysql_db = ui.input(
+                                label="数据库名",
+                                placeholder="kindergarten"
+                            ).classes("w-full")
+                            
+                            mysql_user = ui.input(
+                                label="用户名",
+                                placeholder="root"
+                            ).classes("w-full")
+                            
+                            mysql_password = ui.input(
+                                label="密码",
+                                password=True,
+                                placeholder="password"
+                            ).classes("w-full")
+                        
+                        # 默认隐藏MySQL配置
+                        mysql_panel.visible = (self.db_type == "mysql")
+                        sqlite_info.visible = (self.db_type == "sqlite")
+                        
+                        def on_db_type_change(new_db_type):
+                            """切换数据库类型"""
+                            self.db_type = new_db_type
+                            mysql_panel.visible = (new_db_type == "mysql")
+                            sqlite_info.visible = (new_db_type == "sqlite")
+                            ConfigManager.save_to_storage(
+                                ConfigManager.DB_TYPE, new_db_type
+                            )
+                        
+                        db_type_select.on_change(
+                            lambda e: on_db_type_change(e.value)
+                        )
+                        
+                        def save_db_config():
+                            """保存数据库配置"""
+                            if self.db_type == "mysql":
+                                if not all([
+                                    mysql_host.value,
+                                    mysql_db.value,
+                                    mysql_user.value
+                                ]):
+                                    ui.notify(
+                                        "请填写完整的MySQL配置",
+                                        position="top",
+                                        type="warning"
+                                    )
+                                    return
+                                
+                                self.mysql_config = {
+                                    "host": mysql_host.value,
+                                    "port": int(mysql_port.value or 3306),
+                                    "db": mysql_db.value,
+                                    "user": mysql_user.value,
+                                    "password": mysql_password.value,
+                                }
+                                
+                                # 保存到localStorage
+                                ConfigManager.save_to_storage(
+                                    ConfigManager.MYSQL_HOST,
+                                    mysql_host.value
+                                )
+                                ConfigManager.save_to_storage(
+                                    ConfigManager.MYSQL_PORT,
+                                    str(self.mysql_config["port"])
+                                )
+                                ConfigManager.save_to_storage(
+                                    ConfigManager.MYSQL_DB, mysql_db.value
+                                )
+                                ConfigManager.save_to_storage(
+                                    ConfigManager.MYSQL_USER, mysql_user.value
+                                )
+                                ConfigManager.save_to_storage(
+                                    ConfigManager.MYSQL_PASSWORD,
+                                    mysql_password.value
+                                )
+                            
+                            ui.notify(
+                                f"{self.db_type.upper()} 配置已保存",
+                                position="top",
+                                type="positive"
+                            )
+                        
+                        ui.button(
+                            "保存配置",
+                            on_click=save_db_config
+                        ).classes("bg-green-600 text-white w-full")
 
     def set_semester(self, start_date: str, end_date: str):
         """设置学期信息"""
         try:
             self.semester_start = date.fromisoformat(start_date)
             self.semester_end = date.fromisoformat(end_date)
-            ui.notify(f"学期已设置：{start_date} 至 {end_date}", position="top", type="positive")
+            msg = f"学期已设置：{start_date} 至 {end_date}"
+            ui.notify(msg, position="top", type="positive")
         except ValueError:
             ui.notify("日期格式错误，应为 YYYY-MM-DD", position="top", type="negative")
 
@@ -77,26 +350,46 @@ class TeacherPlanUI:
         self.form_fields.clear()
 
         with ui.column().classes("w-full"):
+            # 添加配置面板（可折叠）
+            with ui.expansion("⚙️ 系统配置").classes("w-full"):
+                self.build_config_panel()
+            
+            ui.separator()
+            
             ui.label("教案关键信息").classes("text-lg font-bold")
             
             with ui.row().classes("w-full gap-4"):
                 with ui.input("学期开始日期").classes("w-48") as semester_start:
                     with semester_start.add_slot("append"):
-                        ui.icon("event").on("click", lambda: semester_start_menu.open()).classes("cursor-pointer")
+                        def open_start_menu():
+                            semester_start_menu.open()
+                        ui.icon("event").on(
+                            "click", open_start_menu
+                        ).classes("cursor-pointer")
                     with ui.menu() as semester_start_menu:
-                        semester_start_date = ui.date(value=self.default_semester_start).bind_value(semester_start)
+                        start_picker = ui.date(value=self.semester_start)
+                        start_picker.bind_value(semester_start)
                 
                 with ui.input("学期结束日期").classes("w-48") as semester_end:
                     with semester_end.add_slot("append"):
-                        ui.icon("event").on("click", lambda: semester_end_menu.open()).classes("cursor-pointer")
+                        def open_end_menu():
+                            semester_end_menu.open()
+                        ui.icon("event").on(
+                            "click", open_end_menu
+                        ).classes("cursor-pointer")
                     with ui.menu() as semester_end_menu:
-                        semester_end_date = ui.date(value=self.default_semester_end).bind_value(semester_end)
+                        end_picker = ui.date(value=self.semester_end)
+                        end_picker.bind_value(semester_end)
                 
                 with ui.input("教案日期").classes("w-48") as target_date:
                     with target_date.add_slot("append"):
-                        ui.icon("event").on("click", lambda: target_date_menu.open()).classes("cursor-pointer")
+                        def open_date_menu():
+                            target_date_menu.open()
+                        ui.icon("event").on(
+                            "click", open_date_menu
+                        ).classes("cursor-pointer")
                     with ui.menu() as target_date_menu:
-                        target_date_picker = ui.date(value="2026-02-26").bind_value(target_date)
+                        _ = ui.date(value="2026-02-26").bind_value(target_date)
 
                 ui.button(
                     "保存学期",
@@ -132,8 +425,14 @@ class TeacherPlanUI:
             ui.separator()
             
             with ui.row().classes("w-full gap-4"):
-                week_label = ui.label("第（0）周").classes("text-base font-semibold")
-                day_label = ui.label("周（一） 2月26日").classes("text-base font-semibold")
+                week_text = "第（0）周"
+                week_label = ui.label(week_text).classes(
+                    "text-base font-semibold"
+                )
+                day_text = "周（一） 2月26日"
+                day_label = ui.label(day_text).classes(
+                    "text-base font-semibold"
+                )
             
             ui.separator()
 
@@ -152,7 +451,8 @@ class TeacherPlanUI:
                 required_marker = " *" if required else ""
                 
                 if field_info.get("type") == "group":
-                    with ui.expansion(f"{field_name}{required_marker}").classes("w-full"):
+                    expansion_label = f"{field_name}{required_marker}"
+                    with ui.expansion(expansion_label).classes("w-full"):
                         subfields = field_info.get("subfields", [])
                         group_data = {}
 
@@ -197,8 +497,13 @@ class TeacherPlanUI:
                     semester_end.value,
                     target_date.value
                 )).classes("bg-emerald-600 text-white")
-                ui.button("填充测试数据", on_click=self.fill_sample_data).classes("bg-blue-600 text-white")
-                ui.button("清空表单", on_click=self.clear_form).classes("bg-gray-600 text-white")
+                ui.button(
+                    "填充测试数据",
+                    on_click=self.fill_sample_data
+                ).classes("bg-blue-600 text-white")
+                ui.button("清空表单", on_click=self.clear_form).classes(
+                    "bg-gray-600 text-white"
+                )
 
             ui.separator()
 
@@ -220,9 +525,14 @@ class TeacherPlanUI:
             with ui.row().classes("w-full gap-4"):
                 with ui.input("起始日期").classes("w-48") as range_start:
                     with range_start.add_slot("append"):
-                        ui.icon("event").on("click", lambda: range_start_menu.open()).classes("cursor-pointer")
+                        def open_range_menu():
+                            range_start_menu.open()
+                        ui.icon("event").on(
+                            "click", open_range_menu
+                        ).classes("cursor-pointer")
                     with ui.menu() as range_start_menu:
-                        range_start_picker = ui.date(value=self.default_semester_start).bind_value(range_start)
+                        start_d = ui.date(value=self.default_semester_start)
+                        start_d.bind_value(range_start)
 
                 range_days = ui.number("连续天数", value=1, min=1).classes("w-32")
                 ui.button(
@@ -408,15 +718,29 @@ class TeacherPlanUI:
         if not self.collective_draft or not self.collective_draft.value:
             ui.notify("请先填写集体活动原稿", position="top", type="negative")
             return
+        
+        if not self.ai_key:
+            ui.notify(
+                "请先在系统配置中设置 OpenAI API Key",
+                position="top",
+                type="warning"
+            )
+            return
 
         try:
+            # 使用保存的AI配置
+            os.environ["OPENAI_API_KEY"] = self.ai_key
+            
             payload = kg.split_collective_activity(self.collective_draft.value)
             if not payload:
                 ui.notify("AI 返回格式不正确", position="top", type="negative")
                 return
 
             group = self.form_fields.get("集体活动", {})
-            for key in ["活动主题", "活动目标", "活动准备", "活动重点", "活动难点", "活动过程"]:
+            for key in [
+                "活动主题", "活动目标", "活动准备",
+                "活动重点", "活动难点", "活动过程"
+            ]:
                 if key in group and key in payload:
                     group[key].value = payload.get(key, "")
             ui.notify("AI 拆分完成", position="top", type="positive")
