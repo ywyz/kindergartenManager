@@ -6,6 +6,7 @@
 
 import json
 import os
+import asyncio
 from pathlib import Path
 from datetime import date, timedelta
 from nicegui import ui
@@ -735,7 +736,7 @@ class TeacherPlanUI:
         if self.plan_date_select:
             self.plan_date_select.options = kg.list_plan_dates(self.plan_db_path)
 
-    def ai_split_collective_activity(self):
+    async def ai_split_collective_activity(self):
         """AI 拆分集体活动原稿"""
         if not self.collective_draft or not self.collective_draft.value:
             ui.notify("请先填写集体活动原稿", position="top", type="negative")
@@ -752,8 +753,16 @@ class TeacherPlanUI:
         try:
             # 使用保存的AI配置
             os.environ["OPENAI_API_KEY"] = self.ai_key
-            
-            payload = kg.split_collective_activity(self.collective_draft.value)
+            if self.ai_base_url:
+                os.environ["OPENAI_BASE_URL"] = self.ai_base_url
+            if self.ai_model:
+                os.environ["OPENAI_MODEL"] = self.ai_model
+
+            ui.notify("AI 正在处理，请稍候...", position="top", type="info")
+            payload = await asyncio.to_thread(
+                kg.split_collective_activity,
+                self.collective_draft.value,
+            )
             if not payload:
                 ui.notify("AI 返回格式不正确", position="top", type="negative")
                 return

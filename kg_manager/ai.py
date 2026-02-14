@@ -32,6 +32,10 @@ def get_ai_client():
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("未检测到 OPENAI_API_KEY 环境变量")
+
+    base_url = os.getenv("OPENAI_BASE_URL")
+    if base_url:
+        return OpenAI(api_key=api_key, base_url=base_url)
     return OpenAI(api_key=api_key)
 
 
@@ -51,8 +55,9 @@ def split_collective_activity(draft_text, system_prompt=None):
     
     try:
         client = get_ai_client()
+        model = os.getenv("OPENAI_MODEL") or AI_MODEL
         response = client.chat.completions.create(
-            model=AI_MODEL,
+            model=model,
             messages=[
                 {"role": "system", "content": system_prompt or AI_SYSTEM_PROMPT},
                 {"role": "user", "content": draft_text},
