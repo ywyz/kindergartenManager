@@ -263,7 +263,7 @@ class TeacherPlanUI:
                                 ConfigManager.DB_TYPE, new_db_type
                             )
                         
-                        db_type_select.on_change(
+                        db_type_select.on_value_change(
                             lambda e: on_db_type_change(e.value)
                         )
                         
@@ -355,134 +355,192 @@ class TeacherPlanUI:
                 self.build_config_panel()
             
             ui.separator()
-            
-            ui.label("教案关键信息").classes("text-lg font-bold")
-            
-            with ui.row().classes("w-full gap-4"):
-                with ui.input("学期开始日期").classes("w-48") as semester_start:
-                    with semester_start.add_slot("append"):
-                        def open_start_menu():
-                            semester_start_menu.open()
-                        ui.icon("event").on(
-                            "click", open_start_menu
-                        ).classes("cursor-pointer")
-                    with ui.menu() as semester_start_menu:
-                        start_picker = ui.date(value=self.semester_start)
-                        start_picker.bind_value(semester_start)
-                
-                with ui.input("学期结束日期").classes("w-48") as semester_end:
-                    with semester_end.add_slot("append"):
-                        def open_end_menu():
-                            semester_end_menu.open()
-                        ui.icon("event").on(
-                            "click", open_end_menu
-                        ).classes("cursor-pointer")
-                    with ui.menu() as semester_end_menu:
-                        end_picker = ui.date(value=self.semester_end)
-                        end_picker.bind_value(semester_end)
-                
-                with ui.input("教案日期").classes("w-48") as target_date:
-                    with target_date.add_slot("append"):
-                        def open_date_menu():
-                            target_date_menu.open()
-                        ui.icon("event").on(
-                            "click", open_date_menu
-                        ).classes("cursor-pointer")
-                    with ui.menu() as target_date_menu:
-                        _ = ui.date(value="2026-02-26").bind_value(target_date)
 
-                ui.button(
-                    "保存学期",
-                    on_click=lambda: self.save_semester_info(
-                        semester_start.value,
-                        semester_end.value,
-                    )
-                ).classes("bg-blue-600 text-white")
-            
-            def on_date_change():
-                start = semester_start.value
-                end = semester_end.value
-                target = target_date.value
-                if start and end and target:
-                    self.set_semester(start, end)
-                    try:
-                        d = date.fromisoformat(target)
-                        week_no = kg.calculate_week_number(
-                            date.fromisoformat(start), d
+            with ui.row().classes("w-full gap-6"):
+                with ui.column().classes("w-full md:w-1/2 gap-4"):
+                    ui.label("数据库教案").classes("text-lg font-bold")
+                    with ui.row().classes("w-full gap-4"):
+                        self.plan_date_select = ui.select(
+                            options=kg.list_plan_dates(self.plan_db_path),
+                            label="已保存教案日期"
+                        ).classes("w-48")
+                        ui.button(
+                            "加载到表单",
+                            on_click=self.load_selected_plan
+                        ).classes("bg-slate-600 text-white")
+                        ui.button(
+                            "导出选中日期",
+                            on_click=self.export_selected_plan
+                        ).classes("bg-teal-600 text-white")
+
+                    with ui.row().classes("w-full gap-4"):
+                        with ui.input("起始日期").classes("w-48") as range_start:
+                            with range_start.add_slot("append"):
+                                def open_range_menu():
+                                    range_start_menu.open()
+                                ui.icon("event").on(
+                                    "click", open_range_menu
+                                ).classes("cursor-pointer")
+                            with ui.menu() as range_start_menu:
+                                start_d = ui.date(
+                                    value=self.default_semester_start
+                                )
+                                start_d.bind_value(range_start)
+
+                        range_days = ui.number(
+                            "连续天数",
+                            value=1,
+                            min=1
+                        ).classes("w-32")
+                        ui.button(
+                            "连续导出",
+                            on_click=lambda: self.export_range_plans(
+                                range_start.value,
+                                range_days.value
+                            )
+                        ).classes("bg-orange-600 text-white")
+
+                    ui.separator()
+
+                    ui.label("教案关键信息").classes("text-lg font-bold")
+
+                    with ui.row().classes("w-full gap-4"):
+                        with ui.input("学期开始日期").classes(
+                            "w-48"
+                        ) as semester_start:
+                            with semester_start.add_slot("append"):
+                                def open_start_menu():
+                                    semester_start_menu.open()
+                                ui.icon("event").on(
+                                    "click", open_start_menu
+                                ).classes("cursor-pointer")
+                            with ui.menu() as semester_start_menu:
+                                start_picker = ui.date(
+                                    value=self.semester_start
+                                )
+                                start_picker.bind_value(semester_start)
+
+                        with ui.input("学期结束日期").classes(
+                            "w-48"
+                        ) as semester_end:
+                            with semester_end.add_slot("append"):
+                                def open_end_menu():
+                                    semester_end_menu.open()
+                                ui.icon("event").on(
+                                    "click", open_end_menu
+                                ).classes("cursor-pointer")
+                            with ui.menu() as semester_end_menu:
+                                end_picker = ui.date(value=self.semester_end)
+                                end_picker.bind_value(semester_end)
+
+                        with ui.input("教案日期").classes("w-48") as target_date:
+                            with target_date.add_slot("append"):
+                                def open_date_menu():
+                                    target_date_menu.open()
+                                ui.icon("event").on(
+                                    "click", open_date_menu
+                                ).classes("cursor-pointer")
+                            with ui.menu() as target_date_menu:
+                                _ = ui.date(
+                                    value="2026-02-26"
+                                ).bind_value(target_date)
+
+                        ui.button(
+                            "保存学期",
+                            on_click=lambda: self.save_semester_info(
+                                semester_start.value,
+                                semester_end.value,
+                            )
+                        ).classes("bg-blue-600 text-white")
+
+                    def on_date_change():
+                        start = semester_start.value
+                        end = semester_end.value
+                        target = target_date.value
+                        if start and end and target:
+                            self.set_semester(start, end)
+                            try:
+                                d = date.fromisoformat(target)
+                                week_no = kg.calculate_week_number(
+                                    date.fromisoformat(start), d
+                                )
+                                week_label.text = f"第（{week_no}）周"
+                                day_label.text = (
+                                    f"周（{kg.weekday_cn(d)}） "
+                                    f"{d.month}月{d.day}日"
+                                )
+                            except ValueError:
+                                pass
+
+                    semester_start.on_value_change(on_date_change)
+                    semester_end.on_value_change(on_date_change)
+                    target_date.on_value_change(on_date_change)
+
+                    with ui.row().classes("w-full gap-4"):
+                        week_text = "第（0）周"
+                        week_label = ui.label(week_text).classes(
+                            "text-base font-semibold"
                         )
-                        week_label.text = f"第（{week_no}）周"
-                        day_label.text = (
-                            f"周（{kg.weekday_cn(d)}） "
-                            f"{d.month}月{d.day}日"
+                        day_text = "周（一） 2月26日"
+                        day_label = ui.label(day_text).classes(
+                            "text-base font-semibold"
                         )
-                    except ValueError:
-                        pass
-            
-            semester_start.on_value_change(on_date_change)
-            semester_end.on_value_change(on_date_change)
-            target_date.on_value_change(on_date_change)
 
-            ui.separator()
-            
-            with ui.row().classes("w-full gap-4"):
-                week_text = "第（0）周"
-                week_label = ui.label(week_text).classes(
-                    "text-base font-semibold"
-                )
-                day_text = "周（一） 2月26日"
-                day_label = ui.label(day_text).classes(
-                    "text-base font-semibold"
-                )
-            
-            ui.separator()
+                    on_date_change()
 
-            on_date_change()
+                with ui.column().classes("w-full md:w-1/2 gap-4"):
+                    ui.label("教案详细内容").classes("text-lg font-bold")
 
-            ui.label("教案详细内容").classes("text-lg font-bold")
+                    for field_info in self.schema["fields"]:
+                        field_name = field_info["name"]
 
-            for field_info in self.schema["fields"]:
-                field_name = field_info["name"]
-                
-                # 跳过周次和日期，已自动计算
-                if field_name in ["周次", "日期"]:
-                    continue
-                
-                required = field_info.get("required", False)
-                required_marker = " *" if required else ""
-                
-                if field_info.get("type") == "group":
-                    expansion_label = f"{field_name}{required_marker}"
-                    with ui.expansion(expansion_label).classes("w-full"):
-                        subfields = field_info.get("subfields", [])
-                        group_data = {}
+                        # 跳过周次和日期，已自动计算
+                        if field_name in ["周次", "日期"]:
+                            continue
 
-                        if field_name == "集体活动":
-                            self.collective_draft = ui.textarea(
-                                label="集体活动原稿",
-                                placeholder="粘贴完整原稿，AI 将自动拆分"
-                            ).classes("w-full")
-                            ui.button(
-                                "AI 拆分到集体活动",
-                                on_click=self.ai_split_collective_activity
-                            ).classes("bg-purple-600 text-white")
-                        
-                        for subfield_info in subfields:
-                            subfield_name = subfield_info["name"]
-                            placeholder = subfield_info.get("placeholder", "")
-                            
+                        required = field_info.get("required", False)
+                        required_marker = " *" if required else ""
+
+                        if field_info.get("type") == "group":
+                            expansion_label = f"{field_name}{required_marker}"
+                            with ui.expansion(expansion_label).classes(
+                                "w-full"
+                            ):
+                                subfields = field_info.get("subfields", [])
+                                group_data = {}
+
+                                if field_name == "集体活动":
+                                    self.collective_draft = ui.textarea(
+                                        label="集体活动原稿",
+                                        placeholder="粘贴完整原稿，AI 将自动拆分"
+                                    ).classes("w-full")
+                                    ui.button(
+                                        "AI 拆分到集体活动",
+                                        on_click=(
+                                            self.ai_split_collective_activity
+                                        )
+                                    ).classes("bg-purple-600 text-white")
+
+                                for subfield_info in subfields:
+                                    subfield_name = subfield_info["name"]
+                                    placeholder = subfield_info.get(
+                                        "placeholder",
+                                        ""
+                                    )
+
+                                    text_area = ui.textarea(
+                                        label=subfield_name,
+                                        placeholder=placeholder
+                                    ).classes("w-full")
+                                    group_data[subfield_name] = text_area
+
+                                self.form_fields[field_name] = group_data
+                        else:
                             text_area = ui.textarea(
-                                label=subfield_name,
-                                placeholder=placeholder
+                                label=f"{field_name}{required_marker}",
+                                placeholder=field_info.get("placeholder", "")
                             ).classes("w-full")
-                            group_data[subfield_name] = text_area
-                        
-                        self.form_fields[field_name] = group_data
-                else:
-                    text_area = ui.textarea(
-                        label=f"{field_name}{required_marker}",
-                        placeholder=field_info.get("placeholder", "")
-                    ).classes("w-full")
-                    self.form_fields[field_name] = text_area
+                            self.form_fields[field_name] = text_area
             
             ui.separator()
             
@@ -506,42 +564,6 @@ class TeacherPlanUI:
                 )
 
             ui.separator()
-
-            ui.label("数据库教案").classes("text-lg font-bold")
-            with ui.row().classes("w-full gap-4"):
-                self.plan_date_select = ui.select(
-                    options=kg.list_plan_dates(self.plan_db_path),
-                    label="已保存教案日期"
-                ).classes("w-48")
-                ui.button(
-                    "加载到表单",
-                    on_click=self.load_selected_plan
-                ).classes("bg-slate-600 text-white")
-                ui.button(
-                    "导出选中日期",
-                    on_click=self.export_selected_plan
-                ).classes("bg-teal-600 text-white")
-
-            with ui.row().classes("w-full gap-4"):
-                with ui.input("起始日期").classes("w-48") as range_start:
-                    with range_start.add_slot("append"):
-                        def open_range_menu():
-                            range_start_menu.open()
-                        ui.icon("event").on(
-                            "click", open_range_menu
-                        ).classes("cursor-pointer")
-                    with ui.menu() as range_start_menu:
-                        start_d = ui.date(value=self.default_semester_start)
-                        start_d.bind_value(range_start)
-
-                range_days = ui.number("连续天数", value=1, min=1).classes("w-32")
-                ui.button(
-                    "连续导出",
-                    on_click=lambda: self.export_range_plans(
-                        range_start.value,
-                        range_days.value
-                    )
-                ).classes("bg-orange-600 text-white")
 
     def collect_plan_data(self):
         """收集表单数据"""

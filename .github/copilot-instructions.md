@@ -1,126 +1,34 @@
 # Kindergarten Lesson Plan Management System - AI Instructions
 
-## System Architecture
+## Big Picture
+- UI entry: `app.py` builds the NiceGUI web form and wires user actions to the core library in `kg_manager/`.
+- Core library: `kg_manager/` holds reusable logic (`word.py`, `validate.py`, `db.py`, `ai.py`, `models.py`). `minimal_fill.py` is a compatibility layer.
+- Data flow: schema → form → validation → Word export. Form schema is `examples/plan_schema.json` and is derived from `FIELD_ORDER`/`SUBFIELDS`.
 
-**Two-Layer Design:**
-- `minimal_fill.py`: Core logic (Word manipulation, validation, date calculations)
-- `app.py`: NiceGUI web interface (form generation, user interaction)
+## Word Template + Formatting (Critical)
+- Template is `examples/teacherplan.docx` with a 19x2 table; row 0 is 周次, row 1 is 日期.
+- All inserted text must use FangSong 12pt via `apply_run_style(run)`; do not bypass it.
+- For multi-line content, create new paragraphs with `cell.add_paragraph()`, not `\n` in a single run.
+- New content paragraphs must have a first-line indent of 24pt (2 Chinese chars). Labels keep no indent.
 
-**Data Flow:**
-```
-FIELD_ORDER/SUBFIELDS → export_schema_json() → examples/plan_schema.json
-                                                    ↓
-User Input (app.py) → collect_plan_data() → validate_plan_data() → fill_teacher_plan() → Word document
-```
+## Schema + Validation Rules
+- `周次` and `日期` are auto-calculated, not shown in the form, and skipped by validation.
+- Use `validate_plan_data()` before any save/export; grouped fields must include all subfields.
+- Label matching uses normalization (strip whitespace and trailing colons) and is case-sensitive after normalization.
 
-## Critical Word Formatting Rules
+## Date + Calendar Logic
+- Week number is from semester start (`calculate_week_number`), weekday label uses `weekday_cn`.
+- Semester ranges are stored in SQLite at `examples/semester.db`.
 
-**All text MUST use FangSong font 12pt:**
-```python
-# Always use apply_run_style(run) for ANY text insertion
-run.font.name = "FangSong"
-run.font.size = Pt(12)
-run._element.get_or_add_rPr().get_or_add_rFonts().set(qn("w:eastAsia"), "仿宋")
-```
+## Developer Workflows
+- Run UI: `python app.py` (NiceGUI on http://localhost:8080).
+- Regenerate schema/test core: `python minimal_fill.py` (writes `examples/plan_schema.json`).
+- Output Word files are written to `output/` (gitignored).
 
-**Multi-line content handling:**
-- Use `cell.add_paragraph()` to create separate paragraphs (NOT `\n` in single run)
-- New content paragraphs: `paragraph_format.first_line_indent = Pt(24)` (2 Chinese chars)
-- Template labels: no indent, apply FangSong to existing runs
+## Integration Points
+- AI split for “集体活动” uses OpenAI-compatible API in `kg_manager/ai.py`; app config is saved in browser localStorage.
+- DB layer supports SQLite by default, optional MySQL config in UI (see `kg_manager/db.py`).
 
-## Template Structure (examples/teacherplan.docx)
-
-**19-row table (rows 0-18), 2 columns:**
-- Row 0: 周次 (auto-calculated)
-- Row 1: 日期 (auto-calculated)
-- Rows 2-18: Various lesson plan fields
-
-**Cell filling pattern:**
-```python
-# Simple text (周次, 日期, 一日活动反思)
-set_cell_text(cell, text)
-
-# Labeled content with multi-line support
-append_by_labels(cell, {"标签名": "内容"})  # Splits on \n, creates paragraphs
-```
-
-## Field Schema System
-
-**Two-level structure:**
-1. `FIELD_ORDER`: List of `(field_name, required)` tuples (defines order & validation)
-2. `SUBFIELDS`: Dict mapping parent fields to lists of child field names
-
-**Critical pattern:** 周次 and 日期 are:
-- NOT shown in web form (auto-calculated)
-- Excluded from validation (`validate_plan_data` skips them)
-- Calculated via `calculate_week_number()` and `weekday_cn()`
-
-## Date & Calendar Logic
-
-**Semester management:**
-```python
-# Chinese calendar integration (chinesecalendar library)
-is_workday(date)  # Checks against Chinese holidays/working days
-
-# Week calculation from semester start
-calculate_week_number(semester_start, target_date)  # Returns 1-based week number
-```
-
-**Date storage:** `examples/semester.db` (SQLite) stores semester ranges
-
-## Development Workflow
-
-**Testing core logic:**
-```bash
-python minimal_fill.py  # Generates test document + schema JSON
-```
-
-**Running web UI:**
-```bash
-python app.py  # Starts NiceGUI on http://localhost:8080
-```
-
-**Output:** All generated Word files go to `output/` (gitignored)
-
-## Code Conventions
-
-**Label normalization:**
-- Strip whitespace and trailing colons: `normalize_label("标签：")`
-- Match template labels case-sensitively after normalization
-
-**Field validation:**
-- Required fields must exist and be non-empty
-- Grouped fields must be dicts with all subfields present
-- Use `validate_plan_data()` before Word generation
-
-**Data structure for form:**
-```python
-plan_data = {
-    "field_name": "value",  # Simple field
-    "grouped_field": {      # Grouped field
-        "subfield1": "value1",
-        "subfield2": "value2"
-    }
-}
-```
-
-## Key Gotchas
-
-1. **Never use `run.text +=` or string concatenation** for multiline content - always create new paragraphs
-2. **Template content formatting:** When reconstructing cells in `append_by_labels()`, apply `apply_run_style()` to preserve FangSong
-3. **Date pickers in NiceGUI:** Use `ui.date()` in `ui.menu()` pattern, bind to `ui.input()` value
-4. **Schema regeneration:** Run `export_schema_json()` after modifying `FIELD_ORDER`/`SUBFIELDS`
-
-## External Dependencies
-
-- `python-docx`: Word manipulation (table cells, runs, paragraphs)
-- `nicegui`: Web UI framework (reactive components)
-- `chinesecalendar`: Mainland China holiday/workday detection
-- `sqlite3`: Local semester data storage
-
-## Future Extension Points
-
-- MySQL cloud storage (pymysql installed, not yet implemented)
-- AI content generation (openai library available)
-- Batch export functionality
-- Lesson plan history/search features
+## UI Patterns (NiceGUI)
+- Date pickers use `ui.date()` inside `ui.menu()` and bind to `ui.input()` values.
+- When changing schema or UI fields, keep `collect_plan_data()` and `apply_plan_data()` in sync.
