@@ -2,6 +2,7 @@
 Word文档操作模块
 """
 
+import re
 from pathlib import Path
 from docx import Document
 from docx.shared import Pt
@@ -46,7 +47,6 @@ def split_by_punctuation(text):
     lines = []
     for line in text.splitlines():
         # 按句号、问号、叹号拆分
-        import re
         parts = re.split(r'([。？！.?!])', line)
         current = ""
         for i, part in enumerate(parts):
@@ -76,10 +76,12 @@ def set_cell_content(cell, text, indent=True, split_sentences=False):
     else:
         normalized = normalize_multiline_text(text)
         lines = normalized.splitlines() if normalized else [""]
-    for i, line in enumerate(lines):
+    first_written = False
+    for line in lines:
         if not line.strip():
             continue
-        p = cell.paragraphs[0] if i == 0 else cell.add_paragraph()
+        p = cell.paragraphs[0] if not first_written else cell.add_paragraph()
+        first_written = True
         if indent:
             p.paragraph_format.first_line_indent = Pt(WORD_INDENT_FIRST_LINE)
         run = p.add_run(line)
@@ -188,11 +190,11 @@ def append_by_labels(
 
 
 def flatten_plan_data(plan_data):
-    """将嵌套的教案数据扁平化，保留层级关系"""
+    """将嵌套的教案数据扁平化为带前缀的键值对"""
     flat_data = {}
     for key, value in plan_data.items():
         if isinstance(value, dict):
-            # 子字段加父字段前缀，同时也保留不带前缀的（按FIELD_ORDER顺序优先）
+            # 子字段加父字段前缀
             for sub_key, sub_value in value.items():
                 if sub_value:
                     prefixed_key = f"{key}-{sub_key}"

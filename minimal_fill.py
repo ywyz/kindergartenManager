@@ -10,8 +10,6 @@
 """
 
 from pathlib import Path
-from datetime import date, datetime
-from chinese_calendar import is_workday
 
 # 重新导出所有 kg_manager 函数和常量
 from kg_manager import (  # noqa: F401
@@ -52,8 +50,7 @@ from kg_manager import (  # noqa: F401
 
 # 保留以下函数用于向后兼容
 from docx import Document
-from docx.shared import Pt
-from docx.oxml.ns import qn
+from datetime import date
 
 
 def main():

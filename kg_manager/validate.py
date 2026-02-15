@@ -4,7 +4,6 @@
 
 import json
 from pathlib import Path
-from datetime import date
 from .models import FIELD_ORDER, SUBFIELDS
 
 
