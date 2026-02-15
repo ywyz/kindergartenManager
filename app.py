@@ -31,35 +31,35 @@ class ConfigManager:
     MYSQL_PASSWORD = f"{STORAGE_PREFIX}mysql_password"
 
     @staticmethod
-    def get_config_from_storage():
+    async def get_config_from_storage():
         """从浏览器localStorage获取配置"""
         return {
-            "ai_key": ui.run_javascript(
+            "ai_key": await ui.run_javascript(
                 f"localStorage.getItem('{ConfigManager.AI_KEY}')"
             ),
-            "ai_model": ui.run_javascript(
+            "ai_model": await ui.run_javascript(
                 f"localStorage.getItem('{ConfigManager.AI_MODEL}')"
             ),
-            "ai_base_url": ui.run_javascript(
+            "ai_base_url": await ui.run_javascript(
                 f"localStorage.getItem('{ConfigManager.AI_BASE_URL}')"
             ),
-            "db_type": ui.run_javascript(
+            "db_type": await ui.run_javascript(
                 f"localStorage.getItem('{ConfigManager.DB_TYPE}')"
             ),
             "mysql_config": {
-                "host": ui.run_javascript(
+                "host": await ui.run_javascript(
                     f"localStorage.getItem('{ConfigManager.MYSQL_HOST}')"
                 ),
-                "port": ui.run_javascript(
+                "port": await ui.run_javascript(
                     f"localStorage.getItem('{ConfigManager.MYSQL_PORT}')"
                 ),
-                "db": ui.run_javascript(
+                "db": await ui.run_javascript(
                     f"localStorage.getItem('{ConfigManager.MYSQL_DB}')"
                 ),
-                "user": ui.run_javascript(
+                "user": await ui.run_javascript(
                     f"localStorage.getItem('{ConfigManager.MYSQL_USER}')"
                 ),
-                "password": ui.run_javascript(
+                "password": await ui.run_javascript(
                     f"localStorage.getItem('{ConfigManager.MYSQL_PASSWORD}')"
                 ),
             },
@@ -68,7 +68,9 @@ class ConfigManager:
     @staticmethod
     def save_to_storage(key, value):
         """保存配置到浏览器localStorage"""
-        ui.run_javascript(f"localStorage.setItem('{key}', '{value}')")
+        safe_key = json.dumps(str(key))
+        safe_value = json.dumps("" if value is None else str(value))
+        ui.run_javascript(f"localStorage.setItem({safe_key}, {safe_value})")
 
 
 class TeacherPlanUI:
@@ -143,7 +145,8 @@ class TeacherPlanUI:
                         ai_key_input = ui.input(
                             label="API Key",
                             password=True,
-                            placeholder="sk-..."
+                            placeholder="sk-...",
+                            value=self.ai_key or ""
                         ).classes("w-full")
                         
                         ai_model_input = ui.input(
@@ -154,8 +157,29 @@ class TeacherPlanUI:
                         
                         ai_url_input = ui.input(
                             label="API地址 (可选)",
-                            placeholder="https://api.openai.com/v1"
+                            placeholder="https://api.openai.com/v1",
+                            value=self.ai_base_url or ""
                         ).classes("w-full")
+                        
+                        # 异步恢复保存的配置
+                        async def restore_ai_config():
+                            """从localStorage恢复AI配置"""
+                            try:
+                                config = await ConfigManager.get_config_from_storage()
+                                if config.get("ai_key"):
+                                    ai_key_input.value = config["ai_key"]
+                                    self.ai_key = config["ai_key"]
+                                if config.get("ai_model"):
+                                    ai_model_input.value = config["ai_model"]
+                                    self.ai_model = config["ai_model"]
+                                if config.get("ai_base_url"):
+                                    ai_url_input.value = config["ai_base_url"]
+                                    self.ai_base_url = config["ai_base_url"]
+                            except Exception as e:
+                                print(f"恢复AI配置失败: {e}")
+                        
+                        # 在UI加载后恢复配置
+                        ui.timer(0.1, restore_ai_config, once=True)
                         
                         def save_ai_config():
                             """保存AI配置"""
@@ -210,7 +234,7 @@ class TeacherPlanUI:
                             value=self.db_type,
                             options={
                                 "sqlite": "SQLite (本地)",
-                                "mysql": "MySQL (云部署)",
+                                "mysql": "MySQL (云部署 - 暂不支持)",
                             }
                         ).classes("w-full")
                         
@@ -221,39 +245,85 @@ class TeacherPlanUI:
                             "(examples/plan.db)</p>"
                         )
                         
-                        # MySQL配置区域
+                        # MySQL配置区域（保留UI，但标记为未实现）
                         mysql_panel = ui.column().classes("w-full gap-3")
                         with mysql_panel:
+                            ui.html(
+                                "<p class='text-sm text-orange-600 mb-2'>"
+                                "⚠️ MySQL支持暂未实现，配置仅保存到localStorage，实际存储仍使用SQLite</p>"
+                            )
+                            
                             mysql_host = ui.input(
                                 label="数据库地址",
-                                placeholder="localhost"
+                                placeholder="localhost",
+                                value=self.mysql_config.get("host", "")
                             ).classes("w-full")
                             
                             mysql_port = ui.input(
                                 label="端口",
-                                value="3306",
+                                value=str(self.mysql_config.get("port", 3306)),
                                 placeholder="3306"
                             ).classes("w-full")
                             
                             mysql_db = ui.input(
                                 label="数据库名",
-                                placeholder="kindergarten"
+                                placeholder="kindergarten",
+                                value=self.mysql_config.get("db", "")
                             ).classes("w-full")
                             
                             mysql_user = ui.input(
                                 label="用户名",
-                                placeholder="root"
+                                placeholder="root",
+                                value=self.mysql_config.get("user", "")
                             ).classes("w-full")
                             
                             mysql_password = ui.input(
                                 label="密码",
                                 password=True,
-                                placeholder="password"
+                                placeholder="password",
+                                value=self.mysql_config.get("password", "")
                             ).classes("w-full")
                         
                         # 默认隐藏MySQL配置
                         mysql_panel.visible = (self.db_type == "mysql")
                         sqlite_info.visible = (self.db_type == "sqlite")
+                        
+                        # 异步恢复保存的数据库配置
+                        async def restore_db_config():
+                            """从localStorage恢复数据库配置"""
+                            try:
+                                config = await ConfigManager.get_config_from_storage()
+                                if config.get("db_type"):
+                                    db_type_select.value = config["db_type"]
+                                    self.db_type = config["db_type"]
+                                    mysql_panel.visible = (config["db_type"] == "mysql")
+                                    sqlite_info.visible = (config["db_type"] == "sqlite")
+                                
+                                mysql_cfg = config.get("mysql_config", {})
+                                if mysql_cfg.get("host"):
+                                    mysql_host.value = mysql_cfg["host"]
+                                if mysql_cfg.get("port"):
+                                    mysql_port.value = str(mysql_cfg["port"])
+                                if mysql_cfg.get("db"):
+                                    mysql_db.value = mysql_cfg["db"]
+                                if mysql_cfg.get("user"):
+                                    mysql_user.value = mysql_cfg["user"]
+                                if mysql_cfg.get("password"):
+                                    mysql_password.value = mysql_cfg["password"]
+                                
+                                if mysql_cfg:
+                                    self.mysql_config = {
+                                        "host": mysql_cfg.get("host", ""),
+                                        "port": int(mysql_cfg.get("port", 3306)),
+                                        "db": mysql_cfg.get("db", ""),
+                                        "user": mysql_cfg.get("user", ""),
+                                        "password": mysql_cfg.get("password", ""),
+                                    }
+                            except Exception as e:
+                                print(f"恢复数据库配置失败: {e}")
+                        
+                        # 在UI加载后恢复配置
+                        ui.timer(0.1, restore_db_config, once=True)
                         
                         def on_db_type_change(new_db_type):
                             """切换数据库类型"""
@@ -751,17 +821,14 @@ class TeacherPlanUI:
             return
 
         try:
-            # 使用保存的AI配置
-            os.environ["OPENAI_API_KEY"] = self.ai_key
-            if self.ai_base_url:
-                os.environ["OPENAI_BASE_URL"] = self.ai_base_url
-            if self.ai_model:
-                os.environ["OPENAI_MODEL"] = self.ai_model
-
             ui.notify("AI 正在处理，请稍候...", position="top", type="info")
+            # 传递配置参数而非使用环境变量
             payload = await asyncio.to_thread(
                 kg.split_collective_activity,
                 self.collective_draft.value,
+                api_key=self.ai_key,
+                base_url=self.ai_base_url,
+                model=self.ai_model,
             )
             if not payload:
                 ui.notify("AI 返回格式不正确", position="top", type="negative")
