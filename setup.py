@@ -27,16 +27,10 @@ setup(
         "python-docx>=0.8.11",
         "openai>=1.0.0",
         "chinese-calendar>=0.15.0",
-        "nicegui>=1.0.0",  # optional, only for UI
     ],
     extras_require={
         "ui": ["nicegui>=1.0.0"],
         "dev": ["pytest>=7.0.0"],
-    },
-    entry_points={
-        "console_scripts": [
-            "kg-manager=kg_manager.cli:main",  # optional CLI entry point
-        ],
     },
     classifiers=[
         "Development Status :: 3 - Alpha",
