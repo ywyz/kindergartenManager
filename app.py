@@ -178,8 +178,8 @@ class TeacherPlanUI:
                             except Exception as e:
                                 print(f"恢复AI配置失败: {e}")
                         
-                        # 在UI加载后恢复配置
-                        ui.timer(0.1, restore_ai_config, once=True)
+                        # 在UI加载后恢复配置（延迟确保DOM已完全加载）
+                        ui.timer(0.5, restore_ai_config, once=True)
                         
                         def save_ai_config():
                             """保存AI配置"""
@@ -322,8 +322,8 @@ class TeacherPlanUI:
                             except Exception as e:
                                 print(f"恢复数据库配置失败: {e}")
                         
-                        # 在UI加载后恢复配置
-                        ui.timer(0.1, restore_db_config, once=True)
+                        # 在UI加载后恢复配置（延迟确保DOM已完全加载）
+                        ui.timer(0.5, restore_db_config, once=True)
                         
                         def on_db_type_change(new_db_type):
                             """切换数据库类型"""
