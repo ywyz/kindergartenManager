@@ -23,8 +23,12 @@ def apply_run_style(run):
 
 
 def normalize_label(label):
-    """标准化标签：去除空格和冒号"""
-    return label.strip().rstrip("：:").strip()
+    """标准化标签：去除所有空格、换行符和冒号"""
+    # Remove all colons (both Chinese and English)
+    cleaned = label.replace('：', '').replace(':', '')
+    # Remove all types of whitespace (spaces, newlines, tabs, etc.)
+    cleaned = ''.join(cleaned.split())
+    return cleaned
 
 
 def normalize_multiline_text(text):
