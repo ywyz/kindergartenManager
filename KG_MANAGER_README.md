@@ -69,13 +69,19 @@ kg.generate_plan_docx(
 
 ```python
 import kg_manager as kg
-import os
 
-# 设置OpenAI API密钥
-os.environ["OPENAI_API_KEY"] = "your-api-key"
-
-# 使用AI拆分原稿
+# 推荐方式：通过参数传递配置（线程安全，适合多用户/并发场景）
 draft = "完整的集体活动原稿..."
+result = kg.split_collective_activity(
+    draft,
+    api_key="your-api-key",
+    base_url="https://api.openai.com/v1",  # 可选
+    model="gpt-4o-mini"  # 可选
+)
+
+# 兼容方式：从环境变量读取（向后兼容）
+import os
+os.environ["OPENAI_API_KEY"] = "your-api-key"
 result = kg.split_collective_activity(draft)
 
 print(result)
@@ -127,13 +133,28 @@ Word文档操作：
 
 ### `kg_manager.ai`
 AI集成：
-- `split_collective_activity()` - 使用AI拆分集体活动原稿
+- `split_collective_activity()` - 使用AI拆分集体活动原稿（推荐通过参数传递配置）
 - `parse_ai_json()` - 解析AI返回的JSON
 - `set_custom_system_prompt()` - 设置自定义AI提示词
 
-## 环境变量
+## 配置说明
 
-- `OPENAI_API_KEY` - OpenAI API密钥（使用AI功能时必需）
+### AI配置（推荐方式）
+通过参数传递配置，线程安全，适合多用户/并发场景：
+```python
+result = kg.split_collective_activity(
+    draft_text,
+    api_key="your-api-key",
+    base_url="https://api.openai.com/v1",  # 可选
+    model="gpt-4o-mini"  # 可选
+)
+```
+
+### AI配置（兼容方式）
+通过环境变量配置，向后兼容：
+- `OPENAI_API_KEY` - OpenAI API密钥（必需）
+- `OPENAI_BASE_URL` - API基础URL（可选）
+- `OPENAI_MODEL` - 模型名称（可选，默认 gpt-4o-mini）
 
 ## 字段定义
 

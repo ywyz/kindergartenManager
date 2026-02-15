@@ -27,24 +27,38 @@ AI_SYSTEM_PROMPT = (
 )
 
 
-def get_ai_client():
-    """获取OpenAI客户端"""
-    api_key = os.getenv("OPENAI_API_KEY")
+def get_ai_client(api_key=None, base_url=None):
+    """获取OpenAI客户端
+    
+    Args:
+        api_key: OpenAI API密钥（优先使用此参数，否则从环境变量读取）
+        base_url: API基础URL（可选）
+    
+    Returns:
+        OpenAI客户端实例
+    """
     if not api_key:
-        raise ValueError("未检测到 OPENAI_API_KEY 环境变量")
+        api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("未提供 API Key，请通过参数或环境变量 OPENAI_API_KEY 设置")
 
-    base_url = os.getenv("OPENAI_BASE_URL")
+    if not base_url:
+        base_url = os.getenv("OPENAI_BASE_URL")
+    
     if base_url:
         return OpenAI(api_key=api_key, base_url=base_url)
     return OpenAI(api_key=api_key)
 
 
-def split_collective_activity(draft_text, system_prompt=None):
+def split_collective_activity(draft_text, api_key=None, base_url=None, model=None, system_prompt=None):
     """
     使用AI拆分集体活动原稿
     
     Args:
         draft_text: 完整的集体活动原稿
+        api_key: OpenAI API密钥（优先使用此参数，否则从环境变量读取）
+        base_url: API基础URL（可选）
+        model: 使用的AI模型（默认为 gpt-4o-mini）
         system_prompt: 自定义系统提示词（None则使用默认）
         
     Returns:
@@ -54,8 +68,9 @@ def split_collective_activity(draft_text, system_prompt=None):
         raise ValueError("原稿不能为空")
     
     try:
-        client = get_ai_client()
-        model = os.getenv("OPENAI_MODEL") or AI_MODEL
+        client = get_ai_client(api_key=api_key, base_url=base_url)
+        if not model:
+            model = os.getenv("OPENAI_MODEL") or AI_MODEL
         response = client.chat.completions.create(
             model=model,
             messages=[

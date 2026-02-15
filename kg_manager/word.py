@@ -2,11 +2,15 @@
 Word文档操作模块
 """
 
+import re
 from pathlib import Path
 from docx import Document
 from docx.shared import Pt
 from docx.oxml.ns import qn
 from .models import WORD_FONT_NAME, WORD_FONT_SIZE, WORD_INDENT_FIRST_LINE
+
+# 预编译正则表达式以提高性能
+_PUNCTUATION_PATTERN = re.compile(r'([。？！.?!])')
 
 
 def apply_run_style(run):
@@ -46,8 +50,7 @@ def split_by_punctuation(text):
     lines = []
     for line in text.splitlines():
         # 按句号、问号、叹号拆分
-        import re
-        parts = re.split(r'([。？！.?!])', line)
+        parts = _PUNCTUATION_PATTERN.split(line)
         current = ""
         for i, part in enumerate(parts):
             current += part
@@ -225,14 +228,14 @@ def smart_lookup(label_to_text, target_label, context_parent=None):
 
 def fill_table_by_labels(table, label_to_text, content_col=1, label_col=0):
     """使用标签填充表格所有行的内容列"""
+    context_parent = None
     for row in table.rows:
         if len(row.cells) <= content_col:
             continue
         # 尝试从标签列推断上下文父字段
-        context_parent = None
         if len(row.cells) > label_col:
             label_text = normalize_label(row.cells[label_col].text)
-            # 检查是否是父字段标签
+            # 检查是否是父字段标签（更新上下文）
             for key in label_to_text.keys():
                 if "-" in key and key.startswith(f"{label_text}-"):
                     context_parent = label_text

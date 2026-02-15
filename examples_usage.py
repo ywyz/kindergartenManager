@@ -130,7 +130,15 @@ def example_ai_split():
     """
     
     try:
-        # 注意：需要设置 OPENAI_API_KEY 环境变量
+        # 推荐方式：通过参数传递配置（更安全，不会影响全局状态）
+        # result = kg.split_collective_activity(
+        #     draft,
+        #     api_key="your-api-key",
+        #     base_url="https://api.openai.com/v1",  # 可选
+        #     model="gpt-4o-mini"  # 可选
+        # )
+        
+        # 兼容方式：从环境变量读取（需要设置 OPENAI_API_KEY）
         result = kg.split_collective_activity(draft)
         if result:
             print("✓ AI拆分结果:")
@@ -140,7 +148,7 @@ def example_ai_split():
             print("✗ AI返回格式不正确")
     except Exception as e:
         print(f"✗ AI处理失败：{e}")
-        print("  (需要设置 OPENAI_API_KEY 环境变量)")
+        print("  (需要设置 OPENAI_API_KEY 环境变量或传递 api_key 参数)")
 
 
 def example_export_schema():

@@ -5,7 +5,6 @@
 """
 
 import json
-import os
 import asyncio
 from pathlib import Path
 from datetime import date, timedelta
@@ -31,35 +30,35 @@ class ConfigManager:
     MYSQL_PASSWORD = f"{STORAGE_PREFIX}mysql_password"
 
     @staticmethod
-    def get_config_from_storage():
+    async def get_config_from_storage():
         """从浏览器localStorage获取配置"""
         return {
-            "ai_key": ui.run_javascript(
+            "ai_key": await ui.run_javascript(
                 f"localStorage.getItem('{ConfigManager.AI_KEY}')"
             ),
-            "ai_model": ui.run_javascript(
+            "ai_model": await ui.run_javascript(
                 f"localStorage.getItem('{ConfigManager.AI_MODEL}')"
             ),
-            "ai_base_url": ui.run_javascript(
+            "ai_base_url": await ui.run_javascript(
                 f"localStorage.getItem('{ConfigManager.AI_BASE_URL}')"
             ),
-            "db_type": ui.run_javascript(
+            "db_type": await ui.run_javascript(
                 f"localStorage.getItem('{ConfigManager.DB_TYPE}')"
             ),
             "mysql_config": {
-                "host": ui.run_javascript(
+                "host": await ui.run_javascript(
                     f"localStorage.getItem('{ConfigManager.MYSQL_HOST}')"
                 ),
-                "port": ui.run_javascript(
+                "port": await ui.run_javascript(
                     f"localStorage.getItem('{ConfigManager.MYSQL_PORT}')"
                 ),
-                "db": ui.run_javascript(
+                "db": await ui.run_javascript(
                     f"localStorage.getItem('{ConfigManager.MYSQL_DB}')"
                 ),
-                "user": ui.run_javascript(
+                "user": await ui.run_javascript(
                     f"localStorage.getItem('{ConfigManager.MYSQL_USER}')"
                 ),
-                "password": ui.run_javascript(
+                "password": await ui.run_javascript(
                     f"localStorage.getItem('{ConfigManager.MYSQL_PASSWORD}')"
                 ),
             },
@@ -68,7 +67,9 @@ class ConfigManager:
     @staticmethod
     def save_to_storage(key, value):
         """保存配置到浏览器localStorage"""
-        ui.run_javascript(f"localStorage.setItem('{key}', '{value}')")
+        safe_key = json.dumps(str(key))
+        safe_value = json.dumps("" if value is None else str(value))
+        ui.run_javascript(f"localStorage.setItem({safe_key}, {safe_value})")
 
 
 class TeacherPlanUI:
@@ -156,6 +157,23 @@ class TeacherPlanUI:
                             label="API地址 (可选)",
                             placeholder="https://api.openai.com/v1"
                         ).classes("w-full")
+                        
+                        # 异步加载配置并回填
+                        async def load_ai_config():
+                            config = (
+                                await ConfigManager.get_config_from_storage()
+                            )
+                            if config.get("ai_key"):
+                                ai_key_input.value = config["ai_key"]
+                                self.ai_key = config["ai_key"]
+                            if config.get("ai_model"):
+                                ai_model_input.value = config["ai_model"]
+                                self.ai_model = config["ai_model"]
+                            if config.get("ai_base_url"):
+                                ai_url_input.value = config["ai_base_url"]
+                                self.ai_base_url = config["ai_base_url"]
+                        
+                        ui.timer(0.1, load_ai_config, once=True)
                         
                         def save_ai_config():
                             """保存AI配置"""
@@ -250,6 +268,44 @@ class TeacherPlanUI:
                                 password=True,
                                 placeholder="password"
                             ).classes("w-full")
+                        
+                        # 异步加载配置并回填
+                        async def load_db_config():
+                            config = (
+                                await ConfigManager.get_config_from_storage()
+                            )
+                            
+                            # 加载数据库类型
+                            db_type_val = config.get("db_type") or "sqlite"
+                            self.db_type = db_type_val
+                            db_type_select.value = db_type_val
+                            mysql_panel.visible = (db_type_val == "mysql")
+                            sqlite_info.visible = (db_type_val == "sqlite")
+                            
+                            # 加载MySQL配置
+                            mysql_cfg = config.get("mysql_config", {})
+                            if mysql_cfg.get("host"):
+                                mysql_host.value = mysql_cfg["host"]
+                                self.mysql_config["host"] = mysql_cfg["host"]
+                            if mysql_cfg.get("port"):
+                                mysql_port.value = str(mysql_cfg["port"])
+                                try:
+                                    port_val = int(mysql_cfg["port"])
+                                    self.mysql_config["port"] = port_val
+                                except (ValueError, TypeError):
+                                    pass
+                            if mysql_cfg.get("db"):
+                                mysql_db.value = mysql_cfg["db"]
+                                self.mysql_config["db"] = mysql_cfg["db"]
+                            if mysql_cfg.get("user"):
+                                mysql_user.value = mysql_cfg["user"]
+                                self.mysql_config["user"] = mysql_cfg["user"]
+                            if mysql_cfg.get("password"):
+                                pwd = mysql_cfg["password"]
+                                mysql_password.value = pwd
+                                self.mysql_config["password"] = pwd
+                        
+                        ui.timer(0.1, load_db_config, once=True)
                         
                         # 默认隐藏MySQL配置
                         mysql_panel.visible = (self.db_type == "mysql")
@@ -598,7 +654,11 @@ class TeacherPlanUI:
         """生成教案 Word"""
         try:
             if not self.template_path.exists():
-                ui.notify(f"模板文件不存在：{self.template_path}", position="top", type="negative")
+                ui.notify(
+                    f"模板文件不存在：{self.template_path}",
+                    position="top",
+                    type="negative"
+                )
                 return
             
             semester_start = date.fromisoformat(start_date)
@@ -751,17 +811,14 @@ class TeacherPlanUI:
             return
 
         try:
-            # 使用保存的AI配置
-            os.environ["OPENAI_API_KEY"] = self.ai_key
-            if self.ai_base_url:
-                os.environ["OPENAI_BASE_URL"] = self.ai_base_url
-            if self.ai_model:
-                os.environ["OPENAI_MODEL"] = self.ai_model
-
             ui.notify("AI 正在处理，请稍候...", position="top", type="info")
+            # 使用参数传递配置，避免修改全局环境变量
             payload = await asyncio.to_thread(
                 kg.split_collective_activity,
                 self.collective_draft.value,
+                self.ai_key,
+                self.ai_base_url,
+                self.ai_model,
             )
             if not payload:
                 ui.notify("AI 返回格式不正确", position="top", type="negative")
