@@ -60,7 +60,7 @@ else:
 ```python
 from datetime import date
 
-# 保存到SQLite轮
+# 保存到SQLite
 kg.save_plan_data(
     db_path="examples/plan.db",
     date_str="2026-02-26",
