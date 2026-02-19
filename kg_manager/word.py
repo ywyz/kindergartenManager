@@ -23,8 +23,14 @@ def apply_run_style(run):
 
 
 def normalize_label(label):
-    """标准化标签：去除空格和冒号"""
-    return label.strip().rstrip("：:").strip()
+    """标准化标签：去除空格、冒号和换行符"""
+    # 先去除换行符和回车
+    normalized = label.replace("\n", "").replace("\r", "")
+    # 去除所有冒号（中英文）
+    normalized = normalized.replace("：", "").replace(":", "")
+    # 去除前后空格
+    normalized = normalized.strip()
+    return normalized
 
 
 def normalize_multiline_text(text):
@@ -236,10 +242,19 @@ def fill_table_by_labels(table, label_to_text, content_col=1, label_col=0):
         if len(row.cells) > label_col:
             label_text = normalize_label(row.cells[label_col].text)
             # 检查是否是父字段标签（更新上下文）
+            # 需要找到与长标签匹配的父字段（考虑模板中可能的多行标签如"下午：\n户外游戏"）
+            detected_parent = None
             for key in label_to_text.keys():
-                if "-" in key and key.startswith(f"{label_text}-"):
-                    context_parent = label_text
-                    break
+                if "-" in key:
+                    parent_name = key.split("-")[0]
+                    # 规范化比较，去除"："和换行符
+                    parent_normalized = normalize_label(parent_name)
+                    if parent_normalized == label_text:
+                        detected_parent = parent_name
+                        break
+            
+            if detected_parent:
+                context_parent = detected_parent
         
         append_by_labels(
             row.cells[content_col],
@@ -262,10 +277,19 @@ def fill_by_row_labels(table, label_to_text, label_col=0, content_col=1):
             continue
         
         # 检查是否是父字段标签（更新上下文）
+        # 需要找到与标签匹配的父字段（考虑模板中可能的多行标签如"下午：\n户外游戏"）
+        detected_parent = None
         for key in label_to_text.keys():
-            if "-" in key and key.startswith(f"{label_text}-"):
-                context_parent = label_text
-                break
+            if "-" in key:
+                parent_name = key.split("-")[0]
+                # 规范化比较
+                parent_normalized = normalize_label(parent_name)
+                if parent_normalized == label_text:
+                    detected_parent = parent_name
+                    break
+        
+        if detected_parent:
+            context_parent = detected_parent
         
         # 智能查找对应的值
         value = smart_lookup(label_to_text, label_text, context_parent)

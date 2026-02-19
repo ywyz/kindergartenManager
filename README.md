@@ -209,22 +209,22 @@ pip install -e .
 
 ## 📖 文档索引
 
-### 用户文档
-- [配置UI使用指南](CONFIG_UI_GUIDE.md) - 配置面板详细说明
-- [快速参考卡片](CONFIG_QUICK_REFERENCE.md) - 常用操作速查
+**所有文档已整理到 [`docs/`](docs/) 目录，按场景分类方便查找。**
 
-### 开发文档
-- [架构文档](ARCHITECTURE.md) - 系统架构设计
-- [快速上手](QUICKSTART.md) - 开发者入门
-- [KG_MANAGER库文档](KG_MANAGER_README.md) - 核心库API
-- [文件清单](FILE_MANIFEST.md) - 项目文件说明
-- [重构指南](REFACTOR_GUIDE.md) - 重构历史和说明
+### 快速导航
 
-### 技术文档
-- [配置实现总结](CONFIG_IMPLEMENTATION_SUMMARY.md) - 配置功能技术细节
-- [重构总结](REFACTOR_SUMMARY.md) - 模块化重构文档
-- [会话总结](SESSION_SUMMARY.md) - 最新功能开发记录
-- [完成报告](COMPLETION_REPORT.md) - 项目交付报告
+**👤 我是普通用户** → [用户快速开始](docs/user-guide/quickstart.md)  
+**👨‍💻 我是开发者** → [开发快速开始](docs/development/quickstart.md)  
+**🤖 我要接入AI** → [AI集成完整指南](docs/ai-integration/README.md)  
+**📚 我要深入学习** → [完整文档导航](docs/README.md)
+
+### 主要文档
+- [系统架构](docs/architecture/README.md)
+- [API文档](docs/api/kg_manager.md)
+- [系统配置指南](docs/user-guide/config-guide.md)
+- [AI接入指南](docs/ai-integration/README.md)
+- [开发指南](docs/development/quickstart.md)
+- [版本日志](docs/changelog/CHANGELOG.md)
 
 ---
 
