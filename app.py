@@ -611,6 +611,241 @@ class TeacherPlanUI:
                 with ui.column().classes("w-full md:w-1/2 gap-4"):
                     ui.label("教案详细内容").classes("text-lg font-bold")
 
+                    # AI 快速填充区域
+                    with ui.expansion("🤖 AI 快速填充").classes("w-full"):
+                        ui.label("自动生成除集体活动外的所有内容").classes(
+                            "text-sm text-gray-600"
+                        )
+
+                        ai_debug_output = ui.textarea(
+                            label="AI 返回数据（调试）",
+                            placeholder="显示 AI 返回的原始 JSON 数据",
+                        ).classes("w-full text-xs").props("rows=6, readonly")
+
+                        async def quick_ai_fill():
+                            config = (
+                                await ConfigManager.get_config_from_storage()
+                            )
+                            api_key = config.get("ai_key")
+                            model = config.get("ai_model") or "gpt-4o-mini"
+                            base_url = config.get("ai_base_url")
+
+                            if not api_key:
+                                ui.notify(
+                                    "请先在系统配置中设置 OpenAI API Key",
+                                    position="top",
+                                    type="warning",
+                                )
+                                return
+
+                            try:
+                                # 获取背景信息构建输入
+                                grade = self.ai_grade_level or "小班"
+                                class_zones = (
+                                    self.ai_class_zones or "角色区、建构区"
+                                )
+                                outdoor_zones = (
+                                    self.ai_outdoor_zones or "操场、沙水区"
+                                )
+                                
+                                # 动态生成提示词，明确指定要生成的字段
+                                system_prompt = (
+                                    f"你是幼儿园教案专家。基于以下信息生成教案内容。\n"
+                                    f"【背景信息】\n"
+                                    f"- 年级段：{grade}\n"
+                                    f"- 班级区域：{class_zones}\n"
+                                    f"- 户外区域：{outdoor_zones}\n\n"
+                                    f"【生成要求】\n"
+                                    f"生成以下字段（不包括集体活动和一日活动反思）：\n"
+                                    f"1. 晨间活动（包含：集体游戏、自主游戏、重点指导、活动目标、指导要点）\n"
+                                    f"2. 晨间谈话（包含：话题、问题设计）\n"
+                                    f"3. 室内区域游戏"
+                                    f"（包含：游戏区域、重点指导、活动目标、指导要点、支持策略）\n"
+                                    f"4. 下午户外游戏"
+                                    f"（包含：游戏区域、重点观察、活动目标、指导要点、支持策略）\n\n"
+                                    f"【输出格式】\n"
+                                    f"必须返回严格的JSON格式，不要包含任何其他文字。"
+                                    f"包含所有上述字段及其子字段。\n"
+                                    f"示例结构：\n"
+                                    f'{{\n'
+                                    f'  "晨间活动": {{\n'
+                                    f'    "集体游戏": "...",\n'
+                                    f'    "自主游戏": "...",\n'
+                                    f'    "重点指导": "...",\n'
+                                    f'    "活动目标": "...",\n'
+                                    f'    "指导要点": "..."\n'
+                                    f'  }},\n'
+                                    f'  "晨间谈话": {{\n'
+                                    f'    "话题": "...",\n'
+                                    f'    "问题设计": "..."\n'
+                                    f'  }},\n'
+                                    f'  "室内区域游戏": {{\n'
+                                    f'    "游戏区域": "...",\n'
+                                    f'    "重点指导": "...",\n'
+                                    f'    "活动目标": "...",\n'
+                                    f'    "指导要点": "...",\n'
+                                    f'    "支持策略": "..."\n'
+                                    f'  }},\n'
+                                    f'  "下午户外游戏": {{\n'
+                                    f'    "游戏区域": "...",\n'
+                                    f'    "重点观察": "...",\n'
+                                    f'    "活动目标": "...",\n'
+                                    f'    "指导要点": "...",\n'
+                                    f'    "支持策略": "..."\n'
+                                    f'  }}\n'
+                                    f'}}\n'
+                                )
+                                
+                                input_context = (
+                                    f"年级段：{grade}\n"
+                                    f"班级区域：{class_zones}\n"
+                                    f"户外区域：{outdoor_zones}\n"
+                                    f"请根据以上信息生成教案内容"
+                                )
+
+                                ui.notify(
+                                    "AI 正在生成，请稍候...",
+                                    position="top",
+                                    type="info",
+                                )
+
+                                payload = await asyncio.to_thread(
+                                    kg.run_ai_json_task,
+                                    input_context,
+                                    api_key,
+                                    base_url,
+                                    model,
+                                    system_prompt,
+                                )
+
+                                # 显示调试信息
+                                ai_debug_output.value = json.dumps(
+                                    payload,
+                                    ensure_ascii=False,
+                                    indent=2,
+                                )
+
+                                # 自动填充表单
+                                # （排除集体活动和一日活动反思）
+                                skip_fields = {
+                                    "集体活动",
+                                    "一日活动反思",
+                                }
+                                filled_count = 0
+                                fill_debug = []
+                                
+                                # 调试：显示当前表单字段
+                                fill_debug.append(
+                                    f"表单字段：{list(self.form_fields.keys())}"
+                                )
+                                fill_debug.append(
+                                    f"AI 返回字段：{list(payload.keys())}"
+                                )
+                                
+                                for field_name, value in payload.items():
+                                    if field_name in skip_fields:
+                                        fill_debug.append(
+                                            f"跳过字段：{field_name}"
+                                        )
+                                        continue
+                                    
+                                    fill_debug.append(
+                                        f"处理字段：{field_name}, "
+                                        f"类型：{type(value).__name__}"
+                                    )
+                                    
+                                    if field_name not in self.form_fields:
+                                        fill_debug.append(
+                                            "  字段不存在于表单"
+                                        )
+                                        continue
+                                    
+                                    field_widget = (
+                                        self.form_fields[field_name]
+                                    )
+                                    
+                                    if isinstance(value, dict):
+                                        # 分组字段
+                                        fill_debug.append(
+                                            f"  -> 分组字段，子字段："
+                                            f"{list(value.keys())}"
+                                        )
+                                        if isinstance(field_widget, dict):
+                                            fill_debug.append(
+                                                f"     表单子字段："
+                                                f"{list(field_widget.keys())}"
+                                            )
+                                            for (
+                                                sub_key,
+                                                sub_val,
+                                            ) in value.items():
+                                                if (
+                                                    sub_key in field_widget
+                                                ):
+                                                    field_widget[
+                                                        sub_key
+                                                    ].value = str(sub_val)
+                                                    filled_count += 1
+                                                    fill_debug.append(
+                                                        f"     填充"
+                                                        f"{sub_key}"
+                                                    )
+                                                else:
+                                                    fill_debug.append(
+                                                        f"     子字段"
+                                                        f"{sub_key}"
+                                                        "不存在"
+                                                    )
+                                        else:
+                                            fill_debug.append(
+                                                "     表单字段不是字典"
+                                            )
+                                    else:
+                                        # 普通字段
+                                        if isinstance(field_widget, dict):
+                                            fill_debug.append(
+                                                "  表单是分组，"
+                                                "但 AI 返回普通值"
+                                            )
+                                        else:
+                                            field_widget.value = (
+                                                str(value)
+                                            )
+                                            filled_count += 1
+                                            fill_debug.append(
+                                                "  填充普通字段"
+                                            )
+                                
+                                # 显示填充调试信息
+                                ai_debug_output.value = (
+                                    "\n".join(fill_debug) +
+                                    "\n\n=== AI 返回数据 ===\n" +
+                                    json.dumps(
+                                        payload,
+                                        ensure_ascii=False,
+                                        indent=2,
+                                    )
+                                )
+
+                                ui.notify(
+                                    f"AI 生成完成，"
+                                    f"填充了 {filled_count} 个字段",
+                                    position="top",
+                                    type="positive",
+                                )
+                            except Exception as e:
+                                ai_debug_output.value = f"错误: {str(e)}"
+                                ui.notify(
+                                    f"AI 处理失败：{str(e)}",
+                                    position="top",
+                                    type="negative",
+                                )
+
+                        ui.button(
+                            "AI 一键生成",
+                            on_click=quick_ai_fill,
+                        ).classes("w-full bg-purple-600 text-white")
+
                     for field_info in self.schema["fields"]:
                         field_name = field_info["name"]
 
@@ -689,6 +924,51 @@ class TeacherPlanUI:
             ui.separator()
             
             with ui.row().classes("w-full gap-4"):
+                async def load_ai_output_from_storage():
+                    """从localStorage读取AI输出并填充表单"""
+                    ai_output = await ui.run_javascript(
+                        "localStorage.getItem('kg_manager_ai_output')"
+                    )
+                    if not ai_output:
+                        ui.notify(
+                            "没有保存的AI输出，请先运行AI工具",
+                            position="top",
+                            type="warning",
+                        )
+                        return
+                    try:
+                        data = json.loads(ai_output)
+                        
+                        # 将AI输出数据合并到plan_data
+                        for key, value in data.items():
+                            if key in self.form_fields:
+                                if isinstance(value, dict):
+                                    # 处理分组字段
+                                    for sub_key, sub_val in value.items():
+                                        if (
+                                            key in self.form_fields and
+                                            sub_key in self.form_fields[key]
+                                        ):
+                                            field_widget = (
+                                                self.form_fields[key][sub_key]
+                                            )
+                                            field_widget.value = sub_val
+                                else:
+                                    # 处理普通字段
+                                    self.form_fields[key].value = value
+                        
+                        ui.notify(
+                            "AI输出已填充到表单",
+                            position="top",
+                            type="positive",
+                        )
+                    except json.JSONDecodeError:
+                        ui.notify(
+                            "AI输出格式错误",
+                            position="top",
+                            type="negative",
+                        )
+                
                 ui.button("导出为 Word", on_click=lambda: self.generate_plan(
                     semester_start.value,
                     semester_end.value,
@@ -699,6 +979,10 @@ class TeacherPlanUI:
                     semester_end.value,
                     target_date.value
                 )).classes("bg-emerald-600 text-white")
+                ui.button(
+                    "从AI工具填充",
+                    on_click=load_ai_output_from_storage,
+                ).classes("bg-orange-600 text-white")
                 ui.button(
                     "填充测试数据",
                     on_click=self.fill_sample_data
@@ -1229,6 +1513,32 @@ def ai_tool_page():
                         type="negative",
                     )
 
+            async def save_ai_output_to_storage():
+                """将AI输出保存到localStorage供主表单使用"""
+                if not output_text.value or not output_text.value.strip():
+                    ui.notify(
+                        "请先运行AI生成",
+                        position="top",
+                        type="warning",
+                    )
+                    return
+                try:
+                    await ConfigManager.save_to_storage(
+                        "kg_manager_ai_output",
+                        output_text.value,
+                    )
+                    ui.notify(
+                        "AI输出已保存，请返回主页面填充表单",
+                        position="top",
+                        type="positive",
+                    )
+                except Exception as e:
+                    ui.notify(
+                        f"保存失败：{str(e)}",
+                        position="top",
+                        type="negative",
+                    )
+
             with ui.row().classes("w-full gap-4"):
                 ui.button(
                     "生成提示词",
@@ -1242,6 +1552,10 @@ def ai_tool_page():
                     "AI 生成",
                     on_click=run_ai_task,
                 ).classes("bg-purple-600 text-white")
+                ui.button(
+                    "保存到表单",
+                    on_click=save_ai_output_to_storage,
+                ).classes("bg-green-600 text-white")
 
 
 if __name__ in {"__main__", "__mp_main__"}:
