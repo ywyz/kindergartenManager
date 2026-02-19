@@ -53,11 +53,17 @@ from .db import (
     save_semester,
     load_latest_semester,
     init_plan_db,
+    init_ai_config_db,
     save_plan_data,
     load_plan_data,
     list_plan_dates,
     delete_plan_data,
     get_plan_data_info,
+    save_ai_prompt,
+    load_ai_prompt,
+    init_ai_prompt_db,
+    save_ai_prompt_template,
+    load_ai_prompt_template,
 )
 
 # Word Operations
@@ -82,6 +88,7 @@ from .validate import (
 # AI
 from .ai import (
     split_collective_activity,
+    run_ai_json_task,
     parse_ai_json,
     set_custom_system_prompt,
     AI_SYSTEM_PROMPT,
@@ -101,11 +108,17 @@ __all__ = [
     "save_semester",
     "load_latest_semester",
     "init_plan_db",
+    "init_ai_config_db",
     "save_plan_data",
     "load_plan_data",
     "list_plan_dates",
     "delete_plan_data",
     "get_plan_data_info",
+    "save_ai_prompt",
+    "load_ai_prompt",
+    "init_ai_prompt_db",
+    "save_ai_prompt_template",
+    "load_ai_prompt_template",
     # Word
     "generate_plan_docx",
     "fill_teacher_plan",
@@ -121,6 +134,7 @@ __all__ = [
     "build_date_text",
     # AI
     "split_collective_activity",
+    "run_ai_json_task",
     "parse_ai_json",
     "set_custom_system_prompt",
     "AI_SYSTEM_PROMPT",

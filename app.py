@@ -22,6 +22,9 @@ class ConfigManager:
     AI_KEY = f"{STORAGE_PREFIX}ai_key"
     AI_MODEL = f"{STORAGE_PREFIX}ai_model"
     AI_BASE_URL = f"{STORAGE_PREFIX}ai_base_url"
+    AI_GRADE_LEVEL = f"{STORAGE_PREFIX}ai_grade_level"
+    AI_CLASS_ZONES = f"{STORAGE_PREFIX}ai_class_zones"
+    AI_OUTDOOR_ZONES = f"{STORAGE_PREFIX}ai_outdoor_zones"
     DB_TYPE = f"{STORAGE_PREFIX}db_type"
     MYSQL_HOST = f"{STORAGE_PREFIX}mysql_host"
     MYSQL_PORT = f"{STORAGE_PREFIX}mysql_port"
@@ -41,6 +44,15 @@ class ConfigManager:
             ),
             "ai_base_url": await ui.run_javascript(
                 f"localStorage.getItem('{ConfigManager.AI_BASE_URL}')"
+            ),
+            "ai_grade_level": await ui.run_javascript(
+                f"localStorage.getItem('{ConfigManager.AI_GRADE_LEVEL}')"
+            ),
+            "ai_class_zones": await ui.run_javascript(
+                f"localStorage.getItem('{ConfigManager.AI_CLASS_ZONES}')"
+            ),
+            "ai_outdoor_zones": await ui.run_javascript(
+                f"localStorage.getItem('{ConfigManager.AI_OUTDOOR_ZONES}')"
             ),
             "db_type": await ui.run_javascript(
                 f"localStorage.getItem('{ConfigManager.DB_TYPE}')"
@@ -65,11 +77,13 @@ class ConfigManager:
         }
 
     @staticmethod
-    def save_to_storage(key, value):
+    async def save_to_storage(key, value):
         """保存配置到浏览器localStorage"""
         safe_key = json.dumps(str(key))
         safe_value = json.dumps("" if value is None else str(value))
-        ui.run_javascript(f"localStorage.setItem({safe_key}, {safe_value})")
+        await ui.run_javascript(
+            f"localStorage.setItem({safe_key}, {safe_value})"
+        )
 
 
 class TeacherPlanUI:
@@ -95,6 +109,10 @@ class TeacherPlanUI:
         self.ai_key = None
         self.ai_model = "gpt-4o-mini"
         self.ai_base_url = None
+        self.ai_grade_level = ""
+        self.ai_class_zones = ""
+        self.ai_outdoor_zones = ""
+        self.ai_context_labels = {}
         
         # 数据库配置
         self.db_type = "sqlite"
@@ -157,6 +175,21 @@ class TeacherPlanUI:
                             label="API地址 (可选)",
                             placeholder="https://api.openai.com/v1"
                         ).classes("w-full")
+
+                        ai_grade_input = ui.input(
+                            label="幼儿园年级段",
+                            placeholder="小班/中班/大班"
+                        ).classes("w-full")
+
+                        ai_class_zones_input = ui.input(
+                            label="班级提供区域",
+                            placeholder="如：角色区、建构区、阅读区"
+                        ).classes("w-full")
+
+                        ai_outdoor_zones_input = ui.input(
+                            label="幼儿园户外区域",
+                            placeholder="如：沙水区、平衡区、草地"
+                        ).classes("w-full")
                         
                         # 异步加载配置并回填
                         async def load_ai_config():
@@ -172,14 +205,28 @@ class TeacherPlanUI:
                             if config.get("ai_base_url"):
                                 ai_url_input.value = config["ai_base_url"]
                                 self.ai_base_url = config["ai_base_url"]
+                            if config.get("ai_grade_level"):
+                                ai_grade_input.value = config["ai_grade_level"]
+                                self.ai_grade_level = config["ai_grade_level"]
+                            if config.get("ai_class_zones"):
+                                ai_class_zones = config["ai_class_zones"]
+                                ai_class_zones_input.value = ai_class_zones
+                                self.ai_class_zones = ai_class_zones
+                            if config.get("ai_outdoor_zones"):
+                                ai_outdoor_zones = config["ai_outdoor_zones"]
+                                ai_outdoor_zones_input.value = ai_outdoor_zones
+                                self.ai_outdoor_zones = ai_outdoor_zones
                         
                         ui.timer(0.1, load_ai_config, once=True)
                         
-                        def save_ai_config():
+                        async def save_ai_config():
                             """保存AI配置"""
                             key = ai_key_input.value
                             model = ai_model_input.value
                             url = ai_url_input.value or None
+                            grade_level = ai_grade_input.value or ""
+                            class_zones = ai_class_zones_input.value or ""
+                            outdoor_zones = ai_outdoor_zones_input.value or ""
                             
                             if not key:
                                 ui.notify(
@@ -192,18 +239,32 @@ class TeacherPlanUI:
                             self.ai_key = key
                             self.ai_model = model or "gpt-4o-mini"
                             self.ai_base_url = url
+                            self.ai_grade_level = grade_level
+                            self.ai_class_zones = class_zones
+                            self.ai_outdoor_zones = outdoor_zones
                             
                             # 保存到localStorage
-                            ConfigManager.save_to_storage(
+                            await ConfigManager.save_to_storage(
                                 ConfigManager.AI_KEY, key
                             )
-                            ConfigManager.save_to_storage(
+                            await ConfigManager.save_to_storage(
                                 ConfigManager.AI_MODEL, self.ai_model
                             )
                             if url:
-                                ConfigManager.save_to_storage(
+                                await ConfigManager.save_to_storage(
                                     ConfigManager.AI_BASE_URL, url
                                 )
+                            await ConfigManager.save_to_storage(
+                                ConfigManager.AI_GRADE_LEVEL, grade_level
+                            )
+                            await ConfigManager.save_to_storage(
+                                ConfigManager.AI_CLASS_ZONES, class_zones
+                            )
+                            await ConfigManager.save_to_storage(
+                                ConfigManager.AI_OUTDOOR_ZONES, outdoor_zones
+                            )
+
+                            self.update_ai_context_labels()
                             
                             ui.notify(
                                 "AI配置已保存",
@@ -311,20 +372,22 @@ class TeacherPlanUI:
                         mysql_panel.visible = (self.db_type == "mysql")
                         sqlite_info.visible = (self.db_type == "sqlite")
                         
-                        def on_db_type_change(new_db_type):
+                        async def on_db_type_change(new_db_type):
                             """切换数据库类型"""
                             self.db_type = new_db_type
                             mysql_panel.visible = (new_db_type == "mysql")
                             sqlite_info.visible = (new_db_type == "sqlite")
-                            ConfigManager.save_to_storage(
+                            await ConfigManager.save_to_storage(
                                 ConfigManager.DB_TYPE, new_db_type
                             )
                         
                         db_type_select.on_value_change(
-                            lambda e: on_db_type_change(e.value)
+                            lambda e: asyncio.create_task(
+                                on_db_type_change(e.value)
+                            )
                         )
                         
-                        def save_db_config():
+                        async def save_db_config():
                             """保存数据库配置"""
                             if self.db_type == "mysql":
                                 if not all([
@@ -348,21 +411,21 @@ class TeacherPlanUI:
                                 }
                                 
                                 # 保存到localStorage
-                                ConfigManager.save_to_storage(
+                                await ConfigManager.save_to_storage(
                                     ConfigManager.MYSQL_HOST,
                                     mysql_host.value
                                 )
-                                ConfigManager.save_to_storage(
+                                await ConfigManager.save_to_storage(
                                     ConfigManager.MYSQL_PORT,
                                     str(self.mysql_config["port"])
                                 )
-                                ConfigManager.save_to_storage(
+                                await ConfigManager.save_to_storage(
                                     ConfigManager.MYSQL_DB, mysql_db.value
                                 )
-                                ConfigManager.save_to_storage(
+                                await ConfigManager.save_to_storage(
                                     ConfigManager.MYSQL_USER, mysql_user.value
                                 )
-                                ConfigManager.save_to_storage(
+                                await ConfigManager.save_to_storage(
                                     ConfigManager.MYSQL_PASSWORD,
                                     mysql_password.value
                                 )
@@ -577,6 +640,30 @@ class TeacherPlanUI:
                                             self.ai_split_collective_activity
                                         )
                                     ).classes("bg-purple-600 text-white")
+
+                                    with ui.column().classes(
+                                        "w-full gap-1 bg-gray-50 p-3 rounded"
+                                    ):
+                                        ui.label("AI 背景信息").classes(
+                                            "text-sm font-semibold text-gray-600"
+                                        )
+                                        self.ai_context_labels = {
+                                            "grade": ui.label().classes(
+                                                "text-sm text-gray-600"
+                                            ),
+                                            "class_zones": ui.label().classes(
+                                                "text-sm text-gray-600"
+                                            ),
+                                            "outdoor_zones": ui.label().classes(
+                                                "text-sm text-gray-600"
+                                            ),
+                                        }
+                                    self.update_ai_context_labels()
+                                    ui.timer(
+                                        0.2,
+                                        self.update_ai_context_labels,
+                                        once=True,
+                                    )
 
                                 for subfield_info in subfields:
                                     subfield_name = subfield_info["name"]
@@ -813,12 +900,14 @@ class TeacherPlanUI:
         try:
             ui.notify("AI 正在处理，请稍候...", position="top", type="info")
             # 使用参数传递配置，避免修改全局环境变量
+            system_prompt = self.build_collective_activity_prompt()
             payload = await asyncio.to_thread(
                 kg.split_collective_activity,
                 self.collective_draft.value,
                 self.ai_key,
                 self.ai_base_url,
                 self.ai_model,
+                system_prompt,
             )
             if not payload:
                 ui.notify("AI 返回格式不正确", position="top", type="negative")
@@ -834,6 +923,51 @@ class TeacherPlanUI:
             ui.notify("AI 拆分完成", position="top", type="positive")
         except Exception as e:
             ui.notify(f"AI 处理失败：{str(e)}", position="top", type="negative")
+
+    def update_ai_context_labels(self):
+        """刷新AI背景信息展示"""
+        labels = self.ai_context_labels
+        if not labels:
+            return
+
+        grade = self.ai_grade_level or "未设置"
+        class_zones = self.ai_class_zones or "未设置"
+        outdoor_zones = self.ai_outdoor_zones or "未设置"
+
+        labels["grade"].text = f"年级段：{grade}"
+        labels["class_zones"].text = f"班级区域：{class_zones}"
+        labels["outdoor_zones"].text = f"户外区域：{outdoor_zones}"
+
+    def build_collective_activity_prompt(self):
+        """构建集体活动拆分提示词"""
+        context_lines = []
+        if self.ai_grade_level:
+            context_lines.append(f"年级段：{self.ai_grade_level}")
+        if self.ai_class_zones:
+            context_lines.append(f"班级区域：{self.ai_class_zones}")
+        if self.ai_outdoor_zones:
+            context_lines.append(f"户外区域：{self.ai_outdoor_zones}")
+
+        prompt = (
+            "你是幼儿园教案助理。请将用户提供的集体活动原稿拆分为固定字段："
+            "活动主题、活动目标、活动准备、活动重点、活动难点、活动过程。"
+            "请只输出 JSON 对象，不要包含多余文字或 Markdown。"
+            "输出示例："
+            "{"
+            '"活动主题":"...",'
+            '"活动目标":"...",'
+            '"活动准备":"...",'
+            '"活动重点":"...",'
+            '"活动难点":"...",'
+            '"活动过程":"..."'
+            "}"
+        )
+
+        if context_lines:
+            context_text = "\n".join(context_lines)
+            prompt = f"{prompt}\n可用背景信息：\n{context_text}"
+
+        return prompt
 
     def clear_form(self):
         """清空表单"""
@@ -872,10 +1006,242 @@ def main_page():
     with ui.column().classes("w-full h-screen p-8 bg-gray-50"):
         ui.label("幼儿园教案管理系统").classes("text-3xl font-bold text-center")
         ui.label("电子备课系统").classes("text-base text-gray-600 text-center mb-6")
+        ui.link("AI 工具", "/ai").classes("text-sm text-blue-600 text-center")
         
         with ui.card().classes("w-full"):
             plan_ui = TeacherPlanUI()
             plan_ui.build_form()
+
+
+@ui.page("/ai")
+def ai_tool_page():
+    """独立AI工具页面"""
+    with ui.column().classes("w-full min-h-screen p-8 bg-gray-50 gap-4"):
+        ui.label("AI 工具").classes("text-3xl font-bold text-center")
+        ui.link("返回主页面", "/").classes("text-sm text-blue-600 text-center")
+
+        schema_fields = [
+            name for name, _ in kg.FIELD_ORDER
+            if name not in ["周次", "日期"]
+        ]
+        
+        # AI页面中合并"晨间活动"和"晨间活动指导"
+        ai_display_fields = [
+            f for f in schema_fields if f != "晨间活动指导"
+        ]
+        # 添加合并标记
+        merged_field_map = {
+            "晨间活动": "晨间活动 + 晨间活动指导",
+        }
+
+        with ui.card().classes("w-full"):
+            ui.label("提示词与输入").classes("text-lg font-semibold")
+
+            prompt_input = ui.textarea(
+                label="系统提示词",
+                placeholder="在此编辑或生成提示词"
+            ).classes("w-full")
+
+            field_checks = {}
+            output_fields_preview = ui.textarea(
+                label="输出字段（已选）",
+                placeholder="请选择教案字段",
+            ).classes("w-full").props("readonly")
+
+            def build_output_structure(selected_fields):
+                output = {}
+                for field_name in selected_fields:
+                    # 晨间活动合并处理
+                    if field_name == "晨间活动":
+                        output["晨间活动"] = {
+                            sub: "..." for sub in kg.SUBFIELDS.get(
+                                "晨间活动", []
+                            )
+                        }
+                        output["晨间活动指导"] = {
+                            sub: "..." for sub in kg.SUBFIELDS.get(
+                                "晨间活动指导", []
+                            )
+                        }
+                    elif field_name in kg.SUBFIELDS:
+                        output[field_name] = {
+                            sub: "..." for sub in kg.SUBFIELDS[field_name]
+                        }
+                    else:
+                        output[field_name] = "..."
+                return output
+
+            def update_output_fields_preview():
+                fields = [
+                    name for name, checkbox in field_checks.items()
+                    if checkbox.value
+                ]
+                output_fields_preview.value = json.dumps(
+                    build_output_structure(fields),
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            with ui.column().classes("w-full gap-2"):
+                ui.label("教案字段选项（可多选）").classes(
+                    "text-sm font-semibold text-gray-600"
+                )
+                for field_name in ai_display_fields:
+                    checkbox = ui.checkbox(
+                        merged_field_map.get(field_name, field_name)
+                    )
+                    checkbox.on_value_change(
+                        lambda e: update_output_fields_preview()
+                    )
+                    field_checks[field_name] = checkbox
+                    if field_name == "晨间活动":
+                        # 晨间活动合并显示子字段
+                        morning_subfields = (
+                            kg.SUBFIELDS.get("晨间活动", []) +
+                            kg.SUBFIELDS.get("晨间活动指导", [])
+                        )
+                        ui.label(
+                            "子字段：" + "、".join(morning_subfields)
+                        ).classes("text-xs text-gray-500 ml-6")
+                    elif field_name in kg.SUBFIELDS:
+                        ui.label(
+                            "子字段：" + "、".join(kg.SUBFIELDS[field_name])
+                        ).classes("text-xs text-gray-500 ml-6")
+
+            input_text = ui.textarea(
+                label="输入内容",
+                placeholder="粘贴原稿或需求描述"
+            ).classes("w-full")
+
+            output_text = ui.textarea(
+                label="AI 输出（JSON）",
+                placeholder="AI 返回结果将显示在这里"
+            ).classes("w-full").props("readonly")
+
+            async def load_ai_prompt():
+                template = await asyncio.to_thread(
+                    kg.load_ai_prompt_template,
+                    Path("examples/plan.db"),
+                    "default",
+                )
+                if template:
+                    prompt_input.value = template.get("prompt_text", "")
+                    selected = set(template.get("selected_fields", []))
+                    for name, checkbox in field_checks.items():
+                        checkbox.value = (name in selected)
+                    update_output_fields_preview()
+                    return
+
+                prompt = await asyncio.to_thread(
+                    kg.load_ai_prompt,
+                    Path("examples/plan.db"),
+                )
+                if prompt:
+                    prompt_input.value = prompt
+                    update_output_fields_preview()
+
+            ui.timer(0.1, load_ai_prompt, once=True)
+
+            def build_prompt_from_fields():
+                fields = [
+                    name for name, checkbox in field_checks.items()
+                    if checkbox.value
+                ]
+                if not fields:
+                    ui.notify("请先填写输出字段", position="top", type="warning")
+                    return
+                example = json.dumps(
+                    build_output_structure(fields),
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                prompt_input.value = (
+                    "你是幼儿园教案助理。请根据用户输入生成 JSON 输出。"
+                    "按字段输出，其中包含子字段的需输出为对象结构。"
+                    "请只输出 JSON 对象，不要包含多余文字或 Markdown。"
+                    "输出示例：\n" + example
+                )
+
+            async def save_prompt():
+                await asyncio.to_thread(
+                    kg.save_ai_prompt_template,
+                    Path("examples/plan.db"),
+                    "default",
+                    {
+                        "prompt_text": prompt_input.value or "",
+                        "selected_fields": [
+                            name for name, checkbox in field_checks.items()
+                            if checkbox.value
+                        ],
+                    },
+                )
+                ui.notify("提示词已保存到本地数据库", position="top", type="positive")
+
+            async def run_ai_task():
+                config = await ConfigManager.get_config_from_storage()
+                api_key = config.get("ai_key")
+                model = config.get("ai_model") or "gpt-4o-mini"
+                base_url = config.get("ai_base_url")
+                prompt = prompt_input.value or ""
+                user_text = input_text.value or ""
+
+                if not api_key:
+                    ui.notify(
+                        "请先在系统配置中设置 OpenAI API Key",
+                        position="top",
+                        type="warning",
+                    )
+                    return
+                if not prompt.strip():
+                    ui.notify(
+                        "请先填写系统提示词",
+                        position="top",
+                        type="warning",
+                    )
+                    return
+                if not user_text.strip():
+                    ui.notify("请输入内容", position="top", type="warning")
+                    return
+
+                try:
+                    ui.notify(
+                        "AI 正在处理，请稍候...",
+                        position="top",
+                        type="info",
+                    )
+                    payload = await asyncio.to_thread(
+                        kg.run_ai_json_task,
+                        user_text,
+                        api_key,
+                        base_url,
+                        model,
+                        prompt,
+                    )
+                    output_text.value = json.dumps(
+                        payload,
+                        ensure_ascii=False,
+                        indent=2,
+                    )
+                    ui.notify("AI 处理完成", position="top", type="positive")
+                except Exception as e:
+                    ui.notify(
+                        f"AI 处理失败：{str(e)}",
+                        position="top",
+                        type="negative",
+                    )
+
+            with ui.row().classes("w-full gap-4"):
+                ui.button(
+                    "生成提示词",
+                    on_click=build_prompt_from_fields,
+                ).classes("bg-slate-600 text-white")
+                ui.button(
+                    "保存提示词",
+                    on_click=save_prompt,
+                ).classes("bg-blue-600 text-white")
+                ui.button(
+                    "AI 生成",
+                    on_click=run_ai_task,
+                ).classes("bg-purple-600 text-white")
 
 
 if __name__ in {"__main__", "__mp_main__"}:

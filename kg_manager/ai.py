@@ -18,7 +18,7 @@ AI_SYSTEM_PROMPT = (
     "输出示例："
     "{"
     '"活动主题":"...",'
-    '"活动目标":"...",'
+    '"活动目标":"1.2.3.",'
     '"活动准备":"...",'
     '"活动重点":"...",'
     '"活动难点":"...",'
@@ -81,6 +81,53 @@ def split_collective_activity(draft_text, api_key=None, base_url=None, model=Non
         )
         content = response.choices[0].message.content.strip()
         return parse_ai_json(content)
+    except Exception as e:
+        raise RuntimeError(f"AI处理失败：{str(e)}")
+
+
+def run_ai_json_task(
+    input_text,
+    api_key=None,
+    base_url=None,
+    model=None,
+    system_prompt=None,
+):
+    """
+    通用AI任务：返回JSON结果
+
+    Args:
+        input_text: 用户输入内容
+        api_key: OpenAI API密钥（优先使用此参数，否则从环境变量读取）
+        base_url: API基础URL（可选）
+        model: 使用的AI模型（默认为 gpt-4o-mini）
+        system_prompt: 自定义系统提示词（None则使用默认）
+
+    Returns:
+        解析后的字典，若解析失败抛出错误
+    """
+    if not input_text or not input_text.strip():
+        raise ValueError("输入内容不能为空")
+
+    try:
+        client = get_ai_client(api_key=api_key, base_url=base_url)
+        if not model:
+            model = os.getenv("OPENAI_MODEL") or AI_MODEL
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": system_prompt or AI_SYSTEM_PROMPT,
+                },
+                {"role": "user", "content": input_text},
+            ],
+            temperature=0.2,
+        )
+        content = response.choices[0].message.content.strip()
+        payload = parse_ai_json(content)
+        if payload is None:
+            raise RuntimeError("AI 返回格式不正确")
+        return payload
     except Exception as e:
         raise RuntimeError(f"AI处理失败：{str(e)}")
 
