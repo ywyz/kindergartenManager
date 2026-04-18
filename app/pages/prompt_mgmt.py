@@ -102,7 +102,10 @@ def prompt_mgmt_page():
                 test_btn.props("loading")
                 test_status.set_text("⏳ 发送中...")
                 try:
-                    result = ai.test_prompt(content, test_input.value or "测试内容")
+                    from nicegui import run
+                    result = await run.io_bound(
+                        ai.test_prompt, content, test_input.value or "测试内容"
+                    )
                     test_result.set_value(result)
                     test_status.set_text("✅ 测试完成")
                 except Exception as e:

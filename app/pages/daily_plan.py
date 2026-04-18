@@ -1,7 +1,7 @@
 """一日活动计划页面 - AI生成晨间活动/谈话/区域/户外 + 手动填写集体活动"""
 from datetime import date
 
-from nicegui import ui
+from nicegui import ui, run
 
 from app.models.daily_plan import (
     DailyPlan, MorningActivity, MorningTalk, AreaActivity, save_plan
@@ -33,36 +33,41 @@ def daily_plan_page():
             ui.label("选择计划日期").classes("text-lg font-semibold")
             date_info_label = ui.label("").classes("text-sm text-gray-500")
 
-            date_picker = ui.date(value=str(date.today())).classes("w-full")
+            date_picker = ui.date(
+                value=str(date.today()),
+                on_change=lambda e: on_date_change(e),
+            ).classes("w-full")
 
-            def on_date_change(e):
+            async def on_date_change(e):
                 try:
                     selected = date.fromisoformat(e.value)
-                    state["plan_date"] = selected
-                    semester = get_latest_semester()
-                    if semester:
-                        info = get_date_info(semester["start_date"], selected)
-                        state.update({
-                            "week_number": info["week_number"],
-                            "day_of_week": info["day_of_week"],
-                            "is_workday": info["is_workday"],
-                            "near_holiday": info["is_near_holiday"],
-                        })
-                        date_info_label.set_text(
-                            f"第 {info['week_number']} 周 · {info['day_of_week']}  "
-                            f"{'✅ 工作日' if info['is_workday'] else '⚠️ 非工作日'}"
-                            + ("  🎉 临近节假日" if info["is_near_holiday"] else "")
-                        )
-                        if info["tip"]:
-                            ui.notify(info["tip"], type="warning")
-                    else:
-                        date_info_label.set_text("⚠️ 请先在设置页面配置学期信息")
-                    # 尝试加载已保存的计划
-                    _load_existing_plan(selected)
-                except ValueError:
-                    pass
-
-            date_picker.on("update:model-value", on_date_change)
+                except (ValueError, TypeError):
+                    return
+                state["plan_date"] = selected
+                try:
+                    semester = await run.io_bound(get_latest_semester)
+                except Exception as err:
+                    date_info_label.set_text(f"⚠️ 数据库不可用：{err}")
+                    return
+                if semester:
+                    info = get_date_info(semester["start_date"], selected)
+                    state.update({
+                        "week_number": info["week_number"],
+                        "day_of_week": info["day_of_week"],
+                        "is_workday": info["is_workday"],
+                        "near_holiday": info["is_near_holiday"],
+                    })
+                    date_info_label.set_text(
+                        f"第 {info['week_number']} 周 · {info['day_of_week']}  "
+                        f"{'✅ 工作日' if info['is_workday'] else '⚠️ 非工作日'}"
+                        + ("  🎉 临近节假日" if info["is_near_holiday"] else "")
+                    )
+                    if info["tip"]:
+                        ui.notify(info["tip"], type="warning")
+                else:
+                    date_info_label.set_text("⚠️ 请先在设置页面配置学期信息")
+                # 尝试加载已保存的计划
+                await _load_existing_plan(selected)
 
         # ---- AI 一键生成 ----
         with ui.row().classes("gap-2"):
@@ -131,11 +136,19 @@ def daily_plan_page():
         # ----------------------------------------------------------------
         # 事件：加载已有计划
         # ----------------------------------------------------------------
-        def _load_existing_plan(selected_date: date):
-            semester = get_latest_semester()
+        async def _load_existing_plan(selected_date: date):
+            try:
+                semester = await run.io_bound(get_latest_semester)
+            except Exception:
+                return
             grade = semester.get("grade", "") if semester else ""
             class_name = semester.get("class_name", "") if semester else ""
-            existing = get_plan_by_date(selected_date, grade, class_name)
+            try:
+                existing = await run.io_bound(
+                    get_plan_by_date, selected_date, grade, class_name
+                )
+            except Exception:
+                return
             if existing:
                 state["plan"] = existing
                 _fill_form(existing)
@@ -198,10 +211,27 @@ def daily_plan_page():
             gen_status.set_text("⏳ AI 生成中...")
 
             try:
+                semester = await run.io_bound(get_latest_semester)
+                area_content = await run.io_bound(get_setting, "area_content", "")
+                outdoor_content = await run.io_bound(get_setting, "outdoor_content", "")
+            except Exception as e:
+                gen_status.set_text(f"❌ 读取设置失败：{e}")
+                return
+            grade = semester.get("grade", "") if semester else ""
+            class_name = semester.get("class_name", "") if semester else ""
+            week = state.get("week_number") or 1
+            day = state.get("day_of_week", "")
+            near_holiday = state.get("near_holiday", False)
+
+            gen_btn.props("loading")
+            gen_status.set_text("⏳ AI 生成中...")
+
+            try:
                 # 晨间活动
                 gen_status.set_text("⏳ 生成晨间活动...")
-                ma_result = ai.generate_morning_activity(
-                    week, day, grade, class_name, outdoor_content
+                ma_result = await run.io_bound(
+                    ai.generate_morning_activity,
+                    week, day, grade, class_name, outdoor_content,
                 )
                 ma_type.set_value(ma_result.get("activity_type", ""))
                 ma_goal.set_value(ma_result.get("activity_goal", ""))
@@ -210,15 +240,18 @@ def daily_plan_page():
 
                 # 晨间谈话
                 gen_status.set_text("⏳ 生成晨间谈话...")
-                mt_result = ai.generate_morning_talk(
-                    week, day, grade, class_name, near_holiday
+                mt_result = await run.io_bound(
+                    ai.generate_morning_talk,
+                    week, day, grade, class_name, near_holiday,
                 )
                 mt_topic.set_value(mt_result.get("topic", ""))
                 mt_questions.set_value(mt_result.get("questions", ""))
 
                 # 室内区域活动
                 gen_status.set_text("⏳ 生成室内区域活动...")
-                ia_result = ai.generate_indoor_area(grade, class_name, area_content)
+                ia_result = await run.io_bound(
+                    ai.generate_indoor_area, grade, class_name, area_content
+                )
                 ia_area.set_value(ia_result.get("game_area", ""))
                 ia_goal.set_value(ia_result.get("activity_goal", ""))
                 ia_guidance.set_value(ia_result.get("key_guidance", ""))
@@ -227,7 +260,9 @@ def daily_plan_page():
 
                 # 户外游戏活动
                 gen_status.set_text("⏳ 生成户外游戏活动...")
-                og_result = ai.generate_outdoor_game(grade, class_name, outdoor_content)
+                og_result = await run.io_bound(
+                    ai.generate_outdoor_game, grade, class_name, outdoor_content
+                )
                 og_area.set_value(og_result.get("game_area", ""))
                 og_goal.set_value(og_result.get("activity_goal", ""))
                 og_guidance.set_value(og_result.get("key_guidance", ""))
@@ -246,16 +281,26 @@ def daily_plan_page():
         # ----------------------------------------------------------------
         # 事件：保存
         # ----------------------------------------------------------------
-        def do_save():
+        async def do_save():
             from app.models.daily_plan import GroupActivity
-            semester = get_latest_semester()
+            try:
+                semester = await run.io_bound(get_latest_semester)
+            except Exception as e:
+                action_status.set_text(f"❌ 数据库不可用：{e}")
+                return
             grade = semester.get("grade", "") if semester else ""
             class_name = semester.get("class_name", "") if semester else ""
             semester_id = semester.get("id") if semester else None
 
-            existing = state.get("plan") or get_plan_by_date(
-                state["plan_date"], grade, class_name
-            )
+            existing = state.get("plan")
+            if not existing:
+                try:
+                    existing = await run.io_bound(
+                        get_plan_by_date, state["plan_date"], grade, class_name
+                    )
+                except Exception as e:
+                    action_status.set_text(f"❌ 读取计划失败：{e}")
+                    return
             plan = existing or DailyPlan()
 
             plan.plan_date = state["plan_date"]
@@ -300,7 +345,7 @@ def daily_plan_page():
             plan.daily_reflection = reflection.value
 
             try:
-                saved_id = save_plan(plan)
+                saved_id = await run.io_bound(save_plan, plan)
                 plan.id = saved_id
                 state["plan"] = plan
                 action_status.set_text(f"✅ 已保存（ID: {saved_id}）")
@@ -312,16 +357,16 @@ def daily_plan_page():
         # ----------------------------------------------------------------
         # 事件：导出 Word
         # ----------------------------------------------------------------
-        def do_export():
+        async def do_export():
             if not state.get("plan"):
-                do_save()
+                await do_save()
             plan = state.get("plan")
             if not plan:
                 action_status.set_text("❌ 请先保存后再导出")
                 return
             try:
                 from app.services.word_export import save_export_to_file
-                file_path = save_export_to_file(plan)
+                file_path = await run.io_bound(save_export_to_file, plan)
                 action_status.set_text(f"✅ 已导出：{file_path.name}")
                 ui.download(str(file_path), filename=file_path.name)
             except Exception as e:

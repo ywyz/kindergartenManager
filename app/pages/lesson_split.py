@@ -2,7 +2,7 @@
 import difflib
 from datetime import date
 
-from nicegui import ui
+from nicegui import ui, run
 
 from app.models.daily_plan import DailyPlan, GroupActivity, save_plan
 from app.services.ai_service import get_ai_service
@@ -142,7 +142,8 @@ def lesson_split_page():
             split_status.set_text("⏳ AI 拆分中，请稍候...")
 
             try:
-                result = ai.split_lesson_plan(text, grade)
+                # 同步的 OpenAI 请求会阻塞事件循环，放到线程池中执行
+                result = await run.io_bound(ai.split_lesson_plan, text, grade)
                 theme_input.set_value(result.get("theme", ""))
                 goal_input.set_value(result.get("goal", ""))
                 prep_input.set_value(result.get("preparation", ""))
@@ -153,8 +154,10 @@ def lesson_split_page():
 
                 split_status.set_text("✅ 拆分成功，正在 AI 修改活动过程...")
 
-                # 修改活动过程
-                mod_text = ai.modify_activity_process(orig_process, grade)
+                # 修改活动过程（继续放入线程池）
+                mod_text = await run.io_bound(
+                    ai.modify_activity_process, orig_process, grade
+                )
                 modified_process.set_value(mod_text)
 
                 # 生成 diff 高亮 HTML
@@ -174,8 +177,12 @@ def lesson_split_page():
 
         split_btn.on("click", do_split)
 
-        def do_save():
-            semester = get_latest_semester()
+        async def do_save():
+            try:
+                semester = await run.io_bound(get_latest_semester)
+            except Exception as e:
+                action_status.set_text(f"❌ 数据库不可用：{e}")
+                return
             grade = semester.get("grade", "") if semester else ""
             class_name = semester.get("class_name", "") if semester else ""
             semester_id = semester.get("id") if semester else None
@@ -190,7 +197,13 @@ def lesson_split_page():
             if use_modified.value and process_text != orig_process:
                 ai_parts = {"fields": ["group_activity_process"]}
 
-            existing = get_plan_by_date(state["plan_date"], grade, class_name)
+            try:
+                existing = await run.io_bound(
+                    get_plan_by_date, state["plan_date"], grade, class_name
+                )
+            except Exception as e:
+                action_status.set_text(f"❌ 读取计划失败：{e}")
+                return
             plan = existing or DailyPlan()
             plan.plan_date = state["plan_date"]
             plan.week_number = state.get("week_number")
@@ -211,7 +224,7 @@ def lesson_split_page():
             plan.ai_modified_parts = ai_parts
 
             try:
-                saved_id = save_plan(plan)
+                saved_id = await run.io_bound(save_plan, plan)
                 plan.id = saved_id
                 state["plan"] = plan
                 action_status.set_text(f"✅ 已保存（ID: {saved_id}）")
@@ -220,17 +233,17 @@ def lesson_split_page():
 
         save_btn.on("click", do_save)
 
-        def do_export():
+        async def do_export():
             if not state.get("plan"):
                 # 先触发保存
-                do_save()
+                await do_save()
             plan = state.get("plan")
             if not plan:
                 action_status.set_text("❌ 请先保存后再导出")
                 return
             try:
                 from app.services.word_export import save_export_to_file
-                file_path = save_export_to_file(plan)
+                file_path = await run.io_bound(save_export_to_file, plan)
                 action_status.set_text(f"✅ 已导出：{file_path.name}")
                 ui.download(str(file_path), filename=file_path.name)
             except Exception as e:

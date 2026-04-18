@@ -1,5 +1,5 @@
 """历史计划查看页面 - 列出已保存的计划，可查看详情和重新导出"""
-from nicegui import ui
+from nicegui import ui, run
 
 from app.models.daily_plan import DailyPlan, get_plans
 from app.services.word_export import save_export_to_file
@@ -15,9 +15,15 @@ def plan_history_page():
         status = ui.label("").classes("text-sm text-gray-500")
         records_container = ui.column().classes("w-full gap-2")
 
-        def load_plans():
+        async def load_plans():
             records_container.clear()
-            plans = get_plans(limit=100)
+            try:
+                plans = await run.io_bound(get_plans, 100)
+            except Exception as e:
+                with records_container:
+                    ui.label(f"⚠️ 读取失败：{e}").classes("text-red-500")
+                status.set_text("")
+                return
             if not plans:
                 with records_container:
                     ui.label("暂无保存的计划记录。").classes("text-gray-400")
@@ -87,9 +93,9 @@ def plan_history_page():
 
                     # 导出
                     def make_export(p=plan):
-                        def do_export():
+                        async def do_export():
                             try:
-                                file_path = save_export_to_file(p)
+                                file_path = await run.io_bound(save_export_to_file, p)
                                 ui.download(str(file_path), filename=file_path.name)
                                 ui.notify(f"导出成功：{file_path.name}", type="positive")
                             except Exception as e:
@@ -100,7 +106,8 @@ def plan_history_page():
                         "导出 Word", on_click=make_export()
                     ).props("size=sm flat color=secondary")
 
-        load_plans()
+        # 进入页面后异步加载（async 函数需要事件循环 await）
+        ui.timer(0.1, load_plans, once=True)
 
         # 刷新按钮
         ui.button("🔄 刷新列表", on_click=load_plans).classes("mt-2")
