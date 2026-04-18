@@ -102,10 +102,19 @@ def _build_client(api_url: str, api_key: str) -> OpenAI:
 
 
 def _extract_json(text: str) -> dict | list:
-    """从模型响应中提取 JSON（处理 markdown 代码块等包裹）"""
-    # 去除 ```json ... ``` 包裹
-    text = re.sub(r"```(?:json)?\s*", "", text).strip().rstrip("`").strip()
-    return json.loads(text)
+    """从模型响应中提取 JSON（容错多种包裹格式）"""
+    if text is None:
+        raise ValueError("AI 返回为空")
+    raw = text.strip()
+    # 1) 如果存在 ``` 包裹代码块，取出其中的 JSON 部分
+    fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw, re.IGNORECASE)
+    if fence:
+        candidate = fence.group(1).strip()
+    else:
+        # 2) 否则提取从第一个 { 或 [ 到最后一个 } 或 ] 的范围
+        m = re.search(r"[\{\[][\s\S]*[\}\]]", raw)
+        candidate = m.group(0) if m else raw
+    return json.loads(candidate)
 
 
 def _chat(client: OpenAI, model: str, system_msg: str, user_msg: str,
@@ -273,6 +282,7 @@ def get_ai_service() -> Optional[AIService]:
     若无配置则返回 None。
     """
     from app.config import AIConfig
+    from app.services.crypto import decrypt
     try:
         row = execute_one(
             "SELECT api_url, api_key, model_name FROM ai_config ORDER BY id DESC LIMIT 1"
@@ -280,7 +290,7 @@ def get_ai_service() -> Optional[AIService]:
         if row and row.get("api_key"):
             return AIService(
                 api_url=row["api_url"],
-                api_key=row["api_key"],
+                api_key=decrypt(row["api_key"]),
                 model=row["model_name"],
             )
     except Exception:

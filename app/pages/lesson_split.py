@@ -34,34 +34,40 @@ def lesson_split_page():
 
             date_info_label = ui.label("").classes("text-sm text-gray-500")
 
+            def refresh_date_info(value: str) -> None:
+                try:
+                    selected = date.fromisoformat(value)
+                except (ValueError, TypeError):
+                    date_info_label.set_text("日期格式无效")
+                    return
+                state["plan_date"] = selected
+                try:
+                    semester = get_latest_semester()
+                except Exception as e:
+                    date_info_label.set_text(f"⚠️ 数据库不可用：{e}")
+                    return
+                if not semester:
+                    date_info_label.set_text("⚠️ 请先在设置页面配置学期信息")
+                    return
+                info = get_date_info(semester["start_date"], selected)
+                state["week_number"] = info["week_number"]
+                state["day_of_week"] = info["day_of_week"]
+                state["is_workday"] = info["is_workday"]
+                date_info_label.set_text(
+                    f"第 {info['week_number']} 周 · {info['day_of_week']}"
+                    f"  {'✅ 工作日' if info['is_workday'] else '⚠️ 非工作日'}"
+                )
+                if info["tip"]:
+                    ui.notify(info["tip"], type="warning")
+
             with ui.row().classes("gap-4 items-center"):
                 date_picker = ui.date(
                     value=str(date.today()),
+                    on_change=lambda e: refresh_date_info(e.value),
                 ).classes("flex-1")
 
-                def on_date_change(e):
-                    try:
-                        selected = date.fromisoformat(e.value)
-                        state["plan_date"] = selected
-                        semester = get_latest_semester()
-                        if semester:
-                            info = get_date_info(semester["start_date"], selected)
-                            state["week_number"] = info["week_number"]
-                            state["day_of_week"] = info["day_of_week"]
-                            state["is_workday"] = info["is_workday"]
-                            label_text = (
-                                f"第 {info['week_number']} 周 · {info['day_of_week']}"
-                                f"  {'✅ 工作日' if info['is_workday'] else '⚠️ 非工作日'}"
-                            )
-                            date_info_label.set_text(label_text)
-                            if info["tip"]:
-                                ui.notify(info["tip"], type="warning")
-                        else:
-                            date_info_label.set_text("⚠️ 请先在设置页面配置学期信息")
-                    except ValueError:
-                        date_info_label.set_text("日期格式无效")
-
-                date_picker.on("update:model-value", on_date_change)
+            # 初始化一次显示
+            refresh_date_info(str(date.today()))
 
         # ---- 教案输入区 ----
         with ui.card().classes("w-full"):
