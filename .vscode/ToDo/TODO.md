@@ -35,10 +35,22 @@
 | 1 | `app/pages/daily_plan.py` | 集体活动栏不会自动从当天「教案拆分」结果继承数据,需用户重复输入 | TODO |
 | 2 | `app/services/date_utils.py` | 节假日列表硬编码,不含调休,需接入外部 API 或维护年度数据 | TODO |
 | 3 | DB schema `daily_plans` | 缺 `(plan_date, grade, class_name)` 唯一索引,可能产生重复记录 | TODO |
-| 4 | `app/services/ai_service.py` | JSON 解析失败仅抛异常,未做 1-2 次让模型修正的重试 | TODO |
+| 4 | `app/services/ai_service.py` | JSON 解析失败仅抛异常,未做 1-2 次让模型修正的重试 | ✅ 已完成 |
 | 5 | `app/pages/settings.py` | `area_content`/`outdoor_content` 只有单一文本框,Plan 2.1 要求"可保存多条候选" | TODO |
 | 6 | 学期设置 | 仅最近一条生效,无法切换/查看历史学期 | TODO |
 | 7 | `.env` `APP_SECRET_KEY` | 仍是占位符,加密强度=0,**必须立刻替换为强随机值** | **紧急** |
+| 8 | `app/pages/lesson_split.py` | 拆分页有独立日期,应与一日计划日期共用 | 处理中 |
+| 9 | `app/pages/lesson_split.py` → `daily_plan.py` | 教案拆分模块应内嵌到一日计划页面,统一保存与导出 Word | 处理中 |
+| 10 | `_DEFAULT_PROMPTS["process_modify"]` | 模型偶尔返回完整 JSON 而非纯文本,导致"AI 修改版"显示 JSON;需在提示词层显式禁止 JSON,并在调用层兜底剥离 | 处理中 |
+| 11 | `_DEFAULT_PROMPTS["lesson_split"]` + `_KEY_ALIASES` | 模型把目标键写成"活动目标"被错误归一化为 `activity_goal`,导致 `result.get("goal")` 为空、目标不显示 | 处理中 |
+| 12 | `app/services/word_export.py` Row 11 | 导出后「活动过程」整段文字全部变红,实际仅【AI修改】标记的环节(段落)需变红,其余保持黑色;需按段落级判定 | **TODO** |
+
+---
+
+## 🆕 新增功能需求
+
+- [ ] **多 AI 并发批量生成**:晨间活动/晨间谈话/室内区域/户外游戏目前是串行 4 次 AI 请求,改为 `asyncio.gather` 或线程池并发,显著降低等待时间
+- [ ] **多 AI 负载均衡**:`ai_config` 表支持配置多条激活的 AI(不同 url/key/model),`get_ai_service` 按轮询/随机/权重策略分发请求,避免单 Key 限速;失败自动切换下一个
 
 > ⚠️ 修改 `APP_SECRET_KEY` 后,旧的 Fernet 加密 API Key 无法解密,需要在设置页**重新保存一次 AI Key**
 

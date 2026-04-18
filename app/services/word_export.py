@@ -158,24 +158,14 @@ def export_daily_plan_word(plan: DailyPlan) -> bytes:
     _append_content_run(para1, date_text)
 
     # ----------------------------------------------------------------------
-    # Row 2 - 晨间活动：体能大循环/集体游戏/自主游戏
+    # Row 2 - 晨间活动：集体活动名称 / 自选活动名称
     # ----------------------------------------------------------------------
     row2_cell = t.rows[2].cells[1]
-    # 三个段落：体能大循环 / 集体游戏 / 自主游戏
-    activity_lines = [
-        ("体能大循环", ma.activity_type if ma.activity_type else ""),
-        ("集体游戏：", ""),
-        ("自主游戏：", ""),
-    ]
-    # 第一个段落写活动类型（体能大循环）
-    if row2_cell.paragraphs:
-        para = row2_cell.paragraphs[0]
-        orig = para.text
-        for run in para.runs:
-            run.text = ""
-        if para.runs:
-            para.runs[0].text = orig.split("\n")[0].rstrip()
-        _append_content_run(para, f" {ma.activity_type}" if ma.activity_type else "", is_red("activity_type"))
+    # 模板段落标签关键字可能为「集体游戏/集体活动」「自主游戏/自选活动」
+    _fill_multiline_cell(row2_cell, [
+        ("集体", ma.group_activity_name, is_red("morning_activity")),
+        ("自", ma.self_selected_name, is_red("morning_activity")),
+    ])
 
     # ----------------------------------------------------------------------
     # Row 3 - 晨间活动：重点指导/活动目标/指导要点

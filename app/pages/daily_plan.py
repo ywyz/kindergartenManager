@@ -77,9 +77,10 @@ def daily_plan_page():
         # ====== 晨间活动 ======
         with ui.card().classes("w-full"):
             ui.label("☀️ 晨间活动").classes("text-lg font-semibold")
-            ma_type = ui.input("活动类型（体能大循环/集体游戏/自选游戏）").classes("w-full")
+            ma_group = ui.input("集体活动").classes("w-full")
+            ma_self = ui.input("自选活动").classes("w-full")
+            ma_guidance = ui.input("重点指导（活动名称）").classes("w-full")
             ma_goal = ui.textarea("活动目标").classes("w-full").props("rows=3")
-            ma_guidance = ui.input("重点指导").classes("w-full")
             ma_points = ui.textarea("指导要点").classes("w-full").props("rows=2")
 
         # ====== 晨间谈话 ======
@@ -91,15 +92,42 @@ def daily_plan_page():
         # ====== 集体活动（来自教案拆分）======
         with ui.card().classes("w-full"):
             ui.label("👨‍🏫 集体活动").classes("text-lg font-semibold")
-            ui.label("若已完成教案拆分，此处将自动填充；也可手动填写。").classes(
+            ui.label("粘贴完整教案后点击「AI 拆分」自动填充；也可手动编辑。").classes(
                 "text-sm text-gray-400 mb-2"
             )
+
+            # ---- 教案输入 + AI 拆分按钮 ----
+            lesson_input = ui.textarea(
+                placeholder="请将完整教案内容粘贴到此处...",
+            ).classes("w-full").props("rows=8")
+
+            with ui.row().classes("gap-2 items-center"):
+                split_btn = ui.button("🤖 AI 拆分教案", color="primary")
+                use_modified = ui.checkbox(
+                    "采用 AI 修改版活动过程（导出时显红色）", value=True,
+                )
+            split_status = ui.label("").classes("text-sm text-gray-500")
+
+            # ---- 拆分结果字段 ----
             ga_theme = ui.input("活动主题").classes("w-full")
             ga_goal = ui.textarea("活动目标").classes("w-full").props("rows=3")
             ga_prep = ui.textarea("活动准备").classes("w-full").props("rows=2")
             ga_key = ui.input("活动重点").classes("w-full")
             ga_diff = ui.input("活动难点").classes("w-full")
-            ga_process = ui.textarea("活动过程").classes("w-full").props("rows=6")
+
+            ui.label("活动过程").classes("font-medium mt-2")
+            with ui.tabs().classes("w-full") as ga_tabs:
+                tab_original = ui.tab("原始版本", icon="article")
+                tab_modified = ui.tab("AI 修改版", icon="auto_fix_high")
+            with ui.tab_panels(ga_tabs, value=tab_original).classes("w-full"):
+                with ui.tab_panel(tab_original):
+                    ga_process_original = ui.textarea(
+                        placeholder="AI 拆分后的活动过程将显示在此...",
+                    ).classes("w-full").props("rows=8")
+                with ui.tab_panel(tab_modified):
+                    ga_process = ui.textarea(
+                        placeholder="AI 修改后的活动过程将显示在此...",
+                    ).classes("w-full").props("rows=8")
 
         # ====== 室内区域活动 ======
         with ui.card().classes("w-full"):
@@ -156,9 +184,10 @@ def daily_plan_page():
 
         def _fill_form(plan: DailyPlan):
             ma = plan.morning_activity
-            ma_type.set_value(ma.activity_type)
-            ma_goal.set_value(ma.activity_goal)
+            ma_group.set_value(ma.group_activity_name)
+            ma_self.set_value(ma.self_selected_name)
             ma_guidance.set_value(ma.key_guidance)
+            ma_goal.set_value(ma.activity_goal)
             ma_points.set_value(ma.guidance_points)
 
             mt = plan.morning_talk
@@ -171,7 +200,9 @@ def daily_plan_page():
             ga_prep.set_value(ga.preparation)
             ga_key.set_value(ga.key_point)
             ga_diff.set_value(ga.difficulty)
+            ga_process_original.set_value(ga.process_original or ga.process)
             ga_process.set_value(ga.process)
+            lesson_input.set_value(plan.original_lesson_text or "")
 
             ia = plan.indoor_area
             ia_area.set_value(ia.game_area)
@@ -233,9 +264,10 @@ def daily_plan_page():
                     ai.generate_morning_activity,
                     week, day, grade, class_name, outdoor_content,
                 )
-                ma_type.set_value(ma_result.get("activity_type", ""))
-                ma_goal.set_value(ma_result.get("activity_goal", ""))
+                ma_group.set_value(ma_result.get("group_activity_name", ""))
+                ma_self.set_value(ma_result.get("self_selected_name", ""))
                 ma_guidance.set_value(ma_result.get("key_guidance", ""))
+                ma_goal.set_value(ma_result.get("activity_goal", ""))
                 ma_points.set_value(ma_result.get("guidance_points", ""))
 
                 # 晨间谈话
@@ -279,6 +311,52 @@ def daily_plan_page():
         gen_btn.on("click", do_generate)
 
         # ----------------------------------------------------------------
+        # 事件：教案 AI 拆分（嵌入在集体活动卡片）
+        # ----------------------------------------------------------------
+        async def do_split_lesson():
+            text = (lesson_input.value or "").strip()
+            if not text:
+                split_status.set_text("❌ 请先粘贴教案内容")
+                return
+            ai = get_ai_service()
+            if not ai:
+                split_status.set_text("❌ 未配置 AI，请先到设置页面配置")
+                return
+            try:
+                semester = await run.io_bound(get_latest_semester)
+            except Exception as e:
+                split_status.set_text(f"❌ 数据库不可用：{e}")
+                return
+            grade = semester.get("grade", "") if semester else ""
+
+            split_btn.props("loading")
+            split_status.set_text("⏳ AI 拆分中，请稍候...")
+            try:
+                result = await run.io_bound(ai.split_lesson_plan, text, grade)
+                ga_theme.set_value(result.get("theme", ""))
+                ga_goal.set_value(result.get("goal", ""))
+                ga_prep.set_value(result.get("preparation", ""))
+                ga_key.set_value(result.get("key_point", ""))
+                ga_diff.set_value(result.get("difficulty", ""))
+                orig_process = result.get("process", "")
+                ga_process_original.set_value(orig_process)
+
+                split_status.set_text("✅ 拆分完成，正在 AI 修改活动过程...")
+                mod_text = await run.io_bound(
+                    ai.modify_activity_process, orig_process, grade
+                )
+                ga_process.set_value(mod_text)
+                state["original_lesson_text"] = text
+                split_status.set_text("✅ 教案拆分并修改完成，已自动切换到「AI 修改版」")
+                ga_tabs.set_value(tab_modified)
+            except Exception as e:
+                split_status.set_text(f"❌ AI 拆分失败：{e}")
+            finally:
+                split_btn.props(remove="loading")
+
+        split_btn.on("click", do_split_lesson)
+
+        # ----------------------------------------------------------------
         # 事件：保存
         # ----------------------------------------------------------------
         async def do_save():
@@ -311,23 +389,33 @@ def daily_plan_page():
             plan.semester_id = semester_id
 
             plan.morning_activity = MorningActivity(
-                activity_type=ma_type.value,
-                activity_goal=ma_goal.value,
+                group_activity_name=ma_group.value,
+                self_selected_name=ma_self.value,
                 key_guidance=ma_guidance.value,
+                activity_goal=ma_goal.value,
                 guidance_points=ma_points.value,
             )
             plan.morning_talk = MorningTalk(
                 topic=mt_topic.value,
                 questions=mt_questions.value,
             )
+            orig_proc = ga_process_original.value or ""
+            mod_proc = ga_process.value or ""
+            chosen_process = mod_proc if (use_modified.value and mod_proc) else (orig_proc or mod_proc)
             plan.group_activity = GroupActivity(
                 theme=ga_theme.value,
                 goal=ga_goal.value,
                 preparation=ga_prep.value,
                 key_point=ga_key.value,
                 difficulty=ga_diff.value,
-                process=ga_process.value,
+                process=chosen_process,
+                process_original=orig_proc,
             )
+            plan.original_lesson_text = state.get("original_lesson_text", "") or (lesson_input.value or "")
+            if use_modified.value and mod_proc and mod_proc != orig_proc:
+                plan.ai_modified_parts = {"fields": ["group_activity_process"]}
+            else:
+                plan.ai_modified_parts = {}
             plan.indoor_area = AreaActivity(
                 game_area=ia_area.value,
                 activity_goal=ia_goal.value,

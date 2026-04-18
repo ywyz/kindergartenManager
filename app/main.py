@@ -16,7 +16,6 @@ from app.config import AppConfig
 
 NAV_ITEMS = [
     ("/settings",    "tune",         "系统设置"),
-    ("/lesson-split","article",      "教案拆分"),
     ("/daily-plan",  "event_note",   "一日计划"),
     ("/prompts",     "psychology",   "提示词管理"),
     ("/history",     "history",      "历史记录"),

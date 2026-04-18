@@ -9,8 +9,9 @@ from app.db import execute_query, execute_one, execute_insert, execute_update, j
 @dataclass
 class MorningActivity:
     """晨间活动"""
-    activity_type: str = ""          # 体能大循环/集体游戏/自选游戏
-    key_guidance: str = ""           # 重点指导
+    group_activity_name: str = ""    # 集体活动名称
+    self_selected_name: str = ""     # 自选活动名称
+    key_guidance: str = ""           # 重点指导（通常是某个活动名称）
     activity_goal: str = ""          # 活动目标
     guidance_points: str = ""        # 指导要点
 

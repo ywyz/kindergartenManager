@@ -1,11 +1,26 @@
 """AI 服务封装 - 使用 openai 库连接兼容接口"""
 import json
+import logging
+import random
 import re
+import time
 from typing import Optional
 
 from openai import OpenAI
 
 from app.db import execute_one
+
+logger = logging.getLogger(__name__)
+
+
+def _diversity_hint() -> str:
+    """生成一段不影响主题的随机化提示，用于打破缓存与提高输出多样性。"""
+    seed = random.randint(10000, 99999)
+    ts = int(time.time())
+    return (
+        f"\n\n[多样性要求] 请避免与常见示例雷同，给出有新意的方案。"
+        f"（随机种子：{seed}-{ts}，仅用于打破缓存，无需出现在输出中）"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -15,26 +30,44 @@ from app.db import execute_one
 _DEFAULT_PROMPTS: dict[str, str] = {
     "lesson_split": (
         "你是一位专业的幼儿园教育专家。请将以下完整教案拆分为结构化的JSON格式，"
-        "包含以下字段：活动主题(theme)、活动目标(goal)、活动准备(preparation)、"
-        "活动重点(key_point)、活动难点(difficulty)、活动过程(process)。\n"
+        "键名必须严格使用以下英文（不要使用中文键名）：\n"
+        "- theme: 活动主题（短句）\n"
+        "- goal: 活动目标（用换行或编号写在同一字符串里）\n"
+        "- preparation: 活动准备\n"
+        "- key_point: 活动重点\n"
+        "- difficulty: 活动难点\n"
+        "- process: 活动过程（保留所有环节、步骤、教师语言、幼儿反应等细节，"
+        "尽量完整，不要省略；用换行分段，不要嵌套 JSON）\n"
         "只返回合法的JSON对象，不要添加任何解释或代码块标记。\n\n"
         "教案内容：\n{content}"
     ),
     "process_modify": (
-        "你是一位专业的幼儿园教育专家。请根据{grade}幼儿的年龄特点和发展水平，"
-        "对以下活动过程进行适当修改优化，使其更符合该年龄段幼儿的认知和行为特点。\n"
-        "请在修改的内容末尾用【AI修改】标注，方便对比。\n"
-        "只返回修改后的活动过程文本，不要添加其他解释。\n\n"
+        "你是一位专业的幼儿园教育专家。下面提供的是【一段“活动过程”纯文本】，"
+        "不是 JSON。请根据{grade}幼儿的年龄特点和发展水平，对其进行【最小化】优化。\n"
+        "【修改范围 · 必须严格遵守】\n"
+        "1. 只允许从下面两种方式中【二选一】操作：\n"
+        "   A. 修改原文中【某一个环节】的内容（仅改这一个环节，其他环节一字不动、原样保留）；\n"
+        "   B. 在原有环节之间或末尾【新增一个环节】（其他原有环节一字不动、原样保留）。\n"
+        "2. 严禁同时修改多个环节，严禁对未选中的环节做任何改写、润色、合并或调整顺序。\n"
+        "3. 必须保留原文所有未改动环节的【原始文字、标点、序号、分段】，不可重写。\n"
+        "4. 仅在你新增或修改的那个环节末尾追加【AI修改】标记，方便对比；其他环节绝不能出现该标记。\n"
+        "【输出要求 · 必须严格遵守】\n"
+        "1. 只输出修改后的【活动过程纯文本】（包含所有未改动的原环节 + 你修改/新增的那一个环节）。\n"
+        "2. 禁止输出 JSON、键值对、Markdown 代码块、```、{ } 等结构化符号。\n"
+        "3. 禁止输出“活动主题/活动目标/活动准备/活动重点/活动难点”等其它字段，"
+        "只输出活动过程本身。\n\n"
         "原始活动过程：\n{content}"
     ),
     "morning_activity": (
         "你是一位专业的幼儿园教育专家。请为{grade}{class_name}设计一份晨间活动方案。\n"
         "当前是第{week}周，{day}。\n"
         "户外体育器材与场地内容：{outdoor_content}\n"
-        "请生成以下JSON格式的晨间活动内容：\n"
+        "请生成以下JSON格式的晨间活动内容（必须包含一个集体活动和一个自选活动，"
+        "并从中挑选一个作为重点指导对象）：\n"
         "{{\n"
-        "  \"activity_type\": \"活动类型（体能大循环/集体游戏/自选游戏）\",\n"
-        "  \"key_guidance\": \"重点指导内容\",\n"
+        "  \"group_activity_name\": \"集体活动名称（一个具体的活动名）\",\n"
+        "  \"self_selected_name\": \"自选活动名称（一个具体的活动名）\",\n"
+        "  \"key_guidance\": \"重点指导名称（必须是上面两个活动之一）\",\n"
         "  \"activity_goal\": \"活动目标（2-3条）\",\n"
         "  \"guidance_points\": \"指导要点（2-3点）\"\n"
         "}}\n"
@@ -117,26 +150,207 @@ def _extract_json(text: str) -> dict | list:
     return json.loads(candidate)
 
 
+# 中文 key -> 英文 key 映射（按业务字段汇总，重名安全）
+_KEY_ALIASES: dict[str, str] = {
+    # 晨间活动专用
+    "集体活动名称": "group_activity_name",
+    "集体活动": "group_activity_name",
+    "集体游戏": "group_activity_name",
+    "集体游戏名称": "group_activity_name",
+    "自选活动名称": "self_selected_name",
+    "自选活动": "self_selected_name",
+    "自主游戏": "self_selected_name",
+    "自主游戏名称": "self_selected_name",
+    "自选游戏": "self_selected_name",
+    "重点指导名称": "key_guidance",
+    # 通用
+    "活动类型": "activity_type",
+    "活动目标": "activity_goal",
+    "重点指导": "key_guidance",
+    "重点指导内容": "key_guidance",
+    "指导要点": "guidance_points",
+    "支持策略": "support_strategy",
+    "教师支持策略": "support_strategy",
+    "游戏区域": "game_area",
+    "游戏场地": "game_area",
+    "游戏场地/区域": "game_area",
+    "区域": "game_area",
+    "谈话主题": "topic",
+    "主题": "topic",
+    "问题设计": "questions",
+    "问题": "questions",
+    # 教案拆分
+    "活动主题": "theme",
+    "活动准备": "preparation",
+    "准备": "preparation",
+    "活动重点": "key_point",
+    "重点": "key_point",
+    "活动难点": "difficulty",
+    "难点": "difficulty",
+    "活动过程": "process",
+    "过程": "process",
+    "目标": "goal",
+}
+
+
+def _normalize_keys(obj):
+    """递归把中文 key 转换为约定的英文 key；list/value 中的字符串保持原样"""
+    if isinstance(obj, dict):
+        result = {}
+        for k, v in obj.items():
+            new_k = _KEY_ALIASES.get(str(k).strip(), k)
+            result[new_k] = _normalize_keys(v)
+        return result
+    if isinstance(obj, list):
+        return [_normalize_keys(x) for x in obj]
+    return obj
+
+
+# 业务上每类生成结果都是“扁平字段”，但模型可能多套一层 wrapper（如 {"result": {...}}
+# 或 {"晨间活动": {...}}）。若顶层只有 1 个 key 且其值是 dict，则解包一层。
+_KNOWN_FIELDS = {
+    "activity_type", "activity_goal", "key_guidance", "guidance_points",
+    "support_strategy", "game_area", "topic", "questions",
+    "theme", "goal", "preparation", "key_point", "difficulty", "process",
+    "group_activity_name", "self_selected_name",
+}
+
+
+def _unwrap_if_needed(data):
+    """若顶层是 wrapper（无任何已知字段），尝试解包内部 dict。"""
+    if not isinstance(data, dict):
+        return data
+    if any(k in _KNOWN_FIELDS for k in data.keys()):
+        return data
+    # 顶层只有一个键，且值是 dict 时解包
+    if len(data) == 1:
+        only_value = next(iter(data.values()))
+        if isinstance(only_value, dict):
+            return only_value
+    return data
+
+
+def _parse_json_response(raw: str) -> dict:
+    """统一的解析入口：提取 -> 归一化 key -> 解包 wrapper，并打日志便于排查。"""
+    logger.info("AI raw response: %s", (raw or "")[:1000])
+    data = _extract_json(raw)
+    data = _normalize_keys(data)
+    data = _unwrap_if_needed(data)
+    logger.info("AI parsed result: %s", data)
+    return data
+
+
+def _strip_to_process_text(raw: str) -> str:
+    """
+    process_modify 兜底：若模型违规返回 JSON 或包含代码块，
+    尽量提取出 process 字段的纯文本；否则原样返回。
+    """
+    if not raw:
+        return ""
+    text = raw.strip()
+    # 去掉 ```json ... ``` 或 ``` ... ``` 包裹
+    fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text, re.IGNORECASE)
+    if fence:
+        text = fence.group(1).strip()
+    # 看起来像 JSON：尝试解析并取出 process 字段
+    if text.startswith("{") and text.endswith("}"):
+        try:
+            data = json.loads(text)
+            if isinstance(data, dict):
+                data = _normalize_keys(data)
+                for key in ("process", "activity_process"):
+                    if key in data and isinstance(data[key], str):
+                        return data[key].strip()
+                # 拿不到 process 时，把所有字符串值拼接，避免完全丢内容
+                texts = [v for v in data.values() if isinstance(v, str)]
+                if texts:
+                    return "\n".join(texts).strip()
+        except json.JSONDecodeError:
+            pass
+    return text
+
+
 def _chat(client: OpenAI, model: str, system_msg: str, user_msg: str,
-          temperature: float = 0.7, max_retries: int = 2) -> str:
-    """发送对话请求，带简单重试"""
+          temperature: float = 0.7, max_retries: int = 2,
+          json_mode: bool = False) -> str:
+    """发送对话请求，带简单重试。json_mode=True 时尝试启用 OpenAI JSON 模式。"""
     last_err = None
     for attempt in range(max_retries + 1):
         try:
-            response = client.chat.completions.create(
-                model=model,
-                messages=[
+            kwargs = {
+                "model": model,
+                "messages": [
                     {"role": "system", "content": system_msg},
                     {"role": "user", "content": user_msg},
                 ],
-                temperature=temperature,
-            )
+                "temperature": temperature,
+            }
+            if json_mode:
+                kwargs["response_format"] = {"type": "json_object"}
+            try:
+                response = client.chat.completions.create(**kwargs)
+            except Exception as e:
+                # 部分兼容网关不支持 response_format，回退一次
+                if json_mode and "response_format" in str(e):
+                    kwargs.pop("response_format", None)
+                    response = client.chat.completions.create(**kwargs)
+                else:
+                    raise
             return response.choices[0].message.content or ""
         except Exception as e:
             last_err = e
             if attempt == max_retries:
                 raise RuntimeError(f"AI调用失败（已重试{max_retries}次）：{e}") from e
     raise RuntimeError(f"AI调用失败：{last_err}")
+
+
+# 强制 JSON 输出的统一格式约束（追加到 user prompt 末尾）
+_JSON_FORMAT_RULES = (
+    "\n\n【输出格式硬性要求 · 必须遵守】\n"
+    "1. 只输出一个合法的 JSON 对象，不要任何多余说明、前后缀或 ``` 代码块标记。\n"
+    "2. 所有键名和字符串值必须使用英文双引号 \"\"。\n"
+    "3. 任意字段如有多项内容，必须写在【同一个字符串】内（用换行或编号），"
+    "禁止把多项内容拆成顶层键的并列字符串（例如 \"key\": \"a\", \"b\" 是非法的）。\n"
+    "4. 字符串内的换行用 \\n，禁止出现裸换行；禁止使用注释。\n"
+    "5. 不要输出键模板里没有列出的额外键。"
+)
+
+
+def _call_json(client: OpenAI, model: str, system_msg: str, user_msg: str,
+               temperature: float = 0.9) -> dict:
+    """
+    通用 JSON 生成调用：自动追加格式约束、启用 JSON 模式、解析失败时让模型自我修正。
+    """
+    full_user = user_msg + _JSON_FORMAT_RULES
+    last_raw = ""
+    last_err: Optional[Exception] = None
+    # 第一次正常调用 + 最多 2 次"修复"重试
+    for attempt in range(3):
+        if attempt == 0:
+            raw = _chat(client, model, system_msg, full_user,
+                        temperature=temperature, json_mode=True)
+        else:
+            repair_prompt = (
+                "你上一次的输出不是合法 JSON，错误信息：\n"
+                f"{last_err}\n\n"
+                "你上次输出的原始内容如下（截取前 1500 字符）：\n"
+                f"{last_raw[:1500]}\n\n"
+                "请严格按要求重新输出修正后的合法 JSON 对象，"
+                "只输出 JSON 本身，不要任何解释。"
+                + _JSON_FORMAT_RULES
+            )
+            raw = _chat(client, model, system_msg, repair_prompt,
+                        temperature=0.2, json_mode=True)
+        last_raw = raw
+        try:
+            return _parse_json_response(raw)
+        except (json.JSONDecodeError, ValueError) as e:
+            last_err = e
+            logger.warning("JSON 解析失败（尝试 %d/3）：%s", attempt + 1, e)
+            continue
+    raise ValueError(
+        f"AI 多次返回的 JSON 仍无法解析：{last_err}\n原始内容：{last_raw[:500]}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -159,29 +373,43 @@ class AIService:
         """
         prompt_tpl = _get_active_prompt("lesson_split")
         prompt = prompt_tpl.format(content=text, grade=grade)
-        raw = _chat(
+        result = _call_json(
             self.client, self.model,
             system_msg="你是专业的幼儿园教育专家，擅长教案分析与整理。",
             user_msg=prompt,
             temperature=0.3,
         )
-        try:
-            return _extract_json(raw)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"AI返回的JSON格式有误：{e}\n原始内容：{raw[:500]}") from e
+        # 教案场景专属归一化：模型常把目标/主题写成"活动目标/活动主题"，
+        # 全局别名会归到 activity_goal/activity_theme，这里再回退一次到 goal/theme。
+        lesson_remap = {
+            "activity_goal": "goal",
+            "activity_theme": "theme",
+            "activity_preparation": "preparation",
+            "activity_key_point": "key_point",
+            "activity_difficulty": "difficulty",
+            "activity_process": "process",
+        }
+        for src, dst in lesson_remap.items():
+            if src in result and dst not in result:
+                result[dst] = result.pop(src)
+        return result
 
     # ---- 活动过程修改 ----
 
     def modify_activity_process(self, original_process: str, grade: str) -> str:
-        """根据年龄段修改活动过程，返回修改后文本，AI修改部分标注【AI修改】"""
+        """根据年龄段修改活动过程，返回修改后文本，AI修改部分标注【AI修改】。
+        若模型违规返回 JSON，将自动剥离仅保留 process 字段文本。
+        """
         prompt_tpl = _get_active_prompt("process_modify")
         prompt = prompt_tpl.format(content=original_process, grade=grade)
-        return _chat(
+        raw = _chat(
             self.client, self.model,
-            system_msg="你是专业的幼儿园教育专家，擅长根据年龄特点优化教学活动。",
+            system_msg="你是专业的幼儿园教育专家，擅长根据年龄特点优化教学活动。"
+                       "你只输出活动过程纯文本，绝不输出 JSON。",
             user_msg=prompt,
             temperature=0.5,
         )
+        return _strip_to_process_text(raw)
 
     # ---- 晨间活动生成 ----
 
@@ -194,15 +422,12 @@ class AIService:
             week=week, day=day, grade=grade,
             class_name=class_name, outdoor_content=outdoor_content,
         )
-        raw = _chat(
+        return _call_json(
             self.client, self.model,
-            system_msg="你是专业的幼儿园教育专家，擅长设计晨间活动。",
-            user_msg=prompt,
+            system_msg="你是专业的幼儿园教育专家，擅长设计晨间活动。每次生成请尽量提供不同的活动名称与内容，避免重复。",
+            user_msg=prompt + _diversity_hint(),
+            temperature=0.95,
         )
-        try:
-            return _extract_json(raw)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"AI返回的JSON格式有误：{e}\n原始内容：{raw[:500]}") from e
 
     # ---- 晨间谈话生成 ----
 
@@ -217,15 +442,12 @@ class AIService:
             week=week, day=day, grade=grade,
             class_name=class_name, holiday_tip=holiday_tip,
         )
-        raw = _chat(
+        return _call_json(
             self.client, self.model,
-            system_msg="你是专业的幼儿园教育专家，擅长设计晨间谈话。",
-            user_msg=prompt,
+            system_msg="你是专业的幼儿园教育专家，擅长设计晨间谈话。每次请选择不同主题，避免重复。",
+            user_msg=prompt + _diversity_hint(),
+            temperature=0.95,
         )
-        try:
-            return _extract_json(raw)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"AI返回的JSON格式有误：{e}\n原始内容：{raw[:500]}") from e
 
     # ---- 室内区域活动生成 ----
 
@@ -235,15 +457,12 @@ class AIService:
         """生成室内区域活动内容"""
         prompt_tpl = _get_active_prompt("indoor_area")
         prompt = prompt_tpl.format(grade=grade, class_name=class_name, area_content=area_content)
-        raw = _chat(
+        return _call_json(
             self.client, self.model,
-            system_msg="你是专业的幼儿园教育专家，擅长设计区域游戏活动。",
-            user_msg=prompt,
+            system_msg="你是专业的幼儿园教育专家，擅长设计区域游戏活动。每次请从可选区域中选择不同区域，提供多样化的内容。",
+            user_msg=prompt + _diversity_hint(),
+            temperature=0.95,
         )
-        try:
-            return _extract_json(raw)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"AI返回的JSON格式有误：{e}\n原始内容：{raw[:500]}") from e
 
     # ---- 户外游戏活动生成 ----
 
@@ -255,15 +474,12 @@ class AIService:
         prompt = prompt_tpl.format(
             grade=grade, class_name=class_name, outdoor_content=outdoor_content
         )
-        raw = _chat(
+        return _call_json(
             self.client, self.model,
-            system_msg="你是专业的幼儿园教育专家，擅长设计户外游戏活动。",
-            user_msg=prompt,
+            system_msg="你是专业的幼儿园教育专家，擅长设计户外游戏活动。每次请提供不同场地、不同玩法的方案，避免重复。",
+            user_msg=prompt + _diversity_hint(),
+            temperature=0.95,
         )
-        try:
-            return _extract_json(raw)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"AI返回的JSON格式有误：{e}\n原始内容：{raw[:500]}") from e
 
     # ---- 提示词测试 ----
 
