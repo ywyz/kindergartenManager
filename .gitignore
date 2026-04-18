@@ -53,3 +53,6 @@ exports/
 # Database
 *.db
 *.sqlite3
+
+# Stray virtualenv folder created by mistake
+list/

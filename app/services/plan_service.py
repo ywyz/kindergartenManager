@@ -73,9 +73,9 @@ def get_ai_config() -> Optional[dict]:
 
 
 def save_ai_config(api_url: str, api_key: str, model_name: str, config_id: Optional[int] = None) -> int:
-    """保存 AI 配置。api_key 存储前进行简单加密（Base64，非高强度加密）"""
-    import base64
-    encrypted_key = base64.b64encode(api_key.encode()).decode()
+    """保存 AI 配置。api_key 使用 Fernet 对称加密后存储。"""
+    from app.services.crypto import encrypt
+    encrypted_key = encrypt(api_key)
 
     if config_id:
         execute_update(
@@ -90,8 +90,8 @@ def save_ai_config(api_url: str, api_key: str, model_name: str, config_id: Optio
 
 
 def get_decrypted_api_key(config_id: Optional[int] = None) -> str:
-    """解密并返回 API Key"""
-    import base64
+    """解密并返回 API Key（兼容历史 Base64 存储）"""
+    from app.services.crypto import decrypt
     row = (
         execute_one("SELECT api_key FROM ai_config WHERE id=%s", (config_id,))
         if config_id
@@ -99,10 +99,7 @@ def get_decrypted_api_key(config_id: Optional[int] = None) -> str:
     )
     if not row or not row.get("api_key"):
         return ""
-    try:
-        return base64.b64decode(row["api_key"].encode()).decode()
-    except Exception:
-        return row["api_key"]  # 兼容旧格式（未加密）
+    return decrypt(row["api_key"])
 
 
 # ---------------------------------------------------------------------------
