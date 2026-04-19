@@ -156,7 +156,10 @@ def get_plans(limit: int = 50, offset: int = 0) -> list[DailyPlan]:
 
 
 def save_plan(plan: DailyPlan) -> int:
-    """保存或更新计划，返回 ID"""
+    """保存或更新计划，返回 ID。
+    有 plan.id 时直接 UPDATE；否则用 INSERT ... ON DUPLICATE KEY UPDATE
+    保证 (plan_date, grade, class_name) 唯一，不产生重复行。
+    """
     data = plan.to_db_dict()
     if plan.id:
         sets = ", ".join(f"{k} = %s" for k in data)
@@ -166,8 +169,25 @@ def save_plan(plan: DailyPlan) -> int:
     else:
         cols = ", ".join(data.keys())
         placeholders = ", ".join(["%s"] * len(data))
-        sql = f"INSERT INTO daily_plans ({cols}) VALUES ({placeholders})"
-        return execute_insert(sql, list(data.values()))
+        update_sets = ", ".join(
+            f"{k} = VALUES({k})"
+            for k in data
+            if k not in ("plan_date", "grade", "class_name")
+        )
+        sql = (
+            f"INSERT INTO daily_plans ({cols}) VALUES ({placeholders}) "
+            f"ON DUPLICATE KEY UPDATE {update_sets}, id = LAST_INSERT_ID(id)"
+        )
+        saved_id = execute_insert(sql, list(data.values()))
+        if saved_id:
+            return saved_id
+
+        # 兜底：部分 MySQL/PyMySQL 组合在重复键且值未变化时可能返回 0
+        row = execute_one(
+            "SELECT id FROM daily_plans WHERE plan_date=%s AND grade=%s AND class_name=%s LIMIT 1",
+            (plan.plan_date, plan.grade, plan.class_name),
+        )
+        return int((row or {}).get("id", 0))
 
 
 def delete_plan(plan_id: int) -> None:

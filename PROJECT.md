@@ -3,7 +3,7 @@
 > 教学管理子系统 · `feature/daily-plan` 分支
 > 最后更新:2026-04-18
 
-本文档由 [.vscode/ToDo/UserTodo.md](.vscode/ToDo/UserTodo.md)、[.github/prompts/plan-dailyActivityPlan.prompt.md](.github/prompts/plan-dailyActivityPlan.prompt.md)、[.vscode/ToDo/TODO.md](.vscode/ToDo/TODO.md) 三份资料汇总而成,作为项目的**唯一入口文档**。后续仅维护本文件。
+本文档由历史待办文档与提示词草案汇总而成,作为项目的**唯一入口文档**。后续仅维护本文件。
 
 ---
 
@@ -146,6 +146,9 @@ kindergartenManager/
 | 10 | `_DEFAULT_PROMPTS["process_modify"]` | 禁止 JSON 输出 + 兜底剥离 | ✅ 已完成 |
 | 11 | lesson_split key 归一化 | 教案目标键被错误映射到 activity_goal | ✅ 已完成 |
 | 12 | `word_export.py` Row 11 | **导出后活动过程整段全红,实际仅【AI修改】标记环节需红字,其余保持黑色** | TODO |
+| 13 | `word_export.py` Row 11 | 活动过程存在【AI新增】等新增环节标记时,导出红字未正确生效 | TODO |
+| 14 | `app/pages/plan_history.py` | 查看历史详情时报错:`'MorningActivity' object has no attribute 'activity_type'`,导致“查看”无响应 | TODO |
+| 15 | `app/pages/plan_history.py` | 历史记录中草稿计划点击“查看”无法打开（需与异常处理联动排查） | TODO |
 
 ### 🚀 待开发功能
 
@@ -156,6 +159,8 @@ kindergartenManager/
 - [ ] 启动自检页:DB / AI 配置 / Word 模板三项检查
 - [ ] AI 调用日志:每次 prompt/响应落库,便于优化
 - [ ] 导出按钮文案区分:`保存并导出` vs 单独 `导出`
+- [ ] 连续导出多日一日活动计划（按日期范围批量导出）
+- [ ] 历史记录页新增“AI生成一日活动反思”按钮（打开历史计划后可一键生成并保存反思）
 
 ---
 

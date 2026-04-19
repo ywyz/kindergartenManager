@@ -461,3 +461,29 @@ def daily_plan_page():
                 action_status.set_text(f"❌ 导出失败：{e}")
 
         export_btn.on("click", do_export)
+
+        # ----------------------------------------------------------------
+        # 页面加载完成后自动初始化今日数据
+        # ----------------------------------------------------------------
+        async def _init_today():
+            today = state["plan_date"]
+            try:
+                semester = await run.io_bound(get_latest_semester)
+            except Exception:
+                return
+            if semester:
+                info = get_date_info(semester["start_date"], today)
+                state.update({
+                    "week_number": info["week_number"],
+                    "day_of_week": info["day_of_week"],
+                    "is_workday": info["is_workday"],
+                    "near_holiday": info["is_near_holiday"],
+                })
+                date_info_label.set_text(
+                    f"第 {info['week_number']} 周 · {info['day_of_week']}  "
+                    f"{'✅ 工作日' if info['is_workday'] else '⚠️ 非工作日'}"
+                    + ("  🎉 临近节假日" if info["is_near_holiday"] else "")
+                )
+            await _load_existing_plan(today)
+
+        ui.timer(0.1, _init_today, once=True)

@@ -60,6 +60,7 @@ _DDL_STATEMENTS = [
         status                  ENUM('draft','completed') DEFAULT 'draft',
         created_at              DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at              DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_plan_date_grade_class (plan_date, grade, class_name),
         FOREIGN KEY (semester_id) REFERENCES semester_settings(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='每日活动计划';
     """,
@@ -147,8 +148,14 @@ def execute_insert(sql: str, args: tuple | list | None = None) -> int:
     try:
         with conn.cursor() as cursor:
             cursor.execute(sql, args)
+            last_id = cursor.lastrowid or 0
+            if not last_id:
+                # 兼容 ON DUPLICATE KEY UPDATE 等场景，尽量从连接级状态获取 ID
+                cursor.execute("SELECT LAST_INSERT_ID() AS id")
+                row = cursor.fetchone() or {}
+                last_id = row.get("id", 0) if isinstance(row, dict) else (row[0] if row else 0)
         conn.commit()
-        return conn.insert_id()
+        return int(last_id or 0)
     except Exception:
         conn.rollback()
         raise
@@ -205,6 +212,20 @@ def init_db() -> None:
             cursor.execute(f"USE `{DBConfig.NAME}`;")
             for ddl in _DDL_STATEMENTS:
                 cursor.execute(ddl)
+            # 迁移：为已存在的 daily_plans 表补加唯一索引（若不存在）
+            cursor.execute(
+                "SELECT COUNT(*) AS cnt FROM information_schema.statistics "
+                "WHERE table_schema = %s AND table_name = 'daily_plans' "
+                "AND index_name = 'uq_plan_date_grade_class'",
+                (DBConfig.NAME,),
+            )
+            row = cursor.fetchone()
+            cnt = row["cnt"] if isinstance(row, dict) else row[0]
+            if cnt == 0:
+                cursor.execute(
+                    "ALTER TABLE daily_plans "
+                    "ADD UNIQUE KEY uq_plan_date_grade_class (plan_date, grade, class_name)"
+                )
         conn.close()
         print(f"[DB] 数据库 {DBConfig.NAME} 初始化成功")
     except Exception as e:

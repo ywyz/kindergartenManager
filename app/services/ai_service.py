@@ -8,7 +8,7 @@ from typing import Optional
 
 from openai import OpenAI
 
-from app.db import execute_one
+from app.db import execute_one, execute_query
 
 logger = logging.getLogger(__name__)
 
@@ -270,6 +270,71 @@ def _strip_to_process_text(raw: str) -> str:
     return text
 
 
+def _build_anti_repeat_hint(category: str, grade: str, class_name: str, limit: int = 5) -> str:
+    """
+    读取近期同年级同班级的已保存内容，构造“避免重复”提示。
+    若数据库不可用或无历史数据，则返回空字符串。
+    """
+    if not grade or not class_name:
+        return ""
+
+    category_to_column = {
+        "morning_activity": "morning_activity_json",
+        "morning_talk": "morning_talk_json",
+        "indoor_area": "indoor_area_json",
+        "outdoor_game": "outdoor_game_json",
+    }
+    col = category_to_column.get(category)
+    if not col:
+        return ""
+
+    try:
+        rows = execute_query(
+            f"SELECT {col} AS payload FROM daily_plans "
+            "WHERE grade=%s AND class_name=%s "
+            "ORDER BY plan_date DESC, id DESC LIMIT %s",
+            (grade, class_name, limit),
+        )
+    except Exception:
+        return ""
+
+    examples: list[str] = []
+    for row in rows:
+        payload = row.get("payload")
+        if not payload:
+            continue
+        try:
+            data = json.loads(payload) if isinstance(payload, str) else payload
+            data = _normalize_keys(data) if isinstance(data, dict) else {}
+        except Exception:
+            continue
+
+        if category == "morning_activity":
+            a = (data.get("group_activity_name") or "").strip()
+            b = (data.get("self_selected_name") or "").strip()
+            item = f"集体:{a} / 自选:{b}".strip(" /")
+        elif category == "morning_talk":
+            item = (data.get("topic") or "").strip()
+        else:
+            area = (data.get("game_area") or "").strip()
+            guidance = (data.get("key_guidance") or "").strip()
+            if len(guidance) > 18:
+                guidance = guidance[:18] + "..."
+            item = f"区域:{area} / 指导:{guidance}".strip(" /")
+
+        if item and item not in examples:
+            examples.append(item)
+
+    if not examples:
+        return ""
+
+    lines = "\n".join(f"- {x}" for x in examples[:limit])
+    return (
+        "\n\n[避免重复要求] 请避免与以下近期已使用内容重复，可借鉴主题方向但不要复用相同活动名/谈话主题/区域组合：\n"
+        + lines
+    )
+
+
 def _chat(client: OpenAI, model: str, system_msg: str, user_msg: str,
           temperature: float = 0.7, max_retries: int = 2,
           json_mode: bool = False) -> str:
@@ -422,10 +487,11 @@ class AIService:
             week=week, day=day, grade=grade,
             class_name=class_name, outdoor_content=outdoor_content,
         )
+        anti_repeat = _build_anti_repeat_hint("morning_activity", grade, class_name)
         return _call_json(
             self.client, self.model,
             system_msg="你是专业的幼儿园教育专家，擅长设计晨间活动。每次生成请尽量提供不同的活动名称与内容，避免重复。",
-            user_msg=prompt + _diversity_hint(),
+            user_msg=prompt + _diversity_hint() + anti_repeat,
             temperature=0.95,
         )
 
@@ -442,10 +508,11 @@ class AIService:
             week=week, day=day, grade=grade,
             class_name=class_name, holiday_tip=holiday_tip,
         )
+        anti_repeat = _build_anti_repeat_hint("morning_talk", grade, class_name)
         return _call_json(
             self.client, self.model,
             system_msg="你是专业的幼儿园教育专家，擅长设计晨间谈话。每次请选择不同主题，避免重复。",
-            user_msg=prompt + _diversity_hint(),
+            user_msg=prompt + _diversity_hint() + anti_repeat,
             temperature=0.95,
         )
 
@@ -457,10 +524,11 @@ class AIService:
         """生成室内区域活动内容"""
         prompt_tpl = _get_active_prompt("indoor_area")
         prompt = prompt_tpl.format(grade=grade, class_name=class_name, area_content=area_content)
+        anti_repeat = _build_anti_repeat_hint("indoor_area", grade, class_name)
         return _call_json(
             self.client, self.model,
             system_msg="你是专业的幼儿园教育专家，擅长设计区域游戏活动。每次请从可选区域中选择不同区域，提供多样化的内容。",
-            user_msg=prompt + _diversity_hint(),
+            user_msg=prompt + _diversity_hint() + anti_repeat,
             temperature=0.95,
         )
 
@@ -474,10 +542,11 @@ class AIService:
         prompt = prompt_tpl.format(
             grade=grade, class_name=class_name, outdoor_content=outdoor_content
         )
+        anti_repeat = _build_anti_repeat_hint("outdoor_game", grade, class_name)
         return _call_json(
             self.client, self.model,
             system_msg="你是专业的幼儿园教育专家，擅长设计户外游戏活动。每次请提供不同场地、不同玩法的方案，避免重复。",
-            user_msg=prompt + _diversity_hint(),
+            user_msg=prompt + _diversity_hint() + anti_repeat,
             temperature=0.95,
         )
 

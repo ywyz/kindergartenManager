@@ -1,6 +1,7 @@
 """Word 导出服务 - 使用 python-docx 填充模板并生成下载文件"""
 import copy
 import io
+import re
 from datetime import date
 from pathlib import Path
 
@@ -106,6 +107,40 @@ def _fill_multiline_cell(cell, fields: list[tuple[str, str, bool]]):
             if label_key in text:
                 _fill_labeled_para(para, content, is_red)
                 break
+
+
+def _fill_process_cell(cell, process_text: str, use_ai_color: bool):
+    """
+    活动过程专用填充函数。
+    - use_ai_color=False：全部黑色
+    - use_ai_color=True：含【AI修改】标记的行显示红色，其余黑色
+    """
+    for para in cell.paragraphs:
+        if "活动过程" in para.text:
+            orig = para.text
+            colon_idx = max(orig.find("："), orig.find(":"))
+            label = orig[: colon_idx + 1] if colon_idx != -1 else orig.rstrip()
+
+            for run in para.runs:
+                run.text = ""
+            if para.runs:
+                para.runs[0].text = label
+            else:
+                para.add_run(label)
+
+            if not process_text:
+                return
+
+            lines = process_text.split("\n")
+            for i, line in enumerate(lines):
+                prefix = "\n" if i > 0 else ""
+                # 兼容多种 AI 标记：如【AI修改】/【AI新增】/[AI修改]/(AI修改) 以及自定义 AI 标签
+                has_ai_tag = bool(re.search(r"[\[\(【]AI[^\]\)】]*[\]\)】]", line))
+                has_ai_keyword = ("AI修改" in line) or ("AI新增" in line)
+                line_red = use_ai_color and (has_ai_tag or has_ai_keyword)
+                run = para.add_run(prefix + line)
+                run.font.color.rgb = RED if line_red else BLACK
+            return
 
 
 # ---------------------------------------------------------------------------
@@ -232,13 +267,10 @@ def export_daily_plan_word(plan: DailyPlan) -> bytes:
     _fill_labeled_para(t.rows[10].cells[1].paragraphs[0], ga.difficulty, is_red("group_activity_difficulty"))
 
     # ----------------------------------------------------------------------
-    # Row 11 - 集体活动：活动过程
+    # Row 11 - 集体活动：活动过程（含【AI修改】标记的行红色，其余黑色）
     # ----------------------------------------------------------------------
     row11_cell = t.rows[11].cells[1]
-    process_red = is_red("group_activity_process")
-    _fill_multiline_cell(row11_cell, [
-        ("活动过程", ga.process, process_red),
-    ])
+    _fill_process_cell(row11_cell, ga.process, is_red("group_activity_process"))
 
     # ----------------------------------------------------------------------
     # Row 12 - 室内区域游戏：游戏区域
