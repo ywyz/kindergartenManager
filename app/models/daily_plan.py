@@ -155,6 +155,23 @@ def get_plans(limit: int = 50, offset: int = 0) -> list[DailyPlan]:
     return [DailyPlan.from_db_row(r) for r in rows]
 
 
+def get_plans_by_date_range(
+    start_date: date, end_date: date, grade: str = "", class_name: str = ""
+) -> list[DailyPlan]:
+    """按日期范围获取计划列表（含起止日期）"""
+    sql = "SELECT * FROM daily_plans WHERE plan_date >= %s AND plan_date <= %s"
+    args: list = [start_date, end_date]
+    if grade:
+        sql += " AND grade = %s"
+        args.append(grade)
+    if class_name:
+        sql += " AND class_name = %s"
+        args.append(class_name)
+    sql += " ORDER BY plan_date ASC"
+    rows = execute_query(sql, args)
+    return [DailyPlan.from_db_row(r) for r in rows]
+
+
 def save_plan(plan: DailyPlan) -> int:
     """保存或更新计划，返回 ID。
     有 plan.id 时直接 UPDATE；否则用 INSERT ... ON DUPLICATE KEY UPDATE

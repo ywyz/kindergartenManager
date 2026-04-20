@@ -1,4 +1,5 @@
 """一日活动计划页面 - AI生成晨间活动/谈话/区域/户外 + 手动填写集体活动"""
+import asyncio
 from datetime import date
 
 from nicegui import ui, run
@@ -157,6 +158,7 @@ def daily_plan_page():
         # ---- 操作按钮 ----
         with ui.row().classes("gap-2"):
             save_btn = ui.button("💾 保存", color="positive")
+            save_export_btn = ui.button("💾📄 保存并导出", color="primary")
             export_btn = ui.button("📄 导出 Word", color="secondary")
 
         action_status = ui.label("").classes("text-sm text-gray-500")
@@ -229,17 +231,8 @@ def daily_plan_page():
                 gen_status.set_text("❌ 未配置 AI，请先在设置页面配置")
                 return
 
-            semester = get_latest_semester()
-            grade = semester.get("grade", "") if semester else ""
-            class_name = semester.get("class_name", "") if semester else ""
-            area_content = get_setting("area_content", "")
-            outdoor_content = get_setting("outdoor_content", "")
-            week = state.get("week_number") or 1
-            day = state.get("day_of_week", "")
-            near_holiday = state.get("near_holiday", False)
-
             gen_btn.props("loading")
-            gen_status.set_text("⏳ AI 生成中...")
+            gen_status.set_text("⏳ 读取设置...")
 
             try:
                 semester = await run.io_bound(get_latest_semester)
@@ -247,6 +240,7 @@ def daily_plan_page():
                 outdoor_content = await run.io_bound(get_setting, "outdoor_content", "")
             except Exception as e:
                 gen_status.set_text(f"❌ 读取设置失败：{e}")
+                gen_btn.props(remove="loading")
                 return
             grade = semester.get("grade", "") if semester else ""
             class_name = semester.get("class_name", "") if semester else ""
@@ -255,46 +249,48 @@ def daily_plan_page():
             near_holiday = state.get("near_holiday", False)
 
             gen_btn.props("loading")
-            gen_status.set_text("⏳ AI 生成中...")
+            gen_status.set_text("⏳ AI 并发生成中（4 项同时进行）...")
 
             try:
-                # 晨间活动
-                gen_status.set_text("⏳ 生成晨间活动...")
-                ma_result = await run.io_bound(
+                # 4 个 AI 请求并发执行
+                ma_future = run.io_bound(
                     ai.generate_morning_activity,
                     week, day, grade, class_name, outdoor_content,
                 )
+                mt_future = run.io_bound(
+                    ai.generate_morning_talk,
+                    week, day, grade, class_name, near_holiday,
+                )
+                ia_future = run.io_bound(
+                    ai.generate_indoor_area, grade, class_name, area_content
+                )
+                og_future = run.io_bound(
+                    ai.generate_outdoor_game, grade, class_name, outdoor_content
+                )
+
+                ma_result, mt_result, ia_result, og_result = await asyncio.gather(
+                    ma_future, mt_future, ia_future, og_future
+                )
+
+                # 填充晨间活动
                 ma_group.set_value(ma_result.get("group_activity_name", ""))
                 ma_self.set_value(ma_result.get("self_selected_name", ""))
                 ma_guidance.set_value(ma_result.get("key_guidance", ""))
                 ma_goal.set_value(ma_result.get("activity_goal", ""))
                 ma_points.set_value(ma_result.get("guidance_points", ""))
 
-                # 晨间谈话
-                gen_status.set_text("⏳ 生成晨间谈话...")
-                mt_result = await run.io_bound(
-                    ai.generate_morning_talk,
-                    week, day, grade, class_name, near_holiday,
-                )
+                # 填充晨间谈话
                 mt_topic.set_value(mt_result.get("topic", ""))
                 mt_questions.set_value(mt_result.get("questions", ""))
 
-                # 室内区域活动
-                gen_status.set_text("⏳ 生成室内区域活动...")
-                ia_result = await run.io_bound(
-                    ai.generate_indoor_area, grade, class_name, area_content
-                )
+                # 填充室内区域活动
                 ia_area.set_value(ia_result.get("game_area", ""))
                 ia_goal.set_value(ia_result.get("activity_goal", ""))
                 ia_guidance.set_value(ia_result.get("key_guidance", ""))
                 ia_points.set_value(ia_result.get("guidance_points", ""))
                 ia_strategy.set_value(ia_result.get("support_strategy", ""))
 
-                # 户外游戏活动
-                gen_status.set_text("⏳ 生成户外游戏活动...")
-                og_result = await run.io_bound(
-                    ai.generate_outdoor_game, grade, class_name, outdoor_content
-                )
+                # 填充户外游戏活动
                 og_area.set_value(og_result.get("game_area", ""))
                 og_goal.set_value(og_result.get("activity_goal", ""))
                 og_guidance.set_value(og_result.get("key_guidance", ""))
@@ -443,11 +439,28 @@ def daily_plan_page():
         save_btn.on("click", do_save)
 
         # ----------------------------------------------------------------
-        # 事件：导出 Word
+        # 事件：保存并导出 Word
+        # ----------------------------------------------------------------
+        async def do_save_and_export():
+            await do_save()
+            plan = state.get("plan")
+            if not plan:
+                action_status.set_text("❌ 保存失败，无法导出")
+                return
+            try:
+                from app.services.word_export import save_export_to_file
+                file_path = await run.io_bound(save_export_to_file, plan)
+                action_status.set_text(f"✅ 已保存并导出：{file_path.name}")
+                ui.download(str(file_path), filename=file_path.name)
+            except Exception as e:
+                action_status.set_text(f"❌ 导出失败：{e}")
+
+        save_export_btn.on("click", do_save_and_export)
+
+        # ----------------------------------------------------------------
+        # 事件：仅导出 Word（不保存当前表单）
         # ----------------------------------------------------------------
         async def do_export():
-            if not state.get("plan"):
-                await do_save()
             plan = state.get("plan")
             if not plan:
                 action_status.set_text("❌ 请先保存后再导出")

@@ -136,32 +136,32 @@ kindergartenManager/
 |---|---|---|---|
 | 1 | `app/pages/daily_plan.py` | 集体活动栏不会自动从当天教案拆分继承(已部分通过内嵌缓解,跨次访问仍需依赖保存) | TODO |
 | 2 | `app/services/date_utils.py` | 节假日列表硬编码,不含调休 | TODO |
-| 3 | DB schema `daily_plans` | 缺 `(plan_date, grade, class_name)` 唯一索引 | TODO |
+| 3 | DB schema `daily_plans` | 缺 `(plan_date, grade, class_name)` 唯一索引 | ✅ 已完成（DDL + ALTER 兜底） |
 | 4 | `ai_service.py` | JSON 解析失败重试 | ✅ 已完成 |
 | 5 | `settings.py` | `area_content`/`outdoor_content` 仅单文本框,需支持多候选 | TODO |
 | 6 | 学期设置 | 仅最近一条生效,无法切换历史学期 | TODO |
-| 7 | `.env` `APP_SECRET_KEY` | 占位符,**必须替换为强随机值**(替换后需重新保存 AI Key) | **紧急** |
+| 7 | `.env` `APP_SECRET_KEY` | 占位符,**必须替换为强随机值**(替换后需重新保存 AI Key) | ✅ 已完成 |
 | 8 | `lesson_split.py` | 与一日计划日期共用 | ✅ 已完成 |
 | 9 | `lesson_split.py` → `daily_plan.py` | 教案拆分内嵌一日计划 | ✅ 已完成 |
 | 10 | `_DEFAULT_PROMPTS["process_modify"]` | 禁止 JSON 输出 + 兜底剥离 | ✅ 已完成 |
 | 11 | lesson_split key 归一化 | 教案目标键被错误映射到 activity_goal | ✅ 已完成 |
-| 12 | `word_export.py` Row 11 | **导出后活动过程整段全红,实际仅【AI修改】标记环节需红字,其余保持黑色** | TODO |
-| 13 | `word_export.py` Row 11 | 活动过程存在【AI新增】等新增环节标记时,导出红字未正确生效 | TODO |
-| 14 | `app/pages/plan_history.py` | 查看历史详情时报错:`'MorningActivity' object has no attribute 'activity_type'`,导致“查看”无响应 | TODO |
-| 15 | `app/pages/plan_history.py` | 历史记录中草稿计划点击“查看”无法打开（需与异常处理联动排查） | TODO |
+| 12 | `word_export.py` Row 11 | **导出后活动过程整段全红,实际仅【AI修改】标记环节需红字,其余保持黑色**（疑似 python-docx 库限制，需进一步排查） | TODO ||
+| 13 | `word_export.py` Row 11 | 活动过程存在【AI新增】等新增环节标记时,导出红字未正确生效（同 #12，可能需换库或调整方案） | TODO |
+| 14 | `app/pages/plan_history.py` | 查看历史详情时报错：`'MorningActivity' object has no attribute 'activity_type'`，导致"查看"无响应 | ✅ 已完成 |
+| 15 | `app/pages/plan_history.py` | 历史记录中草稿计划点击"查看"无法打开（需与异常处理联动排查） | ✅ 已完成 |
 
 ### 🚀 待开发功能
 
-- [ ] **多 AI 并发批量生成**:4 个 AI 请求改 `asyncio.gather` / 线程池并发,显著降低等待时间
+- [x] **多 AI 并发批量生成**:4 个 AI 请求改 `asyncio.gather` 并发,显著降低等待时间
 - [ ] **多 AI 负载均衡**:`ai_config` 支持多条激活记录,按轮询/随机/权重分发,失败自动切换
 - [ ] `templates/MAPPING.md`:docx 单元格 ↔ Python 字段映射文档
-- [ ] 导出文件命名规范:`{年级}{班级}_{YYYY-MM-DD}_{第N周周X}.docx`
+- [x] 导出文件命名规范:`{年级}{班级}_{YYYY-MM-DD}_{第N周周X}.docx`
 - [ ] 启动自检页:DB / AI 配置 / Word 模板三项检查
 - [ ] AI 调用日志:每次 prompt/响应落库,便于优化
-- [ ] 导出按钮文案区分:`保存并导出` vs 单独 `导出`
-- [ ] 连续导出多日一日活动计划（按日期范围批量导出）
-- [ ] 历史记录页新增“AI生成一日活动反思”按钮（打开历史计划后可一键生成并保存反思）
-
+- [x] 导出按钮文案区分:`保存并导出` vs 单独 `导出`
+- [x] 连续导出多日一日活动计划（按日期范围批量导出）
+- [x] 历史记录页新增"AI生成一日活动反思"按钮（打开历史计划后可一键生成并保存反思）
+- [x] **日期加载已有计划**：在一日计划页面选择日期后，自动从数据库加载该日期已保存的计划内容并填充到表单
 ---
 
 ## 7. 开发与启动

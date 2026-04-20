@@ -130,6 +130,27 @@ def _get_active_prompt(category: str) -> str:
     return _DEFAULT_PROMPTS.get(category, "")
 
 
+def _get_ai_params() -> dict:
+    """从 app_settings 读取用户配置的 AI 生成参数"""
+    defaults = {"temperature": 0.95, "top_p": 0.95, "frequency_penalty": 0.3}
+    keys_map = {
+        "ai_temperature": "temperature",
+        "ai_top_p": "top_p",
+        "ai_frequency_penalty": "frequency_penalty",
+    }
+    try:
+        for setting_key, param_name in keys_map.items():
+            row = execute_one(
+                "SELECT setting_val FROM app_settings WHERE setting_key = %s",
+                (setting_key,),
+            )
+            if row and row.get("setting_val"):
+                defaults[param_name] = float(row["setting_val"])
+    except Exception:
+        pass
+    return defaults
+
+
 def _build_client(api_url: str, api_key: str) -> OpenAI:
     return OpenAI(base_url=api_url, api_key=api_key)
 
@@ -336,7 +357,8 @@ def _build_anti_repeat_hint(category: str, grade: str, class_name: str, limit: i
 
 
 def _chat(client: OpenAI, model: str, system_msg: str, user_msg: str,
-          temperature: float = 0.7, max_retries: int = 2,
+          temperature: float = 0.7, top_p: float = 1.0,
+          frequency_penalty: float = 0.0, max_retries: int = 2,
           json_mode: bool = False) -> str:
     """发送对话请求，带简单重试。json_mode=True 时尝试启用 OpenAI JSON 模式。"""
     last_err = None
@@ -349,6 +371,8 @@ def _chat(client: OpenAI, model: str, system_msg: str, user_msg: str,
                     {"role": "user", "content": user_msg},
                 ],
                 "temperature": temperature,
+                "top_p": top_p,
+                "frequency_penalty": frequency_penalty,
             }
             if json_mode:
                 kwargs["response_format"] = {"type": "json_object"}
@@ -382,7 +406,8 @@ _JSON_FORMAT_RULES = (
 
 
 def _call_json(client: OpenAI, model: str, system_msg: str, user_msg: str,
-               temperature: float = 0.9) -> dict:
+               temperature: float = 0.9, top_p: float = 1.0,
+               frequency_penalty: float = 0.0) -> dict:
     """
     通用 JSON 生成调用：自动追加格式约束、启用 JSON 模式、解析失败时让模型自我修正。
     """
@@ -393,7 +418,8 @@ def _call_json(client: OpenAI, model: str, system_msg: str, user_msg: str,
     for attempt in range(3):
         if attempt == 0:
             raw = _chat(client, model, system_msg, full_user,
-                        temperature=temperature, json_mode=True)
+                        temperature=temperature, top_p=top_p,
+                        frequency_penalty=frequency_penalty, json_mode=True)
         else:
             repair_prompt = (
                 "你上一次的输出不是合法 JSON，错误信息：\n"
@@ -428,6 +454,7 @@ class AIService:
     def __init__(self, api_url: str, api_key: str, model: str):
         self.client = _build_client(api_url, api_key)
         self.model = model
+        self._params = _get_ai_params()  # 用户配置的温度等参数
 
     # ---- 教案拆分 ----
 
@@ -492,7 +519,9 @@ class AIService:
             self.client, self.model,
             system_msg="你是专业的幼儿园教育专家，擅长设计晨间活动。每次生成请尽量提供不同的活动名称与内容，避免重复。",
             user_msg=prompt + _diversity_hint() + anti_repeat,
-            temperature=0.95,
+            temperature=self._params["temperature"],
+            top_p=self._params["top_p"],
+            frequency_penalty=self._params["frequency_penalty"],
         )
 
     # ---- 晨间谈话生成 ----
@@ -513,7 +542,9 @@ class AIService:
             self.client, self.model,
             system_msg="你是专业的幼儿园教育专家，擅长设计晨间谈话。每次请选择不同主题，避免重复。",
             user_msg=prompt + _diversity_hint() + anti_repeat,
-            temperature=0.95,
+            temperature=self._params["temperature"],
+            top_p=self._params["top_p"],
+            frequency_penalty=self._params["frequency_penalty"],
         )
 
     # ---- 室内区域活动生成 ----
@@ -529,7 +560,9 @@ class AIService:
             self.client, self.model,
             system_msg="你是专业的幼儿园教育专家，擅长设计区域游戏活动。每次请从可选区域中选择不同区域，提供多样化的内容。",
             user_msg=prompt + _diversity_hint() + anti_repeat,
-            temperature=0.95,
+            temperature=self._params["temperature"],
+            top_p=self._params["top_p"],
+            frequency_penalty=self._params["frequency_penalty"],
         )
 
     # ---- 户外游戏活动生成 ----
@@ -547,7 +580,9 @@ class AIService:
             self.client, self.model,
             system_msg="你是专业的幼儿园教育专家，擅长设计户外游戏活动。每次请提供不同场地、不同玩法的方案，避免重复。",
             user_msg=prompt + _diversity_hint() + anti_repeat,
-            temperature=0.95,
+            temperature=self._params["temperature"],
+            top_p=self._params["top_p"],
+            frequency_penalty=self._params["frequency_penalty"],
         )
 
     # ---- 提示词测试 ----
@@ -558,6 +593,28 @@ class AIService:
             self.client, self.model,
             system_msg="你是专业的幼儿园教育专家。",
             user_msg=prompt_content.replace("{content}", test_input),
+        )
+
+    # ---- 一日活动反思生成 ----
+
+    def generate_daily_reflection(self, plan_summary: str, grade: str, class_name: str) -> str:
+        """根据当日活动内容生成一日活动反思，返回纯文本。"""
+        prompt = (
+            f"你是一位专业的幼儿园教育专家。请根据以下{grade}{class_name}的一日活动内容，"
+            "撰写一份简洁的一日活动反思（200-400字），包含：\n"
+            "1. 今日活动亮点与幼儿表现\n"
+            "2. 存在的问题或需改进之处\n"
+            "3. 后续调整方向\n\n"
+            "请直接输出反思文本，不要输出 JSON 或其他格式。\n\n"
+            f"今日活动内容概要：\n{plan_summary}"
+        )
+        return _chat(
+            self.client, self.model,
+            system_msg="你是专业的幼儿园教育专家，擅长撰写教学反思。",
+            user_msg=prompt,
+            temperature=self._params["temperature"],
+            top_p=self._params["top_p"],
+            frequency_penalty=self._params["frequency_penalty"],
         )
 
 

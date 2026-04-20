@@ -4,6 +4,7 @@ import io
 import re
 from datetime import date
 from pathlib import Path
+from typing import List
 
 from docx import Document
 from docx.oxml.ns import qn
@@ -113,8 +114,17 @@ def _fill_process_cell(cell, process_text: str, use_ai_color: bool):
     """
     活动过程专用填充函数。
     - use_ai_color=False：全部黑色
-    - use_ai_color=True：含【AI修改】标记的行显示红色，其余黑色
+    - use_ai_color=True：含【AI修改】/【AI新增】标记的整个环节显示红色，其余环节黑色。
+      环节由中文数字标题行（如"一、""二、"）或阿拉伯数字标题行划分。
+      当环节标题带 AI 标记时，该标题行及其下属所有内容行均为红色，直到下一个环节标题。
     """
+    # 匹配环节标题行：中文数字"一、二、…" 或 全角/半角阿拉伯 "(一)" 等
+    _SECTION_HEADER_RE = re.compile(
+        r"^\s*[一二三四五六七八九十]+\s*[、.．]"   # 一、 二、
+        r"|^\s*[（\(]\s*[一二三四五六七八九十]+\s*[）\)]"  # （一） (二)
+    )
+    _AI_TAG_RE = re.compile(r"[\[\(【]AI[^\]\)】]*[\]\)】]")
+
     for para in cell.paragraphs:
         if "活动过程" in para.text:
             orig = para.text
@@ -132,14 +142,39 @@ def _fill_process_cell(cell, process_text: str, use_ai_color: bool):
                 return
 
             lines = process_text.split("\n")
+
+            if not use_ai_color:
+                # 不需要红色，全部黑色输出
+                for i, line in enumerate(lines):
+                    prefix = "\n" if i > 0 else ""
+                    run = para.add_run(prefix + line)
+                    run.font.color.rgb = BLACK
+                return
+
+            # ---- 按环节分段，确定每行是否应为红色 ----
+            # 第一遍：标记每行所属环节是否有 AI 标记
+            line_red_flags = [False] * len(lines)
+            current_section_has_ai = False
+
+            for i, line in enumerate(lines):
+                is_header = bool(_SECTION_HEADER_RE.search(line))
+                line_has_ai = bool(_AI_TAG_RE.search(line)) or ("AI修改" in line) or ("AI新增" in line)
+
+                if is_header:
+                    # 新环节开始，根据该标题行是否有 AI 标记决定整个环节颜色
+                    current_section_has_ai = line_has_ai
+                else:
+                    # 非标题行：如果自身带 AI 标记也标红（兜底）
+                    if line_has_ai:
+                        current_section_has_ai = True
+
+                line_red_flags[i] = current_section_has_ai
+
+            # 第二遍：输出带颜色的 runs
             for i, line in enumerate(lines):
                 prefix = "\n" if i > 0 else ""
-                # 兼容多种 AI 标记：如【AI修改】/【AI新增】/[AI修改]/(AI修改) 以及自定义 AI 标签
-                has_ai_tag = bool(re.search(r"[\[\(【]AI[^\]\)】]*[\]\)】]", line))
-                has_ai_keyword = ("AI修改" in line) or ("AI新增" in line)
-                line_red = use_ai_color and (has_ai_tag or has_ai_keyword)
                 run = para.add_run(prefix + line)
-                run.font.color.rgb = RED if line_red else BLACK
+                run.font.color.rgb = RED if line_red_flags[i] else BLACK
             return
 
 
@@ -334,7 +369,7 @@ def export_daily_plan_word(plan: DailyPlan) -> bytes:
 def save_export_to_file(plan: DailyPlan) -> Path:
     """
     将导出的 Word 写入 exports/ 目录，返回文件路径。
-    文件名格式：{year}-{month:02d}-{day:02d}_{grade}{class}.docx
+    文件名格式：{年级}{班级}_{YYYY-MM-DD}_{第N周周X}.docx
     """
     export_dir = AppConfig.EXPORT_DIR
     export_dir.mkdir(parents=True, exist_ok=True)
@@ -342,13 +377,57 @@ def save_export_to_file(plan: DailyPlan) -> Path:
     content = export_daily_plan_word(plan)
     if plan.plan_date:
         d = plan.plan_date
-        filename = (
-            f"{d.year}-{d.month:02d}-{d.day:02d}"
-            f"_{plan.grade}{plan.class_name}.docx"
-        )
+        date_part = f"{d.year}-{d.month:02d}-{d.day:02d}"
+        grade_class = f"{plan.grade}{plan.class_name}" if (plan.grade or plan.class_name) else ""
+        week_part = ""
+        if plan.week_number:
+            day_of_week = plan.day_of_week or ""
+            week_part = f"_第{plan.week_number}周{day_of_week}"
+        if grade_class:
+            filename = f"{grade_class}_{date_part}{week_part}.docx"
+        else:
+            filename = f"{date_part}{week_part}.docx"
     else:
         filename = "daily_plan_export.docx"
 
     file_path = export_dir / filename
     file_path.write_bytes(content)
+    return file_path
+
+
+def export_merged_plans(plans: List[DailyPlan], author_name: str = "教师") -> Path:
+    """
+    将多份计划合并导出为单个 Word 文件，每份计划占一页（分页符分隔）。
+    plans 应已按日期升序排列。
+    返回导出文件路径，文件名为 "{author_name}备课笔记.docx"。
+    """
+    if not plans:
+        raise ValueError("没有可导出的计划")
+
+    export_dir = AppConfig.EXPORT_DIR
+    export_dir.mkdir(parents=True, exist_ok=True)
+
+    # 第一份用正常方式生成作为基础文档
+    first_bytes = export_daily_plan_word(plans[0])
+    merged_doc = Document(io.BytesIO(first_bytes))
+
+    # 后续每份：生成独立文档，将其表格复制到合并文档中（分页符分隔）
+    for plan in plans[1:]:
+        plan_bytes = export_daily_plan_word(plan)
+        sub_doc = Document(io.BytesIO(plan_bytes))
+
+        # 添加分页符
+        merged_doc.add_page_break()
+
+        # 复制子文档的表格到合并文档
+        for table in sub_doc.tables:
+            # 深拷贝表格 XML 到合并文档
+            new_tbl = copy.deepcopy(table._tbl)
+            merged_doc.element.body.append(new_tbl)
+
+    filename = f"{author_name}备课笔记.docx"
+    file_path = export_dir / filename
+    buf = io.BytesIO()
+    merged_doc.save(buf)
+    file_path.write_bytes(buf.getvalue())
     return file_path

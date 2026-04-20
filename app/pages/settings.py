@@ -151,3 +151,39 @@ def settings_page():
                 ai_status.set_text("✅ AI 配置已保存")
 
             ui.button("保存 AI 配置", on_click=on_save_ai).classes("mt-2")
+
+        # ---- AI 生成参数 ----
+        with ui.card().classes("w-full"):
+            ui.label("🎛️ AI 生成参数").classes("text-lg font-semibold mb-2")
+            ui.label(
+                "调节 AI 生成的创意度与多样性。温度越高内容越多样但可能不稳定，越低越保守。"
+            ).classes("text-sm text-gray-500 mb-2")
+
+            current_temp = float(get_setting("ai_temperature", "0.95"))
+            current_top_p = float(get_setting("ai_top_p", "0.95"))
+            current_freq_penalty = float(get_setting("ai_frequency_penalty", "0.3"))
+
+            temp_slider = ui.slider(
+                min=0.0, max=2.0, step=0.05, value=current_temp,
+            ).classes("w-full").props('label-always')
+            ui.label("").bind_text_from(temp_slider, "value", lambda v: f"温度 (temperature): {v:.2f}")
+
+            top_p_slider = ui.slider(
+                min=0.0, max=1.0, step=0.05, value=current_top_p,
+            ).classes("w-full").props('label-always')
+            ui.label("").bind_text_from(top_p_slider, "value", lambda v: f"Top P: {v:.2f}")
+
+            freq_slider = ui.slider(
+                min=0.0, max=2.0, step=0.05, value=current_freq_penalty,
+            ).classes("w-full").props('label-always')
+            ui.label("").bind_text_from(freq_slider, "value", lambda v: f"频率惩罚 (frequency_penalty): {v:.2f}")
+
+            param_status = ui.label("").classes("text-sm")
+
+            def on_save_params():
+                set_setting("ai_temperature", str(temp_slider.value))
+                set_setting("ai_top_p", str(top_p_slider.value))
+                set_setting("ai_frequency_penalty", str(freq_slider.value))
+                param_status.set_text("✅ AI 生成参数已保存")
+
+            ui.button("保存生成参数", on_click=on_save_params).classes("mt-2")
