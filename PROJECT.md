@@ -1,7 +1,7 @@
 # 幼儿园每日活动计划系统
 
 > 教学管理子系统 · `feature/daily-plan` 分支
-> 最后更新:2026-04-18
+> 最后更新:2026-04-22
 
 本文档由历史待办文档与提示词草案汇总而成,作为项目的**唯一入口文档**。后续仅维护本文件。
 
@@ -17,6 +17,7 @@
 - **AI 接入**:OpenAI 兼容接口 (openai SDK)
 - **导出**:python-docx 填充 `templates/teacherplan.docx`
 - **加密**:Fernet (cryptography),用于 AI Key 落库前加密
+- **节假日**:`chinesecalendar`(支持 2004–2026,含调休)
 
 依赖见 [pyproject.toml](pyproject.toml)。
 
@@ -135,7 +136,7 @@ kindergartenManager/
 | # | 位置 | 问题 | 状态 |
 |---|---|---|---|
 | 1 | `app/pages/daily_plan.py` | 集体活动栏不会自动从当天教案拆分继承(已部分通过内嵌缓解,跨次访问仍需依赖保存) | TODO |
-| 2 | `app/services/date_utils.py` | 节假日列表硬编码,不含调休 | TODO |
+| 2 | `app/services/date_utils.py` | 接入 `chinesecalendar` 取代硬编码节假日,含调休;`is_near_holiday` 已禁用(节假日本身被工作日判断覆盖,业务内容不含节假日,无需额外提示) | ✅ 已完成 |
 | 3 | DB schema `daily_plans` | 缺 `(plan_date, grade, class_name)` 唯一索引 | ✅ 已完成（DDL + ALTER 兜底） |
 | 4 | `ai_service.py` | JSON 解析失败重试 | ✅ 已完成 |
 | 5 | `settings.py` | `area_content`/`outdoor_content` 仅单文本框,需支持多候选 | TODO |
@@ -145,8 +146,8 @@ kindergartenManager/
 | 9 | `lesson_split.py` → `daily_plan.py` | 教案拆分内嵌一日计划 | ✅ 已完成 |
 | 10 | `_DEFAULT_PROMPTS["process_modify"]` | 禁止 JSON 输出 + 兜底剥离 | ✅ 已完成 |
 | 11 | lesson_split key 归一化 | 教案目标键被错误映射到 activity_goal | ✅ 已完成 |
-| 12 | `word_export.py` Row 11 | **导出后活动过程整段全红,实际仅【AI修改】标记环节需红字,其余保持黑色**（疑似 python-docx 库限制，需进一步排查） | TODO ||
-| 13 | `word_export.py` Row 11 | 活动过程存在【AI新增】等新增环节标记时,导出红字未正确生效（同 #12，可能需换库或调整方案） | TODO |
+| 12 | `word_export.py` Row 11 | 导出后活动过程整段全红 → 改为**每行独立段落 + 单 run 显式 `<w:color>`**,按"环节"聚合 AI 标记决定红/黑 | ✅ 已完成 |
+| 13 | `word_export.py` Row 11 | 【AI新增】等新增环节标记红字未生效 → 标题正则扩展为强(中文数字/`第N步`)+ 弱(阿拉伯数字)两级,AI 标记正则覆盖 `【】/[]/()` 三种括号 | ✅ 已完成 |
 | 14 | `app/pages/plan_history.py` | 查看历史详情时报错：`'MorningActivity' object has no attribute 'activity_type'`，导致"查看"无响应 | ✅ 已完成 |
 | 15 | `app/pages/plan_history.py` | 历史记录中草稿计划点击"查看"无法打开（需与异常处理联动排查） | ✅ 已完成 |
 
@@ -190,7 +191,8 @@ uv run python app/main.py
 
 - **单用户优先**:不实现登录系统,`user_id` 字段预留。
 - **AI Key 安全**:数据库中 Fernet 加密;`.env` 中默认 Key 不入 Git。
-- **节假日判断**:初版仅按周一至周五 + 硬编码节假日,后续接入 API。
+- **节假日判断**:接入 `chinesecalendar` 库(2004–2026,含调休);因业务内容不含节假日,`is_near_holiday` 已禁用以避免噪声提示。
+- **Word 红字**:不在段落/单元格层级染色;采用"每行独立 `<w:p>` + 显式 `<w:color>`"避免 run 颜色越界,环节按强标题(中文数字/`第N步`)与 AI 标记联合判定。
 - **Git 流**:在 `feature/daily-plan` 开发,完成后合并 `main`。
 - **不做范围**:登录系统、备课笔记、周/月计划、其他教学管理功能。
 

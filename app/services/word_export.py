@@ -110,72 +110,121 @@ def _fill_multiline_cell(cell, fields: list[tuple[str, str, bool]]):
                 break
 
 
+# 强环节标题：中文数字"一、" / "（一）" / "第N步|环节|部分|阶段|课时"
+_PROCESS_STRONG_HEADER_RE = re.compile(
+    r"^\s*(?:"
+    r"[一二三四五六七八九十百]+\s*[、.．:：]"
+    r"|[（(]\s*[一二三四五六七八九十百]+\s*[）)]"
+    r"|第[一二三四五六七八九十百\d]+\s*(?:个|步|环节|部分|阶段|课时)"
+    r")"
+)
+
+# 弱环节标题：阿拉伯数字"1.""1、""(1)" —— 仅在全文不含强标题时才用作分节
+_PROCESS_WEAK_HEADER_RE = re.compile(
+    r"^\s*(?:"
+    r"\d+\s*[、.．:：)）]"
+    r"|[（(]\s*\d+\s*[）)]"
+    r")"
+)
+
+# 兼容【AI修改】/[AI新增]/(AI补充) 等格式
+_PROCESS_AI_TAG_RE = re.compile(r"[\[\(【]\s*AI[^\]\)】]*[\]\)】]")
+
+
+def _compute_process_red_flags(lines: list[str]) -> list[bool]:
+    """按"小节"判定每一行是否应红字。
+
+    - 优先用强标题（中文数字 / "第N步" 等）划分；阿拉伯数字此时作为节内步骤，不分节。
+    - 若全文无强标题，则退回用阿拉伯数字标题划分。
+    - 若仍无标题，则仅对带 AI 标记的行染色。
+    """
+    n = len(lines)
+    flags = [False] * n
+    header_idx = [i for i, ln in enumerate(lines) if _PROCESS_STRONG_HEADER_RE.search(ln)]
+    if not header_idx:
+        header_idx = [i for i, ln in enumerate(lines) if _PROCESS_WEAK_HEADER_RE.search(ln)]
+
+    if not header_idx:
+        for i, ln in enumerate(lines):
+            if _PROCESS_AI_TAG_RE.search(ln):
+                flags[i] = True
+        return flags
+
+    sections: list[tuple[int, int]] = []
+    if header_idx[0] > 0:
+        sections.append((0, header_idx[0]))
+    for k, hi in enumerate(header_idx):
+        end = header_idx[k + 1] if k + 1 < len(header_idx) else n
+        sections.append((hi, end))
+
+    for start, end in sections:
+        if any(_PROCESS_AI_TAG_RE.search(lines[i]) for i in range(start, end)):
+            for i in range(start, end):
+                flags[i] = True
+    return flags
+
+
 def _fill_process_cell(cell, process_text: str, use_ai_color: bool):
     """
     活动过程专用填充函数。
     - use_ai_color=False：全部黑色
-    - use_ai_color=True：含【AI修改】/【AI新增】标记的整个环节显示红色，其余环节黑色。
-      环节由中文数字标题行（如"一、""二、"）或阿拉伯数字标题行划分。
-      当环节标题带 AI 标记时，该标题行及其下属所有内容行均为红色，直到下一个环节标题。
-    """
-    # 匹配环节标题行：中文数字"一、二、…" 或 全角/半角阿拉伯 "(一)" 等
-    _SECTION_HEADER_RE = re.compile(
-        r"^\s*[一二三四五六七八九十]+\s*[、.．]"   # 一、 二、
-        r"|^\s*[（\(]\s*[一二三四五六七八九十]+\s*[）\)]"  # （一） (二)
-    )
-    _AI_TAG_RE = re.compile(r"[\[\(【]AI[^\]\)】]*[\]\)】]")
+    - use_ai_color=True：按环节判定，含【AI修改】/【AI新增】等标记的整节红色，其余黑色。
 
+    实现要点：每一行写入独立段落，单 run 显式带 <w:color> 属性，避免
+    Word 渲染时 run 颜色越界、或 \\n 不被识别为换行的问题。
+    """
+    target_para = None
     for para in cell.paragraphs:
         if "活动过程" in para.text:
-            orig = para.text
-            colon_idx = max(orig.find("："), orig.find(":"))
-            label = orig[: colon_idx + 1] if colon_idx != -1 else orig.rstrip()
+            target_para = para
+            break
+    if target_para is None:
+        return
 
-            for run in para.runs:
-                run.text = ""
-            if para.runs:
-                para.runs[0].text = label
-            else:
-                para.add_run(label)
+    # 提取并保留标签（"活动过程："）
+    orig = target_para.text
+    colon_idx = max(orig.find("："), orig.find(":"))
+    label = orig[: colon_idx + 1] if colon_idx != -1 else orig.rstrip()
+    for run in target_para.runs:
+        run.text = ""
+    if target_para.runs:
+        target_para.runs[0].text = label
+    else:
+        target_para.add_run(label)
 
-            if not process_text:
-                return
+    if not process_text:
+        return
 
-            lines = process_text.split("\n")
+    lines = process_text.split("\n")
+    line_red_flags = (
+        _compute_process_red_flags(lines) if use_ai_color else [False] * len(lines)
+    )
 
-            if not use_ai_color:
-                # 不需要红色，全部黑色输出
-                for i, line in enumerate(lines):
-                    prefix = "\n" if i > 0 else ""
-                    run = para.add_run(prefix + line)
-                    run.font.color.rgb = BLACK
-                return
+    # 复制原段落的 pPr，让后续行段落继承缩进/对齐等样式
+    target_p_element = target_para._p
+    target_pPr = target_p_element.find(qn("w:pPr"))
 
-            # ---- 按环节分段，确定每行是否应为红色 ----
-            # 第一遍：标记每行所属环节是否有 AI 标记
-            line_red_flags = [False] * len(lines)
-            current_section_has_ai = False
+    prev_element = target_p_element
+    for i, line in enumerate(lines):
+        new_p = OxmlElement("w:p")
+        if target_pPr is not None:
+            new_p.append(copy.deepcopy(target_pPr))
 
-            for i, line in enumerate(lines):
-                is_header = bool(_SECTION_HEADER_RE.search(line))
-                line_has_ai = bool(_AI_TAG_RE.search(line)) or ("AI修改" in line) or ("AI新增" in line)
+        new_r = OxmlElement("w:r")
+        rPr = OxmlElement("w:rPr")
+        color_el = OxmlElement("w:color")
+        color_el.set(qn("w:val"), "FF0000" if line_red_flags[i] else "000000")
+        rPr.append(color_el)
+        new_r.append(rPr)
 
-                if is_header:
-                    # 新环节开始，根据该标题行是否有 AI 标记决定整个环节颜色
-                    current_section_has_ai = line_has_ai
-                else:
-                    # 非标题行：如果自身带 AI 标记也标红（兜底）
-                    if line_has_ai:
-                        current_section_has_ai = True
+        new_t = OxmlElement("w:t")
+        new_t.text = line
+        new_t.set(qn("xml:space"), "preserve")
+        new_r.append(new_t)
+        new_p.append(new_r)
 
-                line_red_flags[i] = current_section_has_ai
-
-            # 第二遍：输出带颜色的 runs
-            for i, line in enumerate(lines):
-                prefix = "\n" if i > 0 else ""
-                run = para.add_run(prefix + line)
-                run.font.color.rgb = RED if line_red_flags[i] else BLACK
-            return
+        prev_element.addnext(new_p)
+        prev_element = new_p
 
 
 # ---------------------------------------------------------------------------
