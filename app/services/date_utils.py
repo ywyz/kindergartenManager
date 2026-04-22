@@ -1,37 +1,7 @@
 """日期工具：周次计算、工作日判断、节假日临近判断"""
 from datetime import date, timedelta
 
-
-# 中国法定节假日（初版：2025-2026年度固定节假日，不含调休）
-# 格式：(月, 日)
-_LEGAL_HOLIDAYS: list[tuple[int, int]] = [
-    (1, 1),   # 元旦
-    (2, 3),   # 春节（示例，需按年份调整）
-    (2, 4),
-    (2, 5),
-    (2, 6),
-    (2, 7),
-    (2, 8),
-    (2, 9),
-    (4, 4),   # 清明节
-    (4, 5),
-    (4, 6),
-    (5, 1),   # 劳动节
-    (5, 2),
-    (5, 3),
-    (5, 4),
-    (5, 5),
-    (6, 2),   # 端午节（示例）
-    (6, 3),
-    (6, 4),
-    (10, 1),  # 国庆节
-    (10, 2),
-    (10, 3),
-    (10, 4),
-    (10, 5),
-    (10, 6),
-    (10, 7),
-]
+from chinese_calendar import is_workday as cn_is_workday
 
 _WEEKDAY_NAMES = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
 
@@ -52,25 +22,24 @@ def get_day_of_week(target_date: date) -> str:
     return _WEEKDAY_NAMES[target_date.weekday()]
 
 
+def _safe_is_workday(target_date: date) -> bool:
+    """优先使用法定工作日历；超出库支持范围时退回普通周一到周五判断。"""
+    try:
+        return cn_is_workday(target_date)
+    except NotImplementedError:
+        return target_date.weekday() < 5
+
+
 def is_workday(target_date: date) -> bool:
-    """周一至周五为工作日（不考虑节假日调休）"""
-    return target_date.weekday() < 5
+    """判断 target_date 是否为中国法定工作日，包含调休。"""
+    return _safe_is_workday(target_date)
 
 
 def is_near_holiday(target_date: date, days: int = 3) -> bool:
     """
-    判断 target_date 前后 days 天内是否有法定节假日。
-    初版使用内置节假日列表，未来可接入外部 API。
+    当前业务不使用节假日临近提示，统一返回 False。
+    保留函数签名是为了兼容现有页面调用。
     """
-    year = target_date.year
-    for offset in range(-days, days + 1):
-        check = target_date + timedelta(days=offset)
-        # 检查当前年和相邻年（跨年情况）
-        for y in (check.year, check.year):
-            holiday_date = date(y, check.month, check.day)
-            if (holiday_date.month, holiday_date.day) in _LEGAL_HOLIDAYS:
-                if abs((check - target_date).days) <= days:
-                    return True
     return False
 
 
@@ -93,9 +62,6 @@ def get_date_info(semester_start: date, target_date: date) -> dict:
     tip = ""
     if not workday:
         tip = f"{target_date.strftime('%Y-%m-%d')} 是{dow}，为非工作日，请确认是否需要填写计划。"
-    elif near_hd:
-        tip = f"提示：{target_date.strftime('%Y-%m-%d')} 前后3天内有法定节假日，请注意合理安排。"
-
     return {
         "week_number": week_num,
         "day_of_week": dow,
