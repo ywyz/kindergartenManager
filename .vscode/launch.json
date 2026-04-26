@@ -1,10 +1,13 @@
 {
+    "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: Python File",
+            "name": "Python: app.main",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}"
+            "module": "app.main",
+            "cwd": "${workspaceFolder}",
+            "justMyCode": true
         }
     ]
 }
