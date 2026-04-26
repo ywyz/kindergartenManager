@@ -10,7 +10,7 @@ from app.models.daily_plan import (
 from app.services.ai_service import get_ai_service
 from app.services.date_utils import get_date_info
 from app.services.plan_service import (
-    get_latest_semester, get_setting, get_plan_by_date
+    get_latest_semester, get_setting, get_setting_list, get_plan_by_date
 )
 
 
@@ -130,9 +130,23 @@ def daily_plan_page():
                         placeholder="AI 修改后的活动过程将显示在此...",
                     ).classes("w-full").props("rows=8")
 
+        # 预加载预设列表（页面初始化时同步读取，与其他设置读取方式一致）
+        _area_presets: list[str] = get_setting_list("area_content_list")
+        _outdoor_presets: list[str] = get_setting_list("outdoor_content_list")
+
         # ====== 室内区域活动 ======
         with ui.card().classes("w-full"):
             ui.label("🏠 室内区域活动").classes("text-lg font-semibold")
+            if _area_presets:
+                with ui.row().classes("w-full items-center gap-2 mb-1"):
+                    ui.label("AI 生成用预设：").classes("text-sm text-gray-500 shrink-0")
+                    ia_preset_select = ui.select(
+                        options=_area_presets,
+                        value=_area_presets[0],
+                        label="室内区域内容预设",
+                    ).classes("flex-1")
+            else:
+                ia_preset_select = None
             ia_area = ui.input("游戏区域").classes("w-full")
             ia_goal = ui.textarea("活动目标").classes("w-full").props("rows=3")
             ia_guidance = ui.input("重点指导").classes("w-full")
@@ -142,6 +156,16 @@ def daily_plan_page():
         # ====== 户外游戏活动 ======
         with ui.card().classes("w-full"):
             ui.label("🌳 户外游戏活动").classes("text-lg font-semibold")
+            if _outdoor_presets:
+                with ui.row().classes("w-full items-center gap-2 mb-1"):
+                    ui.label("AI 生成用预设：").classes("text-sm text-gray-500 shrink-0")
+                    og_preset_select = ui.select(
+                        options=_outdoor_presets,
+                        value=_outdoor_presets[0],
+                        label="户外游戏内容预设",
+                    ).classes("flex-1")
+            else:
+                og_preset_select = None
             og_area = ui.input("游戏区域").classes("w-full")
             og_goal = ui.textarea("活动目标").classes("w-full").props("rows=3")
             og_guidance = ui.input("重点指导").classes("w-full")
@@ -236,12 +260,19 @@ def daily_plan_page():
 
             try:
                 semester = await run.io_bound(get_latest_semester)
-                area_content = await run.io_bound(get_setting, "area_content", "")
-                outdoor_content = await run.io_bound(get_setting, "outdoor_content", "")
             except Exception as e:
                 gen_status.set_text(f"❌ 读取设置失败：{e}")
                 gen_btn.props(remove="loading")
                 return
+            # 优先使用页面内下拉选择的预设，无预设时回退到旧单值设置
+            if ia_preset_select is not None:
+                area_content = ia_preset_select.value or ""
+            else:
+                area_content = await run.io_bound(get_setting, "area_content", "")
+            if og_preset_select is not None:
+                outdoor_content = og_preset_select.value or ""
+            else:
+                outdoor_content = await run.io_bound(get_setting, "outdoor_content", "")
             grade = semester.get("grade", "") if semester else ""
             class_name = semester.get("class_name", "") if semester else ""
             week = state.get("week_number") or 1
@@ -343,8 +374,11 @@ def daily_plan_page():
                 )
                 ga_process.set_value(mod_text)
                 state["original_lesson_text"] = text
-                split_status.set_text("✅ 教案拆分并修改完成，已自动切换到「AI 修改版」")
                 ga_tabs.set_value(tab_modified)
+                # 自动保存：确保跨次访问可继承拆分结果
+                split_status.set_text("✅ 教案拆分完成，正在自动保存…")
+                await do_save()
+                split_status.set_text("✅ 教案拆分完成，结果已自动保存，下次打开同一日期可直接继承")
             except Exception as e:
                 split_status.set_text(f"❌ AI 拆分失败：{e}")
             finally:

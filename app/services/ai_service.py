@@ -1,14 +1,19 @@
-"""AI 服务封装 - 使用 openai 库连接兼容接口"""
+"""AI 服务封装 - 使用 openai 库连接兼容接口，含调用日志与多配置负载均衡"""
 import json
 import logging
 import random
 import re
+import threading
 import time
 from typing import Optional
 
 from openai import OpenAI
 
 from app.db import execute_one, execute_query
+
+# 轮询负载均衡计数器（模块级，进程内持久）
+_rr_counter = [0]
+_rr_lock = threading.Lock()
 
 logger = logging.getLogger(__name__)
 
@@ -359,9 +364,11 @@ def _build_anti_repeat_hint(category: str, grade: str, class_name: str, limit: i
 def _chat(client: OpenAI, model: str, system_msg: str, user_msg: str,
           temperature: float = 0.7, top_p: float = 1.0,
           frequency_penalty: float = 0.0, max_retries: int = 2,
-          json_mode: bool = False) -> str:
-    """发送对话请求，带简单重试。json_mode=True 时尝试启用 OpenAI JSON 模式。"""
+          json_mode: bool = False, category: str = "") -> str:
+    """发送对话请求，带简单重试与调用日志。json_mode=True 时尝试启用 OpenAI JSON 模式。"""
+    from app.db import log_ai_call
     last_err = None
+    _start = time.time()
     for attempt in range(max_retries + 1):
         try:
             kwargs = {
@@ -385,10 +392,22 @@ def _chat(client: OpenAI, model: str, system_msg: str, user_msg: str,
                     response = client.chat.completions.create(**kwargs)
                 else:
                     raise
-            return response.choices[0].message.content or ""
+            raw = response.choices[0].message.content or ""
+            log_ai_call(
+                category=category, model_name=model,
+                prompt_text=user_msg, response_text=raw,
+                status="success", duration_ms=int((time.time() - _start) * 1000),
+            )
+            return raw
         except Exception as e:
             last_err = e
             if attempt == max_retries:
+                log_ai_call(
+                    category=category, model_name=model,
+                    prompt_text=user_msg, response_text="",
+                    status="error", error_msg=str(e),
+                    duration_ms=int((time.time() - _start) * 1000),
+                )
                 raise RuntimeError(f"AI调用失败（已重试{max_retries}次）：{e}") from e
     raise RuntimeError(f"AI调用失败：{last_err}")
 
@@ -407,7 +426,7 @@ _JSON_FORMAT_RULES = (
 
 def _call_json(client: OpenAI, model: str, system_msg: str, user_msg: str,
                temperature: float = 0.9, top_p: float = 1.0,
-               frequency_penalty: float = 0.0) -> dict:
+               frequency_penalty: float = 0.0, category: str = "") -> dict:
     """
     通用 JSON 生成调用：自动追加格式约束、启用 JSON 模式、解析失败时让模型自我修正。
     """
@@ -419,7 +438,8 @@ def _call_json(client: OpenAI, model: str, system_msg: str, user_msg: str,
         if attempt == 0:
             raw = _chat(client, model, system_msg, full_user,
                         temperature=temperature, top_p=top_p,
-                        frequency_penalty=frequency_penalty, json_mode=True)
+                        frequency_penalty=frequency_penalty, json_mode=True,
+                        category=category)
         else:
             repair_prompt = (
                 "你上一次的输出不是合法 JSON，错误信息：\n"
@@ -431,7 +451,8 @@ def _call_json(client: OpenAI, model: str, system_msg: str, user_msg: str,
                 + _JSON_FORMAT_RULES
             )
             raw = _chat(client, model, system_msg, repair_prompt,
-                        temperature=0.2, json_mode=True)
+                        temperature=0.2, json_mode=True,
+                        category=f"{category}_repair")
         last_raw = raw
         try:
             return _parse_json_response(raw)
@@ -470,6 +491,7 @@ class AIService:
             system_msg="你是专业的幼儿园教育专家，擅长教案分析与整理。",
             user_msg=prompt,
             temperature=0.3,
+            category="lesson_split",
         )
         # 教案场景专属归一化：模型常把目标/主题写成"活动目标/活动主题"，
         # 全局别名会归到 activity_goal/activity_theme，这里再回退一次到 goal/theme。
@@ -500,6 +522,7 @@ class AIService:
                        "你只输出活动过程纯文本，绝不输出 JSON。",
             user_msg=prompt,
             temperature=0.5,
+            category="process_modify",
         )
         return _strip_to_process_text(raw)
 
@@ -522,6 +545,7 @@ class AIService:
             temperature=self._params["temperature"],
             top_p=self._params["top_p"],
             frequency_penalty=self._params["frequency_penalty"],
+            category="morning_activity",
         )
 
     # ---- 晨间谈话生成 ----
@@ -545,6 +569,7 @@ class AIService:
             temperature=self._params["temperature"],
             top_p=self._params["top_p"],
             frequency_penalty=self._params["frequency_penalty"],
+            category="morning_talk",
         )
 
     # ---- 室内区域活动生成 ----
@@ -563,6 +588,7 @@ class AIService:
             temperature=self._params["temperature"],
             top_p=self._params["top_p"],
             frequency_penalty=self._params["frequency_penalty"],
+            category="indoor_area",
         )
 
     # ---- 户外游戏活动生成 ----
@@ -583,6 +609,7 @@ class AIService:
             temperature=self._params["temperature"],
             top_p=self._params["top_p"],
             frequency_penalty=self._params["frequency_penalty"],
+            category="outdoor_game",
         )
 
     # ---- 提示词测试 ----
@@ -593,6 +620,7 @@ class AIService:
             self.client, self.model,
             system_msg="你是专业的幼儿园教育专家。",
             user_msg=prompt_content.replace("{content}", test_input),
+            category="prompt_test",
         )
 
     # ---- 一日活动反思生成 ----
@@ -615,30 +643,49 @@ class AIService:
             temperature=self._params["temperature"],
             top_p=self._params["top_p"],
             frequency_penalty=self._params["frequency_penalty"],
+            category="daily_reflection",
         )
 
 
 def get_ai_service() -> Optional[AIService]:
     """
-    从数据库读取激活的AI配置，创建 AIService 实例。
-    若无配置则返回 None。
+    从数据库读取所有 AI 配置，按负载均衡策略选取一条，返回 AIService 实例。
+    策略存于 app_settings.ai_lb_mode：random（默认）/ round_robin / weighted。
+    若无 DB 配置则回退到环境变量默认值；仍无则返回 None。
     """
     from app.config import AIConfig
     from app.services.crypto import decrypt
     try:
-        row = execute_one(
-            "SELECT api_url, api_key, model_name FROM ai_config ORDER BY id DESC LIMIT 1"
+        rows = execute_query(
+            "SELECT api_url, api_key, model_name, COALESCE(weight, 1) AS weight "
+            "FROM ai_config ORDER BY id"
         )
-        if row and row.get("api_key"):
+        active = [r for r in rows if r.get("api_key")]
+        if active:
+            # 读取负载均衡策略
+            from app.services.plan_service import get_setting
+            mode = get_setting("ai_lb_mode", "random")
+
+            if mode == "round_robin":
+                with _rr_lock:
+                    idx = _rr_counter[0] % len(active)
+                    _rr_counter[0] += 1
+                chosen = active[idx]
+            elif mode == "weighted":
+                weights = [max(int(r.get("weight") or 1), 1) for r in active]
+                chosen = random.choices(active, weights=weights, k=1)[0]
+            else:
+                chosen = random.choice(active)
+
             return AIService(
-                api_url=row["api_url"],
-                api_key=decrypt(row["api_key"]),
-                model=row["model_name"],
+                api_url=chosen["api_url"],
+                api_key=decrypt(chosen["api_key"]),
+                model=chosen["model_name"],
             )
     except Exception:
         pass
 
-    # 回退到默认配置
+    # 回退：使用环境变量默认配置
     if AIConfig.DEFAULT_KEY:
         return AIService(
             api_url=AIConfig.DEFAULT_URL,

@@ -4,8 +4,8 @@ from nicegui import ui
 
 from app.services.plan_service import (
     get_latest_semester, save_semester,
-    get_ai_config, save_ai_config, get_decrypted_api_key,
-    get_setting, set_setting,
+    save_ai_config, get_all_ai_configs, delete_ai_config, get_decrypted_api_key,
+    get_setting, set_setting, get_setting_list, set_setting_list,
 )
 
 
@@ -82,108 +82,196 @@ def settings_page():
 
         # ---- 区域游戏内容 ----
         with ui.card().classes("w-full"):
-            ui.label("🎮 区域游戏内容").classes("text-lg font-semibold mb-2")
-            area_content = ui.textarea(
-                "室内区域游戏内容（可多行描述各区域设置）",
-                value=get_setting("area_content", ""),
-                placeholder="例：\n美工区：颜料、画笔、彩纸\n建构区：积木、纸杯\n阅读区：绘本若干",
-            ).classes("w-full").props("rows=5")
+            ui.label("🎮 游戏内容预设").classes("text-lg font-semibold mb-1")
+            ui.label(
+                "可配置多条预设内容供每日计划页面选择使用，每条为一个独立方案。"
+            ).classes("text-sm text-gray-400 mb-3")
 
-            outdoor_content = ui.textarea(
-                "户外游戏内容（体育器材、场地等）",
-                value=get_setting("outdoor_content", ""),
-                placeholder="例：操场、跳绳、大型滑梯、沙池、平衡木",
-            ).classes("w-full").props("rows=3")
+            # -------- 室内区域 --------
+            ui.label("室内区域游戏内容").classes("text-sm font-semibold text-gray-600 mb-1")
+            area_list: list[str] = get_setting_list("area_content_list")
+            area_inputs: list = []
+            area_container = ui.column().classes("w-full gap-2")
 
+            def _sync_area():
+                """将当前 textarea 值同步回 area_list"""
+                for k, ta in enumerate(area_inputs):
+                    if k < len(area_list):
+                        area_list[k] = ta.value
+
+            def _render_area_items():
+                area_inputs.clear()
+                area_container.clear()
+                with area_container:
+                    for i, item in enumerate(area_list):
+                        with ui.row().classes("w-full items-start gap-2"):
+                            ta = ui.textarea(
+                                placeholder="例：美工区：颜料、画笔…",
+                                value=item,
+                            ).classes("flex-1").props("rows=2")
+                            area_inputs.append(ta)
+                            ui.button(
+                                icon="delete",
+                                on_click=lambda _, j=i: _del_area(j),
+                            ).props("flat dense color=negative")
+
+            def _del_area(idx: int):
+                _sync_area()
+                area_list.pop(idx)
+                _render_area_items()
+
+            def _add_area():
+                _sync_area()
+                area_list.append("")
+                _render_area_items()
+
+            _render_area_items()
+            ui.button("➕ 添加室内区域方案", on_click=_add_area).classes("mt-1").props("flat dense")
+
+            ui.separator().classes("my-3")
+
+            # -------- 户外游戏 --------
+            ui.label("户外游戏内容").classes("text-sm font-semibold text-gray-600 mb-1")
+            outdoor_list: list[str] = get_setting_list("outdoor_content_list")
+            outdoor_inputs: list = []
+            outdoor_container = ui.column().classes("w-full gap-2")
+
+            def _sync_outdoor():
+                """将当前 textarea 值同步回 outdoor_list"""
+                for k, ta in enumerate(outdoor_inputs):
+                    if k < len(outdoor_list):
+                        outdoor_list[k] = ta.value
+
+            def _render_outdoor_items():
+                outdoor_inputs.clear()
+                outdoor_container.clear()
+                with outdoor_container:
+                    for i, item in enumerate(outdoor_list):
+                        with ui.row().classes("w-full items-start gap-2"):
+                            ta = ui.textarea(
+                                placeholder="例：操场、跳绳、大型滑梯…",
+                                value=item,
+                            ).classes("flex-1").props("rows=2")
+                            outdoor_inputs.append(ta)
+                            ui.button(
+                                icon="delete",
+                                on_click=lambda _, j=i: _del_outdoor(j),
+                            ).props("flat dense color=negative")
+
+            def _del_outdoor(idx: int):
+                _sync_outdoor()
+                outdoor_list.pop(idx)
+                _render_outdoor_items()
+
+            def _add_outdoor():
+                _sync_outdoor()
+                outdoor_list.append("")
+                _render_outdoor_items()
+
+            _render_outdoor_items()
+            ui.button("➕ 添加户外游戏方案", on_click=_add_outdoor).classes("mt-1").props("flat dense")
+
+            ui.separator().classes("my-3")
             content_status = ui.label("").classes("text-sm")
 
             def on_save_content():
-                set_setting("area_content", area_content.value)
-                set_setting("outdoor_content", outdoor_content.value)
-                content_status.set_text("✅ 游戏内容设置已保存")
+                _sync_area()
+                _sync_outdoor()
+                set_setting_list("area_content_list", area_list)
+                set_setting_list("outdoor_content_list", outdoor_list)
+                content_status.set_text("✅ 游戏内容预设已保存")
 
-            ui.button("保存游戏内容", on_click=on_save_content).classes("mt-2")
+            ui.button("保存游戏内容预设", on_click=on_save_content).classes("mt-1")
 
-        # ---- AI API 配置 ----
+        # ---- AI API 配置（多条，负载均衡）----
         with ui.card().classes("w-full"):
-            ui.label("🤖 AI API 配置").classes("text-lg font-semibold mb-2")
+            ui.label("🤖 AI API 配置").classes("text-lg font-semibold mb-1")
             ui.label(
-                "配置与 OpenAI 兼容的 AI 接口。API Key 将加密存储在数据库中。"
-            ).classes("text-sm text-gray-500 mb-2")
-
-            ai_cfg = get_ai_config() or {}
+                "支持配置多个 AI 端点，运行时按策略自动分发。API Key 加密存储。"
+            ).classes("text-sm text-gray-400 mb-3")
 
             from app.config import AIConfig
-            api_url_input = ui.input(
-                "API 地址",
-                value=ai_cfg.get("api_url", AIConfig.DEFAULT_URL),
-                placeholder="https://api.openai.com/v1",
-            ).classes("w-full")
 
-            api_model_input = ui.input(
-                "模型名称",
-                value=ai_cfg.get("model_name", AIConfig.DEFAULT_MODEL),
-                placeholder="gpt-4o",
-            ).classes("w-full")
+            # 负载均衡策略选择
+            with ui.row().classes("w-full items-center gap-3 mb-3"):
+                ui.label("负载均衡策略：").classes("text-sm shrink-0")
+                lb_mode_select = ui.select(
+                    options={"random": "随机", "round_robin": "轮询", "weighted": "加权随机"},
+                    value=get_setting("ai_lb_mode", "random"),
+                    label="策略",
+                ).classes("w-40")
+                ui.label("（加权随机：权重越大被选中概率越高）").classes("text-xs text-gray-400")
 
-            # API Key 读取：解密显示（安全起见，实际生产中不显示原文）
-            existing_key = get_decrypted_api_key(ai_cfg.get("id"))
-            api_key_input = ui.input(
-                "API Key",
-                value=existing_key,
-                password=True,
-                password_toggle_button=True,
-                placeholder="sk-...",
-            ).classes("w-full")
+            ai_cfgs: list[dict] = get_all_ai_configs()
+            ai_cfg_inputs: list[dict] = []  # {"url", "key", "model", "weight"}
+            ai_cfg_container = ui.column().classes("w-full gap-3")
 
-            ai_status = ui.label("").classes("text-sm")
-            ai_id_ref = {"id": ai_cfg.get("id")}
+            def _render_ai_cfg_list():
+                ai_cfg_inputs.clear()
+                ai_cfg_container.clear()
+                with ai_cfg_container:
+                    for i, cfg in enumerate(ai_cfgs):
+                        existing_key = get_decrypted_api_key(cfg.get("id"))
+                        with ui.card().classes("w-full bg-blue-50"):
+                            with ui.row().classes("w-full items-center justify-between mb-1"):
+                                ui.label(f"配置 {i + 1}").classes("text-sm font-semibold text-gray-600")
+                                ui.button(
+                                    icon="delete",
+                                    on_click=lambda _, j=i: _del_ai_cfg(j),
+                                ).props("flat dense color=negative")
+                            url_inp = ui.input(
+                                "API 地址", value=cfg.get("api_url", ""),
+                                placeholder="https://api.openai.com/v1",
+                            ).classes("w-full")
+                            key_inp = ui.input(
+                                "API Key", value=existing_key,
+                                password=True, password_toggle_button=True,
+                                placeholder="sk-...",
+                            ).classes("w-full")
+                            with ui.row().classes("w-full gap-3 items-start"):
+                                model_inp = ui.input(
+                                    "模型名称", value=cfg.get("model_name", ""),
+                                    placeholder="gpt-4o",
+                                ).classes("flex-1")
+                                weight_inp = ui.number(
+                                    "权重", value=cfg.get("weight", 1),
+                                    min=1, max=100, step=1,
+                                ).classes("w-24")
+                            ai_cfg_inputs.append({
+                                "url": url_inp, "key": key_inp,
+                                "model": model_inp, "weight": weight_inp,
+                            })
+
+            def _del_ai_cfg(idx: int):
+                cfg = ai_cfgs[idx]
+                if cfg.get("id"):
+                    delete_ai_config(cfg["id"])
+                ai_cfgs.pop(idx)
+                ai_cfg_inputs.clear()
+                _render_ai_cfg_list()
+
+            def _add_ai_cfg():
+                ai_cfgs.append({"id": None, "api_url": AIConfig.DEFAULT_URL,
+                                "model_name": AIConfig.DEFAULT_MODEL, "weight": 1})
+                _render_ai_cfg_list()
+
+            _render_ai_cfg_list()
+            ui.button("➕ 添加 AI 配置", on_click=_add_ai_cfg).classes("mt-2").props("flat dense")
+
+            ai_status = ui.label("").classes("text-sm mt-2")
 
             def on_save_ai():
-                url = api_url_input.value.strip()
-                key = api_key_input.value.strip()
-                model = api_model_input.value.strip()
-                if not url or not key or not model:
-                    ai_status.set_text("❌ 请填写完整的 API 配置")
-                    return
-                new_id = save_ai_config(url, key, model, ai_id_ref["id"])
-                ai_id_ref["id"] = new_id
-                ai_status.set_text("✅ AI 配置已保存")
+                set_setting("ai_lb_mode", lb_mode_select.value or "random")
+                for cfg, inps in zip(ai_cfgs, ai_cfg_inputs):
+                    url = inps["url"].value.strip()
+                    key = inps["key"].value.strip()
+                    model = inps["model"].value.strip()
+                    weight = int(inps["weight"].value or 1)
+                    if not url or not key or not model:
+                        ai_status.set_text("❌ 请填写每条配置的地址、Key 和模型名称")
+                        return
+                    new_id = save_ai_config(url, key, model, cfg.get("id"), weight)
+                    cfg["id"] = new_id
+                ai_status.set_text(f"✅ AI 配置已保存（共 {len(ai_cfgs)} 条，策略：{lb_mode_select.value}）")
 
             ui.button("保存 AI 配置", on_click=on_save_ai).classes("mt-2")
-
-        # ---- AI 生成参数 ----
-        with ui.card().classes("w-full"):
-            ui.label("🎛️ AI 生成参数").classes("text-lg font-semibold mb-2")
-            ui.label(
-                "调节 AI 生成的创意度与多样性。温度越高内容越多样但可能不稳定，越低越保守。"
-            ).classes("text-sm text-gray-500 mb-2")
-
-            current_temp = float(get_setting("ai_temperature", "0.95"))
-            current_top_p = float(get_setting("ai_top_p", "0.95"))
-            current_freq_penalty = float(get_setting("ai_frequency_penalty", "0.3"))
-
-            temp_slider = ui.slider(
-                min=0.0, max=2.0, step=0.05, value=current_temp,
-            ).classes("w-full").props('label-always')
-            ui.label("").bind_text_from(temp_slider, "value", lambda v: f"温度 (temperature): {v:.2f}")
-
-            top_p_slider = ui.slider(
-                min=0.0, max=1.0, step=0.05, value=current_top_p,
-            ).classes("w-full").props('label-always')
-            ui.label("").bind_text_from(top_p_slider, "value", lambda v: f"Top P: {v:.2f}")
-
-            freq_slider = ui.slider(
-                min=0.0, max=2.0, step=0.05, value=current_freq_penalty,
-            ).classes("w-full").props('label-always')
-            ui.label("").bind_text_from(freq_slider, "value", lambda v: f"频率惩罚 (frequency_penalty): {v:.2f}")
-
-            param_status = ui.label("").classes("text-sm")
-
-            def on_save_params():
-                set_setting("ai_temperature", str(temp_slider.value))
-                set_setting("ai_top_p", str(top_p_slider.value))
-                set_setting("ai_frequency_penalty", str(freq_slider.value))
-                param_status.set_text("✅ AI 生成参数已保存")
-
-            ui.button("保存生成参数", on_click=on_save_params).classes("mt-2")

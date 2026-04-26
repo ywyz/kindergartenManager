@@ -1,4 +1,5 @@
 """计划相关业务逻辑 - 整合数据库操作与设置读取"""
+import json
 from datetime import date
 from typing import Optional
 
@@ -63,6 +64,30 @@ def set_setting(key: str, value: str) -> None:
         )
 
 
+def get_setting_list(key: str) -> list[str]:
+    """读取应用设置（JSON 列表）。若列表为空，自动迁移同名单值旧键。"""
+    raw = get_setting(key, "")
+    if raw:
+        try:
+            result = json.loads(raw)
+            if isinstance(result, list):
+                return [str(x) for x in result if str(x).strip()]
+        except (json.JSONDecodeError, ValueError):
+            pass
+    # 兼容旧数据：以旧单值键名（去掉 _list 后缀）做回退
+    legacy_key = key.removesuffix("_list")
+    if legacy_key != key:
+        old_val = get_setting(legacy_key, "").strip()
+        if old_val:
+            return [old_val]
+    return []
+
+
+def set_setting_list(key: str, items: list[str]) -> None:
+    """写入应用设置（JSON 列表）"""
+    set_setting(key, json.dumps([x for x in items if x.strip()], ensure_ascii=False))
+
+
 # ---------------------------------------------------------------------------
 # AI 配置
 # ---------------------------------------------------------------------------
@@ -72,21 +97,34 @@ def get_ai_config() -> Optional[dict]:
     return execute_one("SELECT * FROM ai_config ORDER BY id DESC LIMIT 1")
 
 
-def save_ai_config(api_url: str, api_key: str, model_name: str, config_id: Optional[int] = None) -> int:
+def save_ai_config(api_url: str, api_key: str, model_name: str,
+                   config_id: Optional[int] = None, weight: int = 1) -> int:
     """保存 AI 配置。api_key 使用 Fernet 对称加密后存储。"""
     from app.services.crypto import encrypt
     encrypted_key = encrypt(api_key)
 
     if config_id:
         execute_update(
-            "UPDATE ai_config SET api_url=%s, api_key=%s, model_name=%s WHERE id=%s",
-            (api_url, encrypted_key, model_name, config_id),
+            "UPDATE ai_config SET api_url=%s, api_key=%s, model_name=%s, weight=%s WHERE id=%s",
+            (api_url, encrypted_key, model_name, weight, config_id),
         )
         return config_id
     return execute_insert(
-        "INSERT INTO ai_config (api_url, api_key, model_name) VALUES (%s, %s, %s)",
-        (api_url, encrypted_key, model_name),
+        "INSERT INTO ai_config (api_url, api_key, model_name, weight) VALUES (%s, %s, %s, %s)",
+        (api_url, encrypted_key, model_name, weight),
     )
+
+
+def get_all_ai_configs() -> list[dict]:
+    """返回所有 AI 配置（不含 api_key 密文）按 id 升序。"""
+    return execute_query(
+        "SELECT id, api_url, model_name, COALESCE(weight, 1) AS weight FROM ai_config ORDER BY id"
+    )
+
+
+def delete_ai_config(config_id: int) -> None:
+    """删除指定 AI 配置。"""
+    execute_update("DELETE FROM ai_config WHERE id = %s", (config_id,))
 
 
 def get_decrypted_api_key(config_id: Optional[int] = None) -> str:

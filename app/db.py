@@ -87,6 +87,21 @@ _DDL_STATEMENTS = [
         updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='应用设置';
     """,
+
+    # AI 调用日志
+    """
+    CREATE TABLE IF NOT EXISTS ai_call_logs (
+        id            INT AUTO_INCREMENT PRIMARY KEY,
+        category      VARCHAR(60)  COMMENT '调用分类：lesson_split/process_modify/morning_activity 等',
+        model_name    VARCHAR(100) COMMENT '使用的模型名称',
+        prompt_text   LONGTEXT     COMMENT '发送的 prompt（user message）',
+        response_text LONGTEXT     COMMENT 'AI 返回的原始响应',
+        status        ENUM('success','error') DEFAULT 'success',
+        error_msg     TEXT         COMMENT '错误信息（status=error 时）',
+        duration_ms   INT          COMMENT '耗时（毫秒）',
+        created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 调用日志';
+    """,
 ]
 
 
@@ -226,8 +241,54 @@ def init_db() -> None:
                     "ALTER TABLE daily_plans "
                     "ADD UNIQUE KEY uq_plan_date_grade_class (plan_date, grade, class_name)"
                 )
+            # 迁移：为 ai_config 补加 weight 列（若不存在）
+            cursor.execute(
+                "SELECT COUNT(*) AS cnt FROM information_schema.columns "
+                "WHERE table_schema = %s AND table_name = 'ai_config' AND column_name = 'weight'",
+                (DBConfig.NAME,),
+            )
+            row2 = cursor.fetchone()
+            cnt2 = row2["cnt"] if isinstance(row2, dict) else row2[0]
+            if cnt2 == 0:
+                cursor.execute(
+                    "ALTER TABLE ai_config ADD COLUMN weight INT NOT NULL DEFAULT 1 "
+                    "COMMENT '负载均衡权重（越大分配概率越高）'"
+                )
         conn.close()
         print(f"[DB] 数据库 {DBConfig.NAME} 初始化成功")
     except Exception as e:
         print(f"[DB] 数据库初始化失败：{e}")
         raise
+
+
+# ---------------------------------------------------------------------------
+# AI 调用日志（fire-and-forget，失败不影响主流程）
+# ---------------------------------------------------------------------------
+
+def log_ai_call(
+    category: str,
+    model_name: str,
+    prompt_text: str,
+    response_text: str,
+    status: str = "success",
+    error_msg: str = "",
+    duration_ms: int = 0,
+) -> None:
+    """写入 AI 调用日志，任何异常都静默忽略。"""
+    try:
+        execute_insert(
+            "INSERT INTO ai_call_logs "
+            "(category, model_name, prompt_text, response_text, status, error_msg, duration_ms) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            (
+                category[:60],
+                model_name[:100],
+                prompt_text[:20000],
+                response_text[:20000],
+                status,
+                error_msg[:2000],
+                duration_ms,
+            ),
+        )
+    except Exception:
+        pass  # 日志失败绝不影响主流程

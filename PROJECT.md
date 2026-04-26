@@ -1,7 +1,7 @@
 # 幼儿园每日活动计划系统
 
 > 教学管理子系统 · `feature/daily-plan` 分支
-> 最后更新:2026-04-22
+> 最后更新:2026-04-26
 
 本文档由历史待办文档与提示词草案汇总而成,作为项目的**唯一入口文档**。后续仅维护本文件。
 
@@ -135,11 +135,11 @@ kindergartenManager/
 
 | # | 位置 | 问题 | 状态 |
 |---|---|---|---|
-| 1 | `app/pages/daily_plan.py` | 集体活动栏不会自动从当天教案拆分继承(已部分通过内嵌缓解,跨次访问仍需依赖保存) | TODO |
+| 1 | `app/pages/daily_plan.py` | 集体活动栏不会自动从当天教案拆分继承（已部分通过内嵌缓解,跨次访问仍需依赖保存) | ✅ 已完成（教案拆分后自动保存到 DB）|
 | 2 | `app/services/date_utils.py` | 接入 `chinesecalendar` 取代硬编码节假日,含调休;`is_near_holiday` 已禁用(节假日本身被工作日判断覆盖,业务内容不含节假日,无需额外提示) | ✅ 已完成 |
 | 3 | DB schema `daily_plans` | 缺 `(plan_date, grade, class_name)` 唯一索引 | ✅ 已完成（DDL + ALTER 兜底） |
 | 4 | `ai_service.py` | JSON 解析失败重试 | ✅ 已完成 |
-| 5 | `settings.py` | `area_content`/`outdoor_content` 仅单文本框,需支持多候选 | TODO |
+| 5 | `settings.py` | `area_content`/`outdoor_content` 仅单文本框,需支持多候选 | ✅ 已完成（多预设列表，每日计划页下拉选择） |
 | 6 | 学期设置 | 仅最近一条生效,无法切换历史学期 | TODO |
 | 7 | `.env` `APP_SECRET_KEY` | 占位符,**必须替换为强随机值**(替换后需重新保存 AI Key) | ✅ 已完成 |
 | 8 | `lesson_split.py` | 与一日计划日期共用 | ✅ 已完成 |
@@ -154,11 +154,11 @@ kindergartenManager/
 ### 🚀 待开发功能
 
 - [x] **多 AI 并发批量生成**:4 个 AI 请求改 `asyncio.gather` 并发,显著降低等待时间
-- [ ] **多 AI 负载均衡**:`ai_config` 支持多条激活记录,按轮询/随机/权重分发,失败自动切换
-- [ ] `templates/MAPPING.md`:docx 单元格 ↔ Python 字段映射文档
+- [x] **多 AI 负载均衡**:`ai_config` 支持多条激活记录,按轮询/随机/权重分发,失败自动切换
+- [x] `templates/MAPPING.md`:docx 单元格 ↔ Python 字段映射文档
 - [x] 导出文件命名规范:`{年级}{班级}_{YYYY-MM-DD}_{第N周周X}.docx`
-- [ ] 启动自检页:DB / AI 配置 / Word 模板三项检查
-- [ ] AI 调用日志:每次 prompt/响应落库,便于优化
+- [x] 启动自检页:DB / AI 配置 / Word 模板三项检查
+- [x] AI 调用日志:每次 prompt/响应落库,便于优化
 - [x] 导出按钮文案区分:`保存并导出` vs 单独 `导出`
 - [x] 连续导出多日一日活动计划（按日期范围批量导出）
 - [x] 历史记录页新增"AI生成一日活动反思"按钮（打开历史计划后可一键生成并保存反思）
@@ -209,3 +209,59 @@ uv run python app/main.py
 7. 导出 Word:表格结构与模板一致,AI 修改环节红字
 8. 自定义提示词激活后实际生效
 9. 历史记录可重新导出旧计划
+
+---
+
+## 10. 下一功能周期：周计划模块
+
+### 目标
+以一日计划数据为基础，生成面向**整周**的活动计划文档，支持 AI 辅助补全。
+
+### 架构决策：直接读 MySQL（共享 Service 层）
+
+周计划模块**不引入独立 API 服务**，直接复用已有 `plan_service.py` + `db_cursor()` 层。
+理由：
+- 同一 NiceGUI 应用内新增页面，无需跨进程通信
+- 已有 Service 层足以满足跨天聚合查询
+- 单用户场景，API 层会增加无谓的序列化、鉴权开销
+
+### 数据来源（从 `daily_plans` 聚合）
+
+| 一日计划字段 | 周计划用途 |
+|---|---|
+| `morning_talk_json → topic` | 本周晨间谈话主题汇总 |
+| `group_activity_json → theme` | 集体活动名称（一周列表） |
+| `group_activity_json → goal` | 集体活动目标 |
+| `indoor_area_json → game_area` | 室内区域活动类型 |
+| `outdoor_game_json → game_area` | 户外游戏名称 |
+| `morning_activity_json → group_activity_name` | 晨间集体活动名 |
+| `plan_date`, `day_of_week`, `week_number` | 日期/周次锚定 |
+
+### 待规划功能
+
+- [ ] `app/pages/weekly_plan.py`：选择"周"查询一周5天计划，渲染汇总表格
+- [ ] `app/services/plan_service.py`：新增 `get_plans_by_week(year, week, grade, class_name)` 聚合查询
+- [ ] `weekly_plans` 表：存储 AI 补全内容（本周目标/环境创设/家园共育等额外字段）
+- [ ] AI 功能：输入一周日计划摘要，AI 生成"本周教育目标"、"家园共育重点"、"环境创设建议"
+- [ ] 提示词：新增 `weekly_summary` 类型（6 类 → 7 类）
+- [ ] Word 导出：新增周计划模板 `templates/weeklyplan.docx`
+- [ ] 导航：在 `main.py` 注册 `/weekly-plan` 路由，加入左侧导航
+
+### 数据库新增表（初步设计）
+
+```sql
+CREATE TABLE weekly_plans (
+    id            INT AUTO_INCREMENT PRIMARY KEY,
+    year          INT NOT NULL,
+    week_number   INT NOT NULL,
+    grade         VARCHAR(20) NOT NULL,
+    class_name    VARCHAR(20) NOT NULL,
+    weekly_goal   TEXT,          -- AI生成：本周教育目标
+    env_setup     TEXT,          -- AI生成：环境创设建议
+    home_school   TEXT,          -- AI生成：家园共育重点
+    notes         TEXT,          -- 手工备注
+    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_week (year, week_number, grade, class_name)
+);
+```
