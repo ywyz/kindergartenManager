@@ -112,11 +112,35 @@
 | `indoor_area`                 | Row 12、13、14      |
 | `outdoor_game`                | Row 15、16、17      |
 
-活动过程（Row 11）红字判定逻辑（`_compute_process_red_flags`）：
-1. 优先以**强标题**（中文数字`一、`/`（一）`/`第N步|环节|部分|阶段|课时`）划分节
-2. 无强标题时，退回**弱标题**（阿拉伯数字`1.`/`(1)`）划分节
-3. 若某节内存在 `【AI修改】`/`[AI新增]`/`(AI补充)` 等标记，则整节所有行染红
-4. 完全无标题时，仅含 AI 标记的行染红
+
+---
+
+# 新版周计划模板字段映射（2026年4月升级）
+
+## weekplan.docx 表格结构
+- 表格外三行：园所/班级/周次/日期/教师1/教师2/保育员
+- 第一行：动态星期列（支持5-6天）
+- 每日列：晨间谈话主题、集体活动名称
+- 周级块：户外游戏、区域游戏、本周重点、环境创设、生活习惯培养、家园共育
+
+## Python 字段 → Word 模板映射
+
+| Word 区域         | Python 字段                | 说明                         |
+|-------------------|----------------------------|------------------------------|
+| 园所/班级/周次等   | plan.grade, plan.class_name, plan.week_number, plan.week_start_date, plan.week_end_date, plan.teacher1, plan.teacher2, plan.carer | 表格外三行头部 |
+| 星期列            | plan.days_json[].date_str, .day_of_week | 动态生成，支持5-6天         |
+| 晨间谈话主题      | plan.days_json[].morning_talk_topic     | 每日一格                     |
+| 集体活动名称      | plan.days_json[].group_activity_theme   | 每日一格                     |
+| 户外游戏          | plan.outdoor_game_week                 | 周级块                       |
+| 区域游戏          | plan.area_materials                    | 周级块                       |
+| 本周重点          | plan.week_focus                        | 周级块                       |
+| 环境创设          | plan.env_setup                         | 周级块                       |
+| 生活习惯培养      | plan.life_habits                       | 周级块                       |
+| 家园共育          | plan.home_school                       | 周级块                       |
+| 备案号/公安备案   | settings.record_code, settings.police_code | 仅页面底部展示，不导出     |
+
+---
+> 本表为新版周计划导出字段与模板映射唯一入口，所有相关变更请同步维护。
 
 ---
 

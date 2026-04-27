@@ -1,3 +1,4 @@
+
 # Kindergarten Manager Agent Guide
 
 ## Scope
@@ -5,6 +6,8 @@ These instructions apply to the whole repository.
 
 ## First Read
 - Product scope and current status: [PROJECT.md](PROJECT.md)
+- Daily plan requirements: [docs/daily-plan.md](docs/daily-plan.md)
+- Weekly plan requirements: [docs/week-plan.md](docs/week-plan.md)
 - Prompt assets: [.github/prompts/](.github/prompts/)
 
 ## Environment And Run
@@ -37,7 +40,7 @@ Use the `db_cursor()` context manager from `app.db`. It auto-commits on success 
 `get_ai_service()` returns a configured `AIService` instance or `None`. JSON generation goes through `_call_json()` with built-in retry; plain text uses `_chat()`. AI generation parameters (temperature, top_p, frequency_penalty) are stored in `app_settings` table.
 
 ## Project Conventions
-- Keep business details in [PROJECT.md](PROJECT.md); do not introduce parallel requirement docs.
+- Keep business details in [docs/daily-plan.md](docs/daily-plan.md) and [docs/week-plan.md](docs/week-plan.md); do not introduce parallel requirement docs.
 - Preserve current data model fields and JSON keys unless explicitly migrating.
 - Keep changes small and local; avoid unrelated refactors.
 
