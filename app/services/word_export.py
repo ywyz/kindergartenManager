@@ -480,3 +480,220 @@ def export_merged_plans(plans: List[DailyPlan], author_name: str = "教师") -> 
     merged_doc.save(buf)
     file_path.write_bytes(buf.getvalue())
     return file_path
+
+
+# ---------------------------------------------------------------------------
+# 周计划导出
+# ---------------------------------------------------------------------------
+
+def _wset(cell, text: str) -> None:
+    """清空单元格后写入纯文本（保留原有段落格式）"""
+    for para in cell.paragraphs:
+        for run in para.runs:
+            run.text = ""
+    if cell.paragraphs:
+        cell.paragraphs[0].runs[0].text = text if cell.paragraphs[0].runs else None
+        if not cell.paragraphs[0].runs:
+            cell.paragraphs[0].add_run(text)
+    else:
+        cell.add_paragraph(text)
+
+
+def _wcell_set(cell, text: str) -> None:
+    """安全地设置单元格文本（保留样式）"""
+    # 清空所有 run
+    for para in cell.paragraphs:
+        for run in para.runs:
+            run.text = ""
+    # 写到第一个段落第一个 run；若无 run 则新建
+    if cell.paragraphs:
+        p = cell.paragraphs[0]
+        if p.runs:
+            p.runs[0].text = text
+        else:
+            p.add_run(text)
+    else:
+        cell.add_paragraph(text)
+
+
+def export_weekly_plan_word(plan) -> bytes:
+    """
+    将 WeeklyPlan 填充到 templates/weekplan.docx 模板并返回 bytes。
+
+    weekplan.docx 表格结构（9行×7列）：
+      Row 0: Col0=周次/班级信息  Col1+2=周一(合并) Col3=周二 Col4=周三 Col5=周四 Col6=周五
+      Row 1: Col0=学习活动      Col1=晨间谈话    Col2-6=各天晨间谈话内容
+      Row 2: Col0=学习活动      Col1=集体活动    Col2-6=各天集体活动内容
+      Row 3: Col0=游戏活动      Col1=户外游戏    Col2-6=各天户外游戏内容
+      Row 4: Col0=游戏活动      Col1=区域游戏    Col2-6=各天区域游戏内容
+      Row 5: Col0=本周重点      Col1-6=合并→本周重点内容
+      Row 6: Col0=环境创设      Col1-6=合并→环境创设内容
+      Row 7: Col0=生活习惯培养  Col1-6=合并→生活习惯内容
+      Row 8: Col0=家园共育      Col1-6=合并→家园共育内容
+
+    注意：Row0 Col1 与 Col2 在模板中是合并单元格，访问 row.cells[1] 与 row.cells[2] 
+    会返回同一个 _tc 对象；对 Col3-6 分别存放周二-周五内容。
+    """
+    from app.models.weekly_plan import WeeklyPlan as WP
+    tmpl = Path(__file__).parent.parent.parent / "templates" / "weekplan.docx"
+    doc = Document(str(tmpl))
+    t = doc.tables[0]
+
+    # 有效天数：days 顺序为周一~周五（5个）
+    days = plan.days  # list[WeekDayPlan]
+
+    # ---- Row 0：标题行（周次、班级、日期、教师） ----
+    row0_c0 = t.rows[0].cells[0]
+    semester_label = f"第{plan.week_number}周"
+    date_range = ""
+    if plan.week_start_date and plan.week_end_date:
+        date_range = (
+            f"{plan.week_start_date.strftime('%Y.%m.%d')}—"
+            f"{plan.week_end_date.strftime('%m.%d')}"
+        )
+    header_text = (
+        f"{plan.grade}{plan.class_name}  {semester_label}\n"
+        f"{date_range}\n"
+        f"教师：{plan.teacher_name}  保育员：{plan.carer_name}\n"
+        f"主题：{plan.theme}"
+    )
+    _wcell_set(row0_c0, header_text)
+
+    # 独立列映射：周一对应 col_idx=2（因 col1+2 合并，col2 是周一内容列）；周二=3…周五=6
+    # 实测：合并单元格后 cells[1] 和 cells[2] 指向同一 XML 元素；
+    # 如果写 cells[2] 会覆盖合并块，所以我们用 unique cell list 定位
+    def _unique_row_cells(row):
+        """返回去重后的实际单元格列表（过滤掉合并复制格）"""
+        seen = []
+        seen_ids = set()
+        for c in row.cells:
+            cid = id(c._tc)
+            if cid not in seen_ids:
+                seen_ids.add(cid)
+                seen.append(c)
+        return seen
+
+    # Row 0 唯一单元格: [col0(周次), col1+2(周一), col3(周二), col4(周三), col5(周四), col6(周五)]
+    row0_unique = _unique_row_cells(t.rows[0])
+    # 设置列日期头（唯一格索引1-5对应周一~周五）
+    day_header_labels = [
+        f"{d.day_of_week}\n{d.date_str[5:]}" if d else "" for d in days
+    ] if days else []
+    for i, lbl in enumerate(day_header_labels):
+        idx = i + 1  # row0_unique[1]=周一, [2]=周二 ...
+        if idx < len(row0_unique):
+            _wcell_set(row0_unique[idx], lbl)
+
+    # 内容行（Row1-4）每行的唯一格: [col0, col1(label), day1, day2, day3, day4, day5]
+    # 但合并格可能使唯一格数量减少，所以用 _unique_row_cells 安全获取
+    def _day_cells(row_idx: int) -> list:
+        """返回内容行中各天的单元格（跳过 col0、col1 标签列）"""
+        unique = _unique_row_cells(t.rows[row_idx])
+        # col0=类别, col1=小标签, col2~col6=各天（最多5个）
+        return unique[2:] if len(unique) > 2 else []
+
+    def _fmt_day_talk(day) -> str:
+        if not day or day.is_holiday:
+            return ""
+        lines = []
+        if day.morning_talk_topic:
+            lines.append(f"谈话主题：{day.morning_talk_topic}")
+        if day.morning_talk_questions:
+            lines.append(f"问题设计：{day.morning_talk_questions}")
+        return "\n".join(lines)
+
+    def _fmt_day_group(day) -> str:
+        if not day or day.is_holiday:
+            return "放假"
+        lines = []
+        if day.group_activity_theme:
+            lines.append(f"主题：{day.group_activity_theme}")
+        if day.group_activity_goal:
+            lines.append(f"目标：{day.group_activity_goal}")
+        if day.group_activity_process:
+            lines.append(f"过程：{day.group_activity_process}")
+        return "\n".join(lines) or ""
+
+    def _fmt_day_outdoor(day) -> str:
+        if not day or day.is_holiday:
+            return ""
+        lines = []
+        if day.outdoor_game_circuit:
+            lines.append(f"体能大循环：{day.outdoor_game_circuit}")
+        if day.outdoor_game_group:
+            lines.append(f"集体游戏：{day.outdoor_game_group}")
+        if day.outdoor_game_free:
+            lines.append(f"自主游戏：{day.outdoor_game_free}")
+        return "\n".join(lines)
+
+    def _fmt_day_area(day) -> str:
+        if not day or day.is_holiday:
+            return ""
+        lines = []
+        if day.area_game_zone:
+            lines.append(f"重点区域：{day.area_game_zone}")
+        if day.area_game_goal:
+            lines.append(f"目标：{day.area_game_goal}")
+        if day.area_game_materials:
+            lines.append(f"材料：{day.area_game_materials}")
+        if day.area_game_guidance:
+            lines.append(f"指导：{day.area_game_guidance}")
+        return "\n".join(lines)
+
+    # Row 1: 晨间谈话
+    talk_cells = _day_cells(1)
+    for i, day in enumerate(days):
+        if i < len(talk_cells):
+            _wcell_set(talk_cells[i], _fmt_day_talk(day))
+
+    # Row 2: 集体活动
+    group_cells = _day_cells(2)
+    for i, day in enumerate(days):
+        if i < len(group_cells):
+            _wcell_set(group_cells[i], _fmt_day_group(day))
+
+    # Row 3: 户外游戏
+    outdoor_cells = _day_cells(3)
+    for i, day in enumerate(days):
+        if i < len(outdoor_cells):
+            _wcell_set(outdoor_cells[i], _fmt_day_outdoor(day))
+
+    # Row 4: 区域游戏
+    area_cells = _day_cells(4)
+    for i, day in enumerate(days):
+        if i < len(area_cells):
+            _wcell_set(area_cells[i], _fmt_day_area(day))
+
+    # Row 5-8: 本周重点、环境创设、生活习惯、家园共育（合并格，取 unique[1]）
+    for row_idx, content in [
+        (5, plan.week_focus),
+        (6, plan.env_setup),
+        (7, plan.life_habits),
+        (8, plan.home_school),
+    ]:
+        unique = _unique_row_cells(t.rows[row_idx])
+        if len(unique) > 1:
+            _wcell_set(unique[1], content or "")
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def save_weekly_plan_to_file(plan) -> Path:
+    """将周计划导出到 exports/ 目录，返回文件路径。"""
+    export_dir = AppConfig.EXPORT_DIR
+    export_dir.mkdir(parents=True, exist_ok=True)
+
+    content = export_weekly_plan_word(plan)
+
+    # 文件名：{年级}{班级}_周计划_{开始日期}~{结束日期}_第N周.docx
+    start_str = plan.week_start_date.strftime("%Y-%m-%d") if plan.week_start_date else "unknown"
+    end_str = plan.week_end_date.strftime("%m-%d") if plan.week_end_date else ""
+    filename = (
+        f"{plan.grade}{plan.class_name}_周计划_"
+        f"{start_str}~{end_str}_第{plan.week_number}周.docx"
+    )
+    file_path = export_dir / filename
+    file_path.write_bytes(content)
+    return file_path

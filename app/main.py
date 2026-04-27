@@ -8,6 +8,7 @@ from app.pages.daily_plan import daily_plan_page
 from app.pages.prompt_mgmt import prompt_mgmt_page
 from app.pages.plan_history import plan_history_page
 from app.pages.startup_check import startup_check_page
+from app.pages.weekly_plan import weekly_plan_page
 from app.config import AppConfig
 
 
@@ -16,11 +17,12 @@ from app.config import AppConfig
 # ---------------------------------------------------------------------------
 
 NAV_ITEMS = [
-    ("/settings",    "tune",         "系统设置"),
-    ("/daily-plan",  "event_note",   "一日计划"),
-    ("/prompts",     "psychology",   "提示词管理"),
-    ("/history",     "history",      "历史记录"),
-    ("/startup-check", "health_and_safety", "系统自检"),
+    ("/settings",      "tune",               "系统设置"),
+    ("/daily-plan",    "event_note",         "一日计划"),
+    ("/weekly-plan",   "calendar_view_week", "周计划"),
+    ("/prompts",       "psychology",         "提示词管理"),
+    ("/history",       "history",            "历史记录"),
+    ("/startup-check", "health_and_safety",  "系统自检"),
 ]
 
 
@@ -96,6 +98,13 @@ def page_startup_check():
     create_layout("/startup-check")
     with ui.column().classes("w-full p-4"):
         startup_check_page()
+
+
+@ui.page("/weekly-plan")
+def page_weekly_plan():
+    create_layout("/weekly-plan")
+    with ui.column().classes("w-full p-4"):
+        weekly_plan_page()
 
 
 # ---------------------------------------------------------------------------

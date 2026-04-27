@@ -114,6 +114,53 @@ _DEFAULT_PROMPTS: dict[str, str] = {
         "}}\n"
         "只返回合法的JSON对象。"
     ),
+    "weekly_morning_talk": (
+        "你是一位专业的幼儿园教育专家。请为{grade}{class_name}设计{day}（{date}）的晨间谈话方案。\n"
+        "当前是第{week}周，本周活动主题：{theme}。\n"
+        "请围绕本周主题设计晨间谈话，生成以下JSON格式内容：\n"
+        "{{\n"
+        "  \"topic\": \"谈话主题（与本周主题呼应）\",\n"
+        "  \"questions\": \"问题设计（3-5个开放性问题，用换行分隔）\"\n"
+        "}}\n"
+        "只返回合法的JSON对象。"
+    ),
+    "weekly_outdoor_game": (
+        "你是一位专业的幼儿园教育专家。请为{grade}{class_name}设计{day}（{date}）的户外游戏方案。\n"
+        "当前是第{week}周，本周活动主题：{theme}。\n"
+        "户外体育器材与场地内容：{outdoor_content}\n"
+        "请生成以下JSON格式的户外游戏内容（包含体能大循环、集体游戏、自主游戏三部分）：\n"
+        "{{\n"
+        "  \"outdoor_game_circuit\": \"体能大循环内容（简要描述）\",\n"
+        "  \"outdoor_game_group\": \"集体游戏名称及玩法（2-3句）\",\n"
+        "  \"outdoor_game_free\": \"自主游戏内容（2-3句）\"\n"
+        "}}\n"
+        "只返回合法的JSON对象。"
+    ),
+    "weekly_area_game": (
+        "你是一位专业的幼儿园教育专家。请为{grade}{class_name}设计{day}（{date}）的区域游戏方案。\n"
+        "当前是第{week}周，本周活动主题：{theme}。\n"
+        "当前班级区域游戏内容设置为：{area_content}\n"
+        "请生成以下JSON格式的区域游戏内容：\n"
+        "{{\n"
+        "  \"area_game_zone\": \"重点指导区域名称\",\n"
+        "  \"area_game_goal\": \"活动目标（2-3条）\",\n"
+        "  \"area_game_materials\": \"区域材料\",\n"
+        "  \"area_game_guidance\": \"区域指导要点（2-3点）\"\n"
+        "}}\n"
+        "只返回合法的JSON对象。"
+    ),
+    "weekly_summary": (
+        "你是一位专业的幼儿园教育专家。请为{grade}{class_name}制定第{week}周的教育教学要点。\n"
+        "本周活动主题：{theme}\n"
+        "请生成以下JSON格式的周级汇总内容：\n"
+        "{{\n"
+        "  \"week_focus\": \"本周重点（3条，每条换行）\",\n"
+        "  \"env_setup\": \"环境创设（2-3条具体布置建议，换行分隔）\",\n"
+        "  \"life_habits\": \"生活习惯培养（2-3条，换行分隔）\",\n"
+        "  \"home_school\": \"家园共育建议（2-3条，换行分隔）\"\n"
+        "}}\n"
+        "只返回合法的JSON对象。"
+    ),
 }
 
 
@@ -644,6 +691,154 @@ class AIService:
             top_p=self._params["top_p"],
             frequency_penalty=self._params["frequency_penalty"],
             category="daily_reflection",
+        )
+
+
+    # ---- 周计划：整周批量生成晨间谈话 ----
+
+    def generate_weekly_morning_talks(
+        self, week: int, grade: str, class_name: str, theme: str,
+        day_infos: list[dict],
+    ) -> list[dict]:
+        """
+        批量生成一周5天的晨间谈话。
+        day_infos: [{"date_str": "2026-05-06", "day_of_week": "周一", "is_holiday": False}, ...]
+        返回: [{"topic": ..., "questions": ...}, ...] 5个元素，放假天返回空dict
+        """
+        prompt_tpl = _get_active_prompt("weekly_morning_talk")
+        results = []
+        for day_info in day_infos:
+            if day_info.get("is_holiday"):
+                results.append({"topic": "", "questions": ""})
+                continue
+            prompt = prompt_tpl.format(
+                week=week,
+                day=day_info["day_of_week"],
+                date=day_info["date_str"],
+                grade=grade,
+                class_name=class_name,
+                theme=theme,
+            )
+            try:
+                r = _call_json(
+                    self.client, self.model,
+                    system_msg="你是专业的幼儿园教育专家，擅长设计晨间谈话。",
+                    user_msg=prompt + _diversity_hint(),
+                    temperature=self._params["temperature"],
+                    top_p=self._params["top_p"],
+                    frequency_penalty=self._params["frequency_penalty"],
+                    category="weekly_morning_talk",
+                )
+                results.append(r)
+            except Exception as e:
+                logger.warning("周晨间谈话生成失败（%s）：%s", day_info["day_of_week"], e)
+                results.append({"topic": "", "questions": ""})
+        return results
+
+    # ---- 周计划：整周批量生成户外游戏 ----
+
+    def generate_weekly_outdoor_games(
+        self, week: int, grade: str, class_name: str, theme: str,
+        outdoor_content: str, day_infos: list[dict],
+    ) -> list[dict]:
+        """
+        批量生成一周5天的户外游戏。
+        返回: [{"outdoor_game_circuit": ..., "outdoor_game_group": ..., "outdoor_game_free": ...}, ...]
+        放假天返回空dict。
+        """
+        prompt_tpl = _get_active_prompt("weekly_outdoor_game")
+        results = []
+        for day_info in day_infos:
+            if day_info.get("is_holiday"):
+                results.append({})
+                continue
+            prompt = prompt_tpl.format(
+                week=week,
+                day=day_info["day_of_week"],
+                date=day_info["date_str"],
+                grade=grade,
+                class_name=class_name,
+                theme=theme,
+                outdoor_content=outdoor_content,
+            )
+            try:
+                r = _call_json(
+                    self.client, self.model,
+                    system_msg="你是专业的幼儿园教育专家，擅长设计户外游戏活动。",
+                    user_msg=prompt + _diversity_hint(),
+                    temperature=self._params["temperature"],
+                    top_p=self._params["top_p"],
+                    frequency_penalty=self._params["frequency_penalty"],
+                    category="weekly_outdoor_game",
+                )
+                results.append(r)
+            except Exception as e:
+                logger.warning("周户外游戏生成失败（%s）：%s", day_info["day_of_week"], e)
+                results.append({})
+        return results
+
+    # ---- 周计划：整周批量生成区域游戏 ----
+
+    def generate_weekly_area_games(
+        self, week: int, grade: str, class_name: str, theme: str,
+        area_content: str, day_infos: list[dict],
+    ) -> list[dict]:
+        """
+        批量生成一周5天的区域游戏。
+        返回: [{"area_game_zone": ..., "area_game_goal": ..., "area_game_materials": ..., "area_game_guidance": ...}, ...]
+        """
+        prompt_tpl = _get_active_prompt("weekly_area_game")
+        results = []
+        for day_info in day_infos:
+            if day_info.get("is_holiday"):
+                results.append({})
+                continue
+            prompt = prompt_tpl.format(
+                week=week,
+                day=day_info["day_of_week"],
+                date=day_info["date_str"],
+                grade=grade,
+                class_name=class_name,
+                theme=theme,
+                area_content=area_content,
+            )
+            try:
+                r = _call_json(
+                    self.client, self.model,
+                    system_msg="你是专业的幼儿园教育专家，擅长设计区域游戏活动。",
+                    user_msg=prompt + _diversity_hint(),
+                    temperature=self._params["temperature"],
+                    top_p=self._params["top_p"],
+                    frequency_penalty=self._params["frequency_penalty"],
+                    category="weekly_area_game",
+                )
+                results.append(r)
+            except Exception as e:
+                logger.warning("周区域游戏生成失败（%s）：%s", day_info["day_of_week"], e)
+                results.append({})
+        return results
+
+    # ---- 周计划：生成周级汇总内容 ----
+
+    def generate_weekly_summary(
+        self, week: int, grade: str, class_name: str, theme: str,
+    ) -> dict:
+        """
+        生成本周重点、环境创设、生活习惯培养、家园共育。
+        返回: {"week_focus": ..., "env_setup": ..., "life_habits": ..., "home_school": ...}
+        """
+        prompt_tpl = _get_active_prompt("weekly_summary")
+        prompt = prompt_tpl.format(
+            week=week, grade=grade, class_name=class_name, theme=theme,
+        )
+        return _call_json(
+            self.client, self.model,
+            system_msg="你是专业的幼儿园教育专家，擅长制定周教学要点。",
+            user_msg=prompt + _diversity_hint(),
+            temperature=self._params["temperature"],
+            top_p=self._params["top_p"],
+            frequency_penalty=self._params["frequency_penalty"],
+            category="weekly_summary",
         )
 
 

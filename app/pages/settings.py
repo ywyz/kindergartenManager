@@ -183,6 +183,33 @@ def settings_page():
 
             ui.button("保存游戏内容预设", on_click=on_save_content).classes("mt-1")
 
+        # ---- 教师与保育员信息 ----
+        with ui.card().classes("w-full"):
+            ui.label("👩‍🏫 教师与保育员信息").classes("text-lg font-semibold mb-2")
+            ui.label(
+                "此信息将在周计划导出时自动填入 Word 文档。"
+            ).classes("text-sm text-gray-400 mb-3")
+
+            teacher_input = ui.input(
+                "班级教师姓名",
+                value=get_setting("teacher_name", ""),
+                placeholder="例：张老师",
+            ).classes("w-full")
+            carer_input = ui.input(
+                "保育员姓名",
+                value=get_setting("carer_name", ""),
+                placeholder="例：李阿姨",
+            ).classes("w-full mt-2")
+
+            staff_status = ui.label("").classes("text-sm")
+
+            def on_save_staff():
+                set_setting("teacher_name", teacher_input.value.strip())
+                set_setting("carer_name", carer_input.value.strip())
+                staff_status.set_text("✅ 教师信息已保存")
+
+            ui.button("保存教师信息", on_click=on_save_staff).classes("mt-2")
+
         # ---- AI API 配置（多条，负载均衡）----
         with ui.card().classes("w-full"):
             ui.label("🤖 AI API 配置").classes("text-lg font-semibold mb-1")

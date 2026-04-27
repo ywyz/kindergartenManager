@@ -151,6 +151,11 @@ PROMPT_CATEGORIES = {
     "morning_talk": "晨间谈话",
     "indoor_area": "室内区域",
     "outdoor_game": "户外游戏",
+    # 周计划相关提示词
+    "weekly_morning_talk": "周计划-晨间谈话",
+    "weekly_outdoor_game": "周计划-户外游戏",
+    "weekly_area_game": "周计划-区域游戏",
+    "weekly_summary": "周计划-周级汇总",
 }
 
 

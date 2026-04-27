@@ -102,6 +102,32 @@ _DDL_STATEMENTS = [
         created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 调用日志';
     """,
+
+    # 周计划
+    """
+    CREATE TABLE IF NOT EXISTS weekly_plans (
+        id                INT AUTO_INCREMENT PRIMARY KEY,
+        semester_id       INT NULL COMMENT '学期ID（FK）',
+        week_number       INT NOT NULL COMMENT '学期第几周',
+        week_start_date   DATE NOT NULL COMMENT '本周周一日期',
+        week_end_date     DATE NOT NULL COMMENT '本周周五日期',
+        grade             VARCHAR(20) NOT NULL COMMENT '年级',
+        class_name        VARCHAR(20) NOT NULL COMMENT '班级',
+        theme             VARCHAR(200) DEFAULT '' COMMENT '本周活动主题',
+        teacher_name      VARCHAR(50) DEFAULT '' COMMENT '教师姓名（快照）',
+        carer_name        VARCHAR(50) DEFAULT '' COMMENT '保育员姓名（快照）',
+        days_json         JSON COMMENT '5天每日活动快照（WeekDayPlan 列表）',
+        week_focus        TEXT COMMENT '本周重点',
+        env_setup         TEXT COMMENT '环境创设',
+        life_habits       TEXT COMMENT '生活习惯培养',
+        home_school       TEXT COMMENT '家园共育',
+        status            ENUM('draft','completed') DEFAULT 'draft',
+        created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at        DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_weekly_plan (semester_id, week_number, grade, class_name),
+        FOREIGN KEY (semester_id) REFERENCES semester_settings(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='周计划';
+    """,
 ]
 
 
