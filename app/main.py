@@ -8,7 +8,8 @@ from app.pages.daily_plan import daily_plan_page
 from app.pages.prompt_mgmt import prompt_mgmt_page
 from app.pages.plan_history import plan_history_page
 from app.pages.startup_check import startup_check_page
-from app.config import AppConfig
+from app.pages.db_setup import db_setup_page
+from app.config import AppConfig, BASE_DIR
 
 
 # ---------------------------------------------------------------------------
@@ -16,11 +17,12 @@ from app.config import AppConfig
 # ---------------------------------------------------------------------------
 
 NAV_ITEMS = [
-    ("/settings",    "tune",         "系统设置"),
-    ("/daily-plan",  "event_note",   "一日计划"),
-    ("/prompts",     "psychology",   "提示词管理"),
-    ("/history",     "history",      "历史记录"),
+    ("/settings",    "tune",               "系统设置"),
+    ("/daily-plan",  "event_note",         "一日计划"),
+    ("/prompts",     "psychology",         "提示词管理"),
+    ("/history",     "history",            "历史记录"),
     ("/startup-check", "health_and_safety", "系统自检"),
+    ("/db-setup",    "settings_ethernet",  "数据库配置"),
 ]
 
 
@@ -53,6 +55,11 @@ def create_layout(current_path: str = "/"):
 
 @ui.page("/")
 def index():
+    # 如果 .env 不存在，引导用户先完成数据库配置
+    env_path = BASE_DIR / ".env"
+    if not env_path.exists():
+        ui.navigate.to("/db-setup")
+        return
     ui.navigate.to("/daily-plan")
 
 
@@ -98,16 +105,28 @@ def page_startup_check():
         startup_check_page()
 
 
+@ui.page("/db-setup")
+def page_db_setup():
+    create_layout("/db-setup")
+    with ui.column().classes("w-full p-4"):
+        db_setup_page()
+
+
 # ---------------------------------------------------------------------------
 # 启动
 # ---------------------------------------------------------------------------
 
+_DB_INIT_OK: bool = False
+
+
 def main():
+    global _DB_INIT_OK
     # 初始化数据库（创建表）
     try:
         init_db()
+        _DB_INIT_OK = True
     except Exception as e:
-        print(f"⚠️  数据库初始化失败，部分功能可能不可用：{e}")
+        print(f"⚠️  数据库初始化失败，将跳转到数据库配置页：{e}")
 
     # 确保导出目录存在
     AppConfig.EXPORT_DIR.mkdir(parents=True, exist_ok=True)
