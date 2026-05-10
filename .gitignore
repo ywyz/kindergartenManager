@@ -1,0 +1,39 @@
+# 环境与密钥
+.env
+.env.prod
+.env.local
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# 导出文件（不入仓）
+exports/
+!exports/.gitkeep
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 测试覆盖率
+.coverage
+htmlcov/
+.pytest_cache/
+
+# 构建产物
+dist/
+build/
+*.egg-info/
+
+# 日志
+*.log
