@@ -67,6 +67,7 @@
 - `python-jose[cryptography]`（JWT）
 - `httpx`
 - `tenacity`
+- `openai`（可选：仅在改用 OpenAI Python SDK 时添加；当前方案默认使用 `httpx` 直连兼容接口）
 - `python-docx`
 - `apscheduler`
 - `pytest`
