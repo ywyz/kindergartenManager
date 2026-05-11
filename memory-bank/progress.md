@@ -35,3 +35,22 @@
 - 节假日逻辑包含“法定节假日前一天”和“不放假节日标签”两个维度，需提前设计接口返回模型。
 - 权限可见性含“同班可见、跨班不可见”，后续数据查询层要预留班级维度过滤。
 
+## 2026-05-11
+
+### 已完成
+
+- 新增 Step 0 自动化测试文件：`tests/conftest.py`、`tests/step0/test_bootstrap.py`、`tests/step0/test_config.py`、`tests/step0/test_logging.py`、`tests/step0/test_database.py`。
+- 保留人工验收清单：`tests/step0/pytest_checklist.md`。
+- 已执行 Step 0 窄范围测试：`.venv/bin/pytest tests/step0 -q`。
+- 测试结果：`18 passed, 1 warning in 2.06s`。
+- 新增 `memory-bank/testing.md`，记录测试说明、覆盖范围、执行命令与最近一次测试情况。
+
+### 当前状态
+
+- 阶段状态不变：阶段 0 已完成并具备自动化回归基线；阶段 1（Step 1.1 账号数据模型）待开始。
+
+### 风险与备注
+
+- 当前 warning 来自第三方库 `python-json-logger` 的弃用提示，不影响 Step 0 结论。
+- Step 0 的数据库测试暂不依赖真实 MySQL，仅验证结构与迁移接线；后续阶段需增加真实迁移与仓库层集成测试。
+
