@@ -26,7 +26,7 @@
 
 ## 阶段 0：项目骨架搭建
 
-### Step 0.1 — 创建标准目录结构
+### Step 0.1 ✅ — 创建标准目录结构
 
 **指令**
 按照 AGENTS.md 中"目录结构规范"，在仓库根目录创建以下空目录（每个目录放一个 `.gitkeep` 文件）：
@@ -50,9 +50,11 @@
 - 运行 `find app tests alembic exports -type d | sort`，输出结果与上述目录清单完全一致。
 - `python -c "import app.core; import app.service; import app.auth"` 无报错。
 
+验收日期：2026-05-14
+
 ---
 
-### Step 0.2 — 创建依赖清单与虚拟环境
+### Step 0.2 ✅ — 创建依赖清单与虚拟环境
 
 **指令**
 在根目录创建 `requirements.txt`，包含以下依赖（只列库名，版本约束宽松 `>=` 即可）：
@@ -80,9 +82,11 @@
 - `pip list | grep nicegui` 有输出。
 - `python -c "import nicegui, sqlalchemy, alembic, passlib, jose, httpx, tenacity, docx, apscheduler"` 无报错。
 
+验收日期：2026-05-14
+
 ---
 
-### Step 0.3 — 配置管理（core/config.py）
+### Step 0.3 ✅ — 配置管理（core/config.py）
 
 **指令**
 在 `app/core/config.py` 中使用 `pydantic-settings` 定义 `Settings` 类，包含以下字段（全部从环境变量读取）：
@@ -99,9 +103,11 @@
 - 复制 `.env.example` 为 `.env`，填入测试用假值。
 - `python -c "from app.core.config import Settings; s = Settings(); print(s.JWT_EXPIRE_MINUTES)"` 输出 `60`。
 
+验收日期：2026-05-14
+
 ---
 
-### Step 0.4 — 日志初始化（core/logging.py）
+### Step 0.4 ✅ — 日志初始化（core/logging.py）
 
 **指令**
 在 `app/core/logging.py` 中配置结构化 JSON 日志：
@@ -113,9 +119,11 @@
 **验证**
 - `python -c "from app.core.logging import get_logger; l = get_logger('test'); l.info('hello')"` 输出包含 `"message": "hello"` 的 JSON 行。
 
+验收日期：2026-05-14
+
 ---
 
-### Step 0.5 — 数据库连接（core/database.py）
+### Step 0.5 ✅ — 数据库连接（core/database.py）
 
 **指令**
 在 `app/core/database.py` 中：
@@ -129,6 +137,8 @@
 **验证**
 - `alembic current` 不报错（首次为空，输出空行或 `<none>` 均可）。
 - `python -c "from app.core.database import Base, AsyncSessionLocal; print('ok')"` 无报错。
+
+验收日期：2026-05-14
 
 ---
 

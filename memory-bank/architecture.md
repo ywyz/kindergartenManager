@@ -85,6 +85,7 @@
 ### 核心约定提示
 - Alembic 迁移使用 `pymysql`（同步）；运行时使用 `aiomysql`（异步）
 - `Base` 必须在所有 model 文件中被导入后，`alembic revision --autogenerate` 才能检测到新表
+- 当 `DATABASE_URL` 含 URL 编码字符（如 `%40`）时，`alembic/env.py` 写入 `sqlalchemy.url` 前必须将 `%` 转义为 `%%`，避免 `configparser` 插值异常
 
 ## 9. 待后续补全
 

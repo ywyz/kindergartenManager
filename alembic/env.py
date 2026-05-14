@@ -12,8 +12,10 @@ from app.core.database import Base  # noqa: F401 — imports all models via meta
 # access to the values within the .ini file in use.
 config = context.config
 
-# Override sqlalchemy.url with value from Settings (env-based)
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("+aiomysql", "+pymysql"))
+# Override sqlalchemy.url with value from Settings (env-based).
+# Alembic uses configparser interpolation, so '%' must be escaped as '%%'.
+sync_url = settings.DATABASE_URL.replace("+aiomysql", "+pymysql")
+config.set_main_option("sqlalchemy.url", sync_url.replace("%", "%%"))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

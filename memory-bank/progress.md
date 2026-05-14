@@ -54,3 +54,22 @@
 - 当前 warning 来自第三方库 `python-json-logger` 的弃用提示，不影响 Step 0 结论。
 - Step 0 的数据库测试暂不依赖真实 MySQL，仅验证结构与迁移接线；后续阶段需增加真实迁移与仓库层集成测试。
 
+## 2026-05-14
+
+### 已完成
+
+- 用户按顺序完成 Step 0 手工验收：Step 0.1~0.5 全部通过。
+- 处理并修复 Alembic 在 `DATABASE_URL` 包含 URL 编码字符（如 `%40`）时的插值报错：
+  - 报错现象：`ValueError: invalid interpolation syntax ...`
+  - 根因：Alembic 底层 `configparser` 将 `%` 解释为插值占位符。
+  - 修复方式：在 `alembic/env.py` 写入 `sqlalchemy.url` 前将 `%` 转义为 `%%`。
+- 修复后复测：`alembic current` 正常执行；当前 `alembic/versions/` 为空时不显示迁移版本属预期行为。
+
+### 当前状态
+
+- 阶段状态：阶段 0 完整通过并可复现；阶段 1 仍未开始（按用户要求等待进一步指令）。
+
+### 风险与备注
+
+- 连接串中若包含 `@`、`%` 等特殊字符，需做 URL 编码；并保留 Alembic `% -> %%` 转义逻辑。
+
