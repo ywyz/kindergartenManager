@@ -85,6 +85,77 @@
 - 节假日逻辑包含“法定节假日前一天”和“不放假节日标签”两个维度，需提前设计接口返回模型。
 - 权限可见性含“同班可见、跨班不可见”，后续数据查询层要预留班级维度过滤。
 
+## 2026-05-16（开发环境迁移 Python 3.12 → 3.14）
+
+### 背景
+
+切换开发电脑，新机器仅有 Python 3.14.4，无 Python 3.12。完成兼容性迁移并验证全量测试通过。
+
+### 变更内容
+
+#### 1. `passlib[argon2]` → `argon2-cffi`（必须修复）
+
+- **原因**：Python 3.13 起标准库移除 `crypt` 模块，`passlib` 内部依赖 `crypt` 导入失败，在 3.14 下运行时直接崩溃。
+- **修复**：
+  - `requirements.txt`：移除 `passlib[argon2]>=1.7.4`，改为 `argon2-cffi>=23.1.0`。
+  - `app/auth/password.py`：从 `passlib.context.CryptContext` 改为直接使用 `argon2.PasswordHasher`；`verify_password` 捕获 `VerifyMismatchError / VerificationError / InvalidHashError` 返回 `False`，接口签名保持不变。
+  - 外部接口（`hash_password` / `verify_password`）签名完全不变，上层代码无需修改。
+- **验证**：`pytest tests/test_password.py tests/test_auth_service.py -v` 全部通过。
+
+#### 2. `pythonjsonlogger` 导入路径修复（DeprecationWarning）
+
+- **原因**：`python-json-logger` 新版将模块从 `pythonjsonlogger.jsonlogger` 移至 `pythonjsonlogger.json`。
+- **修复**：`app/core/logging.py` 中将 `from pythonjsonlogger import jsonlogger` 改为 `from pythonjsonlogger import json as jsonlogger`。
+- **效果**：测试警告从 2 条降至 0 条。
+
+#### 3. 登录页异常捕获增强
+
+- **原因**：原代码只捕获 `AuthError`，数据库连接失败等其他异常被 NiceGUI 静默吞掉，导致按钮点击无任何反应。
+- **修复**：`app/ui/pages/login.py` 新增 `except Exception` 兜底，将错误类型展示到页面，同时记录结构化日志。
+
+#### 4. VS Code 调试配置修复
+
+- **原因**：旧 `launch.json` 以文件路径方式启动（`python app/main.py`），导致 `ModuleNotFoundError: No module named 'app'`。
+- **修复**：`.vscode/launch.json` 新增「运行应用 (python -m app.main)」配置，使用 `module: app.main` + `cwd: ${workspaceFolder}`。
+
+### 测试结果
+
+```
+71 passed, 0 warnings   （Python 3.14.4，修复后）
+```
+
+### 新电脑环境搭建步骤（备忘）
+
+```bash
+# 1. 克隆仓库后进入项目目录
+cd /home/ywyz/code/kindergartenManager
+
+# 2. 创建虚拟环境
+python3 -m venv .venv
+
+# 3. 安装依赖（zsh 下 >= 需引号）
+.venv/bin/pip install -r requirements.txt
+
+# 4. 复制并填写环境变量（DATABASE_URL / ENCRYPTION_KEY / JWT_SECRET 必须与线上一致）
+cp .env.example .env
+
+# 5. 运行应用
+.venv/bin/python -m app.main
+
+# 6. 跑测试
+.venv/bin/pytest tests/ -v
+```
+
+> ⚠️ `ENCRYPTION_KEY` 和 `JWT_SECRET` 必须与生产/云端保持一致，否则已加密的 AI Key 无法解密，已颁发的 JWT token 失效。
+
+### 当前状态
+
+- 全量测试：71 passed，0 warnings（Python 3.14.4）。
+- Alembic head：`67b4aef28796`（未变化）。
+- 下一步：**阶段 3 Step 3.1** — 加密工具 `app/core/crypto.py`（Fernet 对称加密）。
+
+---
+
 ## 2026-05-11
 
 ### 已完成

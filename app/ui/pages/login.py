@@ -9,7 +9,10 @@ from nicegui import app, ui
 
 from app.core.database import AsyncSessionLocal
 from app.core.exceptions import AuthError
+from app.core.logging import get_logger
 from app.service.auth_service import login as auth_login
+
+_logger = get_logger(__name__)
 
 _TENANT_ID = 1  # 首期固定租户，后续可由子域名或配置项注入
 
@@ -38,6 +41,10 @@ async def login_page() -> None:
                 ui.navigate.to("/home")
             except AuthError:
                 error_label.text = "用户名或密码错误"
+                error_label.visible = True
+            except Exception as exc:
+                _logger.exception("登录时发生未预期异常", exc_info=exc)
+                error_label.text = f"系统错误，请联系管理员（{type(exc).__name__}）"
                 error_label.visible = True
 
     # ── 页面布局 ────────────────────────────────────────────────────────────────
