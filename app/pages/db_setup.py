@@ -47,6 +47,9 @@ def _encrypt_if_sensitive(key: str, value: str) -> str:
     """敏感键写入前加密，返回可写入 .env 的值。"""
     if key not in _SENSITIVE_ENV_KEYS:
         return value
+    # 已经是加密格式时避免重复加密
+    if value.startswith("ENC(") and value.endswith(")"):
+        return value
     token = _build_fernet().encrypt(value.encode("utf-8")).decode("utf-8")
     return f"ENC({token})"
 
