@@ -12,6 +12,8 @@ from nicegui import ui
 # 导入页面模块以注册 @ui.page 路由（必须在 ui.run 前执行）
 from app.ui.pages import home  # noqa: F401
 from app.ui.pages import login  # noqa: F401
+from app.ui.pages import settings  # noqa: F401
+from app.ui.pages import date_test  # noqa: F401
 
 from app.core.config import settings
 

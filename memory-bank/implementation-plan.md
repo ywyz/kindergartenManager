@@ -9,24 +9,9 @@
 
 ---
 
-## 已澄清规则（2026-05-10）
-
-1. Word 模板以 `templates/teacherplan.docx` 为唯一实现依据：2 列多行结构，左列固定 8 行标题，右列对应内容；仅右列部分行存在子分割。
-2. 晨间活动中“体能大循环/集体游戏/自选游戏”为固定字段，其中“集体游戏”“自选游戏”后必须拼接具体内容。
-3. 年龄适配改写范围覆盖活动相关多个字段，核心优先“活动过程”；差异比对仍以活动过程为主。
-4. `is_holiday()` 返回语义固定为：法定节假日 `True`、工作日 `False`；周末通过额外判定处理，不并入 `is_holiday()` 返回语义。
-5. `near_holiday` 不包含周末，仅表示“法定节假日前一天”。
-6. 需额外识别“不放假节日”（如 5 月 12 日全国防灾减灾日），将节日标签作为上下文传给 AI，重点影响晨间谈话生成。
-7. 每个 `task_type` 使用独立 system prompt，用户可分别配置；切换 prompt 版本后，已保存草稿不自动重生成。
-8. 同一日期可重复导出并生成多条导出记录；`file_path` 存相对路径；下载行为与 `file_path` 解耦（`ui.download` 直接下载）。
-9. 权限边界：同班教师互相可见、跨班不可见；教研管理员可查看/编辑/批注；系统管理员需独立后台（优先级低于主流程）。
-10. 执行顺序约束：先维护架构文档再推进代码；每完成一个步骤同步更新 `memory-bank/architecture.md` 与 `memory-bank/progress.md`。
-
----
-
 ## 阶段 0：项目骨架搭建
 
-### Step 0.1 ✅ — 创建标准目录结构
+### Step 0.1 — 创建标准目录结构
 
 **指令**
 按照 AGENTS.md 中"目录结构规范"，在仓库根目录创建以下空目录（每个目录放一个 `.gitkeep` 文件）：
@@ -50,11 +35,9 @@
 - 运行 `find app tests alembic exports -type d | sort`，输出结果与上述目录清单完全一致。
 - `python -c "import app.core; import app.service; import app.auth"` 无报错。
 
-验收日期：2026-05-14
-
 ---
 
-### Step 0.2 ✅ — 创建依赖清单与虚拟环境
+### Step 0.2 — 创建依赖清单与虚拟环境
 
 **指令**
 在根目录创建 `requirements.txt`，包含以下依赖（只列库名，版本约束宽松 `>=` 即可）：
@@ -69,7 +52,6 @@
 - `python-jose[cryptography]`（JWT）
 - `httpx`
 - `tenacity`
-- `openai`（可选：仅在改用 OpenAI Python SDK 时添加；当前方案默认使用 `httpx` 直连兼容接口）
 - `python-docx`
 - `apscheduler`
 - `pytest`
@@ -82,11 +64,9 @@
 - `pip list | grep nicegui` 有输出。
 - `python -c "import nicegui, sqlalchemy, alembic, passlib, jose, httpx, tenacity, docx, apscheduler"` 无报错。
 
-验收日期：2026-05-14
-
 ---
 
-### Step 0.3 ✅ — 配置管理（core/config.py）
+### Step 0.3 — 配置管理（core/config.py）
 
 **指令**
 在 `app/core/config.py` 中使用 `pydantic-settings` 定义 `Settings` 类，包含以下字段（全部从环境变量读取）：
@@ -103,11 +83,9 @@
 - 复制 `.env.example` 为 `.env`，填入测试用假值。
 - `python -c "from app.core.config import Settings; s = Settings(); print(s.JWT_EXPIRE_MINUTES)"` 输出 `60`。
 
-验收日期：2026-05-14
-
 ---
 
-### Step 0.4 ✅ — 日志初始化（core/logging.py）
+### Step 0.4 — 日志初始化（core/logging.py）
 
 **指令**
 在 `app/core/logging.py` 中配置结构化 JSON 日志：
@@ -119,11 +97,9 @@
 **验证**
 - `python -c "from app.core.logging import get_logger; l = get_logger('test'); l.info('hello')"` 输出包含 `"message": "hello"` 的 JSON 行。
 
-验收日期：2026-05-14
-
 ---
 
-### Step 0.5 ✅ — 数据库连接（core/database.py）
+### Step 0.5 — 数据库连接（core/database.py）
 
 **指令**
 在 `app/core/database.py` 中：
@@ -138,13 +114,11 @@
 - `alembic current` 不报错（首次为空，输出空行或 `<none>` 均可）。
 - `python -c "from app.core.database import Base, AsyncSessionLocal; print('ok')"` 无报错。
 
-验收日期：2026-05-14
-
 ---
 
 ## 阶段 1：账号与鉴权基础
 
-### Step 1.1 ✅ — 用户数据模型
+### Step 1.1 — 用户数据模型
 
 **指令**
 在 `app/core/models/user.py` 中定义 `User` 表，字段包括：
@@ -165,7 +139,7 @@
 
 ---
 
-### Step 1.2 ✅ — 密码工具（auth/password.py）
+### Step 1.2 — 密码工具（auth/password.py）
 
 **指令**
 在 `app/auth/password.py` 中封装两个函数：
@@ -183,7 +157,7 @@
 
 ---
 
-### Step 1.3 ✅ — JWT 工具（auth/jwt.py）
+### Step 1.3 — JWT 工具（auth/jwt.py）
 
 **指令**
 在 `app/auth/jwt.py` 中封装：
@@ -201,7 +175,7 @@
 
 ---
 
-### Step 1.4 ✅ — 用户仓库层（repository/user_repository.py）
+### Step 1.4 — 用户仓库层（repository/user_repository.py）
 
 **指令**
 在 `app/repository/user_repository.py` 中定义异步函数：
@@ -221,7 +195,7 @@
 
 ---
 
-### Step 1.5 ✅ — 登录服务（service/auth_service.py）
+### Step 1.5 — 登录服务（service/auth_service.py）
 
 **指令**
 在 `app/service/auth_service.py` 中定义：
@@ -239,7 +213,7 @@
 
 ---
 
-### Step 1.6 ✅ — NiceGUI 登录页面（ui/pages/login.py）
+### Step 1.6 — NiceGUI 登录页面（ui/pages/login.py）
 
 **指令**
 在 `app/ui/pages/login.py` 中创建登录页面：
@@ -319,18 +293,14 @@
 
 **指令**
 在 `app/integration/holiday_client/client.py` 中实现：
-- `is_holiday(target_date: date) -> bool`：调用 `Settings.HOLIDAY_API_URL` 查询指定日期是否为法定节假日，返回语义固定为“法定节假日 True、工作日 False”。
-- 新增 `is_near_holiday(target_date: date) -> bool | None`：仅在“目标日期是法定节假日前一天”返回 True，不将周末视为 near_holiday。
-- 新增 `get_special_day_tags(target_date: date) -> list[str]`：返回不放假节日标签（首批至少包含 5 月 12 日“全国防灾减灾日”）。
+- `is_holiday(target_date: date) -> bool`：调用 `Settings.HOLIDAY_API_URL` 查询指定日期是否为法定节假日。
 - 查询结果以 `{date_str: bool}` 格式缓存到内存字典，缓存有效期为当天结束（跨天自动失效）。
 - API 调用失败时：记录警告日志，返回 `None`（调用方根据 None 判断"节假日信息不可用"，不抛出异常）。
 
 在 `tests/test_holiday_client.py` 中使用 `httpx` 的 `MockTransport` 模拟 API：
-- 正常响应时返回正确的 bool 值（法定节假日 True、工作日 False）。
+- 正常响应时返回正确的 bool 值。
 - API 返回 5xx 时返回 `None`。
 - 同一日期第二次调用不发出 HTTP 请求（验证缓存生效）。
-- near_holiday 对周末返回 False，仅对法定节假日前一天返回 True。
-- `get_special_day_tags` 在 5 月 12 日包含“全国防灾减灾日”。
 
 **验证**
 - `pytest tests/test_holiday_client.py -v` 全部通过。
@@ -484,10 +454,10 @@ system prompt 从 `app/repository/prompt_repository.py` 查询当前激活版本
 
 **指令**
 在 `app/integration/ai_client/adapt_client.py` 中实现：
-- `adapt_activity_fields(fields: dict, grade: str, api_base_url: str, api_key: str) -> dict`：对活动相关字段进行年龄段改写，至少覆盖 `activity_process`，并尽量覆盖 `activity_goal`、`activity_prep`、`activity_key`、`activity_difficult`。
+- `adapt_activity_process(original: str, grade: str, api_base_url: str, api_key: str) -> str`：将活动过程按年龄段（小班/中班/大班）改写，返回改写后文本。
 
 **验证**
-- Mock 返回正常时，返回 dict 且 `activity_process` 非空。
+- Mock 返回正常时，返回字符串非空。
 - Mock 返回缺少内容时抛出 `AiParseError`。
 
 ---
@@ -542,7 +512,7 @@ system prompt 从 `app/repository/prompt_repository.py` 查询当前激活版本
 在 `app/service/lesson_plan_service.py` 中编排完整教案拆分流程：
 1. 从数据库获取用户 AI Key（解密）
 2. 调用 `split_lesson_plan()`
-3. 调用 `adapt_activity_fields()` 对活动相关字段改写（以活动过程为主）
+3. 调用 `adapt_activity_process()` 对活动过程改写
 4. 调用 `compute_diff()` 生成差异
 5. 将所有结果组合为 `LessonPlanResult` dataclass（定义在 `app/service/` 目录内），包含拆分字段 + 改写文 + 差异列表
 6. 不负责入库（入库由 repository 层负责，由 UI 层触发）
@@ -642,10 +612,7 @@ system prompt 从 `app/repository/prompt_repository.py` 查询当前激活版本
 
 **指令**
 在 `app/integration/word_export/exporter.py` 中实现 `export_daily_plan(daily_plan: DailyPlan, diff_result: list[dict]) -> bytes`：
-- 基于 `templates/teacherplan.docx` 进行模板填充（不重建新表格）：左列固定 8 行标题，右列填充值。
-- 对右列存在子分割的行，按模板既有分段位置写入。
-- 晨间活动行固定输出“体能大循环/集体游戏/自选游戏”三个字段，其中“集体游戏”“自选游戏”后拼接生成内容。
-- 按以下业务顺序填充：
+- 使用 `python-docx` 创建包含单个表格的文档，按以下行顺序填充：
   1. 第 N 周（整行合并）
   2. 月 日 周X（整行合并）
   3. 晨间活动内容
@@ -677,7 +644,7 @@ system prompt 从 `app/repository/prompt_repository.py` 查询当前激活版本
 生成迁移并执行。
 
 在 `/daily-plan` 页面中激活"导出 Word"按钮：
-- 点击后调用 `export_daily_plan()`，将返回 bytes 写入 `exports/{tenant_id}_{user_id}_{grade}_{class}_{YYYYMMDD}_{HHMMSS}_日计划.docx`。
+- 点击后调用 `export_daily_plan()`，将返回 bytes 写入 `exports/{tenant_id}_{user_id}_{grade}_{class}_{YYYYMMDD}_日计划.docx`。
 - 将文件路径写入 `export_records` 表。
 - 通过 NiceGUI 的 `ui.download` 触发浏览器下载。
 
@@ -685,21 +652,6 @@ system prompt 从 `app/repository/prompt_repository.py` 查询当前激活版本
 - 点击"导出 Word"，浏览器自动下载文件，文件名格式正确。
 - 打开下载文件，表格共 8 行，差异内容字体为红色。
 - `export_records` 表中有对应记录。
-- 同一日期多次导出可产生多条记录。
-
----
-
-### Step 6.3 — 导出历史页面（ui/pages/export_history.py）
-
-**指令**
-新增导出历史页面（路由 `/export-history`）：
-- 按当前用户可见范围列出导出记录（时间、班级、日期、文件名）。
-- 支持按日期筛选。
-- 提供“重新下载”按钮（基于记录中的相对路径读取文件并下载）。
-
-**验证**
-- 同一日期存在多次导出时，页面可显示多条记录。
-- 点击“重新下载”可下载对应历史文件。
 
 ---
 
@@ -710,13 +662,12 @@ system prompt 从 `app/repository/prompt_repository.py` 查询当前激活版本
 **指令**
 在 `app/integration/ai_client/activity_gen_client.py` 中实现：
 - `generate_daily_activities(context: dict, api_base_url: str, api_key: str) -> dict`
-- `context` 字段：`week_number`、`weekday`、`near_holiday`（bool 或 None，仅法定节假日前一天）、`holiday_today`（bool 或 None）、`special_day_tags`（list[str]）、`indoor_areas`、`outdoor_content`、`grade`、`class_name`
+- `context` 字段：`week_number`、`weekday`、`near_holiday`（bool 或 None）、`indoor_areas`、`outdoor_content`、`grade`、`class_name`
 - 返回 dict 包含键：`morning_activity`、`indoor_area`、`outdoor_activity`、`morning_talk_topic`、`morning_talk_questions`
 
 **验证**
 - Mock 测试：返回 dict 包含全部 5 个键。
 - `near_holiday=True` 时，system prompt 中包含节假日相关提示（通过断言 prompt 字符串实现）。
-- `special_day_tags` 非空时，晨间谈话提示词中包含对应节日引导语。
 
 ---
 

@@ -27,7 +27,57 @@
 
 ### 下一步
 
-- 阶段 1（Step 1.1~1.6）全部完成，待用户手工验收 Step 1.6 登录页面后，开始阶段 2（Step 2.1 学期配置数据模型）。
+- 阶段 2（Step 2.1 学期配置数据模型）。
+
+## 2026-05-16（续）
+
+### 已完成（阶段 2）
+
+- **Step 2.1 ✅**：`app/core/models/semester.py` — `SemesterConfig` 模型；Alembic 迁移 `fd6d29f921b4`；手工验收通过（DESCRIBE semester_config 字段与定义一致）。
+- **Step 2.2 ✅**：`app/core/models/class_config.py` — `ClassConfig` 模型；Alembic 迁移 `67b4aef28796`；手工验收通过。
+- **Step 2.3 ✅**：`app/service/date_service.py` — 纯函数：`get_week_number`、`get_weekday_cn`、`is_workday`、`is_within_semester`；`tests/test_date_service.py` 19 passed，0 warnings。
+- **Step 2.4 ✅**：`app/integration/holiday_client/client.py` — `is_holiday`、`is_near_holiday`、`get_holiday_name`、`get_special_day_tags`；缓存结构升级为 `tuple[bool, str | None]` 同时存储节日名称；`tests/test_holiday_client.py` 23 passed，1 warning（已知 pythonjsonlogger）。
+- **Step 2.5 ✅**：`app/repository/semester_repository.py`、`app/repository/class_repository.py`、`app/ui/pages/settings.py`（路由 `/settings`）；手工验收通过（数据持久化、刷新回填正常；tenant_id/user_id 字段正确；MySQL 中文存储正确，CLI 显示 `?` 属终端字符集问题，非数据问题）。
+- **Step 2.6 ✅**：`app/ui/components/date_panel.py` — 可复用日期面板组件；`app/ui/pages/date_test.py`（路由 `/date-test`）；手工验收通过。
+
+### 新增需求记录（2026-05-16）
+
+- **需求 1**：节假日客户端在返回 `is_holiday=True` 时，额外返回具体节日名称（如"国庆节"、"春节"）。
+- **实现 1**：
+  - 内存缓存结构从 `dict[str, bool]` 升级为 `dict[str, tuple[bool, str | None]]`，`is_holiday` 在填充缓存时同时存储节日名称。
+  - 名称解析优先级：`holiday.name`（API 返回的 holiday 对象）→ `type.name`（API 返回的 type 对象）。
+  - 新增 `get_holiday_name(target_date, *, _transport) -> str | None` 函数，复用缓存，同一日期不发额外 HTTP 请求。
+  - `DatePanel` 组件更新：法定节假日提示文字从"今天是法定节假日"变为"今天是法定节假日（国庆节）"。
+- **测试 1**：`TestGetHolidayName` 7 项测试全部通过（节日对象名称、type 名称降级、工作日/周末返回 None、API 失败 None、缓存复用、多节日名称正确）。
+
+- **需求 2**：`get_special_day_tags` 不再强制硬编码，支持通过在线 API 动态获取，不可用时降级为本地硬编码列表。
+- **实现 2**：
+  - 新增可选配置项 `SPECIAL_DAY_API_URL: str | None = None`（`app/core/config.py`）。
+  - API 协议：`GET {SPECIAL_DAY_API_URL}/{YYYY-MM-DD}` → `{"tags": ["教师节"]}`。
+  - 新增独立特殊节日缓存 `_special_day_cache`，当天有效，跨天自动清空。
+  - 新增 `_fetch_special_day_tags_from_api()` 内部帮助函数。
+  - `get_special_day_tags` 改为 async：配置 API 时优先调用，失败后降级硬编码；未配置时直接走硬编码。
+  - 修复 bug：fallback 路径返回缓存对象引用，改为返回副本（`return list(tags)`）。
+  - `DatePanel._update_info` 对应更新：`await get_special_day_tags(target)`。
+- **测试 2**：`TestGetSpecialDayTagsFromApi` 6 项测试全部通过（API 返回标签、API 返回空列表、5xx 降级硬编码、未配置不发请求、缓存复用、API 结果优先于硬编码）；`TestGetSpecialDayTags` 5 项回归测试（改为 async）全部通过。
+
+### DeprecationWarning 记录（Python 升级预警）
+
+| 来源 | 警告内容 | 影响 | 建议 |
+|------|---------|------|------|
+| `passlib/utils/__init__.py` | `import crypt` 在 Python 3.12 弃用，3.13 移除 | 无功能影响 | 升级 3.13 前改用 `argon2-cffi` |
+| `passlib/handlers/argon2.py` | `argon2.__version__` 已弃用 | 无功能影响 | 升级 passlib 可消除 |
+| `pythonjsonlogger/jsonlogger.py` | 模块路径变更为 `pythonjsonlogger.json` | 无功能影响 | 更新 `app/core/logging.py` 导入路径 |
+
+### 当前状态
+
+- **阶段 2（Step 2.1~2.6）+ 附加需求全部完成并通过手工验收。**
+- 全量自动化测试：`71 passed, 0 failed, 3 warnings`（全部为已知 DeprecationWarning，无功能影响）。
+- Alembic 迁移版本：`67b4aef28796 (head)`，含 user / semester_config / class_config 三张表。
+
+### 下一步
+
+- 阶段 3（Step 3.1）：加密工具 `app/core/crypto.py`，实现 Fernet 对称加密/解密。
 
 ### 风险与备注
 

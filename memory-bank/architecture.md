@@ -87,10 +87,73 @@
 - `Base` 必须在所有 model 文件中被导入后，`alembic revision --autogenerate` 才能检测到新表
 - 当 `DATABASE_URL` 含 URL 编码字符（如 `%40`）时，`alembic/env.py` 写入 `sqlalchemy.url` 前必须将 `%` 转义为 `%%`，避免 `configparser` 插值异常
 
-## 9. 待后续补全
+## 9. 阶段 1 & 2 已实现文件清单
 
-- 数据库 ERD 与完整表清单（随模型实现逐步补齐）。
-- Alembic 迁移版本清单（产生迁移后持续补齐）。
-- 模块职责明细（按 app 子目录逐步细化）。
-- 已知限制与扩展点（随实现迭代维护）。
+### 数据库表（Alembic 当前 head：`67b4aef28796`）
+
+| 表名 | 迁移版本 | 主要字段 |
+|------|---------|---------|
+| `users` | `5e03413fdeca` | id, tenant_id, username, hashed_password, role, is_active |
+| `semester_config` | `fd6d29f921b4` | id, tenant_id, user_id, semester_name, start_date, end_date, is_active |
+| `class_config` | `67b4aef28796` | id, tenant_id, user_id, grade, class_name, indoor_areas, outdoor_content |
+
+所有表均含 `created_at`、`updated_at`，并建立 `(tenant_id, user_id)` 联合索引。
+
+### 核心模块
+
+| 文件 | 职责 |
+|------|------|
+| `app/core/models/user.py` | User ORM 模型 |
+| `app/core/models/semester.py` | SemesterConfig ORM 模型 |
+| `app/core/models/class_config.py` | ClassConfig ORM 模型 |
+| `app/auth/password.py` | Argon2 密码哈希与验证（passlib） |
+| `app/auth/jwt.py` | JWT 生成/验证（python-jose HS256），payload 含 sub/tenant_id/role/exp |
+| `app/service/auth_service.py` | 登录逻辑（查用户→验密码→签 JWT）；修改密码 |
+| `app/service/date_service.py` | 纯函数：`get_week_number`、`get_weekday_cn`、`is_workday`、`is_within_semester` |
+| `app/repository/user_repository.py` | 按用户名/ID 查询用户；更新密码 |
+| `app/repository/semester_repository.py` | `get_active_semester`、`upsert_active_semester` |
+| `app/repository/class_repository.py` | `get_class_config`、`upsert_class_config` |
+| `app/integration/holiday_client/client.py` | 法定节假日判定；法定节假日缓存 `dict[str, tuple[bool, str\|None]]`；特殊节日缓存 `dict[str, list[str]]`；`is_holiday`、`is_near_holiday`、`get_holiday_name`、`get_special_day_tags`（async，支持在线 API + 硬编码降级） |
+| `app/ui/pages/login.py` | 登录页（路由 `/`），token 写入 `app.storage.user` |
+| `app/ui/pages/home.py` | 首页（路由 `/home`），快捷导航按钮 |
+| `app/ui/pages/settings.py` | 配置页（路由 `/settings`），学期与班级配置 |
+| `app/ui/pages/date_test.py` | 日期测试页（路由 `/date-test`），嵌入 DatePanel |
+| `app/ui/components/date_panel.py` | 可复用日期面板组件，显示周次/周几/法定节假日（含节日名称）/调班/临近节假日/特殊节日标签 |
+
+### Holiday Client 接口说明
+
+```python
+# 判定法定节假日（True=法定节假日, False=非法定节假日, None=API不可用）
+is_holiday(target_date, *, _transport=None) -> bool | None
+
+# 判定明天是否为法定节假日（True=是, False=否, None=API不可用）
+is_near_holiday(target_date, *, _transport=None) -> bool | None
+
+# 获取具体节日名称（如"国庆节"），非法定节假日或API不可用返回 None
+# 与 is_holiday 共享法定节假日缓存，同一日期不发额外 HTTP 请求
+get_holiday_name(target_date, *, _transport=None) -> str | None
+
+# 返回不放假节日标签列表（如["教师节"]）
+# 若配置了 SPECIAL_DAY_API_URL，优先从 API 获取（GET url/{YYYY-MM-DD} → {"tags":[...]}）
+# API 失败或未配置时，降级为本地硬编码，不阻断主流程
+# 独立缓存（当天有效），返回副本
+get_special_day_tags(target_date, *, _transport=None) -> list[str]  # async
+```
+
+API 响应格式（timor.tech 兼容）：
+```json
+{
+  "code": 0,
+  "type": {"type": 0|1|2|3, "name": "工作日|周末|法定节假日|调班工作日"},
+  "holiday": {"name": "国庆节", "holiday": true, "wage": 3} | null
+}
+```
+type 值：0=工作日，1=周末，2=法定节假日，3=调班工作日。
+
+## 10. 待后续补全
+
+- 数据库 ERD 完整图（随模型实现逐步补齐）。
+- Alembic 迁移版本详细变更描述。
+- 阶段 3（加密工具、AI 客户端、Word 导出）模块实现后更新。
+
 
