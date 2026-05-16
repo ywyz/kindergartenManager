@@ -1,9 +1,12 @@
 """数据库连接配置页面 — 首次部署或无 .env 时使用"""
 import os
 import re
+import base64
+import hashlib
 from pathlib import Path
 
 import pymysql
+from cryptography.fernet import Fernet
 from nicegui import run, ui
 
 from app.config import BASE_DIR, DBConfig, AppConfig
@@ -28,6 +31,26 @@ def _read_env_file(path: Path) -> dict[str, str]:
     return result
 
 
+_SENSITIVE_ENV_KEYS = {"DB_PASSWORD", "APP_SECRET_KEY"}
+
+
+def _build_fernet() -> Fernet:
+    """从 APP_CONFIG_MASTER_KEY 派生 Fernet key。"""
+    master = os.environ.get("APP_CONFIG_MASTER_KEY", "").strip()
+    if not master:
+        raise ValueError("缺少 APP_CONFIG_MASTER_KEY，无法安全保存敏感配置")
+    digest = hashlib.sha256(master.encode("utf-8")).digest()
+    return Fernet(base64.urlsafe_b64encode(digest))
+
+
+def _encrypt_if_sensitive(key: str, value: str) -> str:
+    """敏感键写入前加密，返回可写入 .env 的值。"""
+    if key not in _SENSITIVE_ENV_KEYS:
+        return value
+    token = _build_fernet().encrypt(value.encode("utf-8")).decode("utf-8")
+    return f"ENC({token})"
+
+
 def _write_env_file(path: Path, values: dict[str, str]) -> None:
     """将键值字典写入 .env 文件（覆盖已有同名键，追加新键）"""
     existing: dict[str, str] = {}
@@ -43,13 +66,15 @@ def _write_env_file(path: Path, values: dict[str, str]) -> None:
                     existing[key] = line
                     # 用新值替换
                     if key in values:
-                        lines.append(f'{key}="{values[key]}"')
+                        safe_value = _encrypt_if_sensitive(key, values[key])
+                        lines.append(f'{key}="{safe_value}"')
                         continue
             lines.append(line)
     # 追加不存在的新键
     for k, v in values.items():
         if k not in existing:
-            lines.append(f'{k}="{v}"')
+            safe_value = _encrypt_if_sensitive(k, v)
+            lines.append(f'{k}="{safe_value}"')
 
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
