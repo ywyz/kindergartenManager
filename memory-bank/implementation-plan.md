@@ -144,7 +144,7 @@
 
 ## 阶段 1：账号与鉴权基础
 
-### Step 1.1 — 用户数据模型
+### Step 1.1 ✅ — 用户数据模型
 
 **指令**
 在 `app/core/models/user.py` 中定义 `User` 表，字段包括：
@@ -165,7 +165,7 @@
 
 ---
 
-### Step 1.2 — 密码工具（auth/password.py）
+### Step 1.2 ✅ — 密码工具（auth/password.py）
 
 **指令**
 在 `app/auth/password.py` 中封装两个函数：
@@ -183,7 +183,7 @@
 
 ---
 
-### Step 1.3 — JWT 工具（auth/jwt.py）
+### Step 1.3 ✅ — JWT 工具（auth/jwt.py）
 
 **指令**
 在 `app/auth/jwt.py` 中封装：
@@ -201,7 +201,7 @@
 
 ---
 
-### Step 1.4 — 用户仓库层（repository/user_repository.py）
+### Step 1.4 ✅ — 用户仓库层（repository/user_repository.py）
 
 **指令**
 在 `app/repository/user_repository.py` 中定义异步函数：
@@ -221,7 +221,7 @@
 
 ---
 
-### Step 1.5 — 登录服务（service/auth_service.py）
+### Step 1.5 ✅ — 登录服务（service/auth_service.py）
 
 **指令**
 在 `app/service/auth_service.py` 中定义：
@@ -239,7 +239,7 @@
 
 ---
 
-### Step 1.6 — NiceGUI 登录页面（ui/pages/login.py）
+### Step 1.6 ✅ — NiceGUI 登录页面（ui/pages/login.py）
 
 **指令**
 在 `app/ui/pages/login.py` 中创建登录页面：

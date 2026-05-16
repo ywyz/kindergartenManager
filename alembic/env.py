@@ -6,7 +6,8 @@ from sqlalchemy import pool
 from alembic import context
 
 from app.core.config import settings
-from app.core.database import Base  # noqa: F401 — imports all models via metadata
+from app.core.database import Base  # noqa: F401
+import app.core.models  # noqa: F401 — 确保所有模型被加载，alembic autogenerate 才能发现
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
