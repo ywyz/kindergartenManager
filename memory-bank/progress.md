@@ -36,7 +36,7 @@
 - **Step 2.1 ✅**：`app/core/models/semester.py` — `SemesterConfig` 模型；Alembic 迁移 `fd6d29f921b4`；手工验收通过（DESCRIBE semester_config 字段与定义一致）。
 - **Step 2.2 ✅**：`app/core/models/class_config.py` — `ClassConfig` 模型；Alembic 迁移 `67b4aef28796`；手工验收通过。
 - **Step 2.3 ✅**：`app/service/date_service.py` — 纯函数：`get_week_number`、`get_weekday_cn`、`is_workday`、`is_within_semester`；`tests/test_date_service.py` 19 passed，0 warnings。
-- **Step 2.4 ✅**：`app/integration/holiday_client/client.py` — `is_holiday`、`is_near_holiday`、`get_holiday_name`、`get_special_day_tags`；缓存结构升级为 `tuple[bool, str | None]` 同时存储节日名称；`tests/test_holiday_client.py` 23 passed，1 warning（已知 pythonjsonlogger）。
+- **Step 2.4 ✅**：`app/integration/holiday_client/client.py` — `is_holiday`、`is_near_holiday`、`get_holiday_name`、`get_special_day_tags`、`is_adjusted_workday`；缓存结构最终为 `tuple[bool, str | None, int]`（bool=法定节假日, str=节日名称, int=day_type）；`tests/test_holiday_client.py` 29 passed。
 - **Step 2.5 ✅**：`app/repository/semester_repository.py`、`app/repository/class_repository.py`、`app/ui/pages/settings.py`（路由 `/settings`）；手工验收通过（数据持久化、刷新回填正常；tenant_id/user_id 字段正确；MySQL 中文存储正确，CLI 显示 `?` 属终端字符集问题，非数据问题）。
 - **Step 2.6 ✅**：`app/ui/components/date_panel.py` — 可复用日期面板组件；`app/ui/pages/date_test.py`（路由 `/date-test`）；手工验收通过。
 
@@ -44,22 +44,22 @@
 
 - **需求 1**：节假日客户端在返回 `is_holiday=True` 时，额外返回具体节日名称（如"国庆节"、"春节"）。
 - **实现 1**：
-  - 内存缓存结构从 `dict[str, bool]` 升级为 `dict[str, tuple[bool, str | None]]`，`is_holiday` 在填充缓存时同时存储节日名称。
+  - 内存缓存结构从 `dict[str, bool]` 升级为 `dict[str, tuple[bool, str | None, int]]`（后续需求3追加存储 day_type），`is_holiday` 在填充缓存时同时存储节日名称与 day_type。
   - 名称解析优先级：`holiday.name`（API 返回的 holiday 对象）→ `type.name`（API 返回的 type 对象）。
   - 新增 `get_holiday_name(target_date, *, _transport) -> str | None` 函数，复用缓存，同一日期不发额外 HTTP 请求。
   - `DatePanel` 组件更新：法定节假日提示文字从"今天是法定节假日"变为"今天是法定节假日（国庆节）"。
 - **测试 1**：`TestGetHolidayName` 7 项测试全部通过（节日对象名称、type 名称降级、工作日/周末返回 None、API 失败 None、缓存复用、多节日名称正确）。
 
-- **需求 2**：`get_special_day_tags` 不再强制硬编码，支持通过在线 API 动态获取，不可用时降级为本地硬编码列表。
-- **实现 2**：
-  - 新增可选配置项 `SPECIAL_DAY_API_URL: str | None = None`（`app/core/config.py`）。
-  - API 协议：`GET {SPECIAL_DAY_API_URL}/{YYYY-MM-DD}` → `{"tags": ["教师节"]}`。
-  - 新增独立特殊节日缓存 `_special_day_cache`，当天有效，跨天自动清空。
-  - 新增 `_fetch_special_day_tags_from_api()` 内部帮助函数。
-  - `get_special_day_tags` 改为 async：配置 API 时优先调用，失败后降级硬编码；未配置时直接走硬编码。
-  - 修复 bug：fallback 路径返回缓存对象引用，改为返回副本（`return list(tags)`）。
-  - `DatePanel._update_info` 对应更新：`await get_special_day_tags(target)`。
-- **测试 2**：`TestGetSpecialDayTagsFromApi` 6 项测试全部通过（API 返回标签、API 返回空列表、5xx 降级硬编码、未配置不发请求、缓存复用、API 结果优先于硬编码）；`TestGetSpecialDayTags` 5 项回归测试（改为 async）全部通过。
+- **需求 2**（已回滚，记入 BL-01）：`get_special_day_tags` 曾计划支持在线 API 动态获取，但评估后代价大于收益，已回滚至本地硬编码同步实现。`get_special_day_tags` 保持 sync，不依赖外部 API，不需要 `SPECIAL_DAY_API_URL` 配置项。
+
+- **Bug 修复 — 调班工作日（type=3）显示错误**：
+  - 现象：2026-05-09（周六，调班补班）选择后显示"今天是周末（非工作日）"，未能识别调班工作日。
+  - 根因：`is_workday()` 是纯日历函数（周一～周五判断），不知道调班信息；`is_holiday()` 对 type=3 返回 False（正确），但无函数能检测 type=3。
+  - 修复：
+    - 缓存三元组追加 day_type（第3位 int）：`dict[str, tuple[bool, str | None, int]]`。
+    - 新增 `is_adjusted_workday(target_date, *, _transport=None) -> bool | None`：type=3 返回 True，复用法定节假日缓存，同日期不重复发 HTTP 请求。
+    - `DatePanel._update_info` 在"非工作日"分支优先检查是否调班：调班工作日显示蓝色"今天是调班工作日，需正常上班"；普通周末保持橙色提示。
+  - 测试：新增 `TestIsAdjustedWorkday` 6 项，全部通过。
 
 ### DeprecationWarning 记录（Python 升级预警）
 

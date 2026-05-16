@@ -755,3 +755,20 @@ system prompt 从 `app/repository/prompt_repository.py` 查询当前激活版本
 - [ ] 数据库中 `tenant_id`/`user_id` 在所有表中均正确写入
 - [ ] 提示词可保存新版本并回滚
 - [ ] `memory-bank/architecture.md` 已更新
+
+---
+
+## Backlog：低优先级待开发需求
+
+### BL-01 — `get_special_day_tags` 在线 API 支持
+
+**背景**：在 Step 2.4 阶段曾实现过在线动态获取特殊节日标签（GET `{SPECIAL_DAY_API_URL}/{YYYY-MM-DD}` → `{"tags":[...]}`），但因收益有限、增加配置依赖而回滚，改回本地硬编码同步实现。
+
+**待实现时的方案**：
+- 在 `app/core/config.py` 新增 `SPECIAL_DAY_API_URL: str | None = None`（可选）。
+- `get_special_day_tags` 改为 async：配置 API 时优先在线获取，失败或未配置时降级本地硬编码。
+- 独立缓存 `_special_day_cache: dict[str, list[str]]`，当天有效，跨天自动清空。
+- `DatePanel._update_info` 对应改为 `await get_special_day_tags(target)`。
+- 测试：`MockTransport` 覆盖 API 返回标签、5xx 降级硬编码、未配置不发请求、缓存复用。
+
+**触发条件**：有真实在线特殊节日 API 可接入时启用。

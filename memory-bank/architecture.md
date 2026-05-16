@@ -113,7 +113,7 @@
 | `app/repository/user_repository.py` | 按用户名/ID 查询用户；更新密码 |
 | `app/repository/semester_repository.py` | `get_active_semester`、`upsert_active_semester` |
 | `app/repository/class_repository.py` | `get_class_config`、`upsert_class_config` |
-| `app/integration/holiday_client/client.py` | 法定节假日判定；法定节假日缓存 `dict[str, tuple[bool, str\|None]]`；特殊节日缓存 `dict[str, list[str]]`；`is_holiday`、`is_near_holiday`、`get_holiday_name`、`get_special_day_tags`（async，支持在线 API + 硬编码降级） |
+| `app/integration/holiday_client/client.py` | 法定节假日判定；法定节假日缓存 `dict[str, tuple[bool, str\|None, int]]`（含 day_type）；特殊节日缓存 `dict[str, list[str]]`；`is_holiday`、`is_near_holiday`、`get_holiday_name`、`get_special_day_tags`（sync，本地硬编码）、`is_adjusted_workday` |
 | `app/ui/pages/login.py` | 登录页（路由 `/`），token 写入 `app.storage.user` |
 | `app/ui/pages/home.py` | 首页（路由 `/home`），快捷导航按钮 |
 | `app/ui/pages/settings.py` | 配置页（路由 `/settings`），学期与班级配置 |
@@ -134,10 +134,14 @@ is_near_holiday(target_date, *, _transport=None) -> bool | None
 get_holiday_name(target_date, *, _transport=None) -> str | None
 
 # 返回不放假节日标签列表（如["教师节"]）
-# 若配置了 SPECIAL_DAY_API_URL，优先从 API 获取（GET url/{YYYY-MM-DD} → {"tags":[...]}）
-# API 失败或未配置时，降级为本地硬编码，不阻断主流程
-# 独立缓存（当天有效），返回副本
-get_special_day_tags(target_date, *, _transport=None) -> list[str]  # async
+# 纯本地硬编码字典（不依赖外部 API），返回副本
+# 独立缓存（当天有效）
+get_special_day_tags(target_date) -> list[str]  # sync
+
+# 判定调班工作日：调休补班的周末（type=3），需正常上班
+# 复用 is_holiday 法定节假日缓存（同日期不重复发 HTTP 请求）
+# True=调班工作日, False=非调班工作日, None=API不可用
+is_adjusted_workday(target_date, *, _transport=None) -> bool | None
 ```
 
 API 响应格式（timor.tech 兼容）：
