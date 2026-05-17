@@ -79,6 +79,20 @@
 
 - 阶段 3（Step 3.1）：加密工具 `app/core/crypto.py`，实现 Fernet 对称加密/解密。
 
+## 2026-05-17
+
+### 开发环境升级
+
+- **Python 升级**：`.venv` 由 Python 3.12.3 升级至 **Python 3.14.4**（`/home/admin/.local/bin/python3.14`）。
+- **依赖重装**：删除旧 `.venv`，用 `python3.14 -m venv .venv` 重建，`pip install -r requirements.txt` 全量安装。
+- **验证**：`pytest tests/ -q` 全部通过（**89 passed, 0 warnings**），相比 3.12 环境消除了 passlib/json-logger DeprecationWarning（已知问题，代码层已提前切换至 argon2-cffi + pythonjsonlogger.json）。
+
+### 当前状态
+
+- Python：3.14.4
+- 依赖与旧环境版本一致（nicegui 3.12.0、SQLAlchemy 2.0.49、alembic 1.18.4 等）
+- 测试：89 passed, 0 warnings
+
 ### 风险与备注
 
 - Word 导出必须严格按模板结构实现，禁止自行重排结构。
@@ -279,4 +293,21 @@ cp .env.example .env
 ### 风险与备注
 
 - 连接串中若包含 `@`、`%` 等特殊字符，需做 URL 编码；并保留 Alembic `% -> %%` 转义逻辑。
+
+## 2026-05-17（续）
+
+### 已完成：为 AI 配置新增 model_name 字段
+
+- **背景**：AI API Key 表缺少模型名称字段，导致后续 ai_client 层无法知道应使用哪个模型。
+- **数据库**：`app/core/models/ai_key.py` 新增 `model_name: String(128), NOT NULL, server_default='gpt-4o-mini'`；Alembic 迁移 `46b9fd5613c3` 已应用（含回填现有 NULL 值 → 'gpt-4o-mini'）。
+- **附注（数据库状态修复）**：另一台机器曾用 `38441cbdef11` 迁移将 `model_name` 列以 nullable 形式加入 DB，但迁移文件未推送到仓库；本次将 DB alembic_version 重置为 `1a0d0e46f700` 后编写 `46b9fd5613c3` 完成对齐。
+- **仓库层**：`save_ai_key` 新增 `model_name: str = "gpt-4o-mini"` 参数，写入新记录时赋值。
+- **Settings UI**：AI 配置区块新增"模型名称"自由文本输入框（placeholder 提供常用示例）；加载时自动回填；保存前校验非空。
+- **测试**：原有 `save_ai_key` 调用全部补充 `model_name` 参数；新增 `TestModelName` 测试类（3 个用例）；全量测试 **92 passed, 0 warnings**。
+
+### 当前状态
+
+- Alembic 当前版本：`46b9fd5613c3 (head)`
+- 全量测试：92 passed, 0 warnings（Python 3.14.4）
+- 下一步：阶段 3（Step 3.1）加密工具 `app/core/crypto.py`（已在之前阶段完成），或 ai_client 层实现（Step 4.1）
 

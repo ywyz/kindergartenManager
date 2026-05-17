@@ -29,6 +29,9 @@ class AiApiKey(Base):
     tenant_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     api_base_url: Mapped[str] = mapped_column(String(256), nullable=False)
+    model_name: Mapped[str] = mapped_column(
+        String(128), nullable=False, server_default="gpt-4o-mini"
+    )
     # 仅存密文；明文禁止出现在此字段
     api_key_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

@@ -22,29 +22,30 @@ from app.repository.ai_key_repository import (
 
 PLAIN_KEY = "sk-test-api-key-abcdef123456"
 API_URL = "https://api.openai.com/v1"
+MODEL = "gpt-4o-mini"
 
 
 class TestSaveAiKey:
     async def test_encrypted_differs_from_plaintext(self, async_session: AsyncSession):
         """入库后 api_key_encrypted 不能与明文相同。"""
-        record = await save_ai_key(async_session, 1, 1, API_URL, PLAIN_KEY)
+        record = await save_ai_key(async_session, 1, 1, API_URL, PLAIN_KEY, MODEL)
         assert record.api_key_encrypted != PLAIN_KEY
 
     async def test_saved_record_is_active(self, async_session: AsyncSession):
         """新保存的记录 is_active 应为 True。"""
-        record = await save_ai_key(async_session, 1, 1, API_URL, PLAIN_KEY)
+        record = await save_ai_key(async_session, 1, 1, API_URL, PLAIN_KEY, MODEL)
         assert record.is_active is True
 
     async def test_api_base_url_saved_correctly(self, async_session: AsyncSession):
         """api_base_url 字段应与传入值一致。"""
-        record = await save_ai_key(async_session, 1, 1, API_URL, PLAIN_KEY)
+        record = await save_ai_key(async_session, 1, 1, API_URL, PLAIN_KEY, MODEL)
         assert record.api_base_url == API_URL
 
 
 class TestGetActiveAiKey:
     async def test_returns_saved_record(self, async_session: AsyncSession):
         """保存后 get_active_ai_key 可取回该记录。"""
-        await save_ai_key(async_session, 1, 1, API_URL, PLAIN_KEY)
+        await save_ai_key(async_session, 1, 1, API_URL, PLAIN_KEY, MODEL)
         result = await get_active_ai_key(async_session, 1, 1)
         assert result is not None
         assert result.is_active is True
@@ -58,16 +59,36 @@ class TestGetActiveAiKey:
 class TestGetDecryptedKey:
     async def test_decrypted_matches_original(self, async_session: AsyncSession):
         """解密后应还原为原始明文。"""
-        await save_ai_key(async_session, 1, 1, API_URL, PLAIN_KEY)
+        await save_ai_key(async_session, 1, 1, API_URL, PLAIN_KEY, MODEL)
         record = await get_active_ai_key(async_session, 1, 1)
         assert get_decrypted_key(record) == PLAIN_KEY
+
+
+class TestModelName:
+    async def test_model_name_saved_correctly(self, async_session: AsyncSession):
+        """model_name 字段应与传入值一致。"""
+        record = await save_ai_key(async_session, 1, 1, API_URL, PLAIN_KEY, "deepseek-chat")
+        assert record.model_name == "deepseek-chat"
+
+    async def test_model_name_default_value(self, async_session: AsyncSession):
+        """不传 model_name 时应使用默认值 gpt-4o-mini。"""
+        record = await save_ai_key(async_session, 1, 1, API_URL, PLAIN_KEY)
+        assert record.model_name == "gpt-4o-mini"
+
+    async def test_model_name_updated_on_rotation(self, async_session: AsyncSession):
+        """轮换后新记录应使用新 model_name，旧记录保留原值。"""
+        await save_ai_key(async_session, 1, 1, API_URL, "sk-old-key", "gpt-4o")
+        new_record = await save_ai_key(async_session, 1, 1, API_URL, "sk-new-key", "deepseek-chat")
+        active = await get_active_ai_key(async_session, 1, 1)
+        assert active.id == new_record.id
+        assert active.model_name == "deepseek-chat"
 
 
 class TestKeyRotation:
     async def test_old_key_deactivated_on_save(self, async_session: AsyncSession):
         """同一用户保存第二个 Key 后，旧记录 is_active 应变为 False。"""
-        first = await save_ai_key(async_session, 1, 1, API_URL, "sk-old-key")
-        await save_ai_key(async_session, 1, 1, API_URL, "sk-new-key")
+        first = await save_ai_key(async_session, 1, 1, API_URL, "sk-old-key", MODEL)
+        await save_ai_key(async_session, 1, 1, API_URL, "sk-new-key", MODEL)
 
         # 重新从数据库取旧记录
         from sqlalchemy import select
@@ -81,8 +102,8 @@ class TestKeyRotation:
 
     async def test_new_key_is_active_after_rotation(self, async_session: AsyncSession):
         """轮换后 get_active_ai_key 取到的应是新记录。"""
-        await save_ai_key(async_session, 1, 1, API_URL, "sk-old-key")
-        new_record = await save_ai_key(async_session, 1, 1, API_URL, "sk-new-key")
+        await save_ai_key(async_session, 1, 1, API_URL, "sk-old-key", MODEL)
+        new_record = await save_ai_key(async_session, 1, 1, API_URL, "sk-new-key", MODEL)
         active = await get_active_ai_key(async_session, 1, 1)
         assert active.id == new_record.id
         assert get_decrypted_key(active) == "sk-new-key"
@@ -93,8 +114,8 @@ class TestTenantIsolation:
         self, async_session: AsyncSession
     ):
         """不同 tenant_id 下的 Key 互不可见。"""
-        await save_ai_key(async_session, 1, 1, API_URL, "sk-tenant1-key")
-        await save_ai_key(async_session, 2, 1, API_URL, "sk-tenant2-key")
+        await save_ai_key(async_session, 1, 1, API_URL, "sk-tenant1-key", MODEL)
+        await save_ai_key(async_session, 2, 1, API_URL, "sk-tenant2-key", MODEL)
 
         # tenant_id=1 应只能取到自己的 Key
         key1 = await get_active_ai_key(async_session, 1, 1)
@@ -108,6 +129,6 @@ class TestTenantIsolation:
 
     async def test_nonexistent_tenant_returns_none(self, async_session: AsyncSession):
         """查询从未保存过 Key 的租户应返回 None。"""
-        await save_ai_key(async_session, 1, 1, API_URL, PLAIN_KEY)
+        await save_ai_key(async_session, 1, 1, API_URL, PLAIN_KEY, MODEL)
         result = await get_active_ai_key(async_session, 999, 1)
         assert result is None

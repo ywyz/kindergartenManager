@@ -96,7 +96,7 @@
 | `users` | `5e03413fdeca` | id, tenant_id, username, hashed_password, role, is_active |
 | `semester_config` | `fd6d29f921b4` | id, tenant_id, user_id, semester_name, start_date, end_date, is_active |
 | `class_config` | `67b4aef28796` | id, tenant_id, user_id, grade, class_name, indoor_areas, outdoor_content |
-| `ai_api_key` | 阶段3迁移 | id, tenant_id, user_id, api_base_url, api_key_encrypted, is_active |
+| `ai_api_key` | 阶段3迁移 | id, tenant_id, user_id, api_base_url, model_name, api_key_encrypted, is_active |
 
 所有表均含 `created_at`、`updated_at`，并建立 `(tenant_id, user_id)` 联合索引。
 

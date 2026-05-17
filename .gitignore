@@ -5,6 +5,7 @@
 
 # 虚拟环境
 .venv/
+.venv.bak*/
 venv/
 env/
 
@@ -24,7 +25,8 @@ exports/
 
 # IDE
 .idea/
-.vscode/
+.vscode/settings.json
+.vscode/*.code-snippets
 *.swp
 *.swo
 

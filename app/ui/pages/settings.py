@@ -229,6 +229,11 @@ async def settings_page() -> None:
                 placeholder="如：https://api.openai.com/v1",
             ).classes("w-full")
 
+            ai_model_input = ui.input(
+                label="模型名称",
+                placeholder="如：gpt-4o-mini / deepseek-chat / qwen-plus",
+            ).classes("w-full mt-2")
+
             ai_key_input = ui.input(
                 label="API Key",
                 placeholder="输入 API Key（保存后脱敏显示）",
@@ -244,10 +249,16 @@ async def settings_page() -> None:
             async def save_ai_key_handler() -> None:
                 ai_msg.classes(remove="text-green-600 text-red-500")
                 url = ai_url_input.value.strip()
+                model = ai_model_input.value.strip()
                 key_val = ai_key_input.value.strip()
 
                 if not url:
                     ai_msg.text = "请输入 API 地址"
+                    ai_msg.classes(add="text-red-500")
+                    return
+
+                if not model:
+                    ai_msg.text = "请输入模型名称"
                     ai_msg.classes(add="text-red-500")
                     return
 
@@ -287,7 +298,7 @@ async def settings_page() -> None:
                         return
 
                 async with AsyncSessionLocal() as session:
-                    await save_ai_key(session, tenant_id, user_id, url, plain_key)
+                    await save_ai_key(session, tenant_id, user_id, url, plain_key, model)
 
                 masked = _mask_api_key(plain_key)
                 _current_masked[0] = masked
@@ -361,6 +372,7 @@ async def settings_page() -> None:
 
     if ai_key_record:
         ai_url_input.value = ai_key_record.api_base_url
+        ai_model_input.value = ai_key_record.model_name
         try:
             plain = get_decrypted_key(ai_key_record)
             masked = _mask_api_key(plain)

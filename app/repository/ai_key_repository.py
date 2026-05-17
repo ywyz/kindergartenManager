@@ -22,6 +22,7 @@ async def save_ai_key(
     user_id: int,
     api_base_url: str,
     plain_api_key: str,
+    model_name: str = "gpt-4o-mini",
 ) -> AiApiKey:
     """加密 API Key 后入库，同时将该用户旧记录标记为 inactive。
 
@@ -31,6 +32,7 @@ async def save_ai_key(
         user_id: 用户 ID。
         api_base_url: AI 接口地址（如 https://api.openai.com/v1）。
         plain_api_key: 明文 API Key（函数内部立即加密，不写日志）。
+        model_name: 模型名称（如 gpt-4o-mini、deepseek-chat）。
 
     Returns:
         新建的 AiApiKey 记录（`api_key_encrypted` 为密文）。
@@ -53,6 +55,7 @@ async def save_ai_key(
         tenant_id=tenant_id,
         user_id=user_id,
         api_base_url=api_base_url,
+        model_name=model_name,
         api_key_encrypted=encrypted,
         is_active=True,
     )
