@@ -11,7 +11,7 @@
 
 ## 阶段 0：项目骨架搭建
 
-### Step 0.1 — 创建标准目录结构
+### Step 0.1 ✅ — 创建标准目录结构
 
 **指令**
 按照 AGENTS.md 中"目录结构规范"，在仓库根目录创建以下空目录（每个目录放一个 `.gitkeep` 文件）：
@@ -37,7 +37,7 @@
 
 ---
 
-### Step 0.2 — 创建依赖清单与虚拟环境
+### Step 0.2 ✅ — 创建依赖清单与虚拟环境
 
 **指令**
 在根目录创建 `requirements.txt`，包含以下依赖（只列库名，版本约束宽松 `>=` 即可）：
@@ -66,7 +66,7 @@
 
 ---
 
-### Step 0.3 — 配置管理（core/config.py）
+### Step 0.3 ✅ — 配置管理（core/config.py）
 
 **指令**
 在 `app/core/config.py` 中使用 `pydantic-settings` 定义 `Settings` 类，包含以下字段（全部从环境变量读取）：
@@ -85,7 +85,7 @@
 
 ---
 
-### Step 0.4 — 日志初始化（core/logging.py）
+### Step 0.4 ✅ — 日志初始化（core/logging.py）
 
 **指令**
 在 `app/core/logging.py` 中配置结构化 JSON 日志：
@@ -99,7 +99,7 @@
 
 ---
 
-### Step 0.5 — 数据库连接（core/database.py）
+### Step 0.5 ✅ — 数据库连接（core/database.py）
 
 **指令**
 在 `app/core/database.py` 中：
@@ -118,7 +118,7 @@
 
 ## 阶段 1：账号与鉴权基础
 
-### Step 1.1 — 用户数据模型
+### Step 1.1 ✅ — 用户数据模型
 
 **指令**
 在 `app/core/models/user.py` 中定义 `User` 表，字段包括：
@@ -139,7 +139,7 @@
 
 ---
 
-### Step 1.2 — 密码工具（auth/password.py）
+### Step 1.2 ✅ — 密码工具（auth/password.py）
 
 **指令**
 在 `app/auth/password.py` 中封装两个函数：
@@ -157,7 +157,7 @@
 
 ---
 
-### Step 1.3 — JWT 工具（auth/jwt.py）
+### Step 1.3 ✅ — JWT 工具（auth/jwt.py）
 
 **指令**
 在 `app/auth/jwt.py` 中封装：
@@ -175,7 +175,7 @@
 
 ---
 
-### Step 1.4 — 用户仓库层（repository/user_repository.py）
+### Step 1.4 ✅ — 用户仓库层（repository/user_repository.py）
 
 **指令**
 在 `app/repository/user_repository.py` 中定义异步函数：
@@ -195,7 +195,7 @@
 
 ---
 
-### Step 1.5 — 登录服务（service/auth_service.py）
+### Step 1.5 ✅ — 登录服务（service/auth_service.py）
 
 **指令**
 在 `app/service/auth_service.py` 中定义：
@@ -213,7 +213,7 @@
 
 ---
 
-### Step 1.6 — NiceGUI 登录页面（ui/pages/login.py）
+### Step 1.6 ✅ — NiceGUI 登录页面（ui/pages/login.py）
 
 **指令**
 在 `app/ui/pages/login.py` 中创建登录页面：
@@ -231,7 +231,7 @@
 
 ## 阶段 2：学期配置与日期计算
 
-### Step 2.1 — 学期配置数据模型
+### Step 2.1 ✅ — 学期配置数据模型
 
 **指令**
 在 `app/core/models/semester.py` 中定义 `SemesterConfig` 表，字段：
@@ -250,7 +250,7 @@
 
 ---
 
-### Step 2.2 — 班级配置数据模型
+### Step 2.2 ✅ — 班级配置数据模型
 
 **指令**
 在 `app/core/models/class_config.py` 中定义 `ClassConfig` 表，字段：
@@ -269,7 +269,7 @@
 
 ---
 
-### Step 2.3 — 日期计算服务（service/date_service.py）
+### Step 2.3 ✅ — 日期计算服务（service/date_service.py）
 
 **指令**
 在 `app/service/date_service.py` 中实现以下纯函数（无 IO，无数据库依赖）：
@@ -289,7 +289,7 @@
 
 ---
 
-### Step 2.4 — 节假日客户端（integration/holiday_client/client.py）
+### Step 2.4 ✅ — 节假日客户端（integration/holiday_client/client.py）
 
 **指令**
 在 `app/integration/holiday_client/client.py` 中实现：
@@ -307,7 +307,7 @@
 
 ---
 
-### Step 2.5 — 配置页面（ui/pages/settings.py）
+### Step 2.5 ✅ — 配置页面（ui/pages/settings.py）
 
 **指令**
 在 `app/ui/pages/settings.py` 中创建配置页面（路由 `/settings`），包含两个区块：
@@ -333,7 +333,7 @@
 
 ---
 
-### Step 2.6 — 日期选择面板（ui/components/date_panel.py）
+### Step 2.6 ✅ — 日期选择面板（ui/components/date_panel.py）
 
 **指令**
 在 `app/ui/components/date_panel.py` 中创建可复用组件：
@@ -351,7 +351,7 @@
 
 ## 阶段 3：AI Key 管理
 
-### Step 3.1 — 加密工具（core/crypto.py）
+### Step 3.1 ✅ — 加密工具（core/crypto.py）
 
 **指令**
 在 `app/core/crypto.py` 中实现：
@@ -368,7 +368,7 @@
 
 ---
 
-### Step 3.2 — AI Key 数据模型与仓库
+### Step 3.2 ✅ — AI Key 数据模型与仓库
 
 **指令**
 在 `app/core/models/ai_key.py` 中定义 `AiApiKey` 表，字段：
@@ -393,7 +393,7 @@
 
 ---
 
-### Step 3.3 — AI Key 设置页面
+### Step 3.3 ✅ — AI Key 设置页面
 
 **指令**
 在 `/settings` 页面新增"AI 接口配置"区块：

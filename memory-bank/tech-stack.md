@@ -34,7 +34,7 @@
 ## 最小可落地版本（建议直接按此启动）
 
 ### 1) 运行时与框架
-- Python 3.12
+- Python 3.14（生产环境实际版本，开发环境与云端一致）
 - NiceGUI（UI）
 - FastAPI（由 NiceGUI 生态直接复用）
 - Uvicorn（ASGI 服务器）
@@ -46,10 +46,10 @@
 - 关键约束：所有业务表包含 tenant_id、user_id、created_at、updated_at
 
 ### 3) 安全层
-- 密码哈希：Argon2（passlib）
+- 密码哈希：Argon2（argon2-cffi，替代 passlib；Python 3.13+ 移除了 crypt 模块，passlib 在 3.14 下崩溃）
 - 登录态：JWT（短期 access token + 可选 refresh token）
 - 权限：RBAC（教师、教研管理员、系统管理员）
-- AI Key：应用层加密后入库（密钥来自环境变量，不落库）
+- AI Key：应用层 Fernet 对称加密后入库（密钥来自环境变量，不落库）
 
 ### 4) AI 与外部依赖
 - HTTP 客户端：httpx

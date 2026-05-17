@@ -100,7 +100,7 @@
 
 所有表均含 `created_at`、`updated_at`，并建立 `(tenant_id, user_id)` 联合索引。
 
-**安全约束**：`api_api_key.api_key_encrypted` 仅存 Fernet 密文，明文禁止入库、禁止写日志。
+**安全约束**：`ai_api_key.api_key_encrypted` 仅存 Fernet 密文，明文禁止入库、禁止写日志。
 
 ### 核心模块
 
@@ -146,7 +146,6 @@
 |------|------|------|
 | BL-02 | `aliyun.ywyz.tech` 同时有 A/AAAA 记录，aiomysql 优先尝试 IPv6 导致连接超时 2+ 分钟 | `.env` 改用 IPv4 直连；根治方案：删除 DNS AAAA 记录 |
 | BL-01 | `get_special_day_tags` 曾计划在线 API，代价大于收益 | 回滚为本地硬编码同步实现 |
-| `app/ui/components/date_panel.py` | 可复用日期面板组件，显示周次/周几/法定节假日（含节日名称）/调班/临近节假日/特殊节日标签 |
 
 ### Holiday Client 接口说明
 
@@ -182,10 +181,18 @@ API 响应格式（timor.tech 兼容）：
 ```
 type 值：0=工作日，1=周末，2=法定节假日，3=调班工作日。
 
-## 10. 待后续补全
+### DatePanel 组件
+
+`app/ui/components/date_panel.py` — 可复用日期面板，嵌入任意页面即可获得：
+- 日期选择器（`ui.date`）
+- 自动计算并展示：第几周、周几
+- 状态提示（颜色区分）：法定节假日（含节日名称）/ 调班工作日 / 临近节假日 / 特殊节日标签 / 节假日信息不可用
+- 不阻止用户继续操作
+
+## 11. 待后续实现
 
 - 数据库 ERD 完整图（随模型实现逐步补齐）。
-- Alembic 迁移版本详细变更描述。
-- 阶段 3（加密工具、AI 客户端、Word 导出）模块实现后更新。
-
+- 阶段 4（教案拆分、年龄适配、差异比对、每日计划 UI）。
+- 阶段 5（提示词管理）。
+- 阶段 6（Word 导出、导出历史）。
 

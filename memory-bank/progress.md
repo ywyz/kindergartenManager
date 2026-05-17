@@ -189,9 +189,17 @@ cp .env.example .env
 - 自动化测试（Step 3 范围）：`test_crypto.py` 8 passed / `test_ai_key_repository.py` 11 passed。
 - 待执行：Step 3 全量回归测试 + 文档更新 + 推送 GitHub。
 
-### 下一步
+### 全量测试与推送（已完成）
 
-- 全量测试 `pytest tests/ -v`，通过后更新 architecture.md，推送 GitHub。
+- `pytest tests/ -v` — 约 90 passed，0 warnings（含 8 test_crypto + 11 test_ai_key_repository）。
+- 文档更新：`memory-bank/architecture.md` 阶段 3 内容补全。
+- GitHub 推送：`git push origin dev2.0` 成功。
+
+### 当前状态（文档整理完成后）
+
+- 阶段 0~3 全部完成，已推送 `dev2.0` 分支。
+- `memory-bank/` 文档已同步：tech-stack.md（Python 3.14/argon2-cffi）、implementation-plan.md（✅ 标注）、architecture.md（Section 10 编号修正、DatePanel 归位）。
+- 下一步：**阶段 4 Step 4.1** — AI 客户端基础 `app/integration/ai_client/base.py`。
 
 ---
 
