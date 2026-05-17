@@ -553,26 +553,26 @@ system prompt 从 `app/repository/prompt_repository.py` 查询当前激活版本
 
 ## 阶段 5：提示词管理
 
-### Step 5.1 — 提示词数据模型
+### Step 5.1 ✅ — 提示词数据模型
 
 **指令**
 在 `app/core/models/prompt_template.py` 中定义 `PromptTemplate` 表，字段：
 - `id`（主键）
 - `tenant_id` / `user_id`
-- `task_type`（Enum：`split`/`adapt`/`generate`，对应三种 AI 任务）
+- `task_type`（Enum：`split`/`adapt`/`morning_exercise`/`morning_talk`/`area_game`/`outdoor_game`/`daily_reflection`，共 7 种；初始建表为 `split`/`adapt`/`generate`，后经迁移 `e2a3f1b8c9d0` 扩展为 7 值）
 - `version`（Integer，同一用户同一 task_type 下单调递增）
 - `content`（Text，提示词正文）
 - `is_active`（Boolean；同一用户同一 task_type 只能有一条 active）
 - `created_at` / `updated_at`
 
-生成并执行迁移。
+生成并执行迁移（初始迁移 `bcd07e51527d`，扩展迁移 `e2a3f1b8c9d0`）。
 
 **验证**
 - `DESCRIBE prompt_template;` 字段与定义一致。
 
 ---
 
-### Step 5.2 — 提示词仓库与服务
+### Step 5.2 ✅ — 提示词仓库与服务
 
 **指令**
 在 `app/repository/prompt_repository.py` 中实现：
@@ -587,11 +587,11 @@ system prompt 从 `app/repository/prompt_repository.py` 查询当前激活版本
 - 回滚后目标版本变为 active，其他版本变为 inactive。
 
 **验证**
-- `pytest tests/test_prompt_repository.py -v` 全部通过。
+- `pytest tests/test_prompt_repository.py -v` 全部通过（16 passed）。
 
 ---
 
-### Step 5.3 — 提示词管理页面（ui/pages/prompt_mgmt.py）
+### Step 5.3 ✅ — 提示词管理页面（ui/pages/prompt_mgmt.py）
 
 **指令**
 在 `app/ui/pages/prompt_mgmt.py` 中创建提示词管理页面（路由 `/prompts`），对每种 task_type 分别展示：
@@ -599,10 +599,12 @@ system prompt 从 `app/repository/prompt_repository.py` 查询当前激活版本
 - "保存为新版本"按钮
 - 历史版本列表（版本号、创建时间、是否激活）
 - 每条历史版本旁有"回滚"按钮
+- 7 个 Tab（教案拆分、年龄适配、晨间活动、晨间谈话、区域游戏、户外游戏、一日反思）
 
 **验证**
 - 保存新版本后，版本列表中出现新条目，旧条目"激活"标识消失。
 - 点击"回滚"后，对应版本变为激活，验证数据库 `is_active` 字段正确。
+- **手工测试待执行**（下次启动第一步）。
 
 ---
 

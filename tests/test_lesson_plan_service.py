@@ -112,6 +112,10 @@ async def test_process_lesson_plan_success():
             "app.service.lesson_plan_service.get_decrypted_key",
             return_value=plain_key,
         ),
+        patch(
+            "app.service.lesson_plan_service.get_active_prompt",
+            new=AsyncMock(return_value=None),
+        ),
     ):
         result = await process_lesson_plan(
             session=mock_session,
@@ -162,6 +166,10 @@ async def test_process_lesson_plan_diff_reflects_changes():
             "app.service.lesson_plan_service.get_decrypted_key",
             return_value=plain_key,
         ),
+        patch(
+            "app.service.lesson_plan_service.get_active_prompt",
+            new=AsyncMock(return_value=None),
+        ),
     ):
         result = await process_lesson_plan(
             session=mock_session,
@@ -197,3 +205,141 @@ async def test_process_lesson_plan_no_ai_key_raises_config_error():
                 raw_text="教案",
                 grade="大班",
             )
+
+
+# -------------------------------------------------------------------
+# 提示词仓库接入测试（Step 5.2b）
+# -------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_process_lesson_plan_uses_db_prompt_when_available():
+    """DB 中存在激活提示词时，服务层应使用 DB 中的内容，而非内置默认。"""
+    split_resp = {
+        "activity_goal": "目标",
+        "activity_prep": "准备",
+        "activity_key": "重点",
+        "activity_difficult": "难点",
+        "activity_process": "活动过程内容。",
+    }
+    adapt_resp = {"adapted_process": "适配后的活动过程内容。"}
+
+    mock_key_record, plain_key = _make_mock_ai_key()
+    ai_client = _make_mock_ai_client(split_resp, adapt_resp)
+
+    # 模拟 split 有自定义激活提示词，adapt 无自定义提示词
+    mock_split_template = MagicMock()
+    mock_split_template.content = "自定义拆分提示词内容"
+
+    captured_prompts: dict = {}
+
+    original_split = __import__(
+        "app.integration.ai_client.lesson_plan_client",
+        fromlist=["split_lesson_plan"],
+    ).split_lesson_plan
+
+    async def _mock_split(raw_text, api_base_url, api_key, model_name, system_prompt=None, *, _client=None):
+        captured_prompts["split"] = system_prompt
+        return split_resp
+
+    async def _mock_adapt(original, grade, api_base_url, api_key, model_name, system_prompt=None, *, _client=None):
+        captured_prompts["adapt"] = system_prompt
+        return adapt_resp["adapted_process"]
+
+    mock_session = AsyncMock()
+
+    with (
+        patch(
+            "app.service.lesson_plan_service.get_active_ai_key",
+            new=AsyncMock(return_value=mock_key_record),
+        ),
+        patch(
+            "app.service.lesson_plan_service.get_decrypted_key",
+            return_value=plain_key,
+        ),
+        patch(
+            "app.service.lesson_plan_service.get_active_prompt",
+            new=AsyncMock(side_effect=lambda session, tenant_id, user_id, task_type: (
+                mock_split_template if task_type == "split" else None
+            )),
+        ),
+        patch(
+            "app.service.lesson_plan_service.split_lesson_plan",
+            new=_mock_split,
+        ),
+        patch(
+            "app.service.lesson_plan_service.adapt_activity_process",
+            new=_mock_adapt,
+        ),
+    ):
+        await process_lesson_plan(
+            session=mock_session,
+            tenant_id=1,
+            user_id=1,
+            raw_text="教案文本",
+            grade="小班",
+        )
+
+    # split 使用了 DB 中的自定义提示词
+    assert captured_prompts.get("split") == "自定义拆分提示词内容"
+    # adapt 无自定义提示词，应传 None（让客户端使用内置默认）
+    assert captured_prompts.get("adapt") is None
+
+
+@pytest.mark.asyncio
+async def test_process_lesson_plan_uses_default_when_no_db_prompt():
+    """DB 中无激活提示词时，服务层应传 None 给客户端（客户端自行使用内置默认）。"""
+    split_resp = {
+        "activity_goal": "目标",
+        "activity_prep": "准备",
+        "activity_key": "重点",
+        "activity_difficult": "难点",
+        "activity_process": "活动过程。",
+    }
+    adapt_resp = {"adapted_process": "适配后。"}
+
+    mock_key_record, plain_key = _make_mock_ai_key()
+    captured_prompts: dict = {}
+
+    async def _mock_split(raw_text, api_base_url, api_key, model_name, system_prompt=None, *, _client=None):
+        captured_prompts["split"] = system_prompt
+        return split_resp
+
+    async def _mock_adapt(original, grade, api_base_url, api_key, model_name, system_prompt=None, *, _client=None):
+        captured_prompts["adapt"] = system_prompt
+        return adapt_resp["adapted_process"]
+
+    mock_session = AsyncMock()
+
+    with (
+        patch(
+            "app.service.lesson_plan_service.get_active_ai_key",
+            new=AsyncMock(return_value=mock_key_record),
+        ),
+        patch(
+            "app.service.lesson_plan_service.get_decrypted_key",
+            return_value=plain_key,
+        ),
+        patch(
+            "app.service.lesson_plan_service.get_active_prompt",
+            new=AsyncMock(return_value=None),  # DB 无激活提示词
+        ),
+        patch(
+            "app.service.lesson_plan_service.split_lesson_plan",
+            new=_mock_split,
+        ),
+        patch(
+            "app.service.lesson_plan_service.adapt_activity_process",
+            new=_mock_adapt,
+        ),
+    ):
+        await process_lesson_plan(
+            session=mock_session,
+            tenant_id=1,
+            user_id=1,
+            raw_text="教案",
+            grade="大班",
+        )
+
+    # DB 无提示词，两者均应传 None
+    assert captured_prompts.get("split") is None
+    assert captured_prompts.get("adapt") is None

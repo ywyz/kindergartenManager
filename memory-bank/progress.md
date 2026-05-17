@@ -360,3 +360,71 @@ cp .env.example .env
 
 - 阶段 5（Step 5.1）：提示词数据模型 `app/core/models/prompt_template.py`；同步修复 KI-01（在 split/adapt 的内置 default prompt 中强化格式约束）。
 
+---
+
+## 2026-05-17（阶段 5：提示词管理）
+
+### 已完成
+
+- **Step 5.1 ✅**：`app/core/models/prompt_template.py` — `PromptTemplate` ORM 模型；Alembic 迁移 `bcd07e51527d`（add prompt_template table）；`app/core/models/__init__.py` 注册 `PromptTemplate`。
+  - task_type Enum 初始值：`split` / `adapt` / `generate`（后续在 5.x 扩展）。
+  - 联合索引：`(tenant_id, user_id, task_type)`；同一用户同一任务类型只能有一条 `is_active=True` 记录。
+  - `alembic upgrade head` 执行成功，MySQL `DESCRIBE prompt_template` 字段验证通过。
+
+- **Step 5.2 ✅**：`app/repository/prompt_repository.py` — 4 个异步函数。
+  - `get_active_prompt(session, tenant_id, user_id, task_type) -> PromptTemplate | None`
+  - `save_new_version(session, tenant_id, user_id, task_type, content) -> PromptTemplate`（旧 active 失活，版本号自动递增）
+  - `rollback_to_version(session, tenant_id, user_id, task_type, version) -> PromptTemplate`（目标版本激活，其余失活；版本不存在抛 `ValueError`）
+  - `list_versions(session, tenant_id, user_id, task_type) -> list[PromptTemplate]`（按版本降序）
+  - `tests/test_prompt_repository.py` — **16 passed**（TestSaveNewVersion ×5 / TestGetActivePrompt ×3 / TestRollbackToVersion ×3 / TestListVersions ×3 / TestTenantIsolation ×2）。
+
+- **Step 5.2b ✅**：`app/service/lesson_plan_service.py` 接入 `prompt_repository`。
+  - `process_lesson_plan()` 在 `split_system_prompt` / `adapt_system_prompt` 为 `None` 时，先查 DB 激活版本，有则覆盖；否则继续使用 AI 客户端内置默认。
+  - **KI-01 修复**：`DEFAULT_SPLIT_PROMPT`（`lesson_plan_client.py`）与 `DEFAULT_ADAPT_PROMPT`（`adapt_client.py`）均追加明确格式约束（禁 Markdown 标记、步骤间句号自然衔接、无数字编号换行、无多余空行）。
+  - `tests/test_lesson_plan_service.py` — **5 passed**（3 旧用例补加 `get_active_prompt` mock / 2 新用例验证 DB 提示词生效与默认回退）。
+
+- **Step 5.3 ✅**：`app/ui/pages/prompt_mgmt.py` — 提示词管理页面（路由 `/prompts`）。
+  - 顶部导航（返回主页 / 退出登录）；页面说明文字。
+  - 7 个 Tab：教案拆分 / 年龄适配 / 晨间活动 / 晨间谈话 / 区域游戏 / 户外游戏 / 一日反思。
+  - 每 Tab：当前激活版本 badge + 可编辑 textarea（placeholder 显示内置默认）+ "保存为新版本"按钮 + 历史版本列表（含"回滚"按钮）。
+  - `app/main.py` 注册路由；`app/ui/pages/home.py` 新增"提示词管理"（紫色）导航按钮。
+
+- **Step 5.x ✅**：将 `task_type` Enum 从 3 值扩展为 7 值（按需求重新设计一日活动提示词分类）。
+  - **背景**：用户要求一日活动按 5 种活动类型分别管理提示词，每种格式不同，不能合并为单一 `generate` 类型。
+  - **变更**：`generate` → `morning_exercise` / `morning_talk` / `area_game` / `outdoor_game` / `daily_reflection`。
+  - **数据库**：新建 Alembic 迁移 `e2a3f1b8c9d0`（expand prompt_task_type enum）；`upgrade()` 先删除 `generate` 数据行（开发阶段无生产数据），再执行 `ALTER TABLE ... MODIFY COLUMN` 更新 Enum；已应用到 MySQL。
+  - **新文件**：`app/integration/ai_client/generate_client.py` — 5 种活动类型内置默认提示词（含输出格式约束）；模块级 `GENERATE_DEFAULTS: dict[str, str]` 供服务层查取。
+  - **提示词格式规范**（按用户确认）：
+    - 晨间活动：体能大循环（集体游戏/自主游戏/重点指导）+ 活动目标（3条）+ 指导要点（3条）
+    - 晨间谈话：谈话主题 + 问题设计（3条）
+    - 区域游戏：游戏区域（任选2个）+ 重点指导（任选1个）+ 活动目标（3条）+ 指导要点（3条）
+    - 户外游戏：游戏区域（任选2个）+ 重点指导（任选1个）+ 活动目标（3条）+ 指导要点（3条）
+    - 一日活动反思：自然段落，100~200字
+  - **测试**：`test_prompt_repository.py` 将原 `"generate"` 用例改为 `"morning_exercise"`；全量测试 **137 passed, 0 failed, 0 warnings**。
+
+### Bug 修复记录（阶段 5）
+
+| 编号 | 现象 | 根因 | 修复 |
+|------|------|------|------|
+| BL-05 | Step 5.2b 合入后，`test_process_lesson_plan_success` 等旧测试失败 | 测试未 mock `get_active_prompt`，service 实际调用时 `AsyncMock` session 返回协程对象而非模型实例，导致 `.content` 属性报错 | 两个受影响的旧测试补加 `patch("app.service.lesson_plan_service.get_active_prompt", new=AsyncMock(return_value=None))` |
+
+### 全量测试结果
+
+- 自动化测试：**137 passed, 0 failed, 0 warnings**（Python 3.14.4）
+- Alembic 当前版本：`e2a3f1b8c9d0 (head)`，含 6 张业务表（users / semester_config / class_config / ai_api_key / daily_plan / prompt_template）
+
+### 待手工测试（下次启动第一步）
+
+- 访问 `http://localhost:8080/prompts` 验证：
+  1. 7 个 Tab 正常显示（教案拆分、年龄适配、晨间活动、晨间谈话、区域游戏、户外游戏、一日反思）
+  2. 每个 Tab placeholder 显示对应内置默认提示词格式
+  3. 保存新版本 → badge 变为"当前激活：vN" → 历史列表出现新条目
+  4. 连续保存两版 → v2 激活 + v1 含"回滚"按钮
+  5. 点击"回滚" → v1 激活、v2 出现"回滚"按钮、textarea 内容恢复
+  6. 进入 `/daily-plan` → AI 拆分结果无 Markdown 标记（KI-01 修复验证）
+
+### 下一步
+
+- 完成手工测试并记录反馈。
+- 阶段 6（Step 6.1）：Word 导出服务 `app/integration/word_export/exporter.py`。
+

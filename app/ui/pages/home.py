@@ -26,6 +26,10 @@ async def home_page() -> None:
             on_click=lambda: ui.navigate.to("/daily-plan"),
         ).classes("bg-green-600 text-white mt-1")
         ui.button(
+            "提示词管理",
+            on_click=lambda: ui.navigate.to("/prompts"),
+        ).classes("bg-purple-600 text-white mt-1")
+        ui.button(
             "日期选择测试",
             on_click=lambda: ui.navigate.to("/date-test"),
         ).classes("bg-gray-100 mt-1")

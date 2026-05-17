@@ -19,6 +19,7 @@ from app.core.logging import get_logger
 from app.integration.ai_client.adapt_client import adapt_activity_process
 from app.integration.ai_client.lesson_plan_client import split_lesson_plan
 from app.repository.ai_key_repository import get_active_ai_key, get_decrypted_key
+from app.repository.prompt_repository import get_active_prompt
 from app.service.diff_service import compute_diff
 
 logger = get_logger(__name__)
@@ -91,17 +92,30 @@ async def process_lesson_plan(
         extra={"tenant_id": tenant_id, "user_id": user_id, "grade": grade},
     )
 
-    # 2. 教案拆分
+    # 2. 从数据库获取自定义提示词（调用方未传入时查询激活版本；找不到则沿用内置默认）
+    resolved_split_prompt = split_system_prompt
+    if resolved_split_prompt is None:
+        split_template = await get_active_prompt(session, tenant_id, user_id, "split")
+        if split_template is not None:
+            resolved_split_prompt = split_template.content
+
+    resolved_adapt_prompt = adapt_system_prompt
+    if resolved_adapt_prompt is None:
+        adapt_template = await get_active_prompt(session, tenant_id, user_id, "adapt")
+        if adapt_template is not None:
+            resolved_adapt_prompt = adapt_template.content
+
+    # 3. 教案拆分
     split_result = await split_lesson_plan(
         raw_text=raw_text,
         api_base_url=api_base_url,
         api_key=plain_api_key,
         model_name=model_name,
-        system_prompt=split_system_prompt,
+        system_prompt=resolved_split_prompt,
         _client=_ai_client,
     )
 
-    # 3. 年龄适配（对活动过程改写）
+    # 4. 年龄适配（对活动过程改写）
     original_process = split_result["activity_process"]
     adapted_process = await adapt_activity_process(
         original=original_process,
@@ -109,11 +123,11 @@ async def process_lesson_plan(
         api_base_url=api_base_url,
         api_key=plain_api_key,
         model_name=model_name,
-        system_prompt=adapt_system_prompt,
+        system_prompt=resolved_adapt_prompt,
         _client=_ai_client,
     )
 
-    # 4. 差异比对
+    # 5. 差异比对
     diff_result = compute_diff(original_process, adapted_process)
 
     logger.info(

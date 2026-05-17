@@ -16,7 +16,7 @@
 
 - 教案改写：覆盖多个活动字段，核心优先活动过程。
 - 差异标红：导出时以活动过程差异为主进行红字标注。
-- 提示词：split/adapt/generate 三类任务分别独立配置与版本管理。
+- 提示词：共 7 种任务类型，分别独立配置与版本管理：`split`（教案拆分）/ `adapt`（年龄适配）/ `morning_exercise`（晨间活动）/ `morning_talk`（晨间谈话）/ `area_game`（区域游戏）/ `outdoor_game`（户外游戏）/ `daily_reflection`（一日活动反思）。
 - 提示词回滚：仅影响后续生成，不回溯重算已保存草稿。
 
 ## 4. 日历与节假日规则（已确认）
@@ -192,7 +192,6 @@ type 值：0=工作日，1=周末，2=法定节假日，3=调班工作日。
 ## 11. 待后续实现
 
 - 数据库 ERD 完整图（随模型实现逐步补齐）。
-- 阶段 5（提示词管理：数据模型、仓库、管理页面）。
 - 阶段 6（Word 导出、导出历史）。
 - 阶段 7（一日活动辅助生成）。
 
@@ -219,6 +218,43 @@ type 值：0=工作日，1=周末，2=法定节假日，3=调班工作日。
 | 表名 | 迁移版本 | 主要字段 |
 |------|---------|----------|
 | `daily_plan` | `f6d79ac6bf21` | id, tenant_id, user_id, plan_date, week_number, weekday_cn, grade, class_name, activity_goal, activity_prep, activity_key, activity_difficult, activity_process_original, activity_process_adapted, morning_activity, indoor_area, outdoor_activity, morning_talk_topic, morning_talk_questions, daily_reflection |
+
+---
+
+## 13. 阶段 5 已实现文件清单
+
+### 数据库表（新增）
+
+| 表名 | 迁移版本 | 主要字段 |
+|------|---------|----------|
+| `prompt_template` | `bcd07e51527d` → `e2a3f1b8c9d0` | id, tenant_id, user_id, task_type(Enum×7), version, content, is_active, created_at, updated_at |
+
+**Alembic 当前 head**：`e2a3f1b8c9d0`（含全部 6 张业务表）
+
+**task_type Enum 枚举值**：`split` / `adapt` / `morning_exercise` / `morning_talk` / `area_game` / `outdoor_game` / `daily_reflection`
+
+### 核心模块（新增 / 修改）
+
+| 文件 | 职责 |
+|------|------|
+| `app/core/models/prompt_template.py` | `PromptTemplate` ORM 模型；联合索引 `(tenant_id, user_id, task_type)` |
+| `app/repository/prompt_repository.py` | `get_active_prompt` / `save_new_version` / `rollback_to_version` / `list_versions` 四个异步函数 |
+| `app/integration/ai_client/generate_client.py` | 5 种一日活动类型的内置默认提示词；`GENERATE_DEFAULTS: dict[str, str]` 供服务层查取 |
+| `app/integration/ai_client/lesson_plan_client.py` | `DEFAULT_SPLIT_PROMPT` 追加格式约束（禁 Markdown / 无数字编号换行 / 无多余空行）；KI-01 修复 |
+| `app/integration/ai_client/adapt_client.py` | `DEFAULT_ADAPT_PROMPT` 追加格式约束（禁 Markdown / 纯文本 / 标点约束）；KI-01 修复 |
+| `app/service/lesson_plan_service.py` | `process_lesson_plan()` 新增：`split_system_prompt` / `adapt_system_prompt` 为 None 时先查 DB 激活版本，有则覆盖 |
+| `app/ui/pages/prompt_mgmt.py` | 提示词管理页（路由 `/prompts`）；7 Tab；每 Tab 含编辑区 + 保存 + 历史版本 + 回滚 |
+| `app/ui/pages/home.py` | 新增"提示词管理"导航按钮（紫色，跳转 `/prompts`） |
+
+### 一日活动提示词格式规范（已确认）
+
+| 活动类型 | 格式要点 |
+|---------|---------|
+| 晨间活动 `morning_exercise` | 体能大循环（集体游戏/自主游戏/重点指导）+ 活动目标3条 + 指导要点3条 |
+| 晨间谈话 `morning_talk` | 谈话主题 + 问题设计3条 |
+| 区域游戏 `area_game` | 游戏区域（选2个，用" 、 "分隔）+ 重点指导（选1个）+ 活动目标3条 + 指导要点3条 |
+| 户外游戏 `outdoor_game` | 游戏区域（选2个，用" 、 "分隔）+ 重点指导（选1个）+ 活动目标3条 + 指导要点3条 |
+| 一日活动反思 `daily_reflection` | 自然段落（无编号），100~200字，含亮点/问题/调整策略 |
 
 ### 已知问题与决策记录（阶段 4）
 
