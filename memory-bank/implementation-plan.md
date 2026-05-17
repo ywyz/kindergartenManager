@@ -411,7 +411,7 @@
 
 ## 阶段 4：教案拆分与年龄适配
 
-### Step 4.1 — AI 客户端基础（integration/ai_client/base.py）
+### Step 4.1 ✅ — AI 客户端基础（integration/ai_client/base.py）
 
 **指令**
 在 `app/integration/ai_client/base.py` 中实现通用 AI 请求函数：
@@ -431,7 +431,7 @@
 
 ---
 
-### Step 4.2 — 教案拆分客户端（integration/ai_client/lesson_plan_client.py）
+### Step 4.2 ✅ — 教案拆分客户端（integration/ai_client/lesson_plan_client.py）
 
 **指令**
 在 `app/integration/ai_client/lesson_plan_client.py` 中实现：
@@ -450,7 +450,7 @@ system prompt 从 `app/repository/prompt_repository.py` 查询当前激活版本
 
 ---
 
-### Step 4.3 — 年龄适配客户端（integration/ai_client/adapt_client.py）
+### Step 4.3 ✅ — 年龄适配客户端（integration/ai_client/adapt_client.py）
 
 **指令**
 在 `app/integration/ai_client/adapt_client.py` 中实现：
@@ -462,7 +462,7 @@ system prompt 从 `app/repository/prompt_repository.py` 查询当前激活版本
 
 ---
 
-### Step 4.4 — 差异比对服务（service/diff_service.py）
+### Step 4.4 ✅ — 差异比对服务（service/diff_service.py）
 
 **指令**
 在 `app/service/diff_service.py` 中实现：
@@ -480,7 +480,7 @@ system prompt 从 `app/repository/prompt_repository.py` 查询当前激活版本
 
 ---
 
-### Step 4.5 — 教案数据模型
+### Step 4.5 ✅ — 教案数据模型
 
 **指令**
 在 `app/core/models/daily_plan.py` 中定义 `DailyPlan` 表，字段：
@@ -506,7 +506,7 @@ system prompt 从 `app/repository/prompt_repository.py` 查询当前激活版本
 
 ---
 
-### Step 4.6 — 教案拆分服务（service/lesson_plan_service.py）
+### Step 4.6 ✅ — 教案拆分服务（service/lesson_plan_service.py）
 
 **指令**
 在 `app/service/lesson_plan_service.py` 中编排完整教案拆分流程：
@@ -526,7 +526,7 @@ system prompt 从 `app/repository/prompt_repository.py` 查询当前激活版本
 
 ---
 
-### Step 4.7 — 教案拆分页面（ui/pages/daily_plan.py）
+### Step 4.7 ✅ — 教案拆分页面（ui/pages/daily_plan.py）
 
 **指令**
 在 `app/ui/pages/daily_plan.py` 中创建每日活动计划页面（路由 `/daily-plan`），包含：

@@ -192,7 +192,59 @@ type 值：0=工作日，1=周末，2=法定节假日，3=调班工作日。
 ## 11. 待后续实现
 
 - 数据库 ERD 完整图（随模型实现逐步补齐）。
-- 阶段 4（教案拆分、年龄适配、差异比对、每日计划 UI）。
-- 阶段 5（提示词管理）。
+- 阶段 5（提示词管理：数据模型、仓库、管理页面）。
 - 阶段 6（Word 导出、导出历史）。
+- 阶段 7（一日活动辅助生成）。
+
+---
+
+## 12. 阶段 4 已实现文件清单
+
+### 核心模块
+
+| 文件 | 职责 |
+|------|------|
+| `app/core/exceptions.py` | 新增 `AiCallError`（AI 接口调用失败）、`AiParseError`（AI 返回内容解析失败） |
+| `app/core/models/daily_plan.py` | `DailyPlan` ORM 模型；含教案拆分字段、改写文、一日活动、晨间谈话、反思共 20 列 |
+| `app/integration/ai_client/base.py` | 通用 `call_ai()` — httpx 超时 60s + tenacity 重试 3次（指数退避）；HTTP 错误提取响应体写入 `AiCallError.message` |
+| `app/integration/ai_client/lesson_plan_client.py` | `split_lesson_plan()` — 教案拆分，输出 5 个结构化字段；内置默认 system prompt；prompt_repository 查询优先（Step 5 接入后生效） |
+| `app/integration/ai_client/adapt_client.py` | `adapt_activity_process()` — 年龄适配改写；内置三段式 prompt（小班/中班/大班策略）；输出 `adapted_process` 字符串 |
+| `app/service/diff_service.py` | `compute_diff()` — 按标点/换行分句；`difflib.SequenceMatcher` 逐句比对；返回改写文视角 `[{text, changed}]` |
+| `app/service/lesson_plan_service.py` | `process_lesson_plan()` — 编排全流程（AI Key → 拆分 → 适配 → 差异）；`LessonPlanResult` dataclass |
+| `app/repository/daily_plan_repository.py` | `save_daily_plan`（同日期 upsert）、`get_daily_plan_by_date` |
+| `app/ui/pages/daily_plan.py` | 每日活动计划页（路由 `/daily-plan`）；DatePanel 复用；AI 拆分 + 回填 + 保存草稿；刷新后草稿自动加载 |
+
+### 数据库表（新增）
+
+| 表名 | 迁移版本 | 主要字段 |
+|------|---------|----------|
+| `daily_plan` | `f6d79ac6bf21` | id, tenant_id, user_id, plan_date, week_number, weekday_cn, grade, class_name, activity_goal, activity_prep, activity_key, activity_difficult, activity_process_original, activity_process_adapted, morning_activity, indoor_area, outdoor_activity, morning_talk_topic, morning_talk_questions, daily_reflection |
+
+### 已知问题与决策记录（阶段 4）
+
+| 编号 | 问题 | 决策 |
+|------|------|------|
+| BL-03 | `DatePanel.on_date_change` 为 async 函数时，`_update_info` 未 await 导致 state 不更新 | `_update_info` 末尾使用 `asyncio.iscoroutine()` 判断后 await；已修复 |
+| BL-04 | AI 调用失败时 UI 显示通用提示，无法定位原因 | `base.py` 提取 HTTP 错误响应体；`daily_plan.py` 显示 `e.message`；已修复 |
+| KI-01 | AI 返回字段含 markdown 标记（`**重点：**`）、格式不一致 | **待修复**：Step 5 提示词管理时强化 prompt 格式约束 |
+
+### AI 客户端接口说明
+
+```python
+# 通用 AI 调用（httpx + tenacity）
+call_ai(messages, api_base_url, api_key, model_name, response_schema, *, _client) -> dict
+
+# 教案拆分（返回 5 字段 dict）
+split_lesson_plan(raw_text, api_base_url, api_key, model_name, system_prompt, *, _client) -> dict
+# 返回键：activity_goal / activity_prep / activity_key / activity_difficult / activity_process
+
+# 年龄适配（返回改写后文本字符串）
+adapt_activity_process(original, grade, api_base_url, api_key, model_name, system_prompt, *, _client) -> str
+
+# 差异比对（纯本地，无 AI 调用）
+compute_diff(original, adapted) -> list[{"text": str, "changed": bool}]
+
+# 教案拆分服务（编排入口）
+process_lesson_plan(session, tenant_id, user_id, raw_text, grade, *, split_system_prompt, adapt_system_prompt, _ai_client) -> LessonPlanResult
+```
 

@@ -131,7 +131,10 @@ class DatePanel:
         if not date_str:
             self.selected_date = None
             if self.on_date_change:
-                self.on_date_change(None)
+                import asyncio
+                result = self.on_date_change(None)
+                if asyncio.iscoroutine(result):
+                    await result
             return
 
         try:
@@ -211,6 +214,9 @@ class DatePanel:
             with self._tag_row:
                 ui.badge(tag, color="blue").classes("text-xs")
 
-        # ── 回调 ─────────────────────────────────────────────────────────────
+        # ── 回调（支持 sync 和 async 回调） ───────────────────────────────────────
         if self.on_date_change:
-            self.on_date_change(target)
+            import asyncio
+            result = self.on_date_change(target)
+            if asyncio.iscoroutine(result):
+                await result

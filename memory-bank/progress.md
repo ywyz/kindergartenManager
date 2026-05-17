@@ -311,3 +311,52 @@ cp .env.example .env
 - 全量测试：92 passed, 0 warnings（Python 3.14.4）
 - 下一步：阶段 3（Step 3.1）加密工具 `app/core/crypto.py`（已在之前阶段完成），或 ai_client 层实现（Step 4.1）
 
+---
+
+## 2026-05-17（阶段 4）
+
+### 已完成（阶段 4：教案拆分与年龄适配）
+
+- **Step 4.1 ✅**：`app/integration/ai_client/base.py` — 通用 AI 请求函数 `call_ai()`；`httpx.AsyncClient` 超时 60s；`tenacity` 重试 3 次（指数退避 2s→4s→8s）；HTTP 4xx/5xx 提取错误描述写入 `AiCallError.message`；解析失败抛 `AiParseError`；`app/core/exceptions.py` 新增 `AiCallError`、`AiParseError`。
+  - `tests/test_ai_client_base.py` — **6 passed**（正常响应、无效 JSON content、非 JSON body、HTTP 500 重试3次、HTTP 400、缺少 choices 字段）。
+
+- **Step 4.2 ✅**：`app/integration/ai_client/lesson_plan_client.py` — `split_lesson_plan()`；内置默认 system prompt（英文 key 约束）；必填字段验证（5 个 key）；多余字段过滤。
+  - `tests/test_lesson_plan_client.py` — **5 passed**（正常返回、自定义 prompt、缺字段报错、空 dict 报错、多余字段过滤）。
+
+- **Step 4.3 ✅**：`app/integration/ai_client/adapt_client.py` — `adapt_activity_process()`；内置年龄适配 prompt（小班/中班/大班三套策略）；空原文前置校验不发请求；输出字段 `adapted_process` 验证。
+  - `tests/test_adapt_client.py` — **5 passed**（正常返回、三个年龄段、缺字段报错、空原文报错、自定义 prompt）。
+
+- **Step 4.4 ✅**：`app/service/diff_service.py` — `compute_diff()`；按 `。？！\n` 分句；`difflib.SequenceMatcher` 逐句比对；返回改写文视角结果（`{"text": str, "changed": bool}`）。
+  - `tests/test_diff_service.py` — **8 passed**（完全相同、一句改变、空输入、空改写文、全部改变、新增句、原文删除句不出现、多行文本）。
+
+- **Step 4.5 ✅**：`app/core/models/daily_plan.py` — `DailyPlan` 表（20 个字段）；Alembic 迁移 `f6d79ac6bf21`；`app/core/models/__init__.py` 注册 `DailyPlan`；`app/repository/daily_plan_repository.py` — `save_daily_plan`（同日期 upsert）、`get_daily_plan_by_date`。
+  - `alembic upgrade head` 执行成功，迁移版本：`f6d79ac6bf21 (head)`。
+
+- **Step 4.6 ✅**：`app/service/lesson_plan_service.py` — `process_lesson_plan()` 编排完整流程（AI Key 获取→拆分→适配→差异比对）；`LessonPlanResult` dataclass 包含全部字段；AI Key 缺失抛 `ConfigError`。
+  - `tests/test_lesson_plan_service.py` — **3 passed**（完整流程返回 LessonPlanResult、差异正确标注、无 Key 抛 ConfigError）。
+
+- **Step 4.7 ✅**：`app/ui/pages/daily_plan.py` — 每日活动计划页面（路由 `/daily-plan`）；顶部复用 `DatePanel` 组件；教案输入区 + "连接 AI 拆分"按钮；5 个字段自动回填 + 改写原文折叠展示；"保存草稿"（upsert daily_plan 表）；"导出 Word"按钮置灰（Stage 6 实现）；`app/main.py` 注册路由；`app/ui/pages/home.py` 添加导航入口。
+  - 手工验收通过：选择日期 → 粘贴教案 → AI 拆分 → 字段回填 → 保存草稿 → 刷新页面后草稿回填。
+
+### Bug 修复记录（阶段 4 手工测试期间）
+
+| 编号 | 现象 | 根因 | 修复 |
+|------|------|------|------|
+| BL-03 | 选择日期后点击"连接 AI 拆分"提示"⚠ 请先选择日期" | `DatePanel.on_date_change` 回调若为 async 函数，`_update_info` 中调用未加 `await`，协程创建后被丢弃，`state["selected_date"]` 永远为 None | `date_panel.py._update_info` 结尾用 `asyncio.iscoroutine()` 检测回调返回值，若为协程则 await；空日期早返回分支同样修复 |
+| BL-04 | AI 调用失败时仅显示通用提示"请检查网络或 API Key 是否有效"，无法定位具体原因 | `daily_plan.py` 中 `except AiCallError` 丢弃了 `e.message`；`base.py` 中 HTTP 错误未提取响应体 | `base.py` 提取响应体中的 `error.message / message / detail` 字段写入 `AiCallError.message`；`daily_plan.py` 将 `e.message` 展示到页面 |
+
+### 已知问题（待 Step 5 修复）
+
+| 编号 | 问题 | 影响 | 修复计划 |
+|------|------|------|---------|
+| KI-01 | AI 返回的教案拆分/年龄适配内容格式不稳定，存在字段包含 markdown 标记（如 `**重点：**`）、多余换行、数字列表格式不一致等情况 | 拆分结果回填后需人工清理格式；差异比对精度受分句格式影响 | Step 5 提示词管理实现后，在拆分/适配 system prompt 中明确输出格式约束（纯文本、无 markdown 标记、统一分句符号）；支持多版本 prompt 测试与回滚 |
+
+### 全量测试结果
+
+- 自动化测试：**119 passed, 0 failed, 0 warnings**（Python 3.14.4）
+- Alembic 当前版本：`f6d79ac6bf21 (head)`，含 5 张业务表（users / semester_config / class_config / ai_api_key / daily_plan）
+
+### 下一步
+
+- 阶段 5（Step 5.1）：提示词数据模型 `app/core/models/prompt_template.py`；同步修复 KI-01（在 split/adapt 的内置 default prompt 中强化格式约束）。
+

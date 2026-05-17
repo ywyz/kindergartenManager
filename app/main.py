@@ -14,6 +14,7 @@ from app.ui.pages import home  # noqa: F401
 from app.ui.pages import login  # noqa: F401
 from app.ui.pages import settings  # noqa: F401
 from app.ui.pages import date_test  # noqa: F401
+from app.ui.pages import daily_plan  # noqa: F401
 
 from app.core.config import settings
 

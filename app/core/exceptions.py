@@ -26,3 +26,19 @@ class ConfigError(Exception):
     def __init__(self, message: str = "配置缺失") -> None:
         super().__init__(message)
         self.message = message
+
+
+class AiCallError(Exception):
+    """AI 接口调用失败时抛出：HTTP 4xx/5xx、网络超时、超过重试次数等。"""
+
+    def __init__(self, message: str = "AI 调用失败") -> None:
+        super().__init__(message)
+        self.message = message
+
+
+class AiParseError(Exception):
+    """AI 返回内容解析失败时抛出：JSON 格式非法、缺少必要字段等。"""
+
+    def __init__(self, message: str = "AI 返回内容解析失败") -> None:
+        super().__init__(message)
+        self.message = message
