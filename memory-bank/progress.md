@@ -154,6 +154,45 @@ cp .env.example .env
 - Alembic head：`67b4aef28796`（未变化）。
 - 下一步：**阶段 3 Step 3.1** — 加密工具 `app/core/crypto.py`（Fernet 对称加密）。
 
+## 2026-05-17
+
+### 已完成（阶段 3）
+
+- **Step 3.1 ✅**：加密工具 `app/core/crypto.py` — `encrypt` / `decrypt`（Fernet 对称加密）；`app/core/exceptions.py` 新增 `CryptoError`、`ConfigError`。
+  - `ENCRYPTION_KEY` 字符串 → UTF-8 编码取前 32 字节补零 → `base64.urlsafe_b64encode` → 合法 Fernet Key；Fernet 实例模块级初始化一次。
+  - `tests/test_crypto.py` — **8 passed**（加密结果异于原文、往返还原、Unicode 往返、Fernet 随机 IV、篡改密文报错、非法字符串报错、空字符串报错）。
+  - 手工验收：自动化测试全部通过，无需额外手工操作。
+
+- **Step 3.2 ✅**：`app/core/models/ai_key.py` — `AiApiKey` 数据模型；Alembic 迁移（add ai_api_key table）；`app/repository/ai_key_repository.py` — `save_ai_key` / `get_active_ai_key` / `get_decrypted_key`。
+  - `app/core/models/__init__.py` 更新：新增 `AiApiKey` 导入，确保 Alembic autogenerate 可发现。
+  - `tests/test_ai_key_repository.py` — **11 passed**（密文存储、active 记录可取、解密还原、Key 轮换旧记录 inactive、租户隔离）。
+  - Alembic 迁移执行成功；`DESCRIBE ai_api_key;` 字段与定义一致。
+
+- **Step 3.3 ✅**：`app/ui/pages/settings.py` 新增 AI 接口配置区块。
+  - 新增辅助函数 `_mask_api_key`：明文末4位可见，其余替换为 `sk-****` 前缀。
+  - "保存"按钮：判断 Key 是否修改（与脱敏字符串对比），复用或更新 Key 后加密入库。
+  - "验证连接"按钮：内联 `httpx.AsyncClient` 调用 `{api_base_url}/models`，超时 10 秒，显示成功/失败提示。
+  - 页面加载回填：AI 地址正常回填；Key 以脱敏形式展示，解密失败时提示重新配置。
+  - **手工验收通过**（2026-05-17）：密文存储 ✅ / 脱敏显示 ✅ / 验证连接 ✅。
+
+- **Bug 修复 — 登录响应极慢（IPv6 超时）**：
+  - 现象：点击登录等待 2+ 分钟才响应。
+  - 根因：`aliyun.ywyz.tech` 同时有 A 和 AAAA 记录；`aiomysql` 优先尝试 IPv6（`2408:4002:...`），该地址在 13306 端口不通，等待 TCP 超时（约 2 分 15 秒）后才降级 IPv4。
+  - 修复：`.env` 中 `DATABASE_URL` 将主机名改为 IPv4 地址（`47.116.40.89`），绕过 DNS 双栈解析。
+  - 同步修改：`app/core/database.py` 将 `pool_pre_ping=True` 改为 `False`（避免每次取连接前额外发 `SELECT 1` 增加往返延迟），新增 `pool_recycle=1800` 防止服务端主动断连后复用报错。
+  - **验证通过**：登录响应恢复正常。
+  - 后续建议：在 DNS 管理面板删除 `aliyun.ywyz.tech` 的 AAAA 记录（根治），届时可将 `DATABASE_URL` 改回域名。
+
+### 当前状态
+
+- **阶段 3（Step 3.1~3.3）全部完成并通过手工验收。**
+- 自动化测试（Step 3 范围）：`test_crypto.py` 8 passed / `test_ai_key_repository.py` 11 passed。
+- 待执行：Step 3 全量回归测试 + 文档更新 + 推送 GitHub。
+
+### 下一步
+
+- 全量测试 `pytest tests/ -v`，通过后更新 architecture.md，推送 GitHub。
+
 ---
 
 ## 2026-05-11

@@ -2,7 +2,7 @@
 
 ## 1. 当前阶段
 
-- 项目阶段：M1 启动前（文档与实施规则已对齐）
+- 项目阶段：M1 进行中（阶段 0/1/2/3 已完成）
 - 开发策略：先架构后编码；每完成一个步骤同步更新本文件与 progress.md
 
 ## 2. 业务与权限边界（已确认）
@@ -89,15 +89,18 @@
 
 ## 9. 阶段 1 & 2 已实现文件清单
 
-### 数据库表（Alembic 当前 head：`67b4aef28796`）
+### 数据库表（Alembic 当前 head：最新迁移版本，含 ai_api_key 表）
 
 | 表名 | 迁移版本 | 主要字段 |
-|------|---------|---------|
+|------|---------|----------|
 | `users` | `5e03413fdeca` | id, tenant_id, username, hashed_password, role, is_active |
 | `semester_config` | `fd6d29f921b4` | id, tenant_id, user_id, semester_name, start_date, end_date, is_active |
 | `class_config` | `67b4aef28796` | id, tenant_id, user_id, grade, class_name, indoor_areas, outdoor_content |
+| `ai_api_key` | 阶段3迁移 | id, tenant_id, user_id, api_base_url, api_key_encrypted, is_active |
 
 所有表均含 `created_at`、`updated_at`，并建立 `(tenant_id, user_id)` 联合索引。
+
+**安全约束**：`api_api_key.api_key_encrypted` 仅存 Fernet 密文，明文禁止入库、禁止写日志。
 
 ### 核心模块
 
@@ -116,8 +119,33 @@
 | `app/integration/holiday_client/client.py` | 法定节假日判定；法定节假日缓存 `dict[str, tuple[bool, str\|None, int]]`（含 day_type）；特殊节日缓存 `dict[str, list[str]]`；`is_holiday`、`is_near_holiday`、`get_holiday_name`、`get_special_day_tags`（sync，本地硬编码）、`is_adjusted_workday` |
 | `app/ui/pages/login.py` | 登录页（路由 `/`），token 写入 `app.storage.user` |
 | `app/ui/pages/home.py` | 首页（路由 `/home`），快捷导航按钮 |
-| `app/ui/pages/settings.py` | 配置页（路由 `/settings`），学期与班级配置 |
+| `app/ui/pages/settings.py` | 配置页（路由 `/settings`），学期配置、班级配置、AI 接口配置（含脱敏展示与验证连接） |
 | `app/ui/pages/date_test.py` | 日期测试页（路由 `/date-test`），嵌入 DatePanel |
+
+## 10. 阶段 3 已实现文件清单
+
+### 核心模块
+
+| 文件 | 职责 |
+|------|------|
+| `app/core/exceptions.py` | 新增 `CryptoError`（加解密失败）、`ConfigError`（业务配置缺失，如未配置 AI Key） |
+| `app/core/crypto.py` | Fernet 对称加密：`encrypt(plain_text) -> str` / `decrypt(cipher_text) -> str`；密钥来自 `ENCRYPTION_KEY`（UTF-8→取前32字节→base64）；解密失败抛 `CryptoError` |
+| `app/core/models/ai_key.py` | `AiApiKey` ORM 模型；`api_key_encrypted` 仅存密文 |
+| `app/repository/ai_key_repository.py` | `save_ai_key`（加密入库，自动 deactivate 旧记录）/ `get_active_ai_key` / `get_decrypted_key` |
+
+### 基础设施变更
+
+| 文件 | 变更内容 |
+|------|----------|
+| `app/core/database.py` | `pool_pre_ping=False`（避免远程 DB 额外往返）；新增 `pool_recycle=1800` |
+| `.env` | `DATABASE_URL` 主机改为 IPv4 直连（`47.116.40.89`），规避双栈服务器 IPv6 超时问题 |
+
+### 已知问题与决策记录
+
+| 编号 | 问题 | 决策 |
+|------|------|------|
+| BL-02 | `aliyun.ywyz.tech` 同时有 A/AAAA 记录，aiomysql 优先尝试 IPv6 导致连接超时 2+ 分钟 | `.env` 改用 IPv4 直连；根治方案：删除 DNS AAAA 记录 |
+| BL-01 | `get_special_day_tags` 曾计划在线 API，代价大于收益 | 回滚为本地硬编码同步实现 |
 | `app/ui/components/date_panel.py` | 可复用日期面板组件，显示周次/周几/法定节假日（含节日名称）/调班/临近节假日/特殊节日标签 |
 
 ### Holiday Client 接口说明

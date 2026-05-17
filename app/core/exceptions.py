@@ -10,3 +10,19 @@ class AuthError(Exception):
     def __init__(self, message: str = "认证失败") -> None:
         super().__init__(message)
         self.message = message
+
+
+class CryptoError(Exception):
+    """加解密失败时抛出：密文被篡改、密钥不匹配或格式非法。"""
+
+    def __init__(self, message: str = "加解密失败") -> None:
+        super().__init__(message)
+        self.message = message
+
+
+class ConfigError(Exception):
+    """业务配置缺失时抛出：如用户尚未配置 AI Key。"""
+
+    def __init__(self, message: str = "配置缺失") -> None:
+        super().__init__(message)
+        self.message = message
