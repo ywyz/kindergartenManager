@@ -8,6 +8,12 @@
 - daily_reflection  →  一日活动反思
 """
 
+from app.core.exceptions import AiParseError
+from app.core.logging import get_logger
+from app.integration.ai_client.base import call_ai_text
+
+logger = get_logger(__name__)
+
 # ── 晨间活动 ────────────────────────────────────────────────────────────────
 DEFAULT_MORNING_EXERCISE_PROMPT: str = """\
 你是幼儿园晨间活动设计专家。根据提供的班级信息和教案内容，设计一份晨间活动方案。
@@ -132,3 +138,114 @@ GENERATE_DEFAULTS: dict[str, str] = {
     "outdoor_game": DEFAULT_OUTDOOR_GAME_PROMPT,
     "daily_reflection": DEFAULT_DAILY_REFLECTION_PROMPT,
 }
+
+
+def _build_user_content(task_type: str, context: dict) -> str:
+    """根据任务类型和上下文构建发送给 AI 的用户消息。
+
+    context 支持以下字段：
+        grade, class_name, activity_goal, activity_process,
+        indoor_areas, outdoor_content,
+        morning_activity, morning_talk, indoor_area, outdoor_activity
+        content (通用原始文本，用于测试模式)
+    """
+    # 通用原始文本（测试模式）
+    if "content" in context:
+        return context["content"]
+
+    grade = context.get("grade", "")
+    class_name = context.get("class_name", "")
+    activity_goal = context.get("activity_goal", "")
+    activity_process = context.get("activity_process", "")
+
+    prefix = f"班级：{grade}{class_name}\n"
+
+    if task_type == "morning_exercise":
+        return (
+            f"{prefix}"
+            f"今日教案活动目标：{activity_goal or '（未填写）'}\n"
+            f"今日活动过程：{activity_process or '（未填写）'}\n"
+            "请设计今日晨间活动方案。"
+        )
+    if task_type == "morning_talk":
+        return (
+            f"{prefix}"
+            f"今日教案活动目标：{activity_goal or '（未填写）'}\n"
+            "请设计今日晨间谈话方案。"
+        )
+    if task_type == "area_game":
+        indoor_areas = context.get("indoor_areas", "")
+        return (
+            f"{prefix}"
+            f"可用室内游戏区域：{indoor_areas or '（未配置，请自行选择合适区域）'}\n"
+            f"今日教案活动目标：{activity_goal or '（未填写）'}\n"
+            f"今日活动过程：{activity_process or '（未填写）'}\n"
+            "请设计今日区域游戏方案。"
+        )
+    if task_type == "outdoor_game":
+        outdoor_content = context.get("outdoor_content", "")
+        return (
+            f"{prefix}"
+            f"可用户外区域：{outdoor_content or '（未配置，请自行选择合适区域）'}\n"
+            f"今日教案活动目标：{activity_goal or '（未填写）'}\n"
+            "请设计今日户外游戏方案。"
+        )
+    if task_type == "daily_reflection":
+        return (
+            f"{prefix}"
+            f"今日教案活动目标：{activity_goal or '（未填写）'}\n"
+            f"晨间活动：{context.get('morning_activity', '') or '（未填写）'}\n"
+            f"晨间谈话：{context.get('morning_talk', '') or '（未填写）'}\n"
+            f"区域游戏：{context.get('indoor_area', '') or '（未填写）'}\n"
+            f"户外游戏：{context.get('outdoor_activity', '') or '（未填写）'}\n"
+            "请撰写今日一日活动反思。"
+        )
+    return f"{prefix}请根据以上信息生成内容。"
+
+
+async def generate_activity(
+    task_type: str,
+    context: dict,
+    api_base_url: str,
+    api_key: str,
+    model_name: str = "gpt-4o-mini",
+    system_prompt: str | None = None,
+    *,
+    _client=None,
+) -> str:
+    """生成单项一日活动内容（纯文本输出）。
+
+    Args:
+        task_type: 任务类型（morning_exercise / morning_talk / area_game /
+                   outdoor_game / daily_reflection）。
+        context: 上下文信息 dict（grade、class_name、indoor_areas 等）。
+        api_base_url / api_key / model_name: AI 接口参数。
+        system_prompt: 自定义 system prompt；传 None 时使用对应内置默认。
+        _client: 可选 httpx 客户端（测试用）。
+
+    Returns:
+        生成的活动内容文本字符串。
+
+    Raises:
+        AiParseError: 不支持的任务类型或返回内容为空。
+        AiCallError: AI 接口调用失败。
+    """
+    prompt = system_prompt if system_prompt is not None else GENERATE_DEFAULTS.get(task_type)
+    if not prompt:
+        raise AiParseError(f"不支持的活动生成任务类型: {task_type}")
+
+    user_content = _build_user_content(task_type, context)
+    messages = [
+        {"role": "system", "content": prompt},
+        {"role": "user", "content": user_content},
+    ]
+
+    result = await call_ai_text(
+        messages=messages,
+        api_base_url=api_base_url,
+        api_key=api_key,
+        model_name=model_name,
+        _client=_client,
+    )
+    logger.info("活动内容生成成功", extra={"task_type": task_type, "length": len(result)})
+    return result

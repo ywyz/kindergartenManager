@@ -19,8 +19,10 @@ from nicegui import app, ui
 
 from app.auth.jwt import decode_access_token
 from app.core.database import AsyncSessionLocal
+from app.core.exceptions import AiCallError, AiParseError, ConfigError
 from app.core.logging import get_logger
-from app.integration.ai_client.adapt_client import DEFAULT_ADAPT_PROMPT
+from app.integration.ai_client.adapt_client import DEFAULT_ADAPT_PROMPT, adapt_activity_process
+from app.integration.ai_client.base import call_ai_text
 from app.integration.ai_client.generate_client import (
     DEFAULT_AREA_GAME_PROMPT,
     DEFAULT_DAILY_REFLECTION_PROMPT,
@@ -28,7 +30,8 @@ from app.integration.ai_client.generate_client import (
     DEFAULT_MORNING_TALK_PROMPT,
     DEFAULT_OUTDOOR_GAME_PROMPT,
 )
-from app.integration.ai_client.lesson_plan_client import DEFAULT_SPLIT_PROMPT
+from app.integration.ai_client.lesson_plan_client import DEFAULT_SPLIT_PROMPT, split_lesson_plan
+from app.repository.ai_key_repository import get_active_ai_key, get_decrypted_key
 from app.repository.prompt_repository import (
     get_active_prompt,
     list_versions,
@@ -68,6 +71,36 @@ _TASK_CONFIG = {
         "label": "一日活动反思提示词",
         "placeholder": DEFAULT_DAILY_REFLECTION_PROMPT,
     },
+}
+
+# 每种任务类型的输出格式要求（展示在编辑器上方）
+_TASK_SCHEMA: dict[str, str] = {
+    "split": (
+        "输出 JSON，必须包含以下 5 个字段（key 名称不可修改）：\n"
+        '{"activity_goal": "...", "activity_prep": "...", '
+        '"activity_key": "...", "activity_difficult": "...", "activity_process": "..."}'
+    ),
+    "adapt": (
+        "输出 JSON，必须包含以下字段（key 名称不可修改）：\n"
+        '{"adapted_process": "改写后的活动过程"}\n'
+        "⚠ key 必须是 adapted_process，不可使用 activity_process 等其他名称！"
+    ),
+    "morning_exercise": "输出纯文本（非 JSON），按提示词中定义的格式生成晨间活动方案",
+    "morning_talk": "输出纯文本（非 JSON），按提示词中定义的格式生成晨间谈话方案",
+    "area_game": "输出纯文本（非 JSON），按提示词中定义的格式生成区域游戏方案",
+    "outdoor_game": "输出纯文本（非 JSON），按提示词中定义的格式生成户外游戏方案",
+    "daily_reflection": "输出纯文本（非 JSON），按提示词中定义的格式生成一日活动反思",
+}
+
+# 测试区输入框提示文字
+_TEST_PLACEHOLDER: dict[str, str] = {
+    "split": "粘贴完整教案文本（含活动目标、准备、过程等）进行测试……",
+    "adapt": "粘贴活动过程原文进行测试……",
+    "morning_exercise": "输入背景信息进行测试（如：中班，今日教案主题是春天的植物……）",
+    "morning_talk": "输入活动背景进行测试（如：中班，今日活动主题是春天的花朵……）",
+    "area_game": "输入背景信息进行测试（如：中班，可用室内区域：美工区、建构区……）",
+    "outdoor_game": "输入背景信息进行测试（如：中班，可用户外区域：操场、沙池……）",
+    "daily_reflection": "输入当日活动概述进行测试（如：中班，今日开展了春天主题活动……）",
 }
 
 
@@ -203,6 +236,147 @@ async def _build_task_panel(tenant_id: int, user_id: int, task_type: str) -> Non
         ui.button("保存为新版本", on_click=save_version).classes(
             "bg-blue-600 text-white mt-2"
         )
+
+    # ── 格式要求说明 ──────────────────────────────────────────────────────────
+    schema_desc = _TASK_SCHEMA.get(task_type, "")
+    if schema_desc:
+        with ui.card().classes("w-full bg-amber-50 border border-amber-200 mt-2"):
+            ui.label("⚠ 提示词输出格式要求").classes(
+                "text-xs font-semibold text-amber-700 mb-1"
+            )
+            ui.label(schema_desc).classes(
+                "text-xs text-gray-700 font-mono whitespace-pre-wrap"
+            )
+
+    # ── 在线测试 ──────────────────────────────────────────────────────────────
+    with ui.expansion("🧪 测试提示词效果", icon="science").classes("w-full mt-2"):
+        with ui.column().classes("w-full gap-3 p-1"):
+
+            test_input = ui.textarea(
+                label="测试输入",
+                placeholder=_TEST_PLACEHOLDER.get(task_type, "请输入测试内容……"),
+            ).classes("w-full").props("rows=6 outlined")
+
+            # 年龄适配额外选项
+            test_grade_select = None
+            if task_type == "adapt":
+                test_grade_select = ui.select(
+                    ["小班", "中班", "大班"],
+                    value="中班",
+                    label="测试年龄段",
+                ).props("outlined dense")
+
+            test_msg = ui.label("").classes("text-sm")
+
+            # 输出区域（split 显示 5 个字段，其余显示原始文本）
+            if task_type == "split":
+                test_goal_out = ui.textarea(label="活动目标").classes("w-full").props(
+                    "rows=3 outlined readonly"
+                )
+                test_prep_out = ui.textarea(label="活动准备").classes("w-full").props(
+                    "rows=2 outlined readonly"
+                )
+                test_key_out = ui.textarea(label="活动重点").classes("w-full").props(
+                    "rows=2 outlined readonly"
+                )
+                test_diff_out = ui.textarea(label="活动难点").classes("w-full").props(
+                    "rows=2 outlined readonly"
+                )
+                test_proc_out = ui.textarea(label="活动过程").classes("w-full").props(
+                    "rows=5 outlined readonly"
+                )
+            else:
+                test_result_out = ui.textarea(label="AI 返回结果").classes(
+                    "w-full"
+                ).props("rows=7 outlined readonly")
+
+            async def do_test() -> None:
+                if not content_area.value.strip():
+                    test_msg.classes(replace="text-sm text-orange-500")
+                    test_msg.set_text("⚠ 请先在上方输入提示词内容")
+                    return
+                if not test_input.value.strip():
+                    test_msg.classes(replace="text-sm text-orange-500")
+                    test_msg.set_text("⚠ 请输入测试文本")
+                    return
+
+                test_btn.props("loading")
+                test_msg.classes(replace="text-sm text-gray-500")
+                test_msg.set_text("AI 测试中，请稍候……")
+
+                try:
+                    async with AsyncSessionLocal() as session:
+                        ai_key = await get_active_ai_key(session, tenant_id, user_id)
+                    if ai_key is None:
+                        test_msg.classes(replace="text-sm text-orange-500")
+                        test_msg.set_text("⚠ 未配置 AI Key，请到【设置】页面配置")
+                        return
+
+                    api_key_plain = get_decrypted_key(ai_key)
+                    base_url = ai_key.api_base_url
+                    model = ai_key.model_name
+                    current_prompt = content_area.value.strip()
+
+                    if task_type == "split":
+                        result = await split_lesson_plan(
+                            raw_text=test_input.value,
+                            api_base_url=base_url,
+                            api_key=api_key_plain,
+                            model_name=model,
+                            system_prompt=current_prompt,
+                        )
+                        test_goal_out.value = result.get("activity_goal", "")
+                        test_prep_out.value = result.get("activity_prep", "")
+                        test_key_out.value = result.get("activity_key", "")
+                        test_diff_out.value = result.get("activity_difficult", "")
+                        test_proc_out.value = result.get("activity_process", "")
+
+                    elif task_type == "adapt":
+                        grade = test_grade_select.value if test_grade_select else "中班"
+                        adapted = await adapt_activity_process(
+                            original=test_input.value,
+                            grade=grade,
+                            api_base_url=base_url,
+                            api_key=api_key_plain,
+                            model_name=model,
+                            system_prompt=current_prompt,
+                        )
+                        test_result_out.value = adapted
+
+                    else:
+                        # 生成类任务：直接用 call_ai_text，以 test_input 为用户消息
+                        text = await call_ai_text(
+                            messages=[
+                                {"role": "system", "content": current_prompt},
+                                {"role": "user", "content": test_input.value},
+                            ],
+                            api_base_url=base_url,
+                            api_key=api_key_plain,
+                            model_name=model,
+                        )
+                        test_result_out.value = text
+
+                    test_msg.classes(replace="text-sm text-green-600")
+                    test_msg.set_text("✅ 测试完成")
+
+                except AiParseError as e:
+                    test_msg.classes(replace="text-sm text-red-500")
+                    test_msg.set_text(f"❌ 解析失败：{e.message}")
+                except AiCallError as e:
+                    test_msg.classes(replace="text-sm text-red-500")
+                    test_msg.set_text(f"❌ AI调用失败：{e.message}")
+                except ConfigError as e:
+                    test_msg.classes(replace="text-sm text-orange-500")
+                    test_msg.set_text(f"⚠ {e.message}")
+                except Exception as e:
+                    test_msg.classes(replace="text-sm text-red-500")
+                    test_msg.set_text(f"❌ {type(e).__name__}: {e}")
+                finally:
+                    test_btn.props(remove="loading")
+
+            test_btn = ui.button("测试当前提示词", on_click=do_test).classes(
+                "bg-amber-600 text-white"
+            )
 
     # ── 历史版本列表 ──────────────────────────────────────────────────────────
     history_container = ui.column().classes("w-full gap-2 mt-2")

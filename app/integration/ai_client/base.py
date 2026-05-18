@@ -146,3 +146,88 @@ async def call_ai(
 
     async with httpx.AsyncClient() as client:
         return await _request_with_retry(client)
+
+
+async def call_ai_text(
+    messages: list[dict],
+    api_base_url: str,
+    api_key: str,
+    model_name: str = "gpt-4o-mini",
+    *,
+    _client: httpx.AsyncClient | None = None,
+) -> str:
+    """发送 Chat Completions 请求，返回纯文本 content 字符串。
+
+    与 call_ai() 的区别：不强制 json_object 格式，直接返回 message.content。
+    适用于生成结构化文本（非 JSON）的场景，如晨间活动、晨间谈话等。
+
+    Returns:
+        AI 返回的纯文本字符串（已 strip）。
+
+    Raises:
+        AiCallError: HTTP 请求失败或超时。
+        AiParseError: 响应结构异常或内容为空。
+    """
+    url = api_base_url.rstrip("/") + "/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": model_name,
+        "messages": messages,
+    }
+
+    async def _do_text_request(client: httpx.AsyncClient) -> str:
+        try:
+            response = await client.post(url, headers=headers, json=payload, timeout=60.0)
+        except httpx.TimeoutException as exc:
+            raise AiCallError(f"AI 请求超时: {exc}") from exc
+        except httpx.RequestError as exc:
+            raise AiCallError(f"AI 请求网络错误: {exc}") from exc
+
+        if response.status_code >= 400:
+            try:
+                err_body = response.json()
+                err_detail = (
+                    err_body.get("error", {}).get("message")
+                    or err_body.get("message")
+                    or err_body.get("detail")
+                    or str(err_body)[:200]
+                )
+            except Exception:
+                err_detail = response.text[:200]
+            logger.error(
+                "AI 接口返回错误",
+                extra={
+                    "status_code": response.status_code,
+                    "url": url,
+                    "error_detail": err_detail,
+                },
+            )
+            raise AiCallError(f"AI 接口返回 HTTP {response.status_code}: {err_detail}")
+
+        try:
+            body = response.json()
+        except Exception as exc:
+            raise AiParseError(f"AI 返回内容不是有效 JSON: {exc}") from exc
+
+        try:
+            content_str = body["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise AiParseError(f"AI 响应结构异常: {exc}") from exc
+
+        if not content_str or not content_str.strip():
+            raise AiParseError("AI 返回内容为空")
+
+        return content_str.strip()
+
+    @_make_retry_decorator()
+    async def _text_request_with_retry(client: httpx.AsyncClient) -> str:
+        return await _do_text_request(client)
+
+    if _client is not None:
+        return await _text_request_with_retry(_client)
+
+    async with httpx.AsyncClient() as client:
+        return await _text_request_with_retry(client)

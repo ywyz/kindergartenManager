@@ -33,7 +33,7 @@ DEFAULT_ADAPT_PROMPT = """你是一名经验丰富的幼儿园教研员，请将
 1. 保留原有活动步骤结构，仅调整语言难度和教师介入程度。
 2. 输出必须是合法 JSON，不要添加 markdown 代码块标记（禁止 ```json 等包裹）。
 3. adapted_process 的值必须是纯文本字符串，禁止使用任何 markdown 格式标记（禁止 **加粗**、*斜体*、# 标题、- 列表前缀等）。
-4. 步骤之间用句号结尾自然衔接，不使用数字编号前缀另起一行。
+4. 保留原文的步骤编号格式：若原文有"1."、"（1）"等编号，改写后仍按对应步骤结构逐条输出；若原文无编号，自然衔接即可。
 5. 不添加多余的空行或首行缩进。"""
 
 
@@ -91,11 +91,29 @@ async def adapt_activity_process(
     )
 
     if "adapted_process" not in result:
+        # 兼容常见误配置：用户可能将拆分提示词的 schema 复制到适配 tab
+        # 导致 AI 返回 activity_process 等非标准字段名，此处降级处理并记录警告
+        for _fallback in ("activity_process", "adapted", "process", "content"):
+            _val = result.get(_fallback)
+            if isinstance(_val, str) and _val.strip():
+                logger.warning(
+                    "年龄适配提示词 schema 有误，使用了备用字段（建议到提示词管理页修正）",
+                    extra={"fallback_key": _fallback, "result_keys": list(result.keys())},
+                )
+                adapted = _val
+                if not isinstance(adapted, str):
+                    adapted = str(adapted)
+                logger.info("年龄适配成功（备用字段）", extra={"grade": grade, "length": len(adapted)})
+                return adapted
         logger.info(
             "年龄适配结果缺少 adapted_process 字段",
             extra={"result_keys": list(result.keys())},
         )
-        raise AiParseError("年龄适配结果缺少 adapted_process 字段")
+        raise AiParseError(
+            "年龄适配结果缺少 adapted_process 字段。"
+            "请在【提示词管理 → 年龄适配】检查提示词，"
+            "确保 JSON 输出包含 adapted_process 字段"
+        )
 
     adapted = result["adapted_process"]
     if not isinstance(adapted, str):
