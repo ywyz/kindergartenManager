@@ -211,7 +211,8 @@ type 值：0=工作日，1=周末，2=法定节假日，3=调班工作日。
 | `app/service/diff_service.py` | `compute_diff()` — 按标点/换行分句；`difflib.SequenceMatcher` 逐句比对；返回改写文视角 `[{text, changed}]` |
 | `app/service/lesson_plan_service.py` | `process_lesson_plan()` — 编排全流程（AI Key → 拆分 → 适配 → 差异）；`LessonPlanResult` dataclass |
 | `app/repository/daily_plan_repository.py` | `save_daily_plan`（同日期 upsert）、`get_daily_plan_by_date` |
-| `app/ui/pages/daily_plan.py` | 每日活动计划页（路由 `/daily-plan`）；DatePanel 复用；AI 拆分 + 回填 + 保存草稿；刷新后草稿自动加载 |
+| `app/ui/pages/daily_plan.py` | 每日活动计划页（路由 `/daily-plan`）；DatePanel 复用；AI 拆分 + 回填 + 保存草稿；刷新后草稿自动加载。**一日活动各小节（晨间活动/晨间谈话/区域游戏/户外游戏）合并为单个「一键生成一日活动」按钮**，内部 `asyncio.gather(..., return_exceptions=True)` 并发生成、单项失败不阻断；「集体活动」拆分按钮与「一日活动反思」按钮保持独立 |
+| `app/integration/word_export/exporter.py` | `export_daily_plan(daily_plan, diff_result)` — 主方案打开 `templates/teacherplan.docx`（19 行 2 列）按既有单元格结构分子字段填充；`_parse_fields` 解析生成文本为子字段分格写入；活动过程差异标红（`RGBColor(255,0,0)`）、宋体；模板缺失/异常时降级 `_export_from_scratch`（8 行从零建表） |
 
 ### 数据库表（新增）
 

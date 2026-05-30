@@ -612,19 +612,14 @@ system prompt 从 `app/repository/prompt_repository.py` 查询当前激活版本
 
 ### Step 6.1 — Word 导出服务（integration/word_export/exporter.py）
 
+> **2026-05-30 调整**：经核实 `templates/teacherplan.docx` 为 **19 行 2 列** 结构（左列标题纵向合并，右列内容分子字段单元格），并非早前规划的 8 行。导出主方案改为 **打开模板填充其既有单元格**，将子字段分别写入对应行的右列单元格（晨间活动 R2/R3、晨间谈话 R4/R5、集体活动 R6~R11、室内区域 R12~R14、户外 R15~R17、反思 R18）。`_parse_fields` 将一日活动生成文本解析为子字段后分格填充；模板缺失时降级 `_export_from_scratch`（原 8 行从零建表逻辑保留为兜底）。
+
 **指令**
 在 `app/integration/word_export/exporter.py` 中实现 `export_daily_plan(daily_plan: DailyPlan, diff_result: list[dict]) -> bytes`：
-- 使用 `python-docx` 创建包含单个表格的文档，按以下行顺序填充：
-  1. 第 N 周（整行合并）
-  2. 月 日 周X（整行合并）
-  3. 晨间活动内容
-  4. 晨间谈话内容
-  5. 集体活动（活动主题/目标/重点/难点/过程）
-  6. 室内区域活动
-  7. 户外游戏活动
-  8. 一日活动反思（空白）
+- 主方案：`Document(TEMPLATE_PATH)` 打开 `templates/teacherplan.docx`，按模板单元格结构填充各字段（子字段分单元格）。
 - 对"活动过程"字段：`diff_result` 中 `changed=True` 的句子用红色字体（`RGBColor(255, 0, 0)`）输出；未改动句子用黑色。
 - 中文字体统一指定为"宋体"。
+- 模板缺失/填充异常时降级为从零构建简化表格（`_export_from_scratch`，8 行 2 列）。
 - 返回文档的 bytes 内容（不写文件，由调用方决定存储）。
 
 在 `tests/test_word_exporter.py` 中测试：
@@ -675,15 +670,17 @@ system prompt 从 `app/repository/prompt_repository.py` 查询当前激活版本
 
 ### Step 7.2 — 一日活动生成表单（接入 daily_plan 页面）
 
+> **2026-05-30 调整**：按用户手测反馈改为 **一键生成**。原各小节（晨间活动/晨间谈话/区域游戏/户外游戏）独立「AI 生成」按钮已合并为单个「一键生成一日活动」按钮（`_gen_all_daily`），内部用 `asyncio.gather(..., return_exceptions=True)` 并发调用 4 次生成，单项失败不阻断其余项，并在小节与顶部汇总 label 标注结果。「集体活动」走拆分按钮、「一日活动反思」独立按钮保持不变。
+
 **指令**
-在 `/daily-plan` 页面底部新增"一日活动生成"区块：
-- "连接AI生成"按钮：根据当前日期面板信息 + 班级配置调用 `generate_daily_activities()`
-- 生成结果回填到对应 `ui.textarea`：晨间活动、室内区域活动、户外游戏活动、晨间谈话主题、晨间谈话问题设计
+在 `/daily-plan` 页面新增"一日活动生成"区块：
+- "一键生成一日活动"按钮：根据当前日期面板信息 + 班级配置并发调用生成，回填晨间活动、室内区域活动、户外游戏活动、晨间谈话主题/问题设计。
+- 单项失败保留原值并提示，不影响其他项回填。
 
 回填后内容可手动编辑，"保存草稿"已有逻辑自动包含这些字段（无需修改）。
 
 **验证**
-- 选定日期和班级配置后，点击"连接AI生成"，5 个区域被回填。
+- 选定日期和班级配置后，点击"一键生成一日活动"，多个区域并发回填；单项失败有提示。
 - 手动修改回填内容后保存，数据库中记录为修改后内容。
 
 ---

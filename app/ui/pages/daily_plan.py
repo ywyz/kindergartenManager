@@ -8,6 +8,7 @@
 5. 导出 Word 按钮（Step 6 实现前置灰）
 """
 
+import asyncio
 from datetime import date
 from pathlib import Path
 
@@ -225,6 +226,125 @@ async def daily_plan_page() -> None:
                 ).props("rows=5 autogrow readonly")
 
         # ══════════════════════════════════════════════════════════════════════
+        # 区块三-A：一键生成一日活动（晨间活动 / 晨间谈话 / 区域游戏 / 户外游戏）
+        # ══════════════════════════════════════════════════════════════════════
+        with ui.card().classes("w-full bg-purple-50"):
+            with ui.row().classes("w-full items-center"):
+                ui.label("一日活动生成").classes(
+                    "text-base font-bold text-purple-700 flex-1"
+                )
+                gen_all_msg = ui.label("").classes("text-sm")
+            ui.label(
+                "点击下方按钮一次性生成「晨间活动 / 晨间谈话 / 室内区域游戏 / 户外游戏」，"
+                "生成后各区块内容均可手动修改。"
+            ).classes("text-xs text-gray-500")
+
+            async def _gen_all_daily() -> None:
+                if not state["selected_date"]:
+                    gen_all_msg.classes(
+                        remove="text-green-600 text-red-500", add="text-orange-500"
+                    )
+                    gen_all_msg.text = "⚠ 请先选择日期"
+                    return
+
+                gen_all_btn.props("loading")
+                gen_all_msg.classes(
+                    remove="text-green-600 text-red-500 text-orange-500"
+                )
+                gen_all_msg.text = "AI 生成中，请稍候……"
+
+                base_ctx = {
+                    "grade": state["grade"],
+                    "class_name": state["class_name"],
+                    "activity_goal": goal_area.value,
+                    "activity_process": adapted_area.value or original_area.value,
+                }
+                # 每项任务：(task_type, 额外 context, 目标 textarea, 状态 label, 名称)
+                tasks = [
+                    (
+                        "morning_exercise",
+                        {},
+                        morning_activity_area,
+                        morning_activity_msg,
+                        "晨间活动",
+                    ),
+                    (
+                        "morning_talk",
+                        {},
+                        morning_talk_area,
+                        morning_talk_msg,
+                        "晨间谈话",
+                    ),
+                    (
+                        "area_game",
+                        {"indoor_areas": state["indoor_areas"]},
+                        area_game_area,
+                        area_game_msg,
+                        "室内区域游戏",
+                    ),
+                    (
+                        "outdoor_game",
+                        {
+                            "outdoor_content": state["outdoor_content"],
+                            "activity_process": "",
+                        },
+                        outdoor_activity_area,
+                        outdoor_activity_msg,
+                        "户外游戏",
+                    ),
+                ]
+
+                async def _run_one(task_type: str, extra: dict) -> str:
+                    ctx = {**base_ctx, **extra}
+                    async with AsyncSessionLocal() as session:
+                        return await generate_activity_content(
+                            session, tenant_id, user_id, task_type, ctx
+                        )
+
+                results = await asyncio.gather(
+                    *[_run_one(t, extra) for t, extra, *_ in tasks],
+                    return_exceptions=True,
+                )
+
+                failures: list[str] = []
+                for (task_type, _extra, area, msg, name), res in zip(tasks, results):
+                    msg.classes(remove="text-green-600 text-red-500 text-orange-500")
+                    if isinstance(res, ConfigError):
+                        msg.classes(add="text-orange-500")
+                        msg.text = f"⚠ {res.message}"
+                        failures.append(f"{name}：{res.message}")
+                    elif isinstance(res, (AiCallError, AiParseError)):
+                        msg.classes(add="text-red-500")
+                        msg.text = f"❌ {res.message}"
+                        failures.append(f"{name}：{res.message}")
+                    elif isinstance(res, Exception):
+                        msg.classes(add="text-red-500")
+                        msg.text = f"❌ {type(res).__name__}: {res}"
+                        failures.append(f"{name}：{type(res).__name__}")
+                    else:
+                        area.value = res
+                        msg.classes(add="text-green-600")
+                        msg.text = "✅ 生成完成"
+
+                if not failures:
+                    gen_all_msg.classes(add="text-green-600")
+                    gen_all_msg.text = "✅ 四项内容已全部生成"
+                elif len(failures) == len(tasks):
+                    gen_all_msg.classes(add="text-red-500")
+                    gen_all_msg.text = "❌ 生成失败：" + "；".join(failures)
+                else:
+                    gen_all_msg.classes(add="text-orange-500")
+                    gen_all_msg.text = (
+                        f"⚠ 部分生成失败（{len(failures)}/{len(tasks)}）："
+                        + "；".join(failures)
+                    )
+                gen_all_btn.props(remove="loading")
+
+            gen_all_btn = ui.button(
+                "一键生成一日活动", on_click=_gen_all_daily
+            ).classes("bg-purple-600 text-white mt-1")
+
+        # ══════════════════════════════════════════════════════════════════════
         # 区块三-B：晨间活动
         # ══════════════════════════════════════════════════════════════════════
         with ui.card().classes("w-full"):
@@ -233,44 +353,8 @@ async def daily_plan_page() -> None:
                 morning_activity_msg = ui.label("").classes("text-sm")
 
             morning_activity_area = ui.textarea(
-                placeholder="晨间活动方案（AI 生成后可手动修改）……"
+                placeholder="晨间活动方案（点击上方「一键生成一日活动」后可手动修改）……"
             ).classes("w-full").props("rows=5 autogrow")
-
-            async def _gen_morning_activity() -> None:
-                morning_activity_btn.props("loading")
-                morning_activity_msg.classes(
-                    remove="text-green-600 text-red-500 text-orange-500"
-                )
-                morning_activity_msg.text = "AI 生成中……"
-                try:
-                    context = {
-                        "grade": state["grade"],
-                        "class_name": state["class_name"],
-                        "activity_goal": goal_area.value,
-                        "activity_process": adapted_area.value or original_area.value,
-                    }
-                    async with AsyncSessionLocal() as session:
-                        content = await generate_activity_content(
-                            session, tenant_id, user_id, "morning_exercise", context
-                        )
-                    morning_activity_area.value = content
-                    morning_activity_msg.classes(add="text-green-600")
-                    morning_activity_msg.text = "✅ 生成完成"
-                except ConfigError as e:
-                    morning_activity_msg.classes(add="text-orange-500")
-                    morning_activity_msg.text = f"⚠ {e.message}"
-                except (AiCallError, AiParseError) as e:
-                    morning_activity_msg.classes(add="text-red-500")
-                    morning_activity_msg.text = f"❌ {e.message}"
-                except Exception as e:
-                    morning_activity_msg.classes(add="text-red-500")
-                    morning_activity_msg.text = f"❌ {type(e).__name__}: {e}"
-                finally:
-                    morning_activity_btn.props(remove="loading")
-
-            morning_activity_btn = ui.button(
-                "AI 生成", on_click=_gen_morning_activity
-            ).classes("bg-purple-600 text-white text-sm mt-2")
 
         # ══════════════════════════════════════════════════════════════════════
         # 区块三-C：晨间谈话
@@ -281,44 +365,8 @@ async def daily_plan_page() -> None:
                 morning_talk_msg = ui.label("").classes("text-sm")
 
             morning_talk_area = ui.textarea(
-                placeholder="晨间谈话方案（谈话主题 + 问题设计，AI 生成后可手动修改）……"
+                placeholder="晨间谈话方案（谈话主题 + 问题设计，点击上方「一键生成一日活动」后可手动修改）……"
             ).classes("w-full").props("rows=5 autogrow")
-
-            async def _gen_morning_talk() -> None:
-                morning_talk_btn.props("loading")
-                morning_talk_msg.classes(
-                    remove="text-green-600 text-red-500 text-orange-500"
-                )
-                morning_talk_msg.text = "AI 生成中……"
-                try:
-                    context = {
-                        "grade": state["grade"],
-                        "class_name": state["class_name"],
-                        "activity_goal": goal_area.value,
-                        "activity_process": adapted_area.value or original_area.value,
-                    }
-                    async with AsyncSessionLocal() as session:
-                        content = await generate_activity_content(
-                            session, tenant_id, user_id, "morning_talk", context
-                        )
-                    morning_talk_area.value = content
-                    morning_talk_msg.classes(add="text-green-600")
-                    morning_talk_msg.text = "✅ 生成完成"
-                except ConfigError as e:
-                    morning_talk_msg.classes(add="text-orange-500")
-                    morning_talk_msg.text = f"⚠ {e.message}"
-                except (AiCallError, AiParseError) as e:
-                    morning_talk_msg.classes(add="text-red-500")
-                    morning_talk_msg.text = f"❌ {e.message}"
-                except Exception as e:
-                    morning_talk_msg.classes(add="text-red-500")
-                    morning_talk_msg.text = f"❌ {type(e).__name__}: {e}"
-                finally:
-                    morning_talk_btn.props(remove="loading")
-
-            morning_talk_btn = ui.button(
-                "AI 生成", on_click=_gen_morning_talk
-            ).classes("bg-purple-600 text-white text-sm mt-2")
 
         # ══════════════════════════════════════════════════════════════════════
         # 区块三-D：室内区域游戏
@@ -329,45 +377,8 @@ async def daily_plan_page() -> None:
                 area_game_msg = ui.label("").classes("text-sm")
 
             area_game_area = ui.textarea(
-                placeholder="区域游戏方案（AI 生成后可手动修改）……"
+                placeholder="区域游戏方案（点击上方「一键生成一日活动」后可手动修改）……"
             ).classes("w-full").props("rows=5 autogrow")
-
-            async def _gen_area_game() -> None:
-                area_game_btn.props("loading")
-                area_game_msg.classes(
-                    remove="text-green-600 text-red-500 text-orange-500"
-                )
-                area_game_msg.text = "AI 生成中……"
-                try:
-                    context = {
-                        "grade": state["grade"],
-                        "class_name": state["class_name"],
-                        "activity_goal": goal_area.value,
-                        "activity_process": adapted_area.value or original_area.value,
-                        "indoor_areas": state["indoor_areas"],
-                    }
-                    async with AsyncSessionLocal() as session:
-                        content = await generate_activity_content(
-                            session, tenant_id, user_id, "area_game", context
-                        )
-                    area_game_area.value = content
-                    area_game_msg.classes(add="text-green-600")
-                    area_game_msg.text = "✅ 生成完成"
-                except ConfigError as e:
-                    area_game_msg.classes(add="text-orange-500")
-                    area_game_msg.text = f"⚠ {e.message}"
-                except (AiCallError, AiParseError) as e:
-                    area_game_msg.classes(add="text-red-500")
-                    area_game_msg.text = f"❌ {e.message}"
-                except Exception as e:
-                    area_game_msg.classes(add="text-red-500")
-                    area_game_msg.text = f"❌ {type(e).__name__}: {e}"
-                finally:
-                    area_game_btn.props(remove="loading")
-
-            area_game_btn = ui.button(
-                "AI 生成", on_click=_gen_area_game
-            ).classes("bg-purple-600 text-white text-sm mt-2")
 
         # ══════════════════════════════════════════════════════════════════════
         # 区块三-E：户外游戏
@@ -378,44 +389,8 @@ async def daily_plan_page() -> None:
                 outdoor_activity_msg = ui.label("").classes("text-sm")
 
             outdoor_activity_area = ui.textarea(
-                placeholder="户外游戏方案（AI 生成后可手动修改）……"
+                placeholder="户外游戏方案（点击上方「一键生成一日活动」后可手动修改）……"
             ).classes("w-full").props("rows=5 autogrow")
-
-            async def _gen_outdoor_activity() -> None:
-                outdoor_activity_btn.props("loading")
-                outdoor_activity_msg.classes(
-                    remove="text-green-600 text-red-500 text-orange-500"
-                )
-                outdoor_activity_msg.text = "AI 生成中……"
-                try:
-                    context = {
-                        "grade": state["grade"],
-                        "class_name": state["class_name"],
-                        "activity_goal": goal_area.value,
-                        "outdoor_content": state["outdoor_content"],
-                    }
-                    async with AsyncSessionLocal() as session:
-                        content = await generate_activity_content(
-                            session, tenant_id, user_id, "outdoor_game", context
-                        )
-                    outdoor_activity_area.value = content
-                    outdoor_activity_msg.classes(add="text-green-600")
-                    outdoor_activity_msg.text = "✅ 生成完成"
-                except ConfigError as e:
-                    outdoor_activity_msg.classes(add="text-orange-500")
-                    outdoor_activity_msg.text = f"⚠ {e.message}"
-                except (AiCallError, AiParseError) as e:
-                    outdoor_activity_msg.classes(add="text-red-500")
-                    outdoor_activity_msg.text = f"❌ {e.message}"
-                except Exception as e:
-                    outdoor_activity_msg.classes(add="text-red-500")
-                    outdoor_activity_msg.text = f"❌ {type(e).__name__}: {e}"
-                finally:
-                    outdoor_activity_btn.props(remove="loading")
-
-            outdoor_activity_btn = ui.button(
-                "AI 生成", on_click=_gen_outdoor_activity
-            ).classes("bg-purple-600 text-white text-sm mt-2")
 
         # ══════════════════════════════════════════════════════════════════════
         # 区块三-F：一日活动反思

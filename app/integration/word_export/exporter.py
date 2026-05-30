@@ -1,27 +1,65 @@
 """Word 文档导出服务。
 
-使用 python-docx 生成每日活动计划文档（单表格，8 行，2 列）。
+主方案：打开模板 `templates/teacherplan.docx`，按其既有单元格结构填充内容，
+将同一项目的子字段分别写入对应单元格（而非全部塞进一格）。
 
-表格结构：
-  行1  第N周            （整行合并）
-  行2  月 日 周X        （整行合并）
-  行3  晨间活动     | 晨间活动内容
-  行4  晨间谈话     | 谈话主题 + 问题设计
-  行5  集体活动     | 活动目标/准备/重点/难点/过程（差异标红）
-  行6  室内区域活动 | 游戏内容
-  行7  户外游戏活动 | 游戏内容
-  行8  一日活动反思 | （空白，用户手填）
+模板表格结构（19 行 2 列，左列为标题，右列为内容；多行通过纵向合并归属同一标题）：
+
+  R0   第N周                       （整行合并）
+  R1   月 日 周X                   （整行合并）
+  R2   晨间活动 | 体能大循环 / 集体游戏 / 自主游戏
+  R3            | 重点指导 / 活动目标 / 指导要点
+  R4   晨间谈话 | 话题
+  R5            | 问题设计
+  R6   集体活动 | 活动主题
+  R7            | 活动目标
+  R8            | 活动准备
+  R9            | 活动重点
+  R10           | 活动难点
+  R11           | 活动过程（差异标红）
+  R12  室内区域 | 游戏区域
+  R13           | 重点指导 / 活动目标 / 指导要点
+  R14           | 支持策略
+  R15  户外游戏 | 游戏区域
+  R16           | 重点观察 / 活动目标 / 指导要点
+  R17           | 支持策略
+  R18  一日活动反思 | （内容）
+
+若模板文件缺失，降级为从零构建一张简化表格（_export_from_scratch）。
 """
 from io import BytesIO
+from pathlib import Path
 from typing import Any
 
 from docx import Document
 from docx.oxml.ns import qn
 from docx.shared import Pt, RGBColor
 
+from app.core.logging import get_logger
 from app.core.models.daily_plan import DailyPlan
 
+logger = get_logger(__name__)
+
 _RED = RGBColor(0xFF, 0x00, 0x00)
+
+# 模板路径：app/integration/word_export/exporter.py → 上溯 3 层到项目根
+TEMPLATE_PATH = Path(__file__).resolve().parents[3] / "templates" / "teacherplan.docx"
+
+# AI 生成文本中可识别的子字段标签
+_KNOWN_LABELS = (
+    "体能大循环",
+    "集体游戏",
+    "自主游戏",
+    "重点指导",
+    "重点观察",
+    "活动目标",
+    "指导要点",
+    "游戏区域",
+    "支持策略",
+    "谈话主题",
+    "话题",
+    "问题设计",
+)
 
 
 def _set_font(
@@ -44,6 +82,226 @@ def _set_font(
     rFonts.set(qn("w:eastAsia"), "宋体")
 
 
+def _parse_fields(text: str | None) -> dict[str, str]:
+    """将 AI 生成的行结构文本解析为 {标签: 内容} 字典。
+
+    识别形如 "标签：内容" 的行；其后不含标签的行（如编号 1./2./3.）
+    归属上一个标签的内容（以换行拼接）。无法识别的内容被忽略。
+
+    Returns:
+        有序 dict（按出现顺序），键为标签，值为内容（可含换行）。
+    """
+    result: dict[str, str] = {}
+    current: str | None = None
+    for raw in (text or "").splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        matched: str | None = None
+        rest = ""
+        for label in _KNOWN_LABELS:
+            if line.startswith(label + "：") or line.startswith(label + ":"):
+                matched = label
+                rest = line[len(label) + 1:].strip()
+                break
+        if matched:
+            current = matched
+            result[current] = rest
+        elif current is not None:
+            result[current] = (result[current] + "\n" + line).strip("\n")
+    return result
+
+
+def _reset_cell(cell) -> None:
+    """清空单元格内所有段落（保留 tcPr 等属性）。"""
+    for para in list(cell.paragraphs):
+        para._element.getparent().remove(para._element)
+
+
+def _fill_fields_cell(cell, items: list[tuple[str, str]]) -> None:
+    """以 "标签：内容" 形式填充单元格，多个标签各占独立段落。
+
+    Args:
+        cell: 目标单元格。
+        items: [(显示标签, 内容)]，内容可含换行（编号项各占一行）。
+    """
+    _reset_cell(cell)
+    for label, value in items:
+        value = (value or "").strip()
+        lines = value.split("\n") if value else [""]
+        para = cell.add_paragraph()
+        _set_font(para.add_run(f"{label}："), bold=True)
+        if lines[0]:
+            _set_font(para.add_run(lines[0]))
+        for extra in lines[1:]:
+            extra_para = cell.add_paragraph()
+            _set_font(extra_para.add_run(extra))
+    if not cell.paragraphs:
+        cell.add_paragraph()
+
+
+def _fill_plain_cell(cell, text: str, size_pt: float = 11, bold: bool = False) -> None:
+    """清空单元格并写入纯文本（按换行分段）。"""
+    _reset_cell(cell)
+    lines = (text or "").split("\n") or [""]
+    for line in lines:
+        para = cell.add_paragraph()
+        _set_font(para.add_run(line), size_pt=size_pt, bold=bold)
+    if not cell.paragraphs:
+        cell.add_paragraph()
+
+
+def _fill_process_cell(
+    cell,
+    diff_result: list[dict],
+    adapted: str | None,
+) -> None:
+    """填充集体活动「活动过程」单元格，按差异结果标红。"""
+    _reset_cell(cell)
+    para = cell.add_paragraph()
+    _set_font(para.add_run("活动过程："), bold=True)
+    if diff_result:
+        for item in diff_result:
+            color = _RED if item.get("changed") else None
+            _set_font(para.add_run(item.get("text", "")), color=color)
+    elif adapted:
+        _set_font(para.add_run(adapted))
+
+
+def _fill_template(doc: Document, daily_plan: DailyPlan, diff_result: list[dict]) -> None:
+    """按模板既有单元格结构填充各字段。"""
+    table = doc.tables[0]
+    rows = table.rows
+
+    def rcell(idx: int):
+        """右列内容单元格。"""
+        return rows[idx].cells[1]
+
+    # ── R0：第N周（整行合并，写左列即整行）
+    week_text = (
+        f"第 {daily_plan.week_number} 周" if daily_plan.week_number else "第 — 周"
+    )
+    _fill_plain_cell(rows[0].cells[0], week_text, size_pt=14, bold=True)
+
+    # ── R1：月 日 周X（整行合并）
+    d = daily_plan.plan_date
+    date_text = f"{d.month} 月 {d.day} 日  {daily_plan.weekday_cn}" if d else ""
+    _fill_plain_cell(rows[1].cells[0], date_text, size_pt=12, bold=True)
+
+    # ── R2/R3：晨间活动
+    me = _parse_fields(daily_plan.morning_activity)
+    if me:
+        _fill_fields_cell(
+            rcell(2),
+            [
+                ("体能大循环", me.get("体能大循环", "")),
+                ("集体游戏", me.get("集体游戏", "")),
+                ("自主游戏", me.get("自主游戏", "")),
+            ],
+        )
+        _fill_fields_cell(
+            rcell(3),
+            [
+                ("重点指导", me.get("重点指导", "")),
+                ("活动目标", me.get("活动目标", "")),
+                ("指导要点", me.get("指导要点", "")),
+            ],
+        )
+    elif daily_plan.morning_activity:
+        _fill_plain_cell(rcell(2), daily_plan.morning_activity)
+
+    # ── R4/R5：晨间谈话
+    talk = _parse_fields(daily_plan.morning_talk_topic)
+    topic = talk.get("谈话主题") or talk.get("话题")
+    questions = talk.get("问题设计")
+    if topic is None and questions is None:
+        # 旧数据/纯文本：topic 字段存整段，questions 字段单独存
+        topic = daily_plan.morning_talk_topic or ""
+        questions = daily_plan.morning_talk_questions or ""
+    _fill_fields_cell(rcell(4), [("话题", topic or "")])
+    _fill_fields_cell(rcell(5), [("问题设计", questions or "")])
+
+    # ── R6~R11：集体活动
+    _fill_fields_cell(rcell(7), [("活动目标", daily_plan.activity_goal or "")])
+    _fill_fields_cell(rcell(8), [("活动准备", daily_plan.activity_prep or "")])
+    _fill_fields_cell(rcell(9), [("活动重点", daily_plan.activity_key or "")])
+    _fill_fields_cell(rcell(10), [("活动难点", daily_plan.activity_difficult or "")])
+    _fill_process_cell(rcell(11), diff_result, daily_plan.activity_process_adapted)
+
+    # ── R12~R14：室内区域游戏
+    area = _parse_fields(daily_plan.indoor_area)
+    if area:
+        _fill_fields_cell(rcell(12), [("游戏区域", area.get("游戏区域", ""))])
+        _fill_fields_cell(
+            rcell(13),
+            [
+                ("重点指导", area.get("重点指导", "")),
+                ("活动目标", area.get("活动目标", "")),
+                ("指导要点", area.get("指导要点", "")),
+            ],
+        )
+        if area.get("支持策略"):
+            _fill_fields_cell(rcell(14), [("支持策略", area.get("支持策略", ""))])
+    elif daily_plan.indoor_area:
+        _fill_plain_cell(rcell(12), daily_plan.indoor_area)
+
+    # ── R15~R17：户外游戏
+    outdoor = _parse_fields(daily_plan.outdoor_activity)
+    if outdoor:
+        _fill_fields_cell(rcell(15), [("游戏区域", outdoor.get("游戏区域", ""))])
+        _fill_fields_cell(
+            rcell(16),
+            [
+                # AI 输出标签为「重点指导」，模板户外栏标题为「重点观察」
+                ("重点观察", outdoor.get("重点观察") or outdoor.get("重点指导", "")),
+                ("活动目标", outdoor.get("活动目标", "")),
+                ("指导要点", outdoor.get("指导要点", "")),
+            ],
+        )
+        if outdoor.get("支持策略"):
+            _fill_fields_cell(rcell(17), [("支持策略", outdoor.get("支持策略", ""))])
+    elif daily_plan.outdoor_activity:
+        _fill_plain_cell(rcell(15), daily_plan.outdoor_activity)
+
+    # ── R18：一日活动反思
+    if daily_plan.daily_reflection:
+        _fill_plain_cell(rows[18].cells[1], daily_plan.daily_reflection)
+
+
+def export_daily_plan(daily_plan: DailyPlan, diff_result: list[dict]) -> bytes:
+    """生成每日活动计划 Word 文档，返回文档字节流。
+
+    优先使用模板 `templates/teacherplan.docx` 填充其既有单元格；模板缺失或
+    填充异常时降级为从零构建简化表格。
+
+    Args:
+        daily_plan: 数据库中查询到的 DailyPlan 对象。
+        diff_result: 由 diff_service.compute_diff() 计算的差异列表，
+                     格式 [{"text": str, "changed": bool}]。
+                     changed=True 的句子在导出文档中以红色字体显示。
+
+    Returns:
+        Word 文档的 bytes 内容（不写磁盘，由调用方决定存储方式）。
+    """
+    if TEMPLATE_PATH.exists():
+        try:
+            doc = Document(str(TEMPLATE_PATH))
+            _fill_template(doc, daily_plan, diff_result)
+            buf = BytesIO()
+            doc.save(buf)
+            return buf.getvalue()
+        except Exception as exc:  # noqa: BLE001 — 模板异常时降级，保证导出可用
+            logger.warning(
+                "模板填充失败，降级为从零构建",
+                extra={"error": f"{type(exc).__name__}: {exc}"},
+            )
+
+    return _export_from_scratch(daily_plan, diff_result)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 降级方案：从零构建简化表格（模板缺失或填充异常时使用）
+# ──────────────────────────────────────────────────────────────────────────────
 def _write_cell(cell, text: str, size_pt: float = 11, bold: bool = False) -> None:
     """清空单元格，写入纯文本并应用字体样式。"""
     cell.text = text or ""
@@ -57,49 +315,12 @@ def _merge_row(table, row_idx: int) -> None:
     table.rows[row_idx].cells[0].merge(table.rows[row_idx].cells[1])
 
 
-def _write_talk_cell(cell, daily_plan: DailyPlan) -> None:
-    """填充晨间谈话单元格。
-
-    若 morning_talk_questions 为空，则将 morning_talk_topic 作为完整文本
-    直接写入（适用于 AI 一次性生成的合并文本）。
-    否则分两段显示：谈话主题 + 问题设计。
-    """
-    cell.text = ""
-
-    # 模式 A：合并文本（AI 生成，topic 存储完整内容，questions 为空）
-    if daily_plan.morning_talk_topic and not daily_plan.morning_talk_questions:
-        para = cell.paragraphs[0]
-        _set_font(para.add_run(daily_plan.morning_talk_topic))
-        return
-
-    # 模式 B：分字段存储（旧数据兼容）
-    first = True
-    for prefix, content in [
-        ("谈话主题：", daily_plan.morning_talk_topic),
-        ("问题设计：", daily_plan.morning_talk_questions),
-    ]:
-        if not content:
-            continue
-        if first:
-            para = cell.paragraphs[0]
-            first = False
-        else:
-            para = cell.add_paragraph()
-        _set_font(para.add_run(f"{prefix}{content}"))
-
-
 def _build_collective_cell(
     cell,
     daily_plan: DailyPlan,
     diff_result: list[dict],
 ) -> None:
-    """填充集体活动单元格，活动过程按差异结果标红。
-
-    Args:
-        cell: 目标单元格。
-        daily_plan: 教案数据对象。
-        diff_result: 差异列表，格式 [{"text": str, "changed": bool}]。
-    """
+    """填充集体活动单元格，活动过程按差异结果标红。"""
     cell.text = ""
     used_first = False
 
@@ -110,7 +331,6 @@ def _build_collective_cell(
             return cell.paragraphs[0]
         return cell.add_paragraph()
 
-    # 逐字段填充（有内容才写入）
     for label, value in [
         ("活动目标", daily_plan.activity_goal),
         ("活动准备", daily_plan.activity_prep),
@@ -122,7 +342,6 @@ def _build_collective_cell(
             _set_font(p.add_run(f"{label}："), bold=True)
             _set_font(p.add_run(value))
 
-    # 活动过程：优先使用 diff_result 标红，无 diff 时直接输出改写文
     has_adapted = bool(daily_plan.activity_process_adapted)
     if diff_result or has_adapted:
         p = _para()
@@ -135,60 +354,46 @@ def _build_collective_cell(
             _set_font(p.add_run(daily_plan.activity_process_adapted or ""))
 
 
-def export_daily_plan(daily_plan: DailyPlan, diff_result: list[dict]) -> bytes:
-    """生成每日活动计划 Word 文档，返回文档字节流。
-
-    Args:
-        daily_plan: 数据库中查询到的 DailyPlan 对象。
-        diff_result: 由 diff_service.compute_diff() 计算的差异列表，
-                     格式 [{"text": str, "changed": bool}]。
-                     changed=True 的句子在导出文档中以红色字体显示。
-
-    Returns:
-        Word 文档的 bytes 内容（不写磁盘，由调用方决定存储方式）。
-    """
+def _export_from_scratch(daily_plan: DailyPlan, diff_result: list[dict]) -> bytes:
+    """从零构建简化单表格文档（8 行 2 列），作为模板缺失时的兜底方案。"""
     doc = Document()
-
-    # 删除 Document() 创建时自动生成的空段落
     for para in list(doc.paragraphs):
         para._element.getparent().remove(para._element)
 
-    # 创建 2 列 8 行表格，使用内置表格网格样式
     table = doc.add_table(rows=8, cols=2)
     table.style = "Table Grid"
 
-    # ── 行 1：第N周（整行合并）
     _merge_row(table, 0)
-    week_text = f"第 {daily_plan.week_number} 周" if daily_plan.week_number else "第 — 周"
+    week_text = (
+        f"第 {daily_plan.week_number} 周" if daily_plan.week_number else "第 — 周"
+    )
     _write_cell(table.rows[0].cells[0], week_text, size_pt=14, bold=True)
 
-    # ── 行 2：月 日 周X（整行合并）
     _merge_row(table, 1)
     d = daily_plan.plan_date
     date_text = f"{d.month} 月 {d.day} 日  {daily_plan.weekday_cn}" if d else ""
     _write_cell(table.rows[1].cells[0], date_text, size_pt=12, bold=True)
 
-    # ── 行 3：晨间活动
     _write_cell(table.rows[2].cells[0], "晨间活动", bold=True)
     _write_cell(table.rows[2].cells[1], daily_plan.morning_activity or "")
 
-    # ── 行 4：晨间谈话
     _write_cell(table.rows[3].cells[0], "晨间谈话", bold=True)
-    _write_talk_cell(table.rows[3].cells[1], daily_plan)
+    talk = "\n".join(
+        t
+        for t in [daily_plan.morning_talk_topic, daily_plan.morning_talk_questions]
+        if t
+    )
+    _write_cell(table.rows[3].cells[1], talk)
 
-    # ── 行 5：集体活动（含差异标注的活动过程）
     _write_cell(table.rows[4].cells[0], "集体活动", bold=True)
     _build_collective_cell(table.rows[4].cells[1], daily_plan, diff_result)
 
-    # ── 行 6：室内区域活动
     _write_cell(table.rows[5].cells[0], "室内区域活动", bold=True)
     _write_cell(table.rows[5].cells[1], daily_plan.indoor_area or "")
 
-    # ── 行 7：户外游戏活动
     _write_cell(table.rows[6].cells[0], "户外游戏活动", bold=True)
     _write_cell(table.rows[6].cells[1], daily_plan.outdoor_activity or "")
 
-    # ── 行 8：一日活动反思（留空白，用户手填）
     _write_cell(table.rows[7].cells[0], "一日活动反思", bold=True)
     _write_cell(table.rows[7].cells[1], daily_plan.daily_reflection or "")
 
