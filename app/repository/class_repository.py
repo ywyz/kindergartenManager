@@ -61,3 +61,21 @@ async def upsert_class_config(
     session.add(record)
     await session.flush()
     return record
+
+
+async def list_class_configs(
+    session: AsyncSession,
+    tenant_id: int,
+    *,
+    user_id: int | None = None,
+) -> list[ClassConfig]:
+    """按租户（可选用户）查询班级配置列表，按更新时间降序。"""
+    conditions = [ClassConfig.tenant_id == tenant_id]
+    if user_id is not None:
+        conditions.append(ClassConfig.user_id == user_id)
+    result = await session.execute(
+        select(ClassConfig)
+        .where(*conditions)
+        .order_by(ClassConfig.updated_at.desc())
+    )
+    return list(result.scalars().all())

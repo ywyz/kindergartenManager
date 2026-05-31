@@ -150,12 +150,44 @@ GENERATE_DEFAULTS: dict[str, str] = {
 }
 
 
+def _build_prefix(context: dict) -> str:
+    """构建消息开头的班级与教学周信息。
+
+    context 支持 grade、class_name、week_number、weekday 字段；
+    week_number / weekday 缺失时不输出对应行。
+    """
+    grade = context.get("grade", "")
+    class_name = context.get("class_name", "")
+    prefix = f"班级：{grade}{class_name}\n"
+
+    week_number = context.get("week_number")
+    weekday = context.get("weekday", "")
+    if week_number is not None and weekday:
+        prefix += f"教学周：第{week_number}周 {weekday}\n"
+    elif week_number is not None:
+        prefix += f"教学周：第{week_number}周\n"
+    elif weekday:
+        prefix += f"教学周：{weekday}\n"
+    return prefix
+
+
+def _holiday_hint(context: dict) -> str:
+    """当 near_holiday 为 True 时返回临近节假日提示行，否则返回空字符串。
+
+    near_holiday 取值：True 表示明日为法定节假日；False / None 不提示。
+    """
+    if context.get("near_holiday") is True:
+        return "提示：明日为法定节假日，可在活动中适当融入节日主题元素。\n"
+    return ""
+
+
 def _build_user_content(task_type: str, context: dict) -> str:
     """根据任务类型和上下文构建发送给 AI 的用户消息。
 
     context 支持以下字段：
         grade, class_name, activity_goal, activity_process,
         indoor_areas, outdoor_content,
+        week_number, weekday, near_holiday,
         morning_activity, morning_talk, indoor_area, outdoor_activity
         content (通用原始文本，用于测试模式)
     """
@@ -163,30 +195,29 @@ def _build_user_content(task_type: str, context: dict) -> str:
     if "content" in context:
         return context["content"]
 
-    grade = context.get("grade", "")
-    class_name = context.get("class_name", "")
     activity_goal = context.get("activity_goal", "")
     activity_process = context.get("activity_process", "")
 
-    prefix = f"班级：{grade}{class_name}\n"
+    prefix = _build_prefix(context)
+    hint = _holiday_hint(context)
 
     if task_type == "morning_exercise":
         return (
-            f"{prefix}"
+            f"{prefix}{hint}"
             f"今日教案活动目标：{activity_goal or '（未填写）'}\n"
             f"今日活动过程：{activity_process or '（未填写）'}\n"
             "请设计今日晨间活动方案。"
         )
     if task_type == "morning_talk":
         return (
-            f"{prefix}"
+            f"{prefix}{hint}"
             f"今日教案活动目标：{activity_goal or '（未填写）'}\n"
             "请设计今日晨间谈话方案。"
         )
     if task_type == "area_game":
         indoor_areas = context.get("indoor_areas", "")
         return (
-            f"{prefix}"
+            f"{prefix}{hint}"
             f"可用室内游戏区域：{indoor_areas or '（未配置，请自行选择合适区域）'}\n"
             f"今日教案活动目标：{activity_goal or '（未填写）'}\n"
             f"今日活动过程：{activity_process or '（未填写）'}\n"
@@ -195,7 +226,7 @@ def _build_user_content(task_type: str, context: dict) -> str:
     if task_type == "outdoor_game":
         outdoor_content = context.get("outdoor_content", "")
         return (
-            f"{prefix}"
+            f"{prefix}{hint}"
             f"可用户外区域：{outdoor_content or '（未配置，请自行选择合适区域）'}\n"
             f"今日教案活动目标：{activity_goal or '（未填写）'}\n"
             "请设计今日户外游戏方案。"

@@ -2,7 +2,7 @@
 
 from datetime import date, datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models.daily_plan import DailyPlan
@@ -86,3 +86,60 @@ async def get_daily_plan_by_date(
     )
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
+
+
+async def get_daily_plan_by_id(
+    session: AsyncSession,
+    tenant_id: int,
+    plan_id: int,
+) -> DailyPlan | None:
+    """按主键查询每日计划，并强制携带 tenant_id 过滤防止跨租户读取。"""
+    stmt = select(DailyPlan).where(
+        DailyPlan.id == plan_id,
+        DailyPlan.tenant_id == tenant_id,
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def list_daily_plans(
+    session: AsyncSession,
+    tenant_id: int,
+    *,
+    user_id: int | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    grade: str | None = None,
+    class_name: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[DailyPlan], int]:
+    """按条件分页查询每日计划，返回 (records, total)。
+
+    所有查询强制携带 tenant_id 过滤；其余条件按需叠加。
+    按 plan_date 降序、id 降序排列，保证结果稳定。
+    """
+    conditions = [DailyPlan.tenant_id == tenant_id]
+    if user_id is not None:
+        conditions.append(DailyPlan.user_id == user_id)
+    if start_date is not None:
+        conditions.append(DailyPlan.plan_date >= start_date)
+    if end_date is not None:
+        conditions.append(DailyPlan.plan_date <= end_date)
+    if grade:
+        conditions.append(DailyPlan.grade == grade)
+    if class_name:
+        conditions.append(DailyPlan.class_name == class_name)
+
+    total_stmt = select(func.count()).select_from(DailyPlan).where(*conditions)
+    total = (await session.execute(total_stmt)).scalar_one()
+
+    list_stmt = (
+        select(DailyPlan)
+        .where(*conditions)
+        .order_by(DailyPlan.plan_date.desc(), DailyPlan.id.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    records = list((await session.execute(list_stmt)).scalars().all())
+    return records, total

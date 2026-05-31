@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.audit import log_audit
 from app.core.exceptions import ConfigError
 from app.core.logging import get_logger
 from app.integration.ai_client.adapt_client import adapt_activity_process
@@ -138,6 +139,7 @@ async def process_lesson_plan(
             "diff_changed_count": sum(1 for d in diff_result if d["changed"]),
         },
     )
+    log_audit("ai_split", tenant_id=tenant_id, user_id=user_id, grade=grade)
 
     return LessonPlanResult(
         activity_goal=split_result["activity_goal"],

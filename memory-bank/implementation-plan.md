@@ -687,7 +687,7 @@ system prompt 从 `app/repository/prompt_repository.py` 查询当前激活版本
 
 ## 阶段 8：收尾与稳定性
 
-### Step 8.1 — 全局异常处理与日志审计
+### Step 8.1 — 全局异常处理与日志审计 ✅
 
 **指令**
 在 `app/core/exceptions.py` 中确认已定义：`AuthError`、`AiCallError`、`AiParseError`、`CryptoError`、`ConfigError`。
@@ -703,7 +703,7 @@ system prompt 从 `app/repository/prompt_repository.py` 查询当前激活版本
 
 ---
 
-### Step 8.2 — 路由守卫（未登录跳转）
+### Step 8.2 — 路由守卫（未登录跳转） ✅
 
 **指令**
 在 `app/auth/middleware.py` 中实现路由守卫：
@@ -718,7 +718,7 @@ system prompt 从 `app/repository/prompt_repository.py` 查询当前激活版本
 
 ---
 
-### Step 8.3 — 运行全量测试
+### Step 8.3 — 运行全量测试 ✅
 
 **指令**
 运行 `pytest tests/ -v --tb=short`，所有测试用例必须全部通过，零失败、零错误。
@@ -730,7 +730,7 @@ system prompt 从 `app/repository/prompt_repository.py` 查询当前激活版本
 
 ---
 
-### Step 8.4 — 更新 architecture.md
+### Step 8.4 — 更新 architecture.md ✅
 
 **指令**
 在 `memory-bank/` 目录创建（或更新）`architecture.md`，记录：

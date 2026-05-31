@@ -16,7 +16,9 @@ from nicegui import app, ui
 
 from app.auth.jwt import decode_access_token
 from app.core.database import AsyncSessionLocal
+from app.core.audit import log_audit
 from app.core.exceptions import AiCallError, AiParseError, ConfigError
+from app.integration.holiday_client.client import is_near_holiday
 from app.integration.word_export.exporter import export_daily_plan
 from app.repository.class_repository import get_class_config
 from app.repository.daily_plan_repository import (
@@ -253,11 +255,20 @@ async def daily_plan_page() -> None:
                 )
                 gen_all_msg.text = "AI 生成中，请稍候……"
 
+                # 查询是否临近法定节假日（API 失败返回 None，静默忽略不阻断生成）
+                try:
+                    near_holiday = await is_near_holiday(state["selected_date"])
+                except Exception:
+                    near_holiday = None
+
                 base_ctx = {
                     "grade": state["grade"],
                     "class_name": state["class_name"],
                     "activity_goal": goal_area.value,
                     "activity_process": adapted_area.value or original_area.value,
+                    "week_number": state["week_number"],
+                    "weekday": state["weekday_cn"],
+                    "near_holiday": near_holiday,
                 }
                 # 每项任务：(task_type, 额外 context, 目标 textarea, 状态 label, 名称)
                 tasks = [
@@ -570,6 +581,13 @@ async def daily_plan_page() -> None:
                     # 触发浏览器下载
                     ui.download(doc_bytes, filename=filename)
 
+                    log_audit(
+                        "export_word",
+                        tenant_id=tenant_id,
+                        user_id=user_id,
+                        daily_plan_id=plan.id,
+                        file_name=filename,
+                    )
                     export_msg.classes(add="text-green-600")
                     export_msg.text = f"✅ 已导出：{filename}"
 

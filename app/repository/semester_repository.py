@@ -60,3 +60,24 @@ async def upsert_active_semester(
     session.add(record)
     await session.flush()
     return record
+
+
+async def list_semesters(
+    session: AsyncSession,
+    tenant_id: int,
+    *,
+    user_id: int | None = None,
+    active_only: bool = False,
+) -> list[SemesterConfig]:
+    """按租户（可选用户）查询学期配置列表，按更新时间降序。"""
+    conditions = [SemesterConfig.tenant_id == tenant_id]
+    if user_id is not None:
+        conditions.append(SemesterConfig.user_id == user_id)
+    if active_only:
+        conditions.append(SemesterConfig.is_active.is_(True))
+    result = await session.execute(
+        select(SemesterConfig)
+        .where(*conditions)
+        .order_by(SemesterConfig.updated_at.desc())
+    )
+    return list(result.scalars().all())

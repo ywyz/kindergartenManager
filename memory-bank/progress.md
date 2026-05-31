@@ -501,3 +501,146 @@ cp .env.example .env
    - Step 8.2 关键操作审计日志（AI 调用 / 导出 / 账号变更 / 权限变更）。
 4. 验收通过后合并 `dev2.0` → `main`。
 
+---
+
+## 2026-05-31（阶段 7 收尾：near_holiday 接入 + 补单元测试）
+
+### 背景
+
+Step 6 Word 导出手测通过。阶段 7「一键生成一日活动」核心已实现，但存在两个收尾缺口：
+1. `near_holiday`（临近节假日）上下文未接入生成流程。
+2. `generate_client` / `generate_service` / `export_repository` 三个模块缺单元测试（违反「每个 service 函数必须有测试」约定）。
+
+本轮补齐这两项，使阶段 7 真正闭环。（用户不在场，自主决策：范围=阶段 7 收尾，near_holiday=接入，补测试=补齐；阶段 8 留作后续。）
+
+### 已完成
+
+- **near_holiday 上下文接入** — `app/integration/ai_client/generate_client.py`：
+  - 抽出 `_build_prefix(context)`：拼接「班级：年级班名」+「教学周：第N周 周X」（`week_number`/`weekday` 缺失时不输出对应行）。
+  - 新增 `_holiday_hint(context)`：`near_holiday is True` 时返回「提示：明日为法定节假日，可在活动中适当融入节日主题元素。」，`False`/`None`/缺失返回空字符串。
+  - `_build_user_content` 改为消费 `week_number`/`weekday`/`near_holiday`；提示行注入 morning_exercise / morning_talk / area_game / outdoor_game 四类，**daily_reflection 不注入**（反思针对已发生活动，无需节日预告）。
+  - 更新 docstring context 字段说明。
+
+- **页面接入** — `app/ui/pages/daily_plan.py`：
+  - `_gen_all_daily` 在并发 `asyncio.gather` 前 `await is_near_holiday(selected_date)` 取一次；用 `try/except` 包裹，API 失败/异常返回 `None` 静默忽略，不阻断生成。
+  - `base_ctx` 新增 `week_number`（来自 `state["week_number"]`，由学期 start_date 计算）、`weekday`（`state["weekday_cn"]`）、`near_holiday` 三字段。
+  - 新增 `from app.integration.holiday_client.client import is_near_holiday` 导入。
+
+- **补单元测试**（之前缺失）：
+  - `tests/test_generate_client.py`（新，22 项）：`_build_prefix` 教学周拼接、`_holiday_hint` True/False/None/缺失、`_build_user_content` 测试直通 + 4 类注入提示 + daily_reflection 不注入 + 非注入场景 + 区域/户外字段 + 未知类型兜底、`generate_activity` 5 类正常返回 + 自定义 prompt + 不支持类型抛 `AiParseError`、`GENERATE_DEFAULTS` 覆盖 5 类。
+  - `tests/test_generate_service.py`（新，3 项）：默认提示词（system_prompt=None）、DB 激活提示词覆盖、无 AI Key 抛 `ConfigError`（mock AI Key/prompt 仓库与 `generate_activity`）。
+  - `tests/test_export_repository.py`（新，3 项）：`save_export_record` 字段持久化、`daily_plan_id` 可为 None、tenant 隔离查询（SQLite 内存库 `async_session` fixture）。
+
+### 全量测试结果
+
+- **192 passed, 0 failed, 0 warnings**（Python 3.14.4）（较上轮 152 +40 新用例）。
+- Alembic head 不变：`d60766786069`（本轮无 schema 变更）。
+
+### 待手工验收
+
+1. `/daily-plan` 选一个「法定节假日前一天」→ 一键生成 → AI 输出体现节日主题元素。
+2. 选普通工作日 → 生成正常且无节日提示。
+3. 节假日 API 故障时（断网/超时）→ 生成不受阻、不报错。
+
+### 下一步
+
+1. 上述手工验收，记录反馈。
+2. **阶段 8 收尾**：
+   - Step 8.1 全局异常处理与日志审计（`app/main.py` 注册 NiceGUI/FastAPI 异常处理）。
+   - Step 8.2 路由守卫 middleware（抽出各页面手写的登录保护）+ 关键操作审计日志（AI 调用 / 导出 / 账号变更 / 权限变更）。
+3. Step 8.3 全量回归 + Step 8.4 architecture 终版，验收通过后合并 `dev2.0` → `main`。
+
+---
+
+## 2026-05-31（阶段 8 收尾：全局异常处理 + 路由守卫 + 审计日志）
+
+### 背景
+
+阶段 7 闭环后，进入阶段 8 稳定性与安全加固。三项收尾：全局异常处理、路由守卫中间件、关键操作审计日志。（用户授权自主决策，无 schema 变更。）
+
+### 已完成
+
+- **Step 8.1 全局异常处理与审计日志**：
+  - `app/core/audit.py`（新）：`log_audit(action, *, tenant_id=None, user_id=None, **detail)` — 基于 `get_logger("audit")` 的结构化审计日志；内部 `try/except` 包裹，审计失败静默 pass，绝不影响主流程。
+  - `app/main.py`：`from nicegui import app, ui`；新增 `_on_global_exception(exc)` 记录未捕获异常（ERROR + `error_type`/`error_message`/`exc_info`）；`main()` 中 `app.on_exception(_on_global_exception)`。
+  - 审计接入点：
+    - `auth_service.login` → `login_success`（含 role）；`auth_service.change_password` → `change_password`。
+    - `lesson_plan_service.process_lesson_plan` → `ai_split`（含 grade）。
+    - `generate_service.generate_activity_content` → `ai_generate`（含 task_type）。
+    - `daily_plan._export_word` → `export_word`（含 daily_plan_id、file_name）。
+
+- **Step 8.2 路由守卫中间件**：
+  - `app/auth/middleware.py`（新）：`AuthMiddleware(BaseHTTPMiddleware)` — 受限页面路由校验 `app.storage.user` 中 JWT token，无效则清空 storage 并 `RedirectResponse("/")`；非页面路由（静态资源 / `_nicegui`）放行；白名单 `UNRESTRICTED_PAGE_ROUTES = {"/"}`。
+  - `app/main.py`：`app.add_middleware(AuthMiddleware)`。
+  - 各页面原有手写 `_get_current_user()` 登录保护**保留**作为纵深防御（defense-in-depth）。
+
+### 补单元测试
+
+- `tests/test_audit.py`（新，3 项）：结构化字段写入、ids 默认 None、审计调用永不抛异常（mock `app.core.audit._logger`）。
+- `tests/test_middleware.py`（新，5 项）：白名单路由放行、无 token 重定向、有效 token 放行、无效 token（AuthError）重定向、中间件可实例化（mock `app` 与 `decode_access_token`）。
+
+### 全量测试结果
+
+- **200 passed, 0 failed, 0 warnings**（Python 3.14.4）（较上轮 192 +8：test_audit ×3 + test_middleware ×5）。
+- `import app.main` 校验通过（中间件接线无误）。
+- Alembic head 不变：`d60766786069`（本轮无 schema 变更）。
+
+### 手工验收进度（2026-05-31 更新）
+
+1. ✅ **已通过**：未登录直接访问 `/daily-plan`、`/settings`、`/prompts` → 自动重定向回 `/`。
+2. ✅ **已通过**：登录后正常访问受限页面；退出登录后再访问受限页面 → 重定向回 `/`。
+3. ⏳ **未验收**：触发登录 / 改密 / AI 拆分 / 一日活动生成 / 导出 → 日志中出现对应 audit 记录（结构化字段含 tenant_id/user_id）。
+4. ⏳ **未验收**：制造未捕获异常 → 全局异常处理记录完整 traceback。
+
+> 前两项（路由守卫）已手工验收通过；后两项（审计日志落盘、全局异常 traceback）待后续验收。
+
+### 下一步
+
+- 完成审计日志与全局异常 traceback 两项手工验收。
+- 验收通过后合并 `dev2.0` → `main`（M2 里程碑「首期闭环可用」）。
+
+---
+
+## 2026-05-31（二期前置：对外只读 REST API + 项目文档）
+
+### 背景
+
+本系统为「幼儿园信息管理主系统」的子系统。应用户要求，在首期闭环基础上提前落地二期的对外 REST API（PRD 2.2 / 阶段 6），供主系统读取教学计划数据，并补齐项目 README 与开发者文档。
+
+### 对外 API 分析与设计
+
+子系统对外的核心价值是**只读**输出教学计划数据，故 v1 仅提供 GET 端点：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/v1/health` | 健康检查（免鉴权） |
+| GET | `/api/v1/daily-plans` | 分页查询每日活动计划（支持 user_id/start_date/end_date/grade/class_name/limit/offset 过滤） |
+| GET | `/api/v1/daily-plans/{id}` | 按 ID 查询单条计划（强制 tenant 隔离，跨租户返回 404） |
+| GET | `/api/v1/semesters` | 查询学期配置（支持 active_only） |
+| GET | `/api/v1/classes` | 查询班级配置 |
+
+**鉴权**：`X-Api-Key`（必填，配置 `API_KEYS="key:tenant_id"` 映射，每 Key 绑定唯一租户实现隔离）+ 可选 HMAC-SHA256 签名（配置 `API_SIGNING_SECRET` 时强制，校验 `X-Timestamp`/`X-Signature`，时间戳偏移 `API_SIGNATURE_MAX_SKEW` 秒内防重放）。未配置 `API_KEYS` 时对外接口默认关闭（401）。
+
+### 已完成
+
+- **新增 `app/api/` 模块**：`__init__.py`（`create_api_router`）、`auth.py`（API Key + 签名鉴权）、`deps.py`（`get_db`）、`schemas.py`（Pydantic 只读响应模型，不含密钥/密码）、`routes.py`（v1 路由）。
+- **配置**：`app/core/config.py` 新增 `API_KEYS` / `API_SIGNING_SECRET` / `API_SIGNATURE_MAX_SKEW`。
+- **仓库层只读查询**：`daily_plan_repository.list_daily_plans` / `get_daily_plan_by_id`、`semester_repository.list_semesters`、`class_repository.list_class_configs`，均强制 `tenant_id` 过滤。
+- **入口注册**：`app/main.py` 在 `main()` 中 `app.include_router(create_api_router())`；AuthMiddleware 仅拦截页面路由，`/api/*` 放行。
+- **模型修正**：`DailyPlan.id` 补 `.with_variant(Integer, "sqlite")`（与其余模型一致），修复 SQLite 测试自增；MySQL 仍为 BigInteger，**无 schema 变更**。
+- **文档**：新增 `README.md`（项目说明/快速开始/结构）、`docs/DEVELOPER.md`（开发者指南）、`docs/API.md`（对外 API 参考）；更新 `architecture.md`（app/api 职责 + 二期 API 章节）。
+
+### 测试
+
+- 新增 `tests/test_api_auth.py`（12 项：parse_api_keys、verify_signature 各场景）、`tests/test_api_routes.py`（16 项：鉴权放行/拒绝、租户隔离、分页/过滤、按 ID 查询、404、学期/班级、HMAC 签名校验，基于 httpx ASGITransport + SQLite 内存库）。
+- 全量：**228 passed, 0 warnings**（较上轮 200 +28）。
+- `import app.main` + `create_api_router()` 校验通过，路由含 5 个端点。
+- Alembic head 不变：`d60766786069`（本轮无 schema 变更）。
+
+### 下一步
+
+- 完成阶段 8 后两项手工验收（审计日志 / 异常 traceback）。
+- 推送 `dev2.0` 并合并 → `main`（M2 里程碑）。
+- 生产启用对外 API 前：在 `.env` 配置 `API_KEYS`（建议同时配置 `API_SIGNING_SECRET`），并经反向代理限制来源。
+
+

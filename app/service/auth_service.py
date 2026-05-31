@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import create_access_token
 from app.auth.password import hash_password, verify_password
+from app.core.audit import log_audit
 from app.core.exceptions import AuthError
 from app.repository.user_repository import (
     get_user_by_id,
@@ -33,6 +34,12 @@ async def login(
     if user is None or not user.is_active or not verify_password(password, user.hashed_password):
         raise AuthError("用户名或密码错误")
 
+    log_audit(
+        "login_success",
+        tenant_id=user.tenant_id,
+        user_id=user.id,
+        role=user.role.value,
+    )
     return create_access_token(
         user_id=user.id,
         tenant_id=user.tenant_id,
@@ -56,3 +63,4 @@ async def change_password(
         raise AuthError("旧密码不正确")
 
     await update_password(session, user_id=user_id, new_hashed_password=hash_password(new_password))
+    log_audit("change_password", tenant_id=tenant_id, user_id=user_id)

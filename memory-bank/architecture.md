@@ -2,7 +2,7 @@
 
 ## 1. 当前阶段
 
-- 项目阶段：M1 进行中（阶段 0/1/2/3 已完成）
+- 项目阶段：M2/M3 已完成（阶段 0~8 全部完成）；二期对外只读 REST API 已落地。
 - 开发策略：先架构后编码；每完成一个步骤同步更新本文件与 progress.md
 
 ## 2. 业务与权限边界（已确认）
@@ -49,14 +49,14 @@
 |------|------|
 | `app/` | 应用根包，所有业务代码入口 |
 | `app/ui/` | NiceGUI 页面与组件，每个页面独立文件（如 `pages/login.py`、`components/date_panel.py`）；禁止在此层做权限逻辑 |
-| `app/api/` | 预留：首期不实现，二期对外 REST API 放此处 |
+| `app/api/` | 对外只读 REST API（二期）：`/api/v1` 路由、API Key + 可选 HMAC 签名鉴权；供子系统（幼儿园信息管理主系统）读取教学计划数据 |
 | `app/service/` | 业务逻辑层：教案拆分协调、年龄适配、差异比对、日期计算、登录逻辑等；不直接发 HTTP 请求 |
 | `app/repository/` | 数据访问层：封装所有 SQL 查询，返回模型对象；所有查询必须携带 `tenant_id` 过滤条件 |
 | `app/integration/ai_client/` | OpenAI 兼容接口封装：`httpx` + `tenacity` 重试，强约束 JSON schema，解析失败抛出 `AiParseError` |
 | `app/integration/holiday_client/` | 中国法定节假日 API 调用：带内存缓存（当天有效），API 失败时返回 `None` 降级，不阻断主流程 |
 | `app/integration/word_export/` | Word 导出：`python-docx` 主方案，严格依照 `templates/teacherplan.docx` 结构，差异段落标红 |
-| `app/auth/` | JWT 生成/验证、RBAC 权限校验、密码哈希（Argon2）；权限逻辑统一在此层，不下沉到 UI |
-| `app/core/` | 配置（`pydantic-settings`）、日志（JSON 结构化）、数据库连接（`AsyncEngine`）、异常定义、常量、加密工具 |
+| `app/auth/` | JWT 生成/验证、RBAC 权限校验、密码哈希（Argon2）、路由守卫中间件（`middleware.py`）；权限逻辑统一在此层，不下沉到 UI |
+| `app/core/` | 配置（`pydantic-settings`）、日志（JSON 结构化）、审计日志（`audit.py`）、数据库连接（`AsyncEngine`）、异常定义、常量、加密工具 |
 | `app/jobs/` | APScheduler 定时任务（如缓存清理、审计归档等） |
 | `alembic/` | 数据库迁移脚本（Alembic），所有 schema 变更必须通过此处，禁止应用启动时 `create_all()` |
 | `tests/` | pytest 测试，每个 service 函数必须有单元测试；AI/Word/数据库操作用 mock/fixture 隔离 |
@@ -240,7 +240,7 @@ type 值：0=工作日，1=周末，2=法定节假日，3=调班工作日。
 |------|------|
 | `app/core/models/prompt_template.py` | `PromptTemplate` ORM 模型；联合索引 `(tenant_id, user_id, task_type)` |
 | `app/repository/prompt_repository.py` | `get_active_prompt` / `save_new_version` / `rollback_to_version` / `list_versions` 四个异步函数 |
-| `app/integration/ai_client/generate_client.py` | 5 种一日活动类型的内置默认提示词；`GENERATE_DEFAULTS: dict[str, str]` 供服务层查取 |
+| `app/integration/ai_client/generate_client.py` | 5 种一日活动类型的内置默认提示词；`GENERATE_DEFAULTS: dict[str, str]` 供服务层查取；`_build_prefix`（班级 + 教学周）/`_holiday_hint`（near_holiday=True 注入临近节假日提示，daily_reflection 不注入）；`_build_user_content` 消费 `week_number`/`weekday`/`near_holiday` |
 | `app/integration/ai_client/lesson_plan_client.py` | `DEFAULT_SPLIT_PROMPT` 追加格式约束（禁 Markdown / 无数字编号换行 / 无多余空行）；KI-01 修复 |
 | `app/integration/ai_client/adapt_client.py` | `DEFAULT_ADAPT_PROMPT` 追加格式约束（禁 Markdown / 纯文本 / 标点约束）；KI-01 修复 |
 | `app/service/lesson_plan_service.py` | `process_lesson_plan()` 新增：`split_system_prompt` / `adapt_system_prompt` 为 None 时先查 DB 激活版本，有则覆盖 |
@@ -284,4 +284,30 @@ compute_diff(original, adapted) -> list[{"text": str, "changed": bool}]
 # 教案拆分服务（编排入口）
 process_lesson_plan(session, tenant_id, user_id, raw_text, grade, *, split_system_prompt, adapt_system_prompt, _ai_client) -> LessonPlanResult
 ```
+
+### 阶段 8：收尾与稳定性
+
+| 文件 | 职责 |
+|------|------|
+| `app/auth/middleware.py` | `AuthMiddleware`（`BaseHTTPMiddleware`）路由守卫：受限页面校验 `app.storage.user` 中 JWT token，无效则清空 storage 重定向 `/`；非页面路由（静态资源/`_nicegui`）放行；白名单 `UNRESTRICTED_PAGE_ROUTES = {"/"}` |
+| `app/core/audit.py` | `log_audit(action, *, tenant_id, user_id, **detail)` 结构化审计日志（logger 名 `audit`）；接入点：login_success / change_password（auth_service）、ai_split（lesson_plan_service）、ai_generate（generate_service）、export_word（daily_plan 页面）；审计调用绝不抛异常 |
+| `app/main.py` | `app.on_exception(_on_global_exception)` 记录未捕获异常（ERROR + traceback）；`app.add_middleware(AuthMiddleware)` 注册路由守卫 |
+
+**异常体系**（`app/core/exceptions.py`）：`AuthError`、`CryptoError`、`ConfigError`、`AiCallError`、`AiParseError`（均带 `message` 属性）。页面层捕获业务异常展示友好提示（`e.message`），不暴露堆栈；未预期异常由 `app.on_exception` 记录完整 traceback。
+
+### 二期：对外只读 REST API
+
+作为「幼儿园信息管理主系统」的子系统，本模块对外提供教学计划数据的**只读** REST API（路由前缀 `/api/v1`）。
+
+| 文件 | 职责 |
+|------|------|
+| `app/api/__init__.py` | `create_api_router()` 组装并返回对外路由，由 `app/main.py` 的 `app.include_router()` 注册 |
+| `app/api/auth.py` | `ApiPrincipal`、`get_api_principal`（FastAPI 依赖）、`parse_api_keys`、`verify_signature`；API Key 必填（映射 key→tenant_id）+ 可选 HMAC-SHA256 签名（配置 `API_SIGNING_SECRET` 时强制） |
+| `app/api/deps.py` | `get_db` 异步会话依赖（可被测试 `dependency_overrides` 覆盖） |
+| `app/api/schemas.py` | Pydantic 响应模型（`DailyPlanOut`/`DailyPlanListOut`/`SemesterOut`/`ClassConfigOut`/`HealthOut`/`PageMeta`），**不暴露密钥/密码** |
+| `app/api/routes.py` | v1 路由：`GET /health`（免鉴权）、`GET /daily-plans`（分页+过滤）、`GET /daily-plans/{id}`、`GET /semesters`、`GET /classes` |
+
+**租户隔离**：每个 API Key 绑定唯一 `tenant_id`，所有业务查询以鉴权得到的 `tenant_id` 为强制过滤条件，调用方无法越权读取其他租户数据。**未配置** `API_KEYS` 时对外接口默认关闭（返回 401）。详见 [docs/API.md](../docs/API.md)。
+
+仓库层新增只读查询：`daily_plan_repository.list_daily_plans` / `get_daily_plan_by_id`、`semester_repository.list_semesters`、`class_repository.list_class_configs`——均强制携带 `tenant_id` 过滤。
 

@@ -6,6 +6,7 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.audit import log_audit
 from app.core.exceptions import ConfigError
 from app.core.logging import get_logger
 from app.integration.ai_client.generate_client import generate_activity
@@ -72,5 +73,11 @@ async def generate_activity_content(
     logger.info(
         "活动内容生成完成",
         extra={"task_type": task_type, "length": len(result)},
+    )
+    log_audit(
+        "ai_generate",
+        tenant_id=tenant_id,
+        user_id=user_id,
+        task_type=task_type,
     )
     return result
