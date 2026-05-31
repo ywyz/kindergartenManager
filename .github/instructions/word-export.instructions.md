@@ -1,33 +1,59 @@
 ---
-description: "Use when modifying Word export logic, changing docx template filling, fixing font colors, or adding export functions in word_export.py."
-applyTo: "app/services/word_export.py"
+applyTo: "app/integration/word_export/**"
 ---
-# Word Export Conventions
 
-## Template structure
-The Word template (`templates/teacherplan.docx`) contains a single table. Rows are accessed by fixed index (`t.rows[N].cells[1]`). See `export_daily_plan_word()` for the row-to-field mapping (Row 0 = week, Row 1 = date, Row 2-3 = morning activity, etc.).
+# Word 文档导出约定
 
-## Filling helpers
-| Helper | Use case |
-|---|---|
-| `_fill_labeled_para(para, content, is_red)` | Single-label paragraph (finds colon, fills after it) |
-| `_fill_multiline_cell(cell, fields)` | Multi-label cell (matches label keywords across paragraphs) |
-| `_fill_process_cell(cell, text, use_ai_color)` | Activity process only — section-based AI tag coloring |
-| `_set_cell_text(cell, text)` | Simple full-cell replacement |
+## 技术选型
 
-## Red text coloring
-- AI-modified fields are tracked in `plan.ai_modified_parts["fields"]`.
-- `_fill_process_cell` colors entire sections red when the section header contains `【AI修改】` or `【AI新增】` tags.
-- **Known limitation**: python-docx run-level coloring may not render correctly in all Word versions. The logic is correct at the XML level but visual results can be inconsistent. Do not attempt to fix this with paragraph-level or cell-level formatting — it makes things worse.
+- **主方案**：`python-docx`（直接操控 Open XML，支持精准表格定位与字体颜色）
+- **备方案**：`docxtpl`（仅在主方案无法满足模板需求时切换，需说明理由）
 
-## File naming
-- Single export: `{grade}{class}_{YYYY-MM-DD}_{第N周周X}.docx`
-- Merged batch: `{author}备课笔记.docx`
+## Word 模板表格结构（固定，不得自行发明字段）
 
-## Merged export
-`export_merged_plans(plans, author_name)` uses `copy.deepcopy` of each sub-document's table XML, joined by page breaks. Do not use `docxcompose` or similar libraries — the current approach avoids style conflicts.
+| 行 | 左列（标题） | 右列（填充内容） |
+|----|------------|--------------|
+| 1 | 第( )周 | （整行合并） |
+| 2 | 月 日 周() | （整行合并） |
+| 3 | 晨间活动 | 体能大循环/集体游戏/自选游戏 + 重点指导/活动目标/指导要点 |
+| 4 | 晨间谈话 | 谈话主题 + 问题设计 |
+| 5 | 集体活动 | 活动主题/活动目标/活动重点/活动难点/活动过程 |
+| 6 | 室内区域活动 | 游戏区域 + 重点指导/活动目标/指导要点 + 支持策略 |
+| 7 | 户外游戏活动 | 游戏区域 + 重点指导/活动目标/指导要点 + 支持策略 |
+| 8 | 一日活动反思 | （空白，留用户手填） |
 
-## Adding new export functions
-1. Generate content via `export_daily_plan_word(plan)` → bytes.
-2. Write to `AppConfig.EXPORT_DIR` (create with `mkdir(parents=True, exist_ok=True)`).
-3. Return a `Path` object — the caller handles `ui.download()`.
+## 差异红字标注
+
+仅"活动过程"字段需要比对标红：
+
+```python
+from docx.shared import RGBColor
+
+# 差异段落标红
+run.font.color.rgb = RGBColor(0xFF, 0x00, 0x00)
+```
+
+比对逻辑：
+1. 取 `process_original`（AI 拆分原文）与 `process_adapted`（年龄适配改写文）
+2. 逐句/逐段 difflib 比对，仅将**改写文中与原文不同的部分**标红
+3. 未改动部分保持默认黑色
+
+## 中文字体
+
+```python
+from docx.shared import Pt
+from docx.oxml.ns import qn
+
+run.font.name = '宋体'
+run._element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
+```
+
+不显式指定字体名时中文字体可能出现乱码，必须处理。
+
+## 导出文件命名
+
+```
+{tenant_id}_{user_id}_{年级}_{班级}_{日期YYYYMMDD}_日计划.docx
+```
+
+导出文件保存到 `exports/` 目录，并将路径记录到数据库 `export_records` 表。

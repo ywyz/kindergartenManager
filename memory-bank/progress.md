@@ -1,0 +1,646 @@
+# 进度记录
+
+## 2026-05-10
+
+### 已完成
+
+- 完成 memory-bank 文档全量阅读与一致性检查。
+- 收敛 9 项需求澄清并写入实施计划。
+- 已将关键规则固化到 architecture.md 初始化版本。
+- 已确认模板文件存在：`templates/teacherplan.docx`。
+- 已最终确认 `is_holiday` 返回语义：法定节假日 True、工作日 False；周末独立额外判定。
+- **Step 0.1 ✅**：创建标准目录结构与 Python 包初始化文件，创建 `.gitignore`。
+  - 目录：`app/ui`, `app/api`, `app/service`, `app/repository`, `app/integration/{ai_client,holiday_client,word_export}`, `app/auth`, `app/core`, `app/jobs`, `alembic`, `tests`, `exports`
+  - 每目录含 `.gitkeep`，所有 Python 包目录含空 `__init__.py`（共 13 个）
+  - 验证：`find app tests alembic exports -type d | sort` 输出完整；`python3 -c "import app.core; import app.service; import app.auth"` 无报错
+- **Step 0.2 ✅**：创建 `requirements.txt`，建立 `.venv`（Python 3.12），安装全部依赖。
+  - 依赖包含：nicegui, fastapi, uvicorn, sqlalchemy[asyncio], aiomysql, pymysql, alembic, pydantic-settings, passlib[argon2], python-jose, cryptography, httpx, tenacity, python-docx, apscheduler, python-json-logger, pytest, pytest-asyncio, aiosqlite
+  - 创建 `.env.example` 列出所有配置占位符
+- **Step 0.3 ✅**：`app/core/config.py` — `pydantic-settings` Settings 类，读取 DATABASE_URL/ENCRYPTION_KEY/JWT_SECRET/JWT_EXPIRE_MINUTES/HOLIDAY_API_URL/LOG_LEVEL；`.env` 复制自 `.env.example`
+- **Step 0.4 ✅**：`app/core/logging.py` — JSON 结构化日志，`get_logger(name)` 函数，字段含 timestamp/level/logger/message
+- **Step 0.5 ✅**：`app/core/database.py` — `AsyncEngine`、`AsyncSessionLocal`、`Base`、`get_async_session()`；Alembic 初始化并配置 `env.py` 读取 Settings.DATABASE_URL（迁移用 pymysql 同步驱动）
+
+### 当前状态
+
+- 阶段状态：阶段 0（Step 0.1~0.5）全部完成，阶段 1（Step 1.1 账号数据模型）待开始。
+- 文档状态：PRD、implementation-plan、architecture 已具备可执行基线。
+
+### 下一步
+
+- 阶段 2（Step 2.1 学期配置数据模型）。
+
+## 2026-05-16（续）
+
+### 已完成（阶段 2）
+
+- **Step 2.1 ✅**：`app/core/models/semester.py` — `SemesterConfig` 模型；Alembic 迁移 `fd6d29f921b4`；手工验收通过（DESCRIBE semester_config 字段与定义一致）。
+- **Step 2.2 ✅**：`app/core/models/class_config.py` — `ClassConfig` 模型；Alembic 迁移 `67b4aef28796`；手工验收通过。
+- **Step 2.3 ✅**：`app/service/date_service.py` — 纯函数：`get_week_number`、`get_weekday_cn`、`is_workday`、`is_within_semester`；`tests/test_date_service.py` 19 passed，0 warnings。
+- **Step 2.4 ✅**：`app/integration/holiday_client/client.py` — `is_holiday`、`is_near_holiday`、`get_holiday_name`、`get_special_day_tags`、`is_adjusted_workday`；缓存结构最终为 `tuple[bool, str | None, int]`（bool=法定节假日, str=节日名称, int=day_type）；`tests/test_holiday_client.py` 29 passed。
+- **Step 2.5 ✅**：`app/repository/semester_repository.py`、`app/repository/class_repository.py`、`app/ui/pages/settings.py`（路由 `/settings`）；手工验收通过（数据持久化、刷新回填正常；tenant_id/user_id 字段正确；MySQL 中文存储正确，CLI 显示 `?` 属终端字符集问题，非数据问题）。
+- **Step 2.6 ✅**：`app/ui/components/date_panel.py` — 可复用日期面板组件；`app/ui/pages/date_test.py`（路由 `/date-test`）；手工验收通过。
+
+### 新增需求记录（2026-05-16）
+
+- **需求 1**：节假日客户端在返回 `is_holiday=True` 时，额外返回具体节日名称（如"国庆节"、"春节"）。
+- **实现 1**：
+  - 内存缓存结构从 `dict[str, bool]` 升级为 `dict[str, tuple[bool, str | None, int]]`（后续需求3追加存储 day_type），`is_holiday` 在填充缓存时同时存储节日名称与 day_type。
+  - 名称解析优先级：`holiday.name`（API 返回的 holiday 对象）→ `type.name`（API 返回的 type 对象）。
+  - 新增 `get_holiday_name(target_date, *, _transport) -> str | None` 函数，复用缓存，同一日期不发额外 HTTP 请求。
+  - `DatePanel` 组件更新：法定节假日提示文字从"今天是法定节假日"变为"今天是法定节假日（国庆节）"。
+- **测试 1**：`TestGetHolidayName` 7 项测试全部通过（节日对象名称、type 名称降级、工作日/周末返回 None、API 失败 None、缓存复用、多节日名称正确）。
+
+- **需求 2**（已回滚，记入 BL-01）：`get_special_day_tags` 曾计划支持在线 API 动态获取，但评估后代价大于收益，已回滚至本地硬编码同步实现。`get_special_day_tags` 保持 sync，不依赖外部 API，不需要 `SPECIAL_DAY_API_URL` 配置项。
+
+- **Bug 修复 — 调班工作日（type=3）显示错误**：
+  - 现象：2026-05-09（周六，调班补班）选择后显示"今天是周末（非工作日）"，未能识别调班工作日。
+  - 根因：`is_workday()` 是纯日历函数（周一～周五判断），不知道调班信息；`is_holiday()` 对 type=3 返回 False（正确），但无函数能检测 type=3。
+  - 修复：
+    - 缓存三元组追加 day_type（第3位 int）：`dict[str, tuple[bool, str | None, int]]`。
+    - 新增 `is_adjusted_workday(target_date, *, _transport=None) -> bool | None`：type=3 返回 True，复用法定节假日缓存，同日期不重复发 HTTP 请求。
+    - `DatePanel._update_info` 在"非工作日"分支优先检查是否调班：调班工作日显示蓝色"今天是调班工作日，需正常上班"；普通周末保持橙色提示。
+  - 测试：新增 `TestIsAdjustedWorkday` 6 项，全部通过。
+
+### DeprecationWarning 记录（Python 升级预警）
+
+| 来源 | 警告内容 | 影响 | 建议 |
+|------|---------|------|------|
+| `passlib/utils/__init__.py` | `import crypt` 在 Python 3.12 弃用，3.13 移除 | 无功能影响 | 升级 3.13 前改用 `argon2-cffi` |
+| `passlib/handlers/argon2.py` | `argon2.__version__` 已弃用 | 无功能影响 | 升级 passlib 可消除 |
+| `pythonjsonlogger/jsonlogger.py` | 模块路径变更为 `pythonjsonlogger.json` | 无功能影响 | 更新 `app/core/logging.py` 导入路径 |
+
+### 当前状态
+
+- **阶段 2（Step 2.1~2.6）+ 附加需求全部完成并通过手工验收。**
+- 全量自动化测试：`71 passed, 0 failed, 3 warnings`（全部为已知 DeprecationWarning，无功能影响）。
+- Alembic 迁移版本：`67b4aef28796 (head)`，含 user / semester_config / class_config 三张表。
+
+### 下一步
+
+- 阶段 3（Step 3.1）：加密工具 `app/core/crypto.py`，实现 Fernet 对称加密/解密。
+
+## 2026-05-17
+
+### 开发环境升级
+
+- **Python 升级**：`.venv` 由 Python 3.12.3 升级至 **Python 3.14.4**（`/home/admin/.local/bin/python3.14`）。
+- **依赖重装**：删除旧 `.venv`，用 `python3.14 -m venv .venv` 重建，`pip install -r requirements.txt` 全量安装。
+- **验证**：`pytest tests/ -q` 全部通过（**89 passed, 0 warnings**），相比 3.12 环境消除了 passlib/json-logger DeprecationWarning（已知问题，代码层已提前切换至 argon2-cffi + pythonjsonlogger.json）。
+
+### 当前状态
+
+- Python：3.14.4
+- 依赖与旧环境版本一致（nicegui 3.12.0、SQLAlchemy 2.0.49、alembic 1.18.4 等）
+- 测试：89 passed, 0 warnings
+
+### 风险与备注
+
+- Word 导出必须严格按模板结构实现，禁止自行重排结构。
+- 节假日逻辑包含“法定节假日前一天”和“不放假节日标签”两个维度，需提前设计接口返回模型。
+- 权限可见性含“同班可见、跨班不可见”，后续数据查询层要预留班级维度过滤。
+
+## 2026-05-16（开发环境迁移 Python 3.12 → 3.14）
+
+### 背景
+
+切换开发电脑，新机器仅有 Python 3.14.4，无 Python 3.12。完成兼容性迁移并验证全量测试通过。
+
+### 变更内容
+
+#### 1. `passlib[argon2]` → `argon2-cffi`（必须修复）
+
+- **原因**：Python 3.13 起标准库移除 `crypt` 模块，`passlib` 内部依赖 `crypt` 导入失败，在 3.14 下运行时直接崩溃。
+- **修复**：
+  - `requirements.txt`：移除 `passlib[argon2]>=1.7.4`，改为 `argon2-cffi>=23.1.0`。
+  - `app/auth/password.py`：从 `passlib.context.CryptContext` 改为直接使用 `argon2.PasswordHasher`；`verify_password` 捕获 `VerifyMismatchError / VerificationError / InvalidHashError` 返回 `False`，接口签名保持不变。
+  - 外部接口（`hash_password` / `verify_password`）签名完全不变，上层代码无需修改。
+- **验证**：`pytest tests/test_password.py tests/test_auth_service.py -v` 全部通过。
+
+#### 2. `pythonjsonlogger` 导入路径修复（DeprecationWarning）
+
+- **原因**：`python-json-logger` 新版将模块从 `pythonjsonlogger.jsonlogger` 移至 `pythonjsonlogger.json`。
+- **修复**：`app/core/logging.py` 中将 `from pythonjsonlogger import jsonlogger` 改为 `from pythonjsonlogger import json as jsonlogger`。
+- **效果**：测试警告从 2 条降至 0 条。
+
+#### 3. 登录页异常捕获增强
+
+- **原因**：原代码只捕获 `AuthError`，数据库连接失败等其他异常被 NiceGUI 静默吞掉，导致按钮点击无任何反应。
+- **修复**：`app/ui/pages/login.py` 新增 `except Exception` 兜底，将错误类型展示到页面，同时记录结构化日志。
+
+#### 4. VS Code 调试配置修复
+
+- **原因**：旧 `launch.json` 以文件路径方式启动（`python app/main.py`），导致 `ModuleNotFoundError: No module named 'app'`。
+- **修复**：`.vscode/launch.json` 新增「运行应用 (python -m app.main)」配置，使用 `module: app.main` + `cwd: ${workspaceFolder}`。
+
+### 测试结果
+
+```
+71 passed, 0 warnings   （Python 3.14.4，修复后）
+```
+
+### 新电脑环境搭建步骤（备忘）
+
+```bash
+# 1. 克隆仓库后进入项目目录
+cd /home/ywyz/code/kindergartenManager
+
+# 2. 创建虚拟环境
+python3 -m venv .venv
+
+# 3. 安装依赖（zsh 下 >= 需引号）
+.venv/bin/pip install -r requirements.txt
+
+# 4. 复制并填写环境变量（DATABASE_URL / ENCRYPTION_KEY / JWT_SECRET 必须与线上一致）
+cp .env.example .env
+
+# 5. 运行应用
+.venv/bin/python -m app.main
+
+# 6. 跑测试
+.venv/bin/pytest tests/ -v
+```
+
+> ⚠️ `ENCRYPTION_KEY` 和 `JWT_SECRET` 必须与生产/云端保持一致，否则已加密的 AI Key 无法解密，已颁发的 JWT token 失效。
+
+### 当前状态
+
+- 全量测试：71 passed，0 warnings（Python 3.14.4）。
+- Alembic head：`67b4aef28796`（未变化）。
+- 下一步：**阶段 3 Step 3.1** — 加密工具 `app/core/crypto.py`（Fernet 对称加密）。
+
+## 2026-05-17
+
+### 已完成（阶段 3）
+
+- **Step 3.1 ✅**：加密工具 `app/core/crypto.py` — `encrypt` / `decrypt`（Fernet 对称加密）；`app/core/exceptions.py` 新增 `CryptoError`、`ConfigError`。
+  - `ENCRYPTION_KEY` 字符串 → UTF-8 编码取前 32 字节补零 → `base64.urlsafe_b64encode` → 合法 Fernet Key；Fernet 实例模块级初始化一次。
+  - `tests/test_crypto.py` — **8 passed**（加密结果异于原文、往返还原、Unicode 往返、Fernet 随机 IV、篡改密文报错、非法字符串报错、空字符串报错）。
+  - 手工验收：自动化测试全部通过，无需额外手工操作。
+
+- **Step 3.2 ✅**：`app/core/models/ai_key.py` — `AiApiKey` 数据模型；Alembic 迁移（add ai_api_key table）；`app/repository/ai_key_repository.py` — `save_ai_key` / `get_active_ai_key` / `get_decrypted_key`。
+  - `app/core/models/__init__.py` 更新：新增 `AiApiKey` 导入，确保 Alembic autogenerate 可发现。
+  - `tests/test_ai_key_repository.py` — **11 passed**（密文存储、active 记录可取、解密还原、Key 轮换旧记录 inactive、租户隔离）。
+  - Alembic 迁移执行成功；`DESCRIBE ai_api_key;` 字段与定义一致。
+
+- **Step 3.3 ✅**：`app/ui/pages/settings.py` 新增 AI 接口配置区块。
+  - 新增辅助函数 `_mask_api_key`：明文末4位可见，其余替换为 `sk-****` 前缀。
+  - "保存"按钮：判断 Key 是否修改（与脱敏字符串对比），复用或更新 Key 后加密入库。
+  - "验证连接"按钮：内联 `httpx.AsyncClient` 调用 `{api_base_url}/models`，超时 10 秒，显示成功/失败提示。
+  - 页面加载回填：AI 地址正常回填；Key 以脱敏形式展示，解密失败时提示重新配置。
+  - **手工验收通过**（2026-05-17）：密文存储 ✅ / 脱敏显示 ✅ / 验证连接 ✅。
+
+- **Bug 修复 — 登录响应极慢（IPv6 超时）**：
+  - 现象：点击登录等待 2+ 分钟才响应。
+  - 根因：`aliyun.ywyz.tech` 同时有 A 和 AAAA 记录；`aiomysql` 优先尝试 IPv6（`2408:4002:...`），该地址在 13306 端口不通，等待 TCP 超时（约 2 分 15 秒）后才降级 IPv4。
+  - 修复：`.env` 中 `DATABASE_URL` 将主机名改为 IPv4 地址（`47.116.40.89`），绕过 DNS 双栈解析。
+  - 同步修改：`app/core/database.py` 将 `pool_pre_ping=True` 改为 `False`（避免每次取连接前额外发 `SELECT 1` 增加往返延迟），新增 `pool_recycle=1800` 防止服务端主动断连后复用报错。
+  - **验证通过**：登录响应恢复正常。
+  - 后续建议：在 DNS 管理面板删除 `aliyun.ywyz.tech` 的 AAAA 记录（根治），届时可将 `DATABASE_URL` 改回域名。
+
+### 当前状态
+
+- **阶段 3（Step 3.1~3.3）全部完成并通过手工验收。**
+- 自动化测试（Step 3 范围）：`test_crypto.py` 8 passed / `test_ai_key_repository.py` 11 passed。
+- 待执行：Step 3 全量回归测试 + 文档更新 + 推送 GitHub。
+
+### 全量测试与推送（已完成）
+
+- `pytest tests/ -v` — 约 90 passed，0 warnings（含 8 test_crypto + 11 test_ai_key_repository）。
+- 文档更新：`memory-bank/architecture.md` 阶段 3 内容补全。
+- GitHub 推送：`git push origin dev2.0` 成功。
+
+### 当前状态（文档整理完成后）
+
+- 阶段 0~3 全部完成，已推送 `dev2.0` 分支。
+- `memory-bank/` 文档已同步：tech-stack.md（Python 3.14/argon2-cffi）、implementation-plan.md（✅ 标注）、architecture.md（Section 10 编号修正、DatePanel 归位）。
+- 下一步：**阶段 4 Step 4.1** — AI 客户端基础 `app/integration/ai_client/base.py`。
+
+---
+
+## 2026-05-11
+
+### 已完成
+
+- 新增 Step 0 自动化测试文件：`tests/conftest.py`、`tests/step0/test_bootstrap.py`、`tests/step0/test_config.py`、`tests/step0/test_logging.py`、`tests/step0/test_database.py`。
+- 保留人工验收清单：`tests/step0/pytest_checklist.md`。
+- 已执行 Step 0 窄范围测试：`.venv/bin/pytest tests/step0 -q`。
+- 测试结果：`18 passed, 1 warning in 2.06s`。
+- 新增 `memory-bank/testing.md`，记录测试说明、覆盖范围、执行命令与最近一次测试情况。
+
+### 当前状态
+
+- 阶段状态不变：阶段 0 已完成并具备自动化回归基线；阶段 1（Step 1.1 账号数据模型）待开始。
+
+### 风险与备注
+
+- 当前 warning 来自第三方库 `python-json-logger` 的弃用提示，不影响 Step 0 结论。
+- Step 0 的数据库测试暂不依赖真实 MySQL，仅验证结构与迁移接线；后续阶段需增加真实迁移与仓库层集成测试。
+
+## 2026-05-16
+
+### 已完成
+
+- **Step 1.1 ✅**：定义 `User` 数据模型 (`app/core/models/user.py`)，包含 id/tenant_id/username/hashed_password/role/is_active/created_at/updated_at 字段；生成并执行 Alembic 迁移 `5e03413fdeca`（add user table）。
+  - 创建 `app/core/models/__init__.py` 导入所有 model，确保 alembic autogenerate 可发现。
+  - 更新 `alembic/env.py` 导入 `app.core.models`。
+  - `alembic current` 显示 `5e03413fdeca (head)`。
+- **Step 1.2 ✅**：`app/auth/password.py` — `hash_password` / `verify_password`，使用 Argon2（passlib）。
+  - `tests/test_password.py` — 5 passed。
+  - ⚠️ **DeprecationWarning 备注（Python 升级预警）**：
+    - `passlib/utils/__init__.py`：`import crypt` 在 Python 3.12 弃用，Python 3.13 将移除 `crypt` 标准库模块。届时需升级 passlib 至支持 Python 3.13 的版本，或直接改用 `argon2-cffi`。
+    - `passlib/handlers/argon2.py`：`argon2.__version__` 已弃用，建议改用 `importlib.metadata`，升级 passlib 后可消除。
+    - **当前影响**：无功能影响；待 Python 3.13 升级前跟进。
+- **Step 1.3 ✅**：`app/core/exceptions.py` — 定义 `AuthError`；`app/auth/jwt.py` — `create_access_token` / `decode_access_token`，使用 `python-jose`（HS256），从 `Settings` 读取密钥与过期时间。
+  - `tests/test_jwt.py` — 5 passed（正常解码字段、篡改签名报错、错误密钥报错、过期 token 报错、三种角色均可编解码）。
+- **Step 1.4 ✅**：`app/repository/user_repository.py` — `create_user` / `get_user_by_username` / `get_user_by_id` / `update_password`，所有查询携带 `tenant_id` 隔离。
+  - `tests/conftest.py` — 提供 `async_session` fixture（SQLite 内存库，每测试函数独立）。
+  - `pytest.ini` — 设置 `asyncio_mode = auto`，支持异步测试无需逐函数标注。
+  - 修复：`User.id` 使用 `BigInteger().with_variant(Integer, "sqlite")` 解决 SQLite 自增兼容问题。
+  - 修复：`created_at` / `updated_at` 改用 `datetime.now(timezone.utc)` 替代已弃用的 `utcnow()`。
+  - `tests/test_user_repository.py` — 6 passed，0 warnings（创建查询、租户隔离、ID 查询、跨租户隔离、不存在返回 None、更新密码）。
+- **Step 1.5 ✅**：`app/service/auth_service.py` — `login` / `change_password`，调用仓库层与密码/JWT 工具。
+  - 安全约定：`login` 对"用户不存在"与"密码错误"统一抛出 `AuthError`，防止用户枚举攻击。
+  - `tests/test_auth_service.py` — 7 passed（正确凭证返回 token、错误密码报错、不存在用户报错、禁用账号报错、跨租户报错、改密后旧密码失效/新密码有效、旧密码错误不修改）。
+  - ⚠️ **DeprecationWarning**（同 Step 1.2，passlib 已知问题，无功能影响）。
+- **Step 1.6 ✅**：NiceGUI 登录页面与应用入口。
+  - `app/ui/pages/login.py` — 路由 `/`，用户名/密码输入框（支持回车触发）、错误提示（红字）、登录成功存 token 并跳转 `/home`；首期 `tenant_id=1` 固定。
+  - `app/ui/pages/home.py` — 路由 `/home`，占位主页，未登录自动跳回 `/`，含退出登录按钮。
+  - `app/main.py` — 入口，注册页面路由，`ui.run()` 绑定 `storage_secret=JWT_SECRET`，`show=False` 适配服务器环境。
+
+### 当前状态
+
+- **阶段 1（Step 1.1~1.6）全部完成并通过手工验收。**
+- 自动化测试：`23 passed`（test_password ×5、test_jwt ×5、test_user_repository ×6、test_auth_service ×7），2 个已知 passlib DeprecationWarning（无功能影响）。
+- 登录页面手工验收通过：空输入提示、错误密码提示、正确登录跳转、未登录保护、退出登录均符合预期。
+
+### 下一步
+
+- 阶段 2（Step 2.1）：学期配置数据模型 `SemesterConfig`，生成并执行 Alembic 迁移。
+
+### 已完成
+
+- 用户按顺序完成 Step 0 手工验收：Step 0.1~0.5 全部通过。
+- 处理并修复 Alembic 在 `DATABASE_URL` 包含 URL 编码字符（如 `%40`）时的插值报错：
+  - 报错现象：`ValueError: invalid interpolation syntax ...`
+  - 根因：Alembic 底层 `configparser` 将 `%` 解释为插值占位符。
+  - 修复方式：在 `alembic/env.py` 写入 `sqlalchemy.url` 前将 `%` 转义为 `%%`。
+- 修复后复测：`alembic current` 正常执行；当前 `alembic/versions/` 为空时不显示迁移版本属预期行为。
+
+### 当前状态
+
+- 阶段状态：阶段 0 完整通过并可复现；阶段 1 仍未开始（按用户要求等待进一步指令）。
+
+### 风险与备注
+
+- 连接串中若包含 `@`、`%` 等特殊字符，需做 URL 编码；并保留 Alembic `% -> %%` 转义逻辑。
+
+## 2026-05-17（续）
+
+### 已完成：为 AI 配置新增 model_name 字段
+
+- **背景**：AI API Key 表缺少模型名称字段，导致后续 ai_client 层无法知道应使用哪个模型。
+- **数据库**：`app/core/models/ai_key.py` 新增 `model_name: String(128), NOT NULL, server_default='gpt-4o-mini'`；Alembic 迁移 `46b9fd5613c3` 已应用（含回填现有 NULL 值 → 'gpt-4o-mini'）。
+- **附注（数据库状态修复）**：另一台机器曾用 `38441cbdef11` 迁移将 `model_name` 列以 nullable 形式加入 DB，但迁移文件未推送到仓库；本次将 DB alembic_version 重置为 `1a0d0e46f700` 后编写 `46b9fd5613c3` 完成对齐。
+- **仓库层**：`save_ai_key` 新增 `model_name: str = "gpt-4o-mini"` 参数，写入新记录时赋值。
+- **Settings UI**：AI 配置区块新增"模型名称"自由文本输入框（placeholder 提供常用示例）；加载时自动回填；保存前校验非空。
+- **测试**：原有 `save_ai_key` 调用全部补充 `model_name` 参数；新增 `TestModelName` 测试类（3 个用例）；全量测试 **92 passed, 0 warnings**。
+
+### 当前状态
+
+- Alembic 当前版本：`46b9fd5613c3 (head)`
+- 全量测试：92 passed, 0 warnings（Python 3.14.4）
+- 下一步：阶段 3（Step 3.1）加密工具 `app/core/crypto.py`（已在之前阶段完成），或 ai_client 层实现（Step 4.1）
+
+---
+
+## 2026-05-17（阶段 4）
+
+### 已完成（阶段 4：教案拆分与年龄适配）
+
+- **Step 4.1 ✅**：`app/integration/ai_client/base.py` — 通用 AI 请求函数 `call_ai()`；`httpx.AsyncClient` 超时 60s；`tenacity` 重试 3 次（指数退避 2s→4s→8s）；HTTP 4xx/5xx 提取错误描述写入 `AiCallError.message`；解析失败抛 `AiParseError`；`app/core/exceptions.py` 新增 `AiCallError`、`AiParseError`。
+  - `tests/test_ai_client_base.py` — **6 passed**（正常响应、无效 JSON content、非 JSON body、HTTP 500 重试3次、HTTP 400、缺少 choices 字段）。
+
+- **Step 4.2 ✅**：`app/integration/ai_client/lesson_plan_client.py` — `split_lesson_plan()`；内置默认 system prompt（英文 key 约束）；必填字段验证（5 个 key）；多余字段过滤。
+  - `tests/test_lesson_plan_client.py` — **5 passed**（正常返回、自定义 prompt、缺字段报错、空 dict 报错、多余字段过滤）。
+
+- **Step 4.3 ✅**：`app/integration/ai_client/adapt_client.py` — `adapt_activity_process()`；内置年龄适配 prompt（小班/中班/大班三套策略）；空原文前置校验不发请求；输出字段 `adapted_process` 验证。
+  - `tests/test_adapt_client.py` — **5 passed**（正常返回、三个年龄段、缺字段报错、空原文报错、自定义 prompt）。
+
+- **Step 4.4 ✅**：`app/service/diff_service.py` — `compute_diff()`；按 `。？！\n` 分句；`difflib.SequenceMatcher` 逐句比对；返回改写文视角结果（`{"text": str, "changed": bool}`）。
+  - `tests/test_diff_service.py` — **8 passed**（完全相同、一句改变、空输入、空改写文、全部改变、新增句、原文删除句不出现、多行文本）。
+
+- **Step 4.5 ✅**：`app/core/models/daily_plan.py` — `DailyPlan` 表（20 个字段）；Alembic 迁移 `f6d79ac6bf21`；`app/core/models/__init__.py` 注册 `DailyPlan`；`app/repository/daily_plan_repository.py` — `save_daily_plan`（同日期 upsert）、`get_daily_plan_by_date`。
+  - `alembic upgrade head` 执行成功，迁移版本：`f6d79ac6bf21 (head)`。
+
+- **Step 4.6 ✅**：`app/service/lesson_plan_service.py` — `process_lesson_plan()` 编排完整流程（AI Key 获取→拆分→适配→差异比对）；`LessonPlanResult` dataclass 包含全部字段；AI Key 缺失抛 `ConfigError`。
+  - `tests/test_lesson_plan_service.py` — **3 passed**（完整流程返回 LessonPlanResult、差异正确标注、无 Key 抛 ConfigError）。
+
+- **Step 4.7 ✅**：`app/ui/pages/daily_plan.py` — 每日活动计划页面（路由 `/daily-plan`）；顶部复用 `DatePanel` 组件；教案输入区 + "连接 AI 拆分"按钮；5 个字段自动回填 + 改写原文折叠展示；"保存草稿"（upsert daily_plan 表）；"导出 Word"按钮置灰（Stage 6 实现）；`app/main.py` 注册路由；`app/ui/pages/home.py` 添加导航入口。
+  - 手工验收通过：选择日期 → 粘贴教案 → AI 拆分 → 字段回填 → 保存草稿 → 刷新页面后草稿回填。
+
+### Bug 修复记录（阶段 4 手工测试期间）
+
+| 编号 | 现象 | 根因 | 修复 |
+|------|------|------|------|
+| BL-03 | 选择日期后点击"连接 AI 拆分"提示"⚠ 请先选择日期" | `DatePanel.on_date_change` 回调若为 async 函数，`_update_info` 中调用未加 `await`，协程创建后被丢弃，`state["selected_date"]` 永远为 None | `date_panel.py._update_info` 结尾用 `asyncio.iscoroutine()` 检测回调返回值，若为协程则 await；空日期早返回分支同样修复 |
+| BL-04 | AI 调用失败时仅显示通用提示"请检查网络或 API Key 是否有效"，无法定位具体原因 | `daily_plan.py` 中 `except AiCallError` 丢弃了 `e.message`；`base.py` 中 HTTP 错误未提取响应体 | `base.py` 提取响应体中的 `error.message / message / detail` 字段写入 `AiCallError.message`；`daily_plan.py` 将 `e.message` 展示到页面 |
+
+### 已知问题（待 Step 5 修复）
+
+| 编号 | 问题 | 影响 | 修复计划 |
+|------|------|------|---------|
+| KI-01 | AI 返回的教案拆分/年龄适配内容格式不稳定，存在字段包含 markdown 标记（如 `**重点：**`）、多余换行、数字列表格式不一致等情况 | 拆分结果回填后需人工清理格式；差异比对精度受分句格式影响 | Step 5 提示词管理实现后，在拆分/适配 system prompt 中明确输出格式约束（纯文本、无 markdown 标记、统一分句符号）；支持多版本 prompt 测试与回滚 |
+
+### 全量测试结果
+
+- 自动化测试：**119 passed, 0 failed, 0 warnings**（Python 3.14.4）
+- Alembic 当前版本：`f6d79ac6bf21 (head)`，含 5 张业务表（users / semester_config / class_config / ai_api_key / daily_plan）
+
+### 下一步
+
+- 阶段 5（Step 5.1）：提示词数据模型 `app/core/models/prompt_template.py`；同步修复 KI-01（在 split/adapt 的内置 default prompt 中强化格式约束）。
+
+---
+
+## 2026-05-17（阶段 5：提示词管理）
+
+### 已完成
+
+- **Step 5.1 ✅**：`app/core/models/prompt_template.py` — `PromptTemplate` ORM 模型；Alembic 迁移 `bcd07e51527d`（add prompt_template table）；`app/core/models/__init__.py` 注册 `PromptTemplate`。
+  - task_type Enum 初始值：`split` / `adapt` / `generate`（后续在 5.x 扩展）。
+  - 联合索引：`(tenant_id, user_id, task_type)`；同一用户同一任务类型只能有一条 `is_active=True` 记录。
+  - `alembic upgrade head` 执行成功，MySQL `DESCRIBE prompt_template` 字段验证通过。
+
+- **Step 5.2 ✅**：`app/repository/prompt_repository.py` — 4 个异步函数。
+  - `get_active_prompt(session, tenant_id, user_id, task_type) -> PromptTemplate | None`
+  - `save_new_version(session, tenant_id, user_id, task_type, content) -> PromptTemplate`（旧 active 失活，版本号自动递增）
+  - `rollback_to_version(session, tenant_id, user_id, task_type, version) -> PromptTemplate`（目标版本激活，其余失活；版本不存在抛 `ValueError`）
+  - `list_versions(session, tenant_id, user_id, task_type) -> list[PromptTemplate]`（按版本降序）
+  - `tests/test_prompt_repository.py` — **16 passed**（TestSaveNewVersion ×5 / TestGetActivePrompt ×3 / TestRollbackToVersion ×3 / TestListVersions ×3 / TestTenantIsolation ×2）。
+
+- **Step 5.2b ✅**：`app/service/lesson_plan_service.py` 接入 `prompt_repository`。
+  - `process_lesson_plan()` 在 `split_system_prompt` / `adapt_system_prompt` 为 `None` 时，先查 DB 激活版本，有则覆盖；否则继续使用 AI 客户端内置默认。
+  - **KI-01 修复**：`DEFAULT_SPLIT_PROMPT`（`lesson_plan_client.py`）与 `DEFAULT_ADAPT_PROMPT`（`adapt_client.py`）均追加明确格式约束（禁 Markdown 标记、步骤间句号自然衔接、无数字编号换行、无多余空行）。
+  - `tests/test_lesson_plan_service.py` — **5 passed**（3 旧用例补加 `get_active_prompt` mock / 2 新用例验证 DB 提示词生效与默认回退）。
+
+- **Step 5.3 ✅**：`app/ui/pages/prompt_mgmt.py` — 提示词管理页面（路由 `/prompts`）。
+  - 顶部导航（返回主页 / 退出登录）；页面说明文字。
+  - 7 个 Tab：教案拆分 / 年龄适配 / 晨间活动 / 晨间谈话 / 区域游戏 / 户外游戏 / 一日反思。
+  - 每 Tab：当前激活版本 badge + 可编辑 textarea（placeholder 显示内置默认）+ "保存为新版本"按钮 + 历史版本列表（含"回滚"按钮）。
+  - `app/main.py` 注册路由；`app/ui/pages/home.py` 新增"提示词管理"（紫色）导航按钮。
+
+- **Step 5.x ✅**：将 `task_type` Enum 从 3 值扩展为 7 值（按需求重新设计一日活动提示词分类）。
+  - **背景**：用户要求一日活动按 5 种活动类型分别管理提示词，每种格式不同，不能合并为单一 `generate` 类型。
+  - **变更**：`generate` → `morning_exercise` / `morning_talk` / `area_game` / `outdoor_game` / `daily_reflection`。
+  - **数据库**：新建 Alembic 迁移 `e2a3f1b8c9d0`（expand prompt_task_type enum）；`upgrade()` 先删除 `generate` 数据行（开发阶段无生产数据），再执行 `ALTER TABLE ... MODIFY COLUMN` 更新 Enum；已应用到 MySQL。
+  - **新文件**：`app/integration/ai_client/generate_client.py` — 5 种活动类型内置默认提示词（含输出格式约束）；模块级 `GENERATE_DEFAULTS: dict[str, str]` 供服务层查取。
+  - **提示词格式规范**（按用户确认）：
+    - 晨间活动：体能大循环（集体游戏/自主游戏/重点指导）+ 活动目标（3条）+ 指导要点（3条）
+    - 晨间谈话：谈话主题 + 问题设计（3条）
+    - 区域游戏：游戏区域（任选2个）+ 重点指导（任选1个）+ 活动目标（3条）+ 指导要点（3条）
+    - 户外游戏：游戏区域（任选2个）+ 重点指导（任选1个）+ 活动目标（3条）+ 指导要点（3条）
+    - 一日活动反思：自然段落，100~200字
+  - **测试**：`test_prompt_repository.py` 将原 `"generate"` 用例改为 `"morning_exercise"`；全量测试 **137 passed, 0 failed, 0 warnings**。
+
+### Bug 修复记录（阶段 5）
+
+| 编号 | 现象 | 根因 | 修复 |
+|------|------|------|------|
+| BL-05 | Step 5.2b 合入后，`test_process_lesson_plan_success` 等旧测试失败 | 测试未 mock `get_active_prompt`，service 实际调用时 `AsyncMock` session 返回协程对象而非模型实例，导致 `.content` 属性报错 | 两个受影响的旧测试补加 `patch("app.service.lesson_plan_service.get_active_prompt", new=AsyncMock(return_value=None))` |
+
+### 全量测试结果
+
+- 自动化测试：**137 passed, 0 failed, 0 warnings**（Python 3.14.4）
+- Alembic 当前版本：`e2a3f1b8c9d0 (head)`，含 6 张业务表（users / semester_config / class_config / ai_api_key / daily_plan / prompt_template）
+
+### 待手工测试（下次启动第一步）
+
+- 访问 `http://localhost:8080/prompts` 验证：
+  1. 7 个 Tab 正常显示（教案拆分、年龄适配、晨间活动、晨间谈话、区域游戏、户外游戏、一日反思）
+  2. 每个 Tab placeholder 显示对应内置默认提示词格式
+  3. 保存新版本 → badge 变为"当前激活：vN" → 历史列表出现新条目
+  4. 连续保存两版 → v2 激活 + v1 含"回滚"按钮
+  5. 点击"回滚" → v1 激活、v2 出现"回滚"按钮、textarea 内容恢复
+  6. 进入 `/daily-plan` → AI 拆分结果无 Markdown 标记（KI-01 修复验证）
+
+### 下一步
+
+- 完成手工测试并记录反馈。
+- 阶段 6（Step 6.1）：Word 导出服务 `app/integration/word_export/exporter.py`。
+
+---
+
+## 2026-05-30（Step 5 手测反馈修复：按钮一键生成 + 导出分单元格）
+
+### 背景
+
+用户在 Step 5 手动测试 `/daily-plan` 页面后反馈两个问题：
+
+1. **按钮冗余**：一日活动各小节（晨间活动/晨间谈话/区域游戏/户外游戏）各有独立「AI 生成」按钮，需逐个点击。要求：除「集体活动」（走拆分按钮）与「一日活动反思」外，其余应一键生成。
+2. **导出未分单元格**：Word 导出时同一项目内容全部塞进一个单元格，需按 `templates/teacherplan.docx` 模板结构分单元格存放。
+
+### 模板结构核实（teacherplan.docx）
+
+解析得到：**1 张表，19 行 2 列**，左列标题（纵向合并），右列内容；与早前 8 行从零建表方案差异很大：
+
+| 行 | 标题 | 右列子字段 |
+|----|------|-----------|
+| R0 | 第N周 | （整行合并）|
+| R1 | 月 日 周X | （整行合并）|
+| R2 | 晨间活动 | 体能大循环 / 集体游戏 / 自主游戏 |
+| R3 |  | 重点指导 / 活动目标 / 指导要点 |
+| R4 | 晨间谈话 | 话题 |
+| R5 |  | 问题设计 |
+| R6 | 集体活动 | 活动主题 |
+| R7~R10 |  | 活动目标 / 活动准备 / 活动重点 / 活动难点 |
+| R11 |  | 活动过程（差异标红）|
+| R12 | 室内区域游戏 | 游戏区域 |
+| R13 |  | 重点指导 / 活动目标 / 指导要点 |
+| R14 |  | 支持策略 |
+| R15 | 下午：户外游戏 | 游戏区域 |
+| R16 |  | 重点观察 / 活动目标 / 指导要点 |
+| R17 |  | 支持策略 |
+| R18 | 一日活动反思 | （内容）|
+
+### 已完成
+
+- **问题一（按钮一键生成）** — `app/ui/pages/daily_plan.py`：
+  - 删除晨间活动/晨间谈话/区域游戏/户外游戏 4 个独立「AI 生成」按钮及对应 `_gen_*` 函数（保留 textarea 与各小节状态 label）。
+  - 新增「区块三-A：一日活动生成」卡片，含单个「一键生成一日活动」按钮 `_gen_all_daily`：用 `asyncio.gather(..., return_exceptions=True)` 并发调用 4 次 `generate_activity_content`，各用独立 `AsyncSessionLocal`；成功项回填对应 textarea，失败项保留原值并在小节 label + 顶部汇总 label 标注（区分 ConfigError / AiCallError / AiParseError / 其他）。
+  - 「集体活动」拆分按钮 `_do_split` 与「一日活动反思」`_gen_daily_reflection` 按钮保持独立不变。
+
+- **问题二（导出分单元格）** — `app/integration/word_export/exporter.py` 重写：
+  - 主方案改为 `Document(templates/teacherplan.docx)` 打开模板填充其既有单元格，子字段分落到对应行的右列单元格。
+  - 新增 `_parse_fields(text)`：将 generate_client 的行结构文本（"标签：内容" + 编号续行）解析为 `{标签: 内容}` 字典，落到各子单元格；解析失败时整段填入主格降级。
+  - 户外栏 AI 输出「重点指导」映射到模板标题「重点观察」；晨间谈话 AI「谈话主题」映射模板「话题」。
+  - 「活动过程」差异标红逻辑保留（`_fill_process_cell`，红字 `RGBColor(255,0,0)`），宋体 `_set_font` 保留。
+  - 模板缺失或填充异常时降级 `_export_from_scratch`（原 8 行从零建表逻辑保留为兜底）。
+  - 不改数据模型、不新增迁移、不改 AI 输出格式（解析在导出层完成）。
+
+- **支持策略对齐** — `app/integration/ai_client/generate_client.py`：区域游戏 / 户外游戏 prompt 增加「支持策略」段输出（各 3 条，编号起头），对应模板 R14 / R17「支持策略」单元格。
+
+- **测试** — `tests/test_word_exporter.py`：行索引 4→11（活动过程）；新增晨间活动子字段分单元格断言、`TestParseFields`（3 项）、`TestFallbackFromScratch`（模板缺失降级 + 从零建表 8 行）。
+
+### 全量测试结果
+
+- **152 passed, 0 failed, 0 warnings**（Python 3.14.4）
+- Alembic head 不变：`e2a3f1b8c9d0`（本次无 schema 变更）
+
+### 待手工验收
+
+1. `/daily-plan` 选日期 → 拆分 → 点「一键生成一日活动」→ 4 项 textarea 同时回填，单项失败有提示。
+2. 「一日活动反思」按钮单独生成正常；「集体活动」拆分按钮不变。
+3. 保存草稿 → 导出 Word → 打开 docx 确认各子字段落在独立单元格、活动过程差异标红、宋体正常。
+
+### 下一步（下次启动从这里开始，本次暂不实施）
+
+1. **手工验收**：按上述「待手工验收」三步走查 `/daily-plan` 一键生成与 Word 导出实际效果，记录反馈。
+2. **阶段 7 收尾**：评估一日活动生成是否需接入 `near_holiday`（临近节假日）上下文增强（Step 7.1）。
+3. **阶段 8 收尾**：
+   - Step 8.1 全局异常处理与日志审计（`app/main.py` 注册 NiceGUI/FastAPI 异常处理，AI 失败友好提示 + 结构化日志）。
+   - Step 8.2 关键操作审计日志（AI 调用 / 导出 / 账号变更 / 权限变更）。
+4. 验收通过后合并 `dev2.0` → `main`。
+
+---
+
+## 2026-05-31（阶段 7 收尾：near_holiday 接入 + 补单元测试）
+
+### 背景
+
+Step 6 Word 导出手测通过。阶段 7「一键生成一日活动」核心已实现，但存在两个收尾缺口：
+1. `near_holiday`（临近节假日）上下文未接入生成流程。
+2. `generate_client` / `generate_service` / `export_repository` 三个模块缺单元测试（违反「每个 service 函数必须有测试」约定）。
+
+本轮补齐这两项，使阶段 7 真正闭环。（用户不在场，自主决策：范围=阶段 7 收尾，near_holiday=接入，补测试=补齐；阶段 8 留作后续。）
+
+### 已完成
+
+- **near_holiday 上下文接入** — `app/integration/ai_client/generate_client.py`：
+  - 抽出 `_build_prefix(context)`：拼接「班级：年级班名」+「教学周：第N周 周X」（`week_number`/`weekday` 缺失时不输出对应行）。
+  - 新增 `_holiday_hint(context)`：`near_holiday is True` 时返回「提示：明日为法定节假日，可在活动中适当融入节日主题元素。」，`False`/`None`/缺失返回空字符串。
+  - `_build_user_content` 改为消费 `week_number`/`weekday`/`near_holiday`；提示行注入 morning_exercise / morning_talk / area_game / outdoor_game 四类，**daily_reflection 不注入**（反思针对已发生活动，无需节日预告）。
+  - 更新 docstring context 字段说明。
+
+- **页面接入** — `app/ui/pages/daily_plan.py`：
+  - `_gen_all_daily` 在并发 `asyncio.gather` 前 `await is_near_holiday(selected_date)` 取一次；用 `try/except` 包裹，API 失败/异常返回 `None` 静默忽略，不阻断生成。
+  - `base_ctx` 新增 `week_number`（来自 `state["week_number"]`，由学期 start_date 计算）、`weekday`（`state["weekday_cn"]`）、`near_holiday` 三字段。
+  - 新增 `from app.integration.holiday_client.client import is_near_holiday` 导入。
+
+- **补单元测试**（之前缺失）：
+  - `tests/test_generate_client.py`（新，22 项）：`_build_prefix` 教学周拼接、`_holiday_hint` True/False/None/缺失、`_build_user_content` 测试直通 + 4 类注入提示 + daily_reflection 不注入 + 非注入场景 + 区域/户外字段 + 未知类型兜底、`generate_activity` 5 类正常返回 + 自定义 prompt + 不支持类型抛 `AiParseError`、`GENERATE_DEFAULTS` 覆盖 5 类。
+  - `tests/test_generate_service.py`（新，3 项）：默认提示词（system_prompt=None）、DB 激活提示词覆盖、无 AI Key 抛 `ConfigError`（mock AI Key/prompt 仓库与 `generate_activity`）。
+  - `tests/test_export_repository.py`（新，3 项）：`save_export_record` 字段持久化、`daily_plan_id` 可为 None、tenant 隔离查询（SQLite 内存库 `async_session` fixture）。
+
+### 全量测试结果
+
+- **192 passed, 0 failed, 0 warnings**（Python 3.14.4）（较上轮 152 +40 新用例）。
+- Alembic head 不变：`d60766786069`（本轮无 schema 变更）。
+
+### 待手工验收
+
+1. `/daily-plan` 选一个「法定节假日前一天」→ 一键生成 → AI 输出体现节日主题元素。
+2. 选普通工作日 → 生成正常且无节日提示。
+3. 节假日 API 故障时（断网/超时）→ 生成不受阻、不报错。
+
+### 下一步
+
+1. 上述手工验收，记录反馈。
+2. **阶段 8 收尾**：
+   - Step 8.1 全局异常处理与日志审计（`app/main.py` 注册 NiceGUI/FastAPI 异常处理）。
+   - Step 8.2 路由守卫 middleware（抽出各页面手写的登录保护）+ 关键操作审计日志（AI 调用 / 导出 / 账号变更 / 权限变更）。
+3. Step 8.3 全量回归 + Step 8.4 architecture 终版，验收通过后合并 `dev2.0` → `main`。
+
+---
+
+## 2026-05-31（阶段 8 收尾：全局异常处理 + 路由守卫 + 审计日志）
+
+### 背景
+
+阶段 7 闭环后，进入阶段 8 稳定性与安全加固。三项收尾：全局异常处理、路由守卫中间件、关键操作审计日志。（用户授权自主决策，无 schema 变更。）
+
+### 已完成
+
+- **Step 8.1 全局异常处理与审计日志**：
+  - `app/core/audit.py`（新）：`log_audit(action, *, tenant_id=None, user_id=None, **detail)` — 基于 `get_logger("audit")` 的结构化审计日志；内部 `try/except` 包裹，审计失败静默 pass，绝不影响主流程。
+  - `app/main.py`：`from nicegui import app, ui`；新增 `_on_global_exception(exc)` 记录未捕获异常（ERROR + `error_type`/`error_message`/`exc_info`）；`main()` 中 `app.on_exception(_on_global_exception)`。
+  - 审计接入点：
+    - `auth_service.login` → `login_success`（含 role）；`auth_service.change_password` → `change_password`。
+    - `lesson_plan_service.process_lesson_plan` → `ai_split`（含 grade）。
+    - `generate_service.generate_activity_content` → `ai_generate`（含 task_type）。
+    - `daily_plan._export_word` → `export_word`（含 daily_plan_id、file_name）。
+
+- **Step 8.2 路由守卫中间件**：
+  - `app/auth/middleware.py`（新）：`AuthMiddleware(BaseHTTPMiddleware)` — 受限页面路由校验 `app.storage.user` 中 JWT token，无效则清空 storage 并 `RedirectResponse("/")`；非页面路由（静态资源 / `_nicegui`）放行；白名单 `UNRESTRICTED_PAGE_ROUTES = {"/"}`。
+  - `app/main.py`：`app.add_middleware(AuthMiddleware)`。
+  - 各页面原有手写 `_get_current_user()` 登录保护**保留**作为纵深防御（defense-in-depth）。
+
+### 补单元测试
+
+- `tests/test_audit.py`（新，3 项）：结构化字段写入、ids 默认 None、审计调用永不抛异常（mock `app.core.audit._logger`）。
+- `tests/test_middleware.py`（新，5 项）：白名单路由放行、无 token 重定向、有效 token 放行、无效 token（AuthError）重定向、中间件可实例化（mock `app` 与 `decode_access_token`）。
+
+### 全量测试结果
+
+- **200 passed, 0 failed, 0 warnings**（Python 3.14.4）（较上轮 192 +8：test_audit ×3 + test_middleware ×5）。
+- `import app.main` 校验通过（中间件接线无误）。
+- Alembic head 不变：`d60766786069`（本轮无 schema 变更）。
+
+### 手工验收进度（2026-05-31 更新）
+
+1. ✅ **已通过**：未登录直接访问 `/daily-plan`、`/settings`、`/prompts` → 自动重定向回 `/`。
+2. ✅ **已通过**：登录后正常访问受限页面；退出登录后再访问受限页面 → 重定向回 `/`。
+3. ⏳ **未验收**：触发登录 / 改密 / AI 拆分 / 一日活动生成 / 导出 → 日志中出现对应 audit 记录（结构化字段含 tenant_id/user_id）。
+4. ⏳ **未验收**：制造未捕获异常 → 全局异常处理记录完整 traceback。
+
+> 前两项（路由守卫）已手工验收通过；后两项（审计日志落盘、全局异常 traceback）待后续验收。
+
+### 下一步
+
+- 完成审计日志与全局异常 traceback 两项手工验收。
+- 验收通过后合并 `dev2.0` → `main`（M2 里程碑「首期闭环可用」）。
+
+---
+
+## 2026-05-31（二期前置：对外只读 REST API + 项目文档）
+
+### 背景
+
+本系统为「幼儿园信息管理主系统」的子系统。应用户要求，在首期闭环基础上提前落地二期的对外 REST API（PRD 2.2 / 阶段 6），供主系统读取教学计划数据，并补齐项目 README 与开发者文档。
+
+### 对外 API 分析与设计
+
+子系统对外的核心价值是**只读**输出教学计划数据，故 v1 仅提供 GET 端点：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/v1/health` | 健康检查（免鉴权） |
+| GET | `/api/v1/daily-plans` | 分页查询每日活动计划（支持 user_id/start_date/end_date/grade/class_name/limit/offset 过滤） |
+| GET | `/api/v1/daily-plans/{id}` | 按 ID 查询单条计划（强制 tenant 隔离，跨租户返回 404） |
+| GET | `/api/v1/semesters` | 查询学期配置（支持 active_only） |
+| GET | `/api/v1/classes` | 查询班级配置 |
+
+**鉴权**：`X-Api-Key`（必填，配置 `API_KEYS="key:tenant_id"` 映射，每 Key 绑定唯一租户实现隔离）+ 可选 HMAC-SHA256 签名（配置 `API_SIGNING_SECRET` 时强制，校验 `X-Timestamp`/`X-Signature`，时间戳偏移 `API_SIGNATURE_MAX_SKEW` 秒内防重放）。未配置 `API_KEYS` 时对外接口默认关闭（401）。
+
+### 已完成
+
+- **新增 `app/api/` 模块**：`__init__.py`（`create_api_router`）、`auth.py`（API Key + 签名鉴权）、`deps.py`（`get_db`）、`schemas.py`（Pydantic 只读响应模型，不含密钥/密码）、`routes.py`（v1 路由）。
+- **配置**：`app/core/config.py` 新增 `API_KEYS` / `API_SIGNING_SECRET` / `API_SIGNATURE_MAX_SKEW`。
+- **仓库层只读查询**：`daily_plan_repository.list_daily_plans` / `get_daily_plan_by_id`、`semester_repository.list_semesters`、`class_repository.list_class_configs`，均强制 `tenant_id` 过滤。
+- **入口注册**：`app/main.py` 在 `main()` 中 `app.include_router(create_api_router())`；AuthMiddleware 仅拦截页面路由，`/api/*` 放行。
+- **模型修正**：`DailyPlan.id` 补 `.with_variant(Integer, "sqlite")`（与其余模型一致），修复 SQLite 测试自增；MySQL 仍为 BigInteger，**无 schema 变更**。
+- **文档**：新增 `README.md`（项目说明/快速开始/结构）、`docs/DEVELOPER.md`（开发者指南）、`docs/API.md`（对外 API 参考）；更新 `architecture.md`（app/api 职责 + 二期 API 章节）。
+
+### 测试
+
+- 新增 `tests/test_api_auth.py`（12 项：parse_api_keys、verify_signature 各场景）、`tests/test_api_routes.py`（16 项：鉴权放行/拒绝、租户隔离、分页/过滤、按 ID 查询、404、学期/班级、HMAC 签名校验，基于 httpx ASGITransport + SQLite 内存库）。
+- 全量：**228 passed, 0 warnings**（较上轮 200 +28）。
+- `import app.main` + `create_api_router()` 校验通过，路由含 5 个端点。
+- Alembic head 不变：`d60766786069`（本轮无 schema 变更）。
+
+### 下一步
+
+- 完成阶段 8 后两项手工验收（审计日志 / 异常 traceback）。
+- 推送 `dev2.0` 并合并 → `main`（M2 里程碑）。
+- 生产启用对外 API 前：在 `.env` 配置 `API_KEYS`（建议同时配置 `API_SIGNING_SECRET`），并经反向代理限制来源。
+
+

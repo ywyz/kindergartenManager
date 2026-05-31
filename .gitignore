@@ -1,58 +1,44 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+# 环境与密钥
+.env
+.env.prod
+.env.local
 
-# Virtual environments
+# 虚拟环境
 .venv/
+.venv.bak*/
 venv/
-ENV/
 env/
 
-# UV
-.uv/
+# Python 缓存
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
 
-# Environment variables (sensitive!)
-.env
+# NiceGUI 运行时存储（session 状态，不入仓）
+.nicegui/
+
+# 导出文件（不入仓）
+exports/
+!exports/.gitkeep
 
 # IDE
-.vscode/settings.json
 .idea/
+.vscode/settings.json
+.vscode/*.code-snippets
 *.swp
 *.swo
 
-# macOS
-.DS_Store
+# 测试覆盖率
+.coverage
+htmlcov/
+.pytest_cache/
 
-# Logs
+# 构建产物
+dist/
+build/
+*.egg-info/
+
+# 日志
 *.log
-logs/
-
-# Exports
-exports/
-*.docx
-!templates/*.docx
-
-# Database
-*.db
-*.sqlite3
-
-# Stray virtualenv folder created by mistake
-list/

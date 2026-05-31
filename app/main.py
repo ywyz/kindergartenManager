@@ -1,145 +1,61 @@
-"""NiceGUI 应用入口 - 左侧导航栏 + 路由"""
+"""应用入口。
+
+运行方式：
+    python -m app.main
+
+页面路由：
+    /       — 登录页
+    /home   — 主页占位
+"""
 from nicegui import app, ui
 
-from app.db import init_db
-from app.pages.settings import settings_page
-from app.pages.lesson_split import lesson_split_page
-from app.pages.daily_plan import daily_plan_page
-from app.pages.prompt_mgmt import prompt_mgmt_page
-from app.pages.plan_history import plan_history_page
-from app.pages.startup_check import startup_check_page
-from app.pages.db_setup import db_setup_page
-from app.config import AppConfig, BASE_DIR
+# 导入页面模块以注册 @ui.page 路由（必须在 ui.run 前执行）
+from app.ui.pages import home  # noqa: F401
+from app.ui.pages import login  # noqa: F401
+from app.ui.pages import settings  # noqa: F401
+from app.ui.pages import date_test  # noqa: F401
+from app.ui.pages import daily_plan  # noqa: F401
+from app.ui.pages import prompt_mgmt  # noqa: F401
+
+from app.api import create_api_router
+from app.auth.middleware import AuthMiddleware
+from app.core.config import settings
+from app.core.logging import get_logger
+
+logger = get_logger("app.main")
 
 
-# ---------------------------------------------------------------------------
-# 导航侧边栏组件（每个页面都会调用）
-# ---------------------------------------------------------------------------
+def _on_global_exception(exc: Exception) -> None:
+    """全局未捕获异常处理：记录结构化 ERROR 日志（含 traceback）。
 
-NAV_ITEMS = [
-    ("/settings",    "tune",               "系统设置"),
-    ("/daily-plan",  "event_note",         "一日计划"),
-    ("/prompts",     "psychology",         "提示词管理"),
-    ("/history",     "history",            "历史记录"),
-    ("/startup-check", "health_and_safety", "系统自检"),
-    ("/db-setup",    "settings_ethernet",  "数据库配置"),
-]
-
-
-def create_layout(current_path: str = "/"):
-    """创建包含顶栏和侧边导航的布局"""
-    with ui.header().classes("bg-blue-700 text-white items-center px-4 h-12"):
-        ui.label("🏫 幼儿园每日活动计划系统").classes("text-lg font-bold")
-
-    with ui.left_drawer(top_corner=True, bottom_corner=True).classes(
-        "bg-blue-50 w-48"
-    ):
-        ui.label("功能导航").classes("text-xs font-semibold text-gray-500 px-4 py-2 uppercase")
-        for path, icon, label in NAV_ITEMS:
-            is_active = current_path.rstrip("/") == path.rstrip("/")
-            btn_classes = (
-                "w-full text-left rounded-none bg-blue-200 font-semibold"
-                if is_active
-                else "w-full text-left rounded-none"
-            )
-            ui.button(
-                label,
-                icon=icon,
-                on_click=lambda p=path: ui.navigate.to(p),
-            ).classes(btn_classes).props("flat align=left no-caps")
-
-
-# ---------------------------------------------------------------------------
-# 路由注册
-# ---------------------------------------------------------------------------
-
-@ui.page("/")
-def index():
-    # 如果 .env 不存在，引导用户先完成数据库配置
-    env_path = BASE_DIR / ".env"
-    if not env_path.exists():
-        ui.navigate.to("/db-setup")
-        return
-    ui.navigate.to("/daily-plan")
-
-
-@ui.page("/settings")
-def page_settings():
-    create_layout("/settings")
-    with ui.column().classes("w-full p-4"):
-        settings_page()
-
-
-@ui.page("/lesson-split")
-def page_lesson_split():
-    create_layout("/lesson-split")
-    with ui.column().classes("w-full p-4"):
-        lesson_split_page()
-
-
-@ui.page("/daily-plan")
-def page_daily_plan():
-    create_layout("/daily-plan")
-    with ui.column().classes("w-full p-4"):
-        daily_plan_page()
-
-
-@ui.page("/prompts")
-def page_prompts():
-    create_layout("/prompts")
-    with ui.column().classes("w-full p-4"):
-        prompt_mgmt_page()
-
-
-@ui.page("/history")
-def page_history():
-    create_layout("/history")
-    with ui.column().classes("w-full p-4"):
-        plan_history_page()
-
-
-@ui.page("/startup-check")
-def page_startup_check():
-    create_layout("/startup-check")
-    with ui.column().classes("w-full p-4"):
-        startup_check_page()
-
-
-@ui.page("/db-setup")
-def page_db_setup():
-    create_layout("/db-setup")
-    with ui.column().classes("w-full p-4"):
-        db_setup_page()
-
-
-# ---------------------------------------------------------------------------
-# 启动
-# ---------------------------------------------------------------------------
-
-_DB_INIT_OK: bool = False
-
-
-def main():
-    global _DB_INIT_OK
-    # 初始化数据库（创建表）
-    try:
-        init_db()
-        _DB_INIT_OK = True
-    except Exception as e:
-        print(f"⚠️  数据库初始化失败，将跳转到数据库配置页：{e}")
-
-    # 确保导出目录存在
-    AppConfig.EXPORT_DIR.mkdir(parents=True, exist_ok=True)
-
-    ui.run(
-        host=AppConfig.HOST,
-        port=AppConfig.PORT,
-        title="幼儿园每日活动计划系统",
-        favicon="🏫",
-        dark=False,
-        reload=False,
+    用户友好提示由各页面自行处理（如 AI 调用失败展示 e.message）；
+    此处仅保证任何未预期异常都被记录，便于排查。
+    """
+    logger.error(
+        "未捕获异常",
+        extra={"error_type": type(exc).__name__, "error_message": str(exc)},
+        exc_info=exc,
     )
 
 
-if __name__ in ("__main__", "__mp_main__"):
+def main() -> None:
+    # 全局异常日志
+    app.on_exception(_on_global_exception)
+    # 路由守卫：未登录访问受限页面重定向到 /
+    app.add_middleware(AuthMiddleware)
+    # 对外只读 REST API（二期）：/api/v1，API Key + 可选 HMAC 签名鉴权
+    app.include_router(create_api_router())
+
+    ui.run(
+        host="0.0.0.0",
+        port=8080,
+        title="幼儿园教学管理系统",
+        storage_secret=settings.JWT_SECRET,  # 用于加密 app.storage.user
+        reload=False,
+        show=False,  # 不自动打开浏览器（服务器环境）
+        favicon="📚",
+    )
+
+
+if __name__ in {"__main__", "__mp_main__"}:
     main()
