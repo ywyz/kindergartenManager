@@ -5,7 +5,10 @@ from app.repository.user_repository import (
     create_user,
     get_user_by_id,
     get_user_by_username,
+    list_users_by_tenant,
+    query_users_by_tenant,
     update_password,
+    update_user_active,
 )
 
 
@@ -88,8 +91,102 @@ async def test_update_password(async_session):
         role="teacher",
     )
 
-    await update_password(async_session, user_id=user.id, new_hashed_password="new_hash")
+    updated = await update_password(
+        async_session,
+        tenant_id=1,
+        user_id=user.id,
+        new_hashed_password="new_hash",
+    )
+    assert updated is True
 
     updated = await get_user_by_id(async_session, tenant_id=1, user_id=user.id)
     assert updated is not None
     assert updated.hashed_password == "new_hash"
+
+
+async def test_update_password_wrong_tenant_no_effect(async_session):
+    """租户不匹配时，更新密码不应生效。"""
+    user = await create_user(
+        async_session,
+        tenant_id=1,
+        username="frank",
+        hashed_password="old_hash",
+        role="teacher",
+    )
+
+    updated = await update_password(
+        async_session,
+        tenant_id=2,
+        user_id=user.id,
+        new_hashed_password="new_hash",
+    )
+    assert updated is False
+
+    unchanged = await get_user_by_id(async_session, tenant_id=1, user_id=user.id)
+    assert unchanged is not None
+    assert unchanged.hashed_password == "old_hash"
+
+
+async def test_list_users_by_tenant(async_session):
+    """仅返回指定租户内用户。"""
+    await create_user(async_session, tenant_id=1, username="u1", hashed_password="h", role="teacher")
+    await create_user(async_session, tenant_id=2, username="u2", hashed_password="h", role="teacher")
+
+    users = await list_users_by_tenant(async_session, tenant_id=1)
+    usernames = {u.username for u in users}
+    assert usernames == {"u1"}
+
+
+async def test_update_user_active(async_session):
+    """启停状态更新仅在租户匹配时生效。"""
+    user = await create_user(async_session, tenant_id=1, username="active_u", hashed_password="h", role="teacher")
+
+    changed = await update_user_active(
+        async_session,
+        tenant_id=1,
+        user_id=user.id,
+        is_active=False,
+    )
+    assert changed is True
+
+    updated = await get_user_by_id(async_session, tenant_id=1, user_id=user.id)
+    assert updated is not None
+    assert updated.is_active is False
+
+    changed_wrong_tenant = await update_user_active(
+        async_session,
+        tenant_id=2,
+        user_id=user.id,
+        is_active=True,
+    )
+    assert changed_wrong_tenant is False
+
+
+async def test_query_users_by_tenant_with_filter_and_pagination(async_session):
+    """支持用户名关键字筛选和分页，且总数统计正确。"""
+    await create_user(async_session, tenant_id=1, username="alice_1", hashed_password="h", role="teacher")
+    await create_user(async_session, tenant_id=1, username="alice_2", hashed_password="h", role="teaching_admin")
+    await create_user(async_session, tenant_id=1, username="bob_1", hashed_password="h", role="teacher")
+    await create_user(async_session, tenant_id=2, username="alice_3", hashed_password="h", role="teacher")
+
+    users, total = await query_users_by_tenant(
+        async_session,
+        tenant_id=1,
+        username_keyword="alice",
+        role=None,
+        limit=10,
+        offset=0,
+    )
+    assert total == 2
+    assert {u.username for u in users} == {"alice_1", "alice_2"}
+
+    paged_users, paged_total = await query_users_by_tenant(
+        async_session,
+        tenant_id=1,
+        username_keyword=None,
+        role="teacher",
+        limit=1,
+        offset=0,
+    )
+    assert paged_total == 2
+    assert len(paged_users) == 1

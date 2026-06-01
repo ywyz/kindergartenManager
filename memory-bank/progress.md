@@ -1,5 +1,33 @@
 # 进度记录
 
+## 2026-06-01
+
+### 已完成（账号管理第二阶段）
+
+- 文档先行更新：`README.md`、`docs/DEVELOPER.md` 新增管理员初始化说明、阶段二能力说明，并补充手动验证步骤。
+- 新增系统管理员初始化脚本：`app/jobs/bootstrap_admin.py`。
+  - 环境变量开关控制：`BOOTSTRAP_ADMIN_ENABLED`。
+  - 幂等执行：同租户同用户名已存在时跳过，避免重复创建。
+- 扩展用户仓储：`app/repository/user_repository.py`。
+  - 新增 `update_user_active`（启停状态更新）。
+  - 新增 `query_users_by_tenant`（用户名关键字、角色筛选、分页 + 总数）。
+- 扩展鉴权服务：`app/service/auth_service.py`。
+  - 新增 `set_user_active_by_admin`、`reset_user_password_by_admin`。
+  - `list_users_for_admin` 支持筛选分页。
+- 升级账号管理页：`app/ui/pages/user_admin.py`。
+  - 支持筛选、分页、启停、重置密码。
+- 配置项补充：`app/core/config.py`、`.env.example` 增加 bootstrap 相关变量。
+
+### 测试结果
+
+- 定向测试：`tests/test_user_repository.py`、`tests/test_auth_service.py`、`tests/test_bootstrap_admin.py` → **27 passed**。
+- 全量回归：`pytest tests/ -q` → **242 passed, 0 failed**。
+
+### 当前状态
+
+- 第二阶段已完成并通过自动化回归。
+- 首期账号策略保持不变：不开放匿名注册，仅系统管理员可管理账号。
+
 ## 2026-05-10
 
 ### 已完成

@@ -3,6 +3,7 @@
 ## 1. 当前阶段
 
 - 项目阶段：M2/M3 已完成（阶段 0~8 全部完成）；二期对外只读 REST API 已落地。
+- 账号体系补充：已完成第二阶段（管理员初始化脚本、账号创建/启停/重置密码、筛选分页），首期不开放公开自助注册。
 - 开发策略：先架构后编码；每完成一个步骤同步更新本文件与 progress.md
 
 ## 2. 业务与权限边界（已确认）
@@ -111,15 +112,17 @@
 | `app/core/models/class_config.py` | ClassConfig ORM 模型 |
 | `app/auth/password.py` | Argon2 密码哈希与验证（passlib） |
 | `app/auth/jwt.py` | JWT 生成/验证（python-jose HS256），payload 含 sub/tenant_id/role/exp |
-| `app/service/auth_service.py` | 登录逻辑（查用户→验密码→签 JWT）；修改密码 |
+| `app/service/auth_service.py` | 登录逻辑（查用户→验密码→签 JWT）；修改密码；管理员账号创建、筛选分页、启停与重置密码（仅 `sys_admin`） |
 | `app/service/date_service.py` | 纯函数：`get_week_number`、`get_weekday_cn`、`is_workday`、`is_within_semester` |
-| `app/repository/user_repository.py` | 按用户名/ID 查询用户；更新密码 |
+| `app/repository/user_repository.py` | 按用户名/ID 查询用户；更新密码；启停状态更新；用户筛选分页查询 |
 | `app/repository/semester_repository.py` | `get_active_semester`、`upsert_active_semester` |
 | `app/repository/class_repository.py` | `get_class_config`、`upsert_class_config` |
 | `app/integration/holiday_client/client.py` | 法定节假日判定；法定节假日缓存 `dict[str, tuple[bool, str\|None, int]]`（含 day_type）；特殊节日缓存 `dict[str, list[str]]`；`is_holiday`、`is_near_holiday`、`get_holiday_name`、`get_special_day_tags`（sync，本地硬编码）、`is_adjusted_workday` |
 | `app/ui/pages/login.py` | 登录页（路由 `/`），token 写入 `app.storage.user` |
 | `app/ui/pages/home.py` | 首页（路由 `/home`），快捷导航按钮 |
 | `app/ui/pages/settings.py` | 配置页（路由 `/settings`），学期配置、班级配置、AI 接口配置（含脱敏展示与验证连接） |
+| `app/ui/pages/user_admin.py` | 账号管理页（路由 `/user-admin`），系统管理员创建账号、筛选分页、启停账号、重置密码 |
+| `app/jobs/bootstrap_admin.py` | 系统管理员初始化脚本（环境变量控制、幂等创建） |
 | `app/ui/pages/date_test.py` | 日期测试页（路由 `/date-test`），嵌入 DatePanel |
 
 ## 10. 阶段 3 已实现文件清单

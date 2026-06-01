@@ -4,6 +4,8 @@
 """
 from nicegui import app, ui
 
+from app.auth.jwt import decode_access_token
+
 
 @ui.page("/home")
 async def home_page() -> None:
@@ -11,6 +13,13 @@ async def home_page() -> None:
 
     # 未登录则跳回登录页
     if not token:
+        ui.navigate.to("/")
+        return
+
+    try:
+        user = decode_access_token(token)
+    except Exception:
+        app.storage.user.clear()
         ui.navigate.to("/")
         return
 
@@ -29,6 +38,11 @@ async def home_page() -> None:
             "提示词管理",
             on_click=lambda: ui.navigate.to("/prompts"),
         ).classes("bg-purple-600 text-white mt-1")
+        if user.get("role") == "sys_admin":
+            ui.button(
+                "账号管理",
+                on_click=lambda: ui.navigate.to("/user-admin"),
+            ).classes("bg-orange-600 text-white mt-1")
         ui.button(
             "日期选择测试",
             on_click=lambda: ui.navigate.to("/date-test"),

@@ -24,5 +24,12 @@ class Settings(BaseSettings):
     # 签名时间戳允许的最大偏移（秒），用于防重放。
     API_SIGNATURE_MAX_SKEW: int = 300
 
+    # 系统管理员初始化脚本配置
+    BOOTSTRAP_ADMIN_ENABLED: bool = False
+    BOOTSTRAP_ADMIN_TENANT_ID: int = 1
+    BOOTSTRAP_ADMIN_USERNAME: str = "sysadmin"
+    BOOTSTRAP_ADMIN_PASSWORD: str = ""
+    BOOTSTRAP_ADMIN_ALLOW_REMOTE: bool = False
+
 
 settings = Settings()
