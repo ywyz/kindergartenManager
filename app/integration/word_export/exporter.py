@@ -158,14 +158,29 @@ def _fill_process_cell(
 ) -> None:
     """填充集体活动「活动过程」单元格，按差异结果标红。"""
     _reset_cell(cell)
-    para = cell.add_paragraph()
-    _set_font(para.add_run("活动过程："), bold=True)
+    # "活动过程：" 标签独占一段，后续内容各行另起段落
+    label_para = cell.add_paragraph()
+    _set_font(label_para.add_run("活动过程："), bold=True)
     if diff_result:
         for item in diff_result:
             color = _RED if item.get("changed") else None
-            _set_font(para.add_run(item.get("text", "")), color=color)
+            lines = item.get("text", "").split("\n")
+            para = cell.add_paragraph()
+            _set_font(para.add_run(lines[0]), color=color)
+            for extra in lines[1:]:
+                if not extra.strip():
+                    continue
+                para = cell.add_paragraph()
+                _set_font(para.add_run(extra), color=color)
     elif adapted:
-        _set_font(para.add_run(adapted))
+        lines = adapted.split("\n")
+        para = cell.add_paragraph()
+        _set_font(para.add_run(lines[0]))
+        for extra in lines[1:]:
+            if not extra.strip():
+                continue
+            para = cell.add_paragraph()
+            _set_font(para.add_run(extra))
 
 
 def _fill_template(doc: Document, daily_plan: DailyPlan, diff_result: list[dict]) -> None:
@@ -338,9 +353,13 @@ def _build_collective_cell(
         ("活动难点", daily_plan.activity_difficult),
     ]:
         if value:
+            lines = value.split("\n")
             p = _para()
             _set_font(p.add_run(f"{label}："), bold=True)
-            _set_font(p.add_run(value))
+            _set_font(p.add_run(lines[0]))
+            for extra in lines[1:]:
+                p = _para()
+                _set_font(p.add_run(extra))
 
     has_adapted = bool(daily_plan.activity_process_adapted)
     if diff_result or has_adapted:
@@ -349,9 +368,17 @@ def _build_collective_cell(
         if diff_result:
             for item in diff_result:
                 color = _RED if item.get("changed") else None
-                _set_font(p.add_run(item["text"]), color=color)
+                lines = item["text"].split("\n")
+                _set_font(p.add_run(lines[0]), color=color)
+                for extra in lines[1:]:
+                    p = _para()
+                    _set_font(p.add_run(extra), color=color)
         elif has_adapted:
-            _set_font(p.add_run(daily_plan.activity_process_adapted or ""))
+            lines = (daily_plan.activity_process_adapted or "").split("\n")
+            _set_font(p.add_run(lines[0]))
+            for extra in lines[1:]:
+                p = _para()
+                _set_font(p.add_run(extra))
 
 
 def _export_from_scratch(daily_plan: DailyPlan, diff_result: list[dict]) -> bytes:

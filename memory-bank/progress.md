@@ -1,5 +1,32 @@
 # 进度记录
 
+## 2026-06-08
+
+### Bug 修复：Word 导出活动过程大标题不换行 & 多余空白行
+
+**问题现象**：导出的 Word 文档中活动过程格式错误，表现为：
+1. "活动过程：" 与 "一、xxxx" 拼在同一行，不换行
+2. 后续 item 的首行（如 "二、xxxx"）接在上一 item 末尾，不换行
+3. 修复换行后，发现 "一、xxxx" 下方出现一个多余空白行，才到 "1.xxxx"
+
+**根因**：
+- `_fill_process_cell()`（`app/integration/word_export/exporter.py`）将 "活动过程：" 标签和第一个内容行放在同一 `para`（`add_run`），而非新建段落（`add_paragraph`）
+- `diff_service._split_sentences()` 用 lookbehind 在 `\n` 后断句，句子末尾保留 `\n`；`split("\n")` 产生尾部空字符串，被当作新段落写入，形成空行
+
+**修复内容**：`app/integration/word_export/exporter.py` — `_fill_process_cell()`
+
+1. "活动过程：" 标签存入独立变量 `label_para`，不再复用
+2. `diff_result` 分支与 `elif adapted` 分支：每个 item 的第一行 `lines[0]` 改为 `cell.add_paragraph()` 新建段落后写入
+3. `for extra in lines[1:]` 循环内加 `if not extra.strip(): continue`，跳过空行段落
+
+**同步更新测试**：`tests/test_word_exporter.py`
+
+- `test_adapted_newlines_become_separate_paragraphs`：预期段落数 3 → 4（"活动过程："独占 1 段 + 内容 3 行各 1 段）
+
+**验证结果**：`pytest tests/test_word_exporter.py -v` → **17 passed**；用户手工导出验证格式正确。
+
+---
+
 ## 2026-06-01
 
 ### 已完成（账号管理第二阶段）
