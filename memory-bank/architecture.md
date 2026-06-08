@@ -314,3 +314,29 @@ process_lesson_plan(session, tenant_id, user_id, raw_text, grade, *, split_syste
 
 仓库层新增只读查询：`daily_plan_repository.list_daily_plans` / `get_daily_plan_by_id`、`semester_repository.list_semesters`、`class_repository.list_class_configs`——均强制携带 `tenant_id` 过滤。
 
+---
+
+## 14. 日期批量导出（2026-06-08）
+
+### 新增功能
+
+用户可在「每日计划」页面底部选择开始~结束日期范围，将区间内所有已保存计划合并导出为单个 Word 文档（表格按日期升序排列，相邻表格间留一空行）。
+
+### 核心变更
+
+| 文件 | 变更内容 |
+|------|----------|
+| `app/integration/word_export/exporter.py` | 新增 `export_batch_daily_plans(plans_with_diffs)` — 按 `plan_date` 升序排列；首个 plan 作为主文档，后续 plan 用 `copy.deepcopy` 追加表格 XML；相邻表格间插入空段落；空列表返回合法空文档；模板缺失时降级兼容 |
+| `app/ui/pages/daily_plan.py` | 新增「批量导出」卡片：日期范围选择器（`bind_value` 直读 `.value`）、输入校验（start≤end）、调用 `list_daily_plans(..., limit=200)` 范围查询、循环 `compute_diff` + `export_batch_daily_plans`、写入 `export_record`（`daily_plan_id=None`）、`log_audit("batch_export_word")`、`ui.download` 触发下载 |
+| `tests/test_word_exporter.py` | 新增 `TestBatchExport`：`test_batch_empty_list_returns_valid_bytes` / `test_batch_single_plan_has_one_table` / `test_batch_multiple_plans_sorted_by_date` |
+
+### Bug 修复（BL-05）
+
+| 编号 | 问题 | 决策 |
+|------|------|------|
+| BL-05 | 批量导出按钮点击后 `TypeError: strptime() argument 1 must be str, not list`；根因：`ui.date(...).on("update:model-value", lambda e: ..., e.args)` 中 `e.args` 为 NiceGUI 事件参数 list | 删除 `batch_state` dict 及 `on(...)` 监听器，改为在 `_batch_export()` 中直接读 `batch_start_input.value` / `batch_end_input.value`（已由 `bind_value` 双向绑定） |
+
+### 测试基准
+
+全量回归：**251 passed**（新增 9 个测试用例：`TestBatchExport` × 3 + `TestExportDailyPlan` 新增用例 × 3 + 其他 × 3）。
+

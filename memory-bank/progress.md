@@ -2,6 +2,55 @@
 
 ## 2026-06-08
 
+### 新功能：日期批量导出
+
+**需求**：用户需要一次性选择多个日期范围，将该范围内所有已保存的每日计划合并为一个 Word 文档下载。
+
+**实现模块**
+
+- `app/integration/word_export/exporter.py`：新增 `export_batch_daily_plans(plans_with_diffs)` 函数
+  - 输入：`list[tuple[DailyPlan, list[dict]]]`，顺序不限
+  - 自动按 `plan_date` 升序排列
+  - 第一个 plan 作为主文档，后续每个 plan 使用 `copy.deepcopy` 将模板表格 XML 节点追加到主文档 body
+  - 相邻表格间插入一个空行段落分隔
+  - 空列表返回合法空白文档字节流
+  - 模板缺失时降级使用 `_export_from_scratch` 并用同样方式合并
+
+- `app/ui/pages/daily_plan.py`：在「每日计划」页底部新增「批量导出」卡片
+  - 开始日期 + 结束日期选择器（带日历图标弹出）
+  - 输入校验：日期必填、start <= end
+  - 调用 `list_daily_plans(..., limit=200)` 范围查询，超 200 条时补充提示
+  - 计算差异 `compute_diff` 并调用 `export_batch_daily_plans`
+  - 写入一条 `export_record`（`daily_plan_id=None`）+ `log_audit("batch_export_word")` 审计
+  - 完成提示导出条数和日期范围
+
+- `tests/test_word_exporter.py`：新增 `TestBatchExport` 类，3 个测试用例
+  - `test_batch_empty_list_returns_valid_bytes`
+  - `test_batch_single_plan_has_one_table`
+  - `test_batch_multiple_plans_sorted_by_date`
+
+**验证结果**：`pytest tests/test_word_exporter.py -v` → **20 passed**；全量回归 **251 passed**。
+
+---
+
+### Bug 修复：批量导出日期解析 TypeError
+
+**问题现象**：点击「批量导出」按鈕后终端报错：
+```
+TypeError: strptime() argument 1 must be str, not list
+```
+UI 无友好提示，错误被全局异常处理器吸收。
+
+**根因**：`ui.date(...).on("update:model-value", lambda e: batch_state.update(..., e.args))` 中 `e.args` 是 NiceGUI 事件参数列表（`list`）而非字符串，传入 `datetime.strptime()` 导致类型错误。
+
+**修复方案**：`app/ui/pages/daily_plan.py`
+- 删除 `batch_state` dict 和两个 `on("update:model-value", ...)` 监听器
+- `_batch_export()` 改为直接读取 `batch_start_input.value` / `batch_end_input.value`（`bind_value` 已与输入框双向绑定，日期选择后自动同步为字符串）
+
+**验证结果**：全量回归 **251 passed**；手工验证批量导出流程正常。
+
+---
+
 ### Bug 修复：Word 导出活动过程大标题不换行 & 多余空白行
 
 **问题现象**：导出的 Word 文档中活动过程格式错误，表现为：

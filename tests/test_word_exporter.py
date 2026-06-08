@@ -22,6 +22,7 @@ from app.integration.word_export import exporter as exporter_mod
 from app.integration.word_export.exporter import (
     _export_from_scratch,
     _parse_fields,
+    export_batch_daily_plans,
     export_daily_plan,
 )
 
@@ -252,3 +253,42 @@ class TestFallbackFromScratch:
         result = export_daily_plan(plan, [])
         doc = _parse(result)
         assert len(doc.tables[0].rows) == 8
+
+
+class TestBatchExport:
+    def test_batch_empty_list_returns_valid_bytes(self):
+        result = export_batch_daily_plans([])
+        assert isinstance(result, bytes)
+        assert len(result) > 0
+        # 确保是合法 docx（能被解析）
+        doc = _parse(result)
+        assert doc is not None
+
+    def test_batch_single_plan_has_one_table(self):
+        plan = _make_plan(plan_date=date(2026, 5, 12))
+        result = export_batch_daily_plans([(plan, [])])
+        doc = _parse(result)
+        assert len(doc.tables) == 1
+
+    def test_batch_multiple_plans_sorted_by_date(self):
+        # 故意传入逆序：plan2 日期更早，应排在前面
+        plan1 = _make_plan(
+            plan_date=date(2026, 5, 20),
+            week_number=4,
+            weekday_cn="周三",
+        )
+        plan2 = _make_plan(
+            plan_date=date(2026, 5, 12),
+            week_number=3,
+            weekday_cn="周二",
+        )
+        result = export_batch_daily_plans([(plan1, []), (plan2, [])])
+        doc = _parse(result)
+        # 两个 plan → 两张表格
+        assert len(doc.tables) == 2
+        # 第一张表格应为较早的 plan2（5月12日）
+        first_table_text = doc.tables[0].rows[1].cells[0].text
+        assert "12" in first_table_text
+        # 第二张表格应为较晚的 plan1（5月20日）
+        second_table_text = doc.tables[1].rows[1].cells[0].text
+        assert "20" in second_table_text
