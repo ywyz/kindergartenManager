@@ -19,10 +19,11 @@ from app.core.database import AsyncSessionLocal
 from app.core.audit import log_audit
 from app.core.exceptions import AiCallError, AiParseError, ConfigError
 from app.integration.holiday_client.client import is_near_holiday
-from app.integration.word_export.exporter import export_daily_plan
+from app.integration.word_export.exporter import export_batch_daily_plans, export_daily_plan
 from app.repository.class_repository import get_class_config
 from app.repository.daily_plan_repository import (
     get_daily_plan_by_date,
+    list_daily_plans,
     save_daily_plan,
 )
 from app.repository.export_repository import save_export_record
@@ -600,6 +601,155 @@ async def daily_plan_page() -> None:
             export_btn = ui.button("导出 Word", on_click=_export_word).classes(
                 "bg-indigo-600 text-white"
             )
+
+    # ------------------------------------------------------------------
+    # 批量导出区块
+    # ------------------------------------------------------------------
+    with ui.card().classes("w-full"):
+        ui.label("批量导出").classes("text-lg font-bold mb-2")
+        ui.label("选择日期范围，将区间内所有已保存的计划合并导出为一个 Word 文件。").classes(
+            "text-sm text-gray-500 mb-3"
+        )
+        with ui.row().classes("items-center gap-4 flex-wrap"):
+            with ui.input("开始日期").classes("w-44") as batch_start_input:
+                with batch_start_input.add_slot("append"):
+                    ui.icon("event").on(
+                        "click",
+                        lambda: batch_start_picker.open(),
+                    ).classes("cursor-pointer")
+                with ui.menu() as batch_start_picker:
+                    ui.date(mask="YYYY-MM-DD").bind_value(batch_start_input)
+
+            with ui.input("结束日期").classes("w-44") as batch_end_input:
+                with batch_end_input.add_slot("append"):
+                    ui.icon("event").on(
+                        "click",
+                        lambda: batch_end_picker.open(),
+                    ).classes("cursor-pointer")
+                with ui.menu() as batch_end_picker:
+                    ui.date(mask="YYYY-MM-DD").bind_value(batch_end_input)
+
+        batch_msg = ui.label("").classes("text-sm mt-2")
+
+        async def _batch_export() -> None:
+            from datetime import datetime
+
+            start_str = batch_start_input.value
+            end_str = batch_end_input.value
+
+            if not start_str or not end_str:
+                batch_msg.classes(
+                    remove="text-green-600 text-red-500", add="text-orange-500"
+                )
+                batch_msg.text = "⚠ 请先选择开始日期和结束日期"
+                return
+
+            try:
+                start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
+                end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
+            except ValueError:
+                batch_msg.classes(
+                    remove="text-green-600 text-red-500", add="text-orange-500"
+                )
+                batch_msg.text = "⚠ 日期格式错误"
+                return
+
+            if start_date > end_date:
+                batch_msg.classes(
+                    remove="text-green-600 text-red-500", add="text-orange-500"
+                )
+                batch_msg.text = "⚠ 开始日期不能晚于结束日期"
+                return
+
+            batch_btn.props("loading")
+            batch_msg.classes(remove="text-green-600 text-red-500 text-orange-500")
+            batch_msg.text = "查询中……"
+
+            try:
+                async with AsyncSessionLocal() as session:
+                    plans, total = await list_daily_plans(
+                        session,
+                        tenant_id,
+                        user_id=user_id,
+                        start_date=start_date,
+                        end_date=end_date,
+                        limit=200,
+                    )
+
+                if not plans:
+                    batch_msg.classes(add="text-orange-500")
+                    batch_msg.text = "⚠ 所选日期范围内无计划记录"
+                    return
+
+                if total > 200:
+                    batch_msg.text = f"共 {total} 条记录，本次仅导出前 200 条……"
+
+                batch_msg.text = f"正在导出 {len(plans)} 条计划……"
+
+                plans_with_diffs = [
+                    (
+                        plan,
+                        compute_diff(
+                            plan.activity_process_original or "",
+                            plan.activity_process_adapted or "",
+                        ),
+                    )
+                    for plan in plans
+                ]
+
+                doc_bytes = export_batch_daily_plans(plans_with_diffs)
+
+                # 取第一条（按日期升序后最早的）的年级班级信息
+                first_plan = min(plans, key=lambda p: p.plan_date)
+                grade = first_plan.grade or "未知年级"
+                cls = first_plan.class_name or "未知班级"
+                filename = (
+                    f"{tenant_id}_{user_id}_{grade}_{cls}_"
+                    f"{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}"
+                    f"_批量日计划.docx"
+                )
+                exports_dir = Path("exports")
+                exports_dir.mkdir(exist_ok=True)
+                file_path = exports_dir / filename
+                file_path.write_bytes(doc_bytes)
+
+                async with AsyncSessionLocal() as session:
+                    async with session.begin():
+                        await save_export_record(
+                            session=session,
+                            tenant_id=tenant_id,
+                            user_id=user_id,
+                            daily_plan_id=None,
+                            file_name=filename,
+                            file_path=str(file_path.resolve()),
+                        )
+
+                ui.download(doc_bytes, filename=filename)
+
+                log_audit(
+                    "batch_export_word",
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    file_name=filename,
+                    plan_count=len(plans),
+                    start_date=str(start_date),
+                    end_date=str(end_date),
+                )
+                batch_msg.classes(add="text-green-600")
+                batch_msg.text = (
+                    f"✅ 已导出 {len(plans)} 条计划"
+                    f"（{start_date} ~ {end_date}）：{filename}"
+                )
+
+            except Exception as e:
+                batch_msg.classes(add="text-red-500")
+                batch_msg.text = f"❌ 批量导出失败：{type(e).__name__}: {e}"
+            finally:
+                batch_btn.props(remove="loading")
+
+        batch_btn = ui.button("批量导出 Word", on_click=_batch_export).classes(
+            "bg-emerald-600 text-white mt-2"
+        )
 
     # ------------------------------------------------------------------
     # 内部函数：加载已有草稿

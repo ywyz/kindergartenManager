@@ -158,14 +158,29 @@ def _fill_process_cell(
 ) -> None:
     """填充集体活动「活动过程」单元格，按差异结果标红。"""
     _reset_cell(cell)
-    para = cell.add_paragraph()
-    _set_font(para.add_run("活动过程："), bold=True)
+    # "活动过程：" 标签独占一段，后续内容各行另起段落
+    label_para = cell.add_paragraph()
+    _set_font(label_para.add_run("活动过程："), bold=True)
     if diff_result:
         for item in diff_result:
             color = _RED if item.get("changed") else None
-            _set_font(para.add_run(item.get("text", "")), color=color)
+            lines = item.get("text", "").split("\n")
+            para = cell.add_paragraph()
+            _set_font(para.add_run(lines[0]), color=color)
+            for extra in lines[1:]:
+                if not extra.strip():
+                    continue
+                para = cell.add_paragraph()
+                _set_font(para.add_run(extra), color=color)
     elif adapted:
-        _set_font(para.add_run(adapted))
+        lines = adapted.split("\n")
+        para = cell.add_paragraph()
+        _set_font(para.add_run(lines[0]))
+        for extra in lines[1:]:
+            if not extra.strip():
+                continue
+            para = cell.add_paragraph()
+            _set_font(para.add_run(extra))
 
 
 def _fill_template(doc: Document, daily_plan: DailyPlan, diff_result: list[dict]) -> None:
@@ -338,9 +353,13 @@ def _build_collective_cell(
         ("活动难点", daily_plan.activity_difficult),
     ]:
         if value:
+            lines = value.split("\n")
             p = _para()
             _set_font(p.add_run(f"{label}："), bold=True)
-            _set_font(p.add_run(value))
+            _set_font(p.add_run(lines[0]))
+            for extra in lines[1:]:
+                p = _para()
+                _set_font(p.add_run(extra))
 
     has_adapted = bool(daily_plan.activity_process_adapted)
     if diff_result or has_adapted:
@@ -349,9 +368,17 @@ def _build_collective_cell(
         if diff_result:
             for item in diff_result:
                 color = _RED if item.get("changed") else None
-                _set_font(p.add_run(item["text"]), color=color)
+                lines = item["text"].split("\n")
+                _set_font(p.add_run(lines[0]), color=color)
+                for extra in lines[1:]:
+                    p = _para()
+                    _set_font(p.add_run(extra), color=color)
         elif has_adapted:
-            _set_font(p.add_run(daily_plan.activity_process_adapted or ""))
+            lines = (daily_plan.activity_process_adapted or "").split("\n")
+            _set_font(p.add_run(lines[0]))
+            for extra in lines[1:]:
+                p = _para()
+                _set_font(p.add_run(extra))
 
 
 def _export_from_scratch(daily_plan: DailyPlan, diff_result: list[dict]) -> bytes:
@@ -399,4 +426,81 @@ def _export_from_scratch(daily_plan: DailyPlan, diff_result: list[dict]) -> byte
 
     buf = BytesIO()
     doc.save(buf)
+    return buf.getvalue()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 批量导出：将多天计划合并为单个 Word 文档
+# ──────────────────────────────────────────────────────────────────────────────
+
+def export_batch_daily_plans(
+    plans_with_diffs: list[tuple[DailyPlan, list[dict]]],
+) -> bytes:
+    """将多条每日计划合并导出为单个 Word 文档，返回文档字节流。
+
+    各计划按 plan_date 升序排列，相邻计划表格之间插入一个空行段落。
+    空列表时返回一个仅含空白段落的合法 docx bytes。
+
+    使用 `copy.deepcopy` 将每个独立生成的模板表格 XML 元素追加到首个文档的
+    body 中，保留模板样式（字体、边框等）。
+
+    Args:
+        plans_with_diffs: [(DailyPlan, diff_result)] 列表，顺序不限。
+
+    Returns:
+        合并后的 Word 文档 bytes。
+    """
+    from copy import deepcopy
+
+    if not plans_with_diffs:
+        # 空列表：返回仅含一个空白段落的合法文档
+        empty_doc = Document()
+        buf = BytesIO()
+        empty_doc.save(buf)
+        return buf.getvalue()
+
+    # 按日期升序排列
+    sorted_items = sorted(plans_with_diffs, key=lambda t: t[0].plan_date)
+
+    use_template = TEMPLATE_PATH.exists()
+
+    def _gen_doc(plan: DailyPlan, diff: list[dict]) -> Document:
+        """生成单日计划文档对象（不转 bytes）。"""
+        if use_template:
+            try:
+                doc = Document(str(TEMPLATE_PATH))
+                _fill_template(doc, plan, diff)
+                return doc
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "批量导出：模板填充失败，降级从零构建",
+                    extra={"plan_date": str(plan.plan_date), "error": f"{type(exc).__name__}: {exc}"},
+                )
+        # 降级：_export_from_scratch 返回 bytes，重新解析为 Document
+        scratch_bytes = _export_from_scratch(plan, diff)
+        return Document(BytesIO(scratch_bytes))
+
+    # 第一个计划作为主文档
+    first_plan, first_diff = sorted_items[0]
+    combined_doc = _gen_doc(first_plan, first_diff)
+
+    for plan, diff in sorted_items[1:]:
+        # 追加空行段落作为间隔
+        combined_doc.add_paragraph()
+
+        # 生成当天独立文档并取第一张表格
+        day_doc = _gen_doc(plan, diff)
+        if not day_doc.tables:
+            logger.warning(
+                "批量导出：某天文档无表格，跳过",
+                extra={"plan_date": str(plan.plan_date)},
+            )
+            continue
+
+        # deepcopy 表格 XML 节点并追加到主文档 body
+        table_elem = deepcopy(day_doc.tables[0]._element)
+        combined_doc.element.body.append(table_elem)
+
+    buf = BytesIO()
+    combined_doc.save(buf)
     return buf.getvalue()

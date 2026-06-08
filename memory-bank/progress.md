@@ -1,5 +1,109 @@
 # 进度记录
 
+## 2026-06-08
+
+### 新功能：日期批量导出
+
+**需求**：用户需要一次性选择多个日期范围，将该范围内所有已保存的每日计划合并为一个 Word 文档下载。
+
+**实现模块**
+
+- `app/integration/word_export/exporter.py`：新增 `export_batch_daily_plans(plans_with_diffs)` 函数
+  - 输入：`list[tuple[DailyPlan, list[dict]]]`，顺序不限
+  - 自动按 `plan_date` 升序排列
+  - 第一个 plan 作为主文档，后续每个 plan 使用 `copy.deepcopy` 将模板表格 XML 节点追加到主文档 body
+  - 相邻表格间插入一个空行段落分隔
+  - 空列表返回合法空白文档字节流
+  - 模板缺失时降级使用 `_export_from_scratch` 并用同样方式合并
+
+- `app/ui/pages/daily_plan.py`：在「每日计划」页底部新增「批量导出」卡片
+  - 开始日期 + 结束日期选择器（带日历图标弹出）
+  - 输入校验：日期必填、start <= end
+  - 调用 `list_daily_plans(..., limit=200)` 范围查询，超 200 条时补充提示
+  - 计算差异 `compute_diff` 并调用 `export_batch_daily_plans`
+  - 写入一条 `export_record`（`daily_plan_id=None`）+ `log_audit("batch_export_word")` 审计
+  - 完成提示导出条数和日期范围
+
+- `tests/test_word_exporter.py`：新增 `TestBatchExport` 类，3 个测试用例
+  - `test_batch_empty_list_returns_valid_bytes`
+  - `test_batch_single_plan_has_one_table`
+  - `test_batch_multiple_plans_sorted_by_date`
+
+**验证结果**：`pytest tests/test_word_exporter.py -v` → **20 passed**；全量回归 **251 passed**。
+
+---
+
+### Bug 修复：批量导出日期解析 TypeError
+
+**问题现象**：点击「批量导出」按鈕后终端报错：
+```
+TypeError: strptime() argument 1 must be str, not list
+```
+UI 无友好提示，错误被全局异常处理器吸收。
+
+**根因**：`ui.date(...).on("update:model-value", lambda e: batch_state.update(..., e.args))` 中 `e.args` 是 NiceGUI 事件参数列表（`list`）而非字符串，传入 `datetime.strptime()` 导致类型错误。
+
+**修复方案**：`app/ui/pages/daily_plan.py`
+- 删除 `batch_state` dict 和两个 `on("update:model-value", ...)` 监听器
+- `_batch_export()` 改为直接读取 `batch_start_input.value` / `batch_end_input.value`（`bind_value` 已与输入框双向绑定，日期选择后自动同步为字符串）
+
+**验证结果**：全量回归 **251 passed**；手工验证批量导出流程正常。
+
+---
+
+### Bug 修复：Word 导出活动过程大标题不换行 & 多余空白行
+
+**问题现象**：导出的 Word 文档中活动过程格式错误，表现为：
+1. "活动过程：" 与 "一、xxxx" 拼在同一行，不换行
+2. 后续 item 的首行（如 "二、xxxx"）接在上一 item 末尾，不换行
+3. 修复换行后，发现 "一、xxxx" 下方出现一个多余空白行，才到 "1.xxxx"
+
+**根因**：
+- `_fill_process_cell()`（`app/integration/word_export/exporter.py`）将 "活动过程：" 标签和第一个内容行放在同一 `para`（`add_run`），而非新建段落（`add_paragraph`）
+- `diff_service._split_sentences()` 用 lookbehind 在 `\n` 后断句，句子末尾保留 `\n`；`split("\n")` 产生尾部空字符串，被当作新段落写入，形成空行
+
+**修复内容**：`app/integration/word_export/exporter.py` — `_fill_process_cell()`
+
+1. "活动过程：" 标签存入独立变量 `label_para`，不再复用
+2. `diff_result` 分支与 `elif adapted` 分支：每个 item 的第一行 `lines[0]` 改为 `cell.add_paragraph()` 新建段落后写入
+3. `for extra in lines[1:]` 循环内加 `if not extra.strip(): continue`，跳过空行段落
+
+**同步更新测试**：`tests/test_word_exporter.py`
+
+- `test_adapted_newlines_become_separate_paragraphs`：预期段落数 3 → 4（"活动过程："独占 1 段 + 内容 3 行各 1 段）
+
+**验证结果**：`pytest tests/test_word_exporter.py -v` → **17 passed**；用户手工导出验证格式正确。
+
+---
+
+## 2026-06-01
+
+### 已完成（账号管理第二阶段）
+
+- 文档先行更新：`README.md`、`docs/DEVELOPER.md` 新增管理员初始化说明、阶段二能力说明，并补充手动验证步骤。
+- 新增系统管理员初始化脚本：`app/jobs/bootstrap_admin.py`。
+  - 环境变量开关控制：`BOOTSTRAP_ADMIN_ENABLED`。
+  - 幂等执行：同租户同用户名已存在时跳过，避免重复创建。
+- 扩展用户仓储：`app/repository/user_repository.py`。
+  - 新增 `update_user_active`（启停状态更新）。
+  - 新增 `query_users_by_tenant`（用户名关键字、角色筛选、分页 + 总数）。
+- 扩展鉴权服务：`app/service/auth_service.py`。
+  - 新增 `set_user_active_by_admin`、`reset_user_password_by_admin`。
+  - `list_users_for_admin` 支持筛选分页。
+- 升级账号管理页：`app/ui/pages/user_admin.py`。
+  - 支持筛选、分页、启停、重置密码。
+- 配置项补充：`app/core/config.py`、`.env.example` 增加 bootstrap 相关变量。
+
+### 测试结果
+
+- 定向测试：`tests/test_user_repository.py`、`tests/test_auth_service.py`、`tests/test_bootstrap_admin.py` → **27 passed**。
+- 全量回归：`pytest tests/ -q` → **242 passed, 0 failed**。
+
+### 当前状态
+
+- 第二阶段已完成并通过自动化回归。
+- 首期账号策略保持不变：不开放匿名注册，仅系统管理员可管理账号。
+
 ## 2026-05-10
 
 ### 已完成

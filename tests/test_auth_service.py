@@ -1,11 +1,19 @@
 """登录服务集成测试（SQLite 内存库）。"""
 import pytest
+from unittest.mock import patch
 
 from app.auth.jwt import decode_access_token
 from app.auth.password import hash_password
 from app.core.exceptions import AuthError
 from app.repository.user_repository import create_user
-from app.service.auth_service import change_password, login
+from app.service.auth_service import (
+    change_password,
+    create_user_by_admin,
+    list_users_for_admin,
+    login,
+    reset_user_password_by_admin,
+    set_user_active_by_admin,
+)
 
 
 # ── 辅助函数 ──────────────────────────────────────────────────────────────────
@@ -107,3 +115,210 @@ async def test_change_password_wrong_old_password_raises(async_session):
     # 原密码仍可正常登录
     token = await login(async_session, tenant_id=1, username="alice", password="OldPass!")
     assert token is not None
+
+
+async def test_create_user_by_admin_success(async_session):
+    """系统管理员可创建新账号，新账号可登录。"""
+    admin = await _make_user(async_session, username="root", role="sys_admin", password="RootPass!")
+
+    created = await create_user_by_admin(
+        async_session,
+        tenant_id=1,
+        admin_user_id=admin.id,
+        admin_role="sys_admin",
+        username="new_teacher",
+        password="TeacherPass!",
+        role="teacher",
+    )
+
+    assert created.username == "new_teacher"
+    assert created.role.value == "teacher"
+
+    token = await login(async_session, tenant_id=1, username="new_teacher", password="TeacherPass!")
+    assert token is not None
+
+
+async def test_create_user_by_admin_forbidden_role(async_session):
+    """非系统管理员无权创建账号。"""
+    creator = await _make_user(async_session, username="admin", role="teaching_admin", password="AdminPass!")
+
+    with pytest.raises(AuthError):
+        await create_user_by_admin(
+            async_session,
+            tenant_id=1,
+            admin_user_id=creator.id,
+            admin_role="teaching_admin",
+            username="blocked_user",
+            password="TeacherPass!",
+            role="teacher",
+        )
+
+
+async def test_create_user_by_admin_duplicate_username(async_session):
+    """同租户重复用户名创建失败。"""
+    admin = await _make_user(async_session, username="root2", role="sys_admin", password="RootPass!")
+    await _make_user(async_session, username="dup_name", role="teacher", password="TeacherPass!")
+
+    with pytest.raises(ValueError):
+        await create_user_by_admin(
+            async_session,
+            tenant_id=1,
+            admin_user_id=admin.id,
+            admin_role="sys_admin",
+            username="dup_name",
+            password="NewPass123",
+            role="teacher",
+        )
+
+
+async def test_create_user_by_admin_invalid_role(async_session):
+    """非法角色值应被拒绝。"""
+    admin = await _make_user(async_session, username="root3", role="sys_admin", password="RootPass!")
+
+    with pytest.raises(ValueError):
+        await create_user_by_admin(
+            async_session,
+            tenant_id=1,
+            admin_user_id=admin.id,
+            admin_role="sys_admin",
+            username="new_user",
+            password="TeacherPass!",
+            role="invalid_role",
+        )
+
+
+async def test_set_user_active_by_admin(async_session):
+    """系统管理员停用后目标账号无法登录，启用后恢复。"""
+    admin = await _make_user(async_session, username="root4", role="sys_admin", password="RootPass!")
+    target = await _make_user(async_session, username="target_user", role="teacher", password="UserPass!")
+
+    await set_user_active_by_admin(
+        async_session,
+        tenant_id=1,
+        admin_user_id=admin.id,
+        admin_role="sys_admin",
+        target_user_id=target.id,
+        is_active=False,
+    )
+
+    with pytest.raises(AuthError):
+        await login(async_session, tenant_id=1, username="target_user", password="UserPass!")
+
+    await set_user_active_by_admin(
+        async_session,
+        tenant_id=1,
+        admin_user_id=admin.id,
+        admin_role="sys_admin",
+        target_user_id=target.id,
+        is_active=True,
+    )
+
+    token = await login(async_session, tenant_id=1, username="target_user", password="UserPass!")
+    assert token is not None
+
+
+async def test_reset_user_password_by_admin(async_session):
+    """系统管理员重置密码后，旧密码失效，新密码生效。"""
+    admin = await _make_user(async_session, username="root5", role="sys_admin", password="RootPass!")
+    target = await _make_user(async_session, username="target_user2", role="teacher", password="OldUserPass!")
+
+    await reset_user_password_by_admin(
+        async_session,
+        tenant_id=1,
+        admin_user_id=admin.id,
+        admin_role="sys_admin",
+        target_user_id=target.id,
+        new_password="NewUserPass!",
+    )
+
+    with pytest.raises(AuthError):
+        await login(async_session, tenant_id=1, username="target_user2", password="OldUserPass!")
+
+    token = await login(async_session, tenant_id=1, username="target_user2", password="NewUserPass!")
+    assert token is not None
+
+
+async def test_list_users_for_admin_with_filter(async_session):
+    """系统管理员列表支持筛选并返回总数。"""
+    await _make_user(async_session, username="admin_main", role="sys_admin", password="RootPass!")
+    await _make_user(async_session, username="teacher_a", role="teacher", password="TeacherPass!")
+    await _make_user(async_session, username="teacher_b", role="teacher", password="TeacherPass!")
+    await _make_user(async_session, username="manager_a", role="teaching_admin", password="TeacherPass!")
+
+    users, total = await list_users_for_admin(
+        async_session,
+        tenant_id=1,
+        admin_role="sys_admin",
+        username_keyword="teacher",
+        role="teacher",
+        limit=10,
+        offset=0,
+    )
+    assert total == 2
+    assert {u.username for u in users} == {"teacher_a", "teacher_b"}
+
+
+async def test_create_user_by_admin_writes_audit(async_session):
+    """创建账号成功后写入 create_user 审计日志。"""
+    admin = await _make_user(async_session, username="root6", role="sys_admin", password="RootPass!")
+
+    with patch("app.service.auth_service.log_audit") as mock_audit:
+        await create_user_by_admin(
+            async_session,
+            tenant_id=1,
+            admin_user_id=admin.id,
+            admin_role="sys_admin",
+            username="audit_teacher",
+            password="TeacherPass!",
+            role="teacher",
+        )
+
+    mock_audit.assert_called_once()
+    args, kwargs = mock_audit.call_args
+    assert args[0] == "create_user"
+    assert kwargs["tenant_id"] == 1
+    assert kwargs["user_id"] == admin.id
+    assert kwargs["created_username"] == "audit_teacher"
+
+
+async def test_set_user_active_by_admin_writes_audit(async_session):
+    """启停操作成功后写入 set_user_active 审计日志。"""
+    admin = await _make_user(async_session, username="root7", role="sys_admin", password="RootPass!")
+    target = await _make_user(async_session, username="target_audit", role="teacher", password="UserPass!")
+
+    with patch("app.service.auth_service.log_audit") as mock_audit:
+        await set_user_active_by_admin(
+            async_session,
+            tenant_id=1,
+            admin_user_id=admin.id,
+            admin_role="sys_admin",
+            target_user_id=target.id,
+            is_active=False,
+        )
+
+    mock_audit.assert_called_once()
+    args, kwargs = mock_audit.call_args
+    assert args[0] == "set_user_active"
+    assert kwargs["target_user_id"] == target.id
+    assert kwargs["is_active"] is False
+
+
+async def test_reset_user_password_by_admin_writes_audit(async_session):
+    """重置密码成功后写入 reset_user_password 审计日志。"""
+    admin = await _make_user(async_session, username="root8", role="sys_admin", password="RootPass!")
+    target = await _make_user(async_session, username="target_pwd", role="teacher", password="UserPass!")
+
+    with patch("app.service.auth_service.log_audit") as mock_audit:
+        await reset_user_password_by_admin(
+            async_session,
+            tenant_id=1,
+            admin_user_id=admin.id,
+            admin_role="sys_admin",
+            target_user_id=target.id,
+            new_password="NewUserPass!",
+        )
+
+    mock_audit.assert_called_once()
+    args, kwargs = mock_audit.call_args
+    assert args[0] == "reset_user_password"
+    assert kwargs["target_user_id"] == target.id

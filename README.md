@@ -9,6 +9,7 @@
 ## 功能特性
 
 - **账号与权限**：账号密码登录 + JWT + RBAC（教师 / 教研管理员 / 系统管理员）。
+- **账号管理（阶段二）**：系统管理员账号初始化脚本、账号创建、启停、重置密码、筛选分页。
 - **学期与日期**：学期起止配置，自动计算第几周、周几、工作日 / 法定节假日（带缓存与降级）。
 - **教案 AI 拆分**：粘贴整篇教案，一键拆分为活动目标 / 准备 / 重点 / 难点 / 过程并回填表单。
 - **年龄适配与差异比对**：按年龄段改写「活动过程」，原文与改写文逐句比对，导出时差异标红。
@@ -51,6 +52,9 @@ cp .env.example .env
 # 5. 启动应用（默认 http://0.0.0.0:8080）
 .venv/bin/python -m app.main
 
+# 5.1 首次初始化系统管理员（可重复执行，已存在则跳过）
+.venv/bin/python -m app.jobs.bootstrap_admin
+
 # 6. 运行测试
 .venv/bin/pytest tests/ -q
 ```
@@ -70,6 +74,10 @@ cp .env.example .env
 | `API_KEYS` | 否 | 对外 API 鉴权，`"key:tenant_id"` 逗号分隔；为空则对外 API 关闭 |
 | `API_SIGNING_SECRET` | 否 | 对外 API HMAC 签名密钥；非空时强制校验签名 |
 | `API_SIGNATURE_MAX_SKEW` | 否 | 签名时间戳允许偏移秒数，默认 300 |
+| `BOOTSTRAP_ADMIN_ENABLED` | 否 | 是否允许执行管理员初始化脚本，默认 false |
+| `BOOTSTRAP_ADMIN_TENANT_ID` | 否 | 初始化管理员所属租户，默认 1 |
+| `BOOTSTRAP_ADMIN_USERNAME` | 否 | 初始化管理员用户名，默认 sysadmin |
+| `BOOTSTRAP_ADMIN_PASSWORD` | 否 | 初始化管理员密码，留空则脚本拒绝执行 |
 
 ## 目录结构
 
@@ -96,6 +104,7 @@ memory-bank/     项目文档（PRD、技术栈、计划、架构、进度）
 - 技术选型：[memory-bank/tech-stack.md](memory-bank/tech-stack.md)
 - 架构说明：[memory-bank/architecture.md](memory-bank/architecture.md)
 - 开发者指南：[docs/DEVELOPER.md](docs/DEVELOPER.md)
+- 手动测试文档：[docs/MANUAL_TESTING.md](docs/MANUAL_TESTING.md)
 - 对外 API 参考：[docs/API.md](docs/API.md)
 
 ## 里程碑

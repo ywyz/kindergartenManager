@@ -3,6 +3,7 @@
 ## 1. 当前阶段
 
 - 项目阶段：M2/M3 已完成（阶段 0~8 全部完成）；二期对外只读 REST API 已落地。
+- 账号体系补充：已完成第二阶段（管理员初始化脚本、账号创建/启停/重置密码、筛选分页），首期不开放公开自助注册。
 - 开发策略：先架构后编码；每完成一个步骤同步更新本文件与 progress.md
 
 ## 2. 业务与权限边界（已确认）
@@ -111,15 +112,17 @@
 | `app/core/models/class_config.py` | ClassConfig ORM 模型 |
 | `app/auth/password.py` | Argon2 密码哈希与验证（passlib） |
 | `app/auth/jwt.py` | JWT 生成/验证（python-jose HS256），payload 含 sub/tenant_id/role/exp |
-| `app/service/auth_service.py` | 登录逻辑（查用户→验密码→签 JWT）；修改密码 |
+| `app/service/auth_service.py` | 登录逻辑（查用户→验密码→签 JWT）；修改密码；管理员账号创建、筛选分页、启停与重置密码（仅 `sys_admin`） |
 | `app/service/date_service.py` | 纯函数：`get_week_number`、`get_weekday_cn`、`is_workday`、`is_within_semester` |
-| `app/repository/user_repository.py` | 按用户名/ID 查询用户；更新密码 |
+| `app/repository/user_repository.py` | 按用户名/ID 查询用户；更新密码；启停状态更新；用户筛选分页查询 |
 | `app/repository/semester_repository.py` | `get_active_semester`、`upsert_active_semester` |
 | `app/repository/class_repository.py` | `get_class_config`、`upsert_class_config` |
 | `app/integration/holiday_client/client.py` | 法定节假日判定；法定节假日缓存 `dict[str, tuple[bool, str\|None, int]]`（含 day_type）；特殊节日缓存 `dict[str, list[str]]`；`is_holiday`、`is_near_holiday`、`get_holiday_name`、`get_special_day_tags`（sync，本地硬编码）、`is_adjusted_workday` |
 | `app/ui/pages/login.py` | 登录页（路由 `/`），token 写入 `app.storage.user` |
 | `app/ui/pages/home.py` | 首页（路由 `/home`），快捷导航按钮 |
 | `app/ui/pages/settings.py` | 配置页（路由 `/settings`），学期配置、班级配置、AI 接口配置（含脱敏展示与验证连接） |
+| `app/ui/pages/user_admin.py` | 账号管理页（路由 `/user-admin`），系统管理员创建账号、筛选分页、启停账号、重置密码 |
+| `app/jobs/bootstrap_admin.py` | 系统管理员初始化脚本（环境变量控制、幂等创建） |
 | `app/ui/pages/date_test.py` | 日期测试页（路由 `/date-test`），嵌入 DatePanel |
 
 ## 10. 阶段 3 已实现文件清单
@@ -310,4 +313,30 @@ process_lesson_plan(session, tenant_id, user_id, raw_text, grade, *, split_syste
 **租户隔离**：每个 API Key 绑定唯一 `tenant_id`，所有业务查询以鉴权得到的 `tenant_id` 为强制过滤条件，调用方无法越权读取其他租户数据。**未配置** `API_KEYS` 时对外接口默认关闭（返回 401）。详见 [docs/API.md](../docs/API.md)。
 
 仓库层新增只读查询：`daily_plan_repository.list_daily_plans` / `get_daily_plan_by_id`、`semester_repository.list_semesters`、`class_repository.list_class_configs`——均强制携带 `tenant_id` 过滤。
+
+---
+
+## 14. 日期批量导出（2026-06-08）
+
+### 新增功能
+
+用户可在「每日计划」页面底部选择开始~结束日期范围，将区间内所有已保存计划合并导出为单个 Word 文档（表格按日期升序排列，相邻表格间留一空行）。
+
+### 核心变更
+
+| 文件 | 变更内容 |
+|------|----------|
+| `app/integration/word_export/exporter.py` | 新增 `export_batch_daily_plans(plans_with_diffs)` — 按 `plan_date` 升序排列；首个 plan 作为主文档，后续 plan 用 `copy.deepcopy` 追加表格 XML；相邻表格间插入空段落；空列表返回合法空文档；模板缺失时降级兼容 |
+| `app/ui/pages/daily_plan.py` | 新增「批量导出」卡片：日期范围选择器（`bind_value` 直读 `.value`）、输入校验（start≤end）、调用 `list_daily_plans(..., limit=200)` 范围查询、循环 `compute_diff` + `export_batch_daily_plans`、写入 `export_record`（`daily_plan_id=None`）、`log_audit("batch_export_word")`、`ui.download` 触发下载 |
+| `tests/test_word_exporter.py` | 新增 `TestBatchExport`：`test_batch_empty_list_returns_valid_bytes` / `test_batch_single_plan_has_one_table` / `test_batch_multiple_plans_sorted_by_date` |
+
+### Bug 修复（BL-05）
+
+| 编号 | 问题 | 决策 |
+|------|------|------|
+| BL-05 | 批量导出按钮点击后 `TypeError: strptime() argument 1 must be str, not list`；根因：`ui.date(...).on("update:model-value", lambda e: ..., e.args)` 中 `e.args` 为 NiceGUI 事件参数 list | 删除 `batch_state` dict 及 `on(...)` 监听器，改为在 `_batch_export()` 中直接读 `batch_start_input.value` / `batch_end_input.value`（已由 `bind_value` 双向绑定） |
+
+### 测试基准
+
+全量回归：**251 passed**（新增 9 个测试用例：`TestBatchExport` × 3 + `TestExportDailyPlan` 新增用例 × 3 + 其他 × 3）。
 
