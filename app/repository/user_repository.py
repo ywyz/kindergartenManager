@@ -140,3 +140,55 @@ async def query_users_by_tenant(
     items = list(data_result.scalars().all())
     total = int(total_result.scalar_one())
     return items, total
+
+
+async def create_pending_user(
+    session: AsyncSession,
+    tenant_id: int,
+    username: str,
+    hashed_password: str,
+    display_name: str | None = None,
+) -> User:
+    """创建待审核用户（is_active=False，role=teacher），用于自助注册流程。
+
+    Args:
+        session: 异步数据库会话。
+        tenant_id: 邀请码绑定的机构 ID。
+        username: 用户名（同 tenant 唯一）。
+        hashed_password: Argon2 哈希密码。
+        display_name: 显示名（可选）。
+
+    Returns:
+        新建的 User 对象（is_active=False）。
+    """
+    user = User(
+        tenant_id=tenant_id,
+        username=username,
+        hashed_password=hashed_password,
+        role=UserRole.teacher,
+        is_active=False,
+        display_name=display_name,
+    )
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
+async def update_display_name(
+    session: AsyncSession,
+    tenant_id: int,
+    user_id: int,
+    display_name: str | None,
+) -> bool:
+    """更新用户显示名，返回是否操作成功。"""
+    result = await session.execute(
+        update(User)
+        .where(
+            User.tenant_id == tenant_id,
+            User.id == user_id,
+        )
+        .values(display_name=display_name)
+    )
+    await session.commit()
+    return bool(result.rowcount)

@@ -74,64 +74,127 @@
 
 ## 待办（后续阶段）
 
-### 阶段 A：基础设施
-- [ ] 写测试 `tests/test_config_image_settings.py`（3 用例）
-- [ ] `requirements.txt` 新增 `Pillow>=10.0.0`
-- [ ] `app/core/config.py` 新增 IMAGE_STORAGE_BACKEND / IMAGE_MAX_BYTES
+### 阶段 A：基础设施 ✅（2026-06-09）
 
-### 阶段 B：数据模型与迁移
-- [ ] 写测试（扩充 `test_migrations_smoke.py`，5 用例）
-- [ ] B1: ai_api_key.key_type 列（ENUM text/vision）
-- [ ] B2: user.display_name 列（VARCHAR 64 NULL）
-- [ ] B3: game_observation 表
-- [ ] B4: game_observation_image 表（LargeBinary/LONGBLOB）
-- [ ] B5: invite_code 表
-- [ ] B6: prompt_template.task_type 扩展 game_observation
+| 步骤 | 内容 | 状态 |
+|------|------|------|
+| A.T | 写测试 `tests/test_config_image_settings.py`（3 用例）→ 先红 | ✅ |
+| A.1 | `app/core/config.py` 新增 `IMAGE_STORAGE_BACKEND`（默认 `mysql_blob`）、`IMAGE_MAX_BYTES`（默认 1048576） | ✅ |
+| A.2 | `requirements.txt` 新增 `Pillow>=10.0.0`；`pip install` 到 `.venv` | ✅ |
+| 测试 | `pytest tests/test_config_image_settings.py -v` → **3/3 passed** | ✅ |
+| 回归 | `pytest tests/ -v` → **264 passed, 0 failed** | ✅ |
 
-### 阶段 C：图片处理与存储
-- [ ] 写测试 test_image_processing.py（5）+ test_image_storage_blob.py（3）
-- [ ] app/integration/image_processing.py（compress_image）
-- [ ] app/integration/image_storage/（base + blob_backend + factory）
+### 阶段 B：数据模型（2026-06-09）
 
-### 阶段 D：仓库层
-- [ ] 写测试（5 个文件，共 18 用例）
-- [ ] observation_repository.py / observation_image_repository.py / invite_code_repository.py
-- [ ] 扩充 ai_key_repository.py（key_type 参数）
-- [ ] 扩充 user_repository.py（create_pending_user / update_display_name）
+| 步骤 | 内容 | 状态 |
+|------|------|------|
+| B.T | 写测试 `tests/test_migrations_smoke.py`（9 用例）→ 先红 | ✅ |
+| B.1 | `app/core/models/ai_key.py` 新增 `key_type` ENUM(text/vision)，server_default='text' | ✅ |
+| B.2 | `app/core/models/user.py` 新增 `display_name` VARCHAR(64) NULL | ✅ |
+| B.3 | 新建 `app/core/models/game_observation.py`（17 字段） | ✅ |
+| B.4 | 新建 `app/core/models/game_observation_image.py`（LargeBinary + LONGBLOB variant） | ✅ |
+| B.5 | 新建 `app/core/models/invite_code.py`（code UNIQUE 约束） | ✅ |
+| B.6 | `app/core/models/prompt_template.py` Enum 增加 `game_observation` | ✅ |
+| - | `app/core/models/__init__.py` 新增 3 个 model 导入 | ✅ |
+| - | `app/core/exceptions.py` 新增 `AppError` | ✅ |
+| 测试 | 9/9 passed | ✅ |
+| Alembic 迁移 | 2 个迁移脚本已执行：`54c20d37a461`（新表+新列）、`ff6b88b2ee1e`（Enum 扩展）| ✅ |
 
-### 阶段 E：AI 视觉客户端
-- [ ] 写测试 test_vision_base.py（5）+ test_observation_client.py（4）
-- [ ] vision_base.py / observation_client.py
+**手动验证（MySQL）✅（2026-06-09）**
 
-### 阶段 F：服务层（里程碑 M-CORE）
-- [ ] 写测试（3 个文件，共 11 用例）
-- [ ] observation_service.py / 扩充 auth_service.py / invite_service.py
+| 验证项 | 结果 |
+|--------|------|
+| `ai_api_key.key_type` ENUM('text','vision') DEFAULT text | ✅ |
+| `user.display_name` VARCHAR(64) NULL | ✅ |
+| `game_observation` 表存在 | ✅ |
+| `game_observation_image` 表存在，`blob_content` 为 LONGBLOB | ✅ |
+| `invite_code` 表存在，`code` 有 UNIQUE KEY | ✅ |
+| `prompt_template.task_type` 含 `game_observation` | ✅ |
 
-### 阶段 G：Word 导出
-- [ ] 写测试 test_observation_exporter.py（8）+ 扩充 test_export_repository.py（2）
-- [ ] observation_exporter.py / export_record 新增 observation_id 列
+**里程碑 M-DB：✅ 已完成**
 
-### 阶段 H：UI 页面（里程碑 M-UI）
-- [ ] 写测试 test_observation_ui_helpers.py（3 用例）
-- [ ] H1~H8：8 个页面改动（game_observation/register/profile/settings 扩展等）
+### 阶段 C：图片处理与存储抽象（2026-06-09）
 
-### 阶段 I：全量回归
-- [ ] 目标 ~298 passed（原 261 + 新增 ~37）
-- [ ] 更新 architecture.md
+| 步骤 | 内容 | 状态 |
+|------|------|------|
+| C.T | 写测试 `test_image_processing.py`（5）+ `test_image_storage_blob.py`（4）→ 先红 | ✅ |
+| C.1 | 新建 `app/integration/image_processing.py`（compress_image + CompressedImage） | ✅ |
+| C.2 | 新建 `app/integration/image_storage/base.py`（ImageStorageBackend ABC） | ✅ |
+| C.2 | 新建 `app/integration/image_storage/blob_backend.py`（BlobImageStorage） | ✅ |
+| C.2 | 新建 `app/integration/image_storage/__init__.py`（get_storage_backend 工厂） | ✅ |
+| 测试 | 9/9 passed | ✅ |
+
+### 阶段 D：仓库层（2026-06-09）
+
+| 步骤 | 内容 | 状态 |
+|------|------|------|
+| D.T | 写 5 个测试文件共 16 用例 → 先红 | ✅ |
+| D.1 | 新建 `app/repository/observation_repository.py`（save/get/list/update） | ✅ |
+| D.2 | 新建 `app/repository/observation_image_repository.py`（add/list/get/delete） | ✅ |
+| D.3 | 扩充 `app/repository/ai_key_repository.py`（key_type 参数，向后兼容默认 'text'） | ✅ |
+| D.4 | 新建 `app/repository/invite_code_repository.py`（create/get_active/list/set_active） | ✅ |
+| D.5 | 扩充 `app/repository/user_repository.py`（create_pending_user/update_display_name） | ✅ |
+| 测试 | 16/16 passed（新增）| ✅ |
+
+**全量回归（pytest tests/ -q）**
+
+| 指标 | 值 |
+|------|----|
+| 总用例数 | **298 passed** |
+| 失败 | 0 |
+| 耗时 | 20.43s |
 
 ---
 
-## 测试用例统计
+### 阶段 E：AI 视觉客户端（待开发）
+- [ ] 写测试 `tests/test_vision_base.py`（5 用例）+ `tests/test_observation_client.py`（4 用例）
+- [ ] `app/integration/ai_client/vision_base.py`
+- [ ] `app/integration/ai_client/observation_client.py`
+
+### 阶段 F：服务层（待开发，里程碑 M-CORE）
+- [ ] 写测试（`test_observation_service.py` 4 用例 / 扩充 `test_auth_service.py` 5 用例 / `test_invite_service.py` 2 用例）
+- [ ] `app/service/observation_service.py`
+- [ ] 扩充 `app/service/auth_service.py`（register_user / approve_user / update_profile_display_name）
+- [ ] `app/service/invite_service.py`
+
+### 阶段 G：Word 导出（待开发）
+- [ ] 写测试 `test_observation_exporter.py`（8 用例）+ 扩充 `test_export_repository.py`（2 用例）
+- [ ] `app/integration/word_export/observation_exporter.py`
+- [ ] `export_record` 表新增 `observation_id` 列（迁移）
+
+### 阶段 H：UI 页面（待开发，里程碑 M-UI）
+- [ ] 写测试 `test_observation_ui_helpers.py`（3 用例，纯函数）
+- [ ] H1: `settings.py` 拆分文本/视觉模型配置
+- [ ] H2: 新建 `app/ui/pages/game_observation.py`（观察主页面）
+- [ ] H3: 观察历史（同页或子区块）
+- [ ] H4: `prompt_mgmt.py` 新增 `game_observation` Tab
+- [ ] H5: 新建 `app/ui/pages/register.py` + 中间件白名单
+- [ ] H6: 新建 `app/ui/pages/profile.py`
+- [ ] H7: `user_admin.py` 扩展（邀请码 + 待审核）
+- [ ] H8: `home.py` 新增导航按钮
+
+### 阶段 I：全量回归（待开发）
+- [ ] 全量 `pytest tests/ -v` 全绿（目标 ~330+ passed）
+- [ ] 更新 `architecture.md`
+
+---
+
+## 测试用例统计（截至 2026-06-09）
 
 | 阶段 | 文件 | 用例数 | 状态 |
 |------|------|--------|------|
-| 0 | test_app_shell_menu.py | 10 | ✅ 已通过 |
-| A | test_config_image_settings.py | 3 | ⏳ |
-| B | test_migrations_smoke.py（扩充）| 5 | ⏳ |
-| C | test_image_processing + test_image_storage_blob | 8 | ⏳ |
-| D | 5 个仓库测试文件 | 18 | ⏳ |
-| E | test_vision_base + test_observation_client | 9 | ⏳ |
-| F | 3 个服务测试文件 | 11 | ⏳ |
-| G | test_observation_exporter + 扩充 | 10 | ⏳ |
-| H | test_observation_ui_helpers | 3 | ⏳ |
-| **合计** | | **~77** | |
+| 0 | test_app_shell_menu.py | 10 | ✅ |
+| A | test_config_image_settings.py | 3 | ✅ |
+| B | test_migrations_smoke.py | 9 | ✅ |
+| C | test_image_processing.py + test_image_storage_blob.py | 9 | ✅ |
+| D | test_observation_repository.py | 4 | ✅ |
+| D | test_observation_image_repository.py | 3 | ✅ |
+| D | test_invite_code_repository.py | 3 | ✅ |
+| D | test_ai_key_repository_keytype.py | 3 | ✅ |
+| D | test_user_repository_displayname.py | 3 | ✅ |
+| **已完成小计** | | **47** | ✅ |
+| E | test_vision_base.py + test_observation_client.py | 9 | ⏳ |
+| F | test_observation_service.py + 扩充 test_auth_service.py + test_invite_service.py | 11 | ⏳ |
+| G | test_observation_exporter.py + 扩充 test_export_repository.py | 10 | ⏳ |
+| H | test_observation_ui_helpers.py | 3 | ⏳ |
+| **全量（含已有 251 基础用例）** | | **298 passed** | ✅ |

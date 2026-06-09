@@ -205,9 +205,16 @@ type 值：0=工作日，1=周末，2=法定节假日，3=调班工作日。
 - 二期：对外只读 REST API（`/api/v1`）✅
 - 附加功能：日期批量导出 Word ✅（详见第 14 节）
 - **dev3.0 阶段 0**：界面重构（app_shell 共享布局、首页仪表盘、迁移 4 页、清理 date-test）✅
+- **dev3.0 阶段 A**：Pillow 依赖 + 图片配置项 ✅
+- **dev3.0 阶段 B**：6 个数据模型变更（ORM + Alembic 迁移均已完成 ✅，M-DB 达成）
+- **dev3.0 阶段 C**：图片压缩处理 + 可插拔存储抽象（BlobBackend）✅
+- **dev3.0 阶段 D**：仓库层（观察记录/图片/邀请码 + ai_key/user 扩充）✅
 
 **低优先级待办：**
-- 数据库 ERD 完整图（随模型实现逐步补齐，当前共 7 张业务表含 export_records）
+- 数据库 ERD 完整图（随模型实现逐步补齐）
+- 里程碑 M-DB：✅ 已完成（2026-06-09）
+  - 迁移 `54c20d37a461`：新建 game_observation / game_observation_image / invite_code 表，ai_api_key 加 key_type，user 加 display_name
+  - 迁移 `ff6b88b2ee1e`：prompt_template.task_type Enum 扩展加 game_observation
 
 ---
 
@@ -248,8 +255,76 @@ app/ui/components/app_shell.py
 
 ### 测试结果
 
-- `pytest tests/ -v`：**261 passed, 0 failed**（原 228 + 新增 10 + 调整 23）
+- `pytest tests/ -q`：**298 passed, 0 failed**（截至 2026-06-09，Phase B/C/D 完成后）
 - 手动验证：仪表盘/菜单/4 个功能页/date-test 404 全部通过 ✅
+
+---
+
+## dev3.0 阶段 A — 基础设施（2026-06-09 完成）
+
+| 类型 | 文件 | 说明 |
+|------|------|------|
+| 新增配置 | `app/core/config.py` | `IMAGE_STORAGE_BACKEND`（默认 `mysql_blob`）、`IMAGE_MAX_BYTES`（默认 1048576）|
+| 新增依赖 | `requirements.txt` | `Pillow>=10.0.0` |
+| 新增测试 | `tests/test_config_image_settings.py` | 3 用例，全绿 |
+
+---
+
+## dev3.0 阶段 B — 数据模型（2026-06-09 完成，Alembic 迁移待执行）
+
+### ORM 模型变更
+
+| 类型 | 文件 | 变更内容 |
+|------|------|----------|
+| 修改 | `app/core/models/ai_key.py` | 新增 `key_type` ENUM('text','vision')，server_default='text' |
+| 修改 | `app/core/models/user.py` | 新增 `display_name` VARCHAR(64) NULL |
+| 新建 | `app/core/models/game_observation.py` | 游戏观察记录表（17 字段）|
+| 新建 | `app/core/models/game_observation_image.py` | 观察图片表（LargeBinary + MySQL LONGBLOB variant）|
+| 新建 | `app/core/models/invite_code.py` | 邀请码表（code UNIQUE）|
+| 修改 | `app/core/models/prompt_template.py` | Enum 增加 `game_observation` 值 |
+| 修改 | `app/core/models/__init__.py` | 导入 3 个新 model |
+| 修改 | `app/core/exceptions.py` | 新增 `AppError`（通用业务异常）|
+
+### 数据库表（dev3.0 新增，Alembic 待执行）
+
+| 表名 | 主要字段 | 状态 |
+|------|---------|------|
+| `game_observation` | id, tenant_id, user_id, obs_date, time_range, big_env, game_area, grade, class_name, adult/child count, child_names/age, observer, 4个AI字段 | ⏳ 待迁移 |
+| `game_observation_image` | id, tenant_id, user_id, observation_id, image_index, storage_backend, blob_content(LONGBLOB), mime_type, file_size | ⏳ 待迁移 |
+| `invite_code` | id, tenant_id, code(UNIQUE), note, is_active, created_by | ⏳ 待迁移 |
+| `ai_api_key` | 新增列 `key_type` ENUM('text','vision') | ⏳ 待迁移 |
+| `user` | 新增列 `display_name` VARCHAR(64) NULL | ⏳ 待迁移 |
+| `prompt_template` | task_type Enum 增加 `game_observation` | ⏳ 待迁移 |
+
+> 待执行：`alembic upgrade head`（里程碑 M-DB）
+
+---
+
+## dev3.0 阶段 C — 图片处理与存储（2026-06-09 完成）
+
+| 文件 | 职责 |
+|------|------|
+| `app/integration/image_processing.py` | `compress_image(data, max_bytes) -> CompressedImage`；超限时等比缩放+降 JPEG 质量；非图片字节抛 `AppError` |
+| `app/integration/image_storage/base.py` | `ImageStorageBackend` ABC：`put(data, mime) -> dict` / `get(stored) -> bytes` |
+| `app/integration/image_storage/blob_backend.py` | `BlobImageStorage`：put 返回 `{"blob_content": data}`，与 DB session 解耦 |
+| `app/integration/image_storage/__init__.py` | `get_storage_backend(backend_name=None)` 工厂；未知后端抛 `ValueError` |
+
+---
+
+## dev3.0 阶段 D — 仓库层（2026-06-09 完成）
+
+| 文件 | 主要函数 |
+|------|---------|
+| `app/repository/observation_repository.py` | `save_observation` / `get_observation_by_id` / `list_observations`（分页+过滤）/ `update_observation` |
+| `app/repository/observation_image_repository.py` | `add_image` / `list_images_by_observation`（按 image_index 升序）/ `get_image` / `delete_images_by_observation` |
+| `app/repository/invite_code_repository.py` | `create_code` / `get_active_by_code` / `list_codes` / `set_code_active` |
+| `app/repository/ai_key_repository.py`（扩充）| `save_ai_key(key_type='text')` / `get_active_ai_key(key_type='text')`：text/vision 各自独立 active，互不影响 |
+| `app/repository/user_repository.py`（扩充）| `create_pending_user`（is_active=False）/ `update_display_name` |
+
+### 关键设计
+
+- `ai_key_repository`：`key_type` 参数默认 `'text'`，向后兼容现有 settings.py 等调用方无需修改
+- `observation_image_repository`：`list_images_by_observation` 按 `image_index` 升序，保证 Word 导出时图片顺序稳定
 
 ---
 

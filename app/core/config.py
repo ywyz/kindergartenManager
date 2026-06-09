@@ -42,5 +42,9 @@ class Settings(BaseSettings):
     BOOTSTRAP_ADMIN_PASSWORD: str = ""
     BOOTSTRAP_ADMIN_ALLOW_REMOTE: bool = False
 
+    # 图片处理配置（游戏观察子系统）
+    IMAGE_STORAGE_BACKEND: str = "mysql_blob"  # 可选：mysql_blob（本期唯一实现）
+    IMAGE_MAX_BYTES: int = 1048576  # 单图压缩上限，默认 1MB
+
 
 settings = Settings()

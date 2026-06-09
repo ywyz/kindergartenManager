@@ -57,7 +57,8 @@ def run_startup_migrations() -> None:
 
         alembic_cfg = Config(ini_path)
         alembic_cfg.set_main_option("script_location", script_location)
-        alembic_cfg.set_main_option("sqlalchemy.url", sync_url)
+        # configparser 插值规则：% 须转义为 %%，否则 URL 中的 %40 等编码字符会引发 ValueError
+        alembic_cfg.set_main_option("sqlalchemy.url", sync_url.replace("%", "%%"))
 
         logger.info("正在执行数据库迁移...", extra={"db_url": sync_url.split("@")[-1] if "@" in sync_url else sync_url})
         command.upgrade(alembic_cfg, "head")

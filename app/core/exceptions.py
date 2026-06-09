@@ -42,3 +42,11 @@ class AiParseError(Exception):
     def __init__(self, message: str = "AI 返回内容解析失败") -> None:
         super().__init__(message)
         self.message = message
+
+
+class AppError(Exception):
+    """通用业务异常：输入非法、文件格式错误等非 AI / 非鉴权类业务错误。"""
+
+    def __init__(self, message: str = "操作失败") -> None:
+        super().__init__(message)
+        self.message = message
