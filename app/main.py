@@ -17,7 +17,6 @@ from nicegui import app, ui
 from app.ui.pages import home  # noqa: F401
 from app.ui.pages import login  # noqa: F401
 from app.ui.pages import settings  # noqa: F401
-from app.ui.pages import date_test  # noqa: F401
 from app.ui.pages import daily_plan  # noqa: F401
 from app.ui.pages import prompt_mgmt  # noqa: F401
 from app.ui.pages import user_admin  # noqa: F401

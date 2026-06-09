@@ -19,6 +19,7 @@ from app.service.auth_service import (
     reset_user_password_by_admin,
     set_user_active_by_admin,
 )
+from app.ui.components.app_shell import render_shell
 
 
 _ROLES = ["teacher", "teaching_admin", "sys_admin"]
@@ -52,13 +53,7 @@ async def user_admin_page() -> None:
             ui.button("返回主页", on_click=lambda: ui.navigate.to("/home")).classes("bg-gray-100")
         return
 
-    with ui.header().classes("bg-blue-700 text-white items-center px-4"):
-        ui.label("账号管理").classes("text-lg font-bold flex-1")
-        ui.button("返回主页", on_click=lambda: ui.navigate.to("/home")).classes("text-white")
-        ui.button(
-            "退出登录",
-            on_click=lambda: (app.storage.user.clear(), ui.navigate.to("/")),
-        ).classes("text-white ml-2")
+    await render_shell(user, active="user-admin")
 
     with ui.column().classes("w-full max-w-4xl mx-auto p-6 gap-6"):
         ui.label("创建账号").classes("text-xl font-bold text-blue-700")

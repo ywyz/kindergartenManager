@@ -38,6 +38,7 @@ from app.repository.prompt_repository import (
     rollback_to_version,
     save_new_version,
 )
+from app.ui.components.app_shell import render_shell
 
 logger = get_logger(__name__)
 
@@ -125,17 +126,7 @@ async def prompt_mgmt_page() -> None:
     tenant_id: int = user["tenant_id"]
     user_id: int = int(user["sub"])
 
-    # ── 顶部导航 ─────────────────────────────────────────────────────────────
-    with ui.header().classes("bg-blue-700 text-white items-center px-4"):
-        ui.label("幼儿园教学管理系统").classes("text-lg font-bold flex-1")
-        ui.button(
-            "返回主页",
-            on_click=lambda: ui.navigate.to("/home"),
-        ).classes("text-white")
-        ui.button(
-            "退出登录",
-            on_click=lambda: (app.storage.user.clear(), ui.navigate.to("/")),
-        ).classes("text-white ml-2")
+    await render_shell(user, active="prompts")
 
     with ui.column().classes("w-full max-w-3xl mx-auto p-6 gap-6"):
         ui.label("提示词管理").classes("text-xl font-bold text-blue-700")

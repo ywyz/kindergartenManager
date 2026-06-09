@@ -1,53 +1,74 @@
-"""主页占位页（路由：/home）。
+"""主页仪表盘（路由：/home）。
 
-首期仅做路由占位，后续实现完整功能模块后替换。
+显示欢迎信息、当前班级信息和快捷入口卡片。
 """
 from nicegui import app, ui
 
 from app.auth.jwt import decode_access_token
+from app.core.database import AsyncSessionLocal
+from app.repository.class_repository import get_class_config
+from app.ui.components.app_shell import app_shell, get_display_name
+
+
+def _get_current_user() -> dict | None:
+    token = app.storage.user.get("token")
+    if not token:
+        return None
+    try:
+        return decode_access_token(token)
+    except Exception:
+        return None
 
 
 @ui.page("/home")
 async def home_page() -> None:
-    token = app.storage.user.get("token")
-
-    # 未登录则跳回登录页
-    if not token:
+    user = _get_current_user()
+    if not user:
         ui.navigate.to("/")
         return
 
-    try:
-        user = decode_access_token(token)
-    except Exception:
-        app.storage.user.clear()
-        ui.navigate.to("/")
-        return
+    tenant_id: int = user["tenant_id"]
+    user_id: int = int(user["sub"])
 
-    with ui.column().classes("items-center justify-center min-h-screen gap-3"):
-        ui.label("幼儿园教学管理系统").classes("text-2xl font-bold text-blue-700")
-        ui.label("登录成功，功能模块开发中……").classes("text-gray-500")
-        ui.button(
-            "基础配置（学期 / 班级）",
-            on_click=lambda: ui.navigate.to("/settings"),
-        ).classes("bg-blue-600 text-white mt-2")
-        ui.button(
-            "每日活动计划",
-            on_click=lambda: ui.navigate.to("/daily-plan"),
-        ).classes("bg-green-600 text-white mt-1")
-        ui.button(
-            "提示词管理",
-            on_click=lambda: ui.navigate.to("/prompts"),
-        ).classes("bg-purple-600 text-white mt-1")
-        if user.get("role") == "sys_admin":
-            ui.button(
-                "账号管理",
-                on_click=lambda: ui.navigate.to("/user-admin"),
-            ).classes("bg-orange-600 text-white mt-1")
-        ui.button(
-            "日期选择测试",
-            on_click=lambda: ui.navigate.to("/date-test"),
-        ).classes("bg-gray-100 mt-1")
-        ui.button(
-            "退出登录",
-            on_click=lambda: (app.storage.user.clear(), ui.navigate.to("/")),
-        ).classes("mt-2")
+    # 读取班级配置
+    class_info: str = "未配置班级"
+    async with AsyncSessionLocal() as session:
+        class_cfg = await get_class_config(session, tenant_id, user_id)
+        if class_cfg:
+            class_info = f"{class_cfg.grade} {class_cfg.class_name}"
+
+    async with app_shell(user, active="home"):
+        with ui.column().classes("w-full max-w-3xl mx-auto p-6 gap-6"):
+            # 欢迎信息
+            display_name = get_display_name(user)
+            ui.label(f"你好，{display_name}！").classes(
+                "text-2xl font-bold text-blue-700"
+            )
+            ui.label(f"当前班级：{class_info}").classes("text-gray-500 -mt-4")
+
+            # 快捷入口卡片
+            ui.label("快捷入口").classes(
+                "text-sm font-semibold text-gray-400 uppercase tracking-wide"
+            )
+            with ui.row().classes("w-full gap-4 flex-wrap"):
+                with ui.card().classes(
+                    "flex-1 min-w-48 cursor-pointer hover:shadow-md transition-shadow"
+                ).on("click", lambda: ui.navigate.to("/daily-plan")):
+                    with ui.row().classes("items-center gap-3"):
+                        ui.icon("edit_calendar").classes("text-3xl text-blue-600")
+                        with ui.column().classes("gap-0"):
+                            ui.label("每日活动计划").classes("font-semibold text-gray-800")
+                            ui.label("教案拆分 · 活动生成 · 导出").classes(
+                                "text-xs text-gray-400"
+                            )
+
+                with ui.card().classes(
+                    "flex-1 min-w-48 cursor-pointer hover:shadow-md transition-shadow"
+                ).on("click", lambda: ui.navigate.to("/game-observation")):
+                    with ui.row().classes("items-center gap-3"):
+                        ui.icon("videocam").classes("text-3xl text-green-600")
+                        with ui.column().classes("gap-0"):
+                            ui.label("游戏观察记录").classes("font-semibold text-gray-800")
+                            ui.label("拍照 · AI 分析 · 导出报告").classes(
+                                "text-xs text-gray-400"
+                            )

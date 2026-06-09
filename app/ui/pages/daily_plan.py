@@ -33,6 +33,7 @@ from app.service.diff_service import compute_diff
 from app.service.generate_service import generate_activity_content
 from app.service.lesson_plan_service import process_lesson_plan
 from app.ui.components.date_panel import DatePanel
+from app.ui.components.app_shell import render_shell
 
 
 def _get_current_user() -> dict | None:
@@ -68,20 +69,7 @@ async def daily_plan_page() -> None:
         "outdoor_content": "",         # 户外内容（来自 class_cfg）
     }
 
-    # ── 顶部导航 ────────────────────────────────────────────────────────────────
-    with ui.header().classes("bg-blue-700 text-white items-center px-4"):
-        ui.label("每日活动计划").classes("text-lg font-bold flex-1")
-        ui.button("返回主页", on_click=lambda: ui.navigate.to("/home")).classes(
-            "text-white"
-        )
-        ui.button(
-            "设置",
-            on_click=lambda: ui.navigate.to("/settings"),
-        ).classes("text-white ml-2")
-        ui.button(
-            "退出",
-            on_click=lambda: (app.storage.user.clear(), ui.navigate.to("/")),
-        ).classes("text-white ml-2")
+    await render_shell(user, active="daily-plan")
 
     with ui.column().classes("w-full max-w-3xl mx-auto p-4 gap-4"):
 

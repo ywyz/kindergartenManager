@@ -194,7 +194,7 @@ type 值：0=工作日，1=周末，2=法定节假日，3=调班工作日。
 
 ## 11. 当前状态（截至 2026-06-09）
 
-**所有首期阶段（0~8）及二期对外只读 REST API 均已完成。**
+**所有首期阶段（0~8）及二期对外只读 REST API 均已完成。dev3.0（游戏观察子系统）阶段 0 界面重构已完成。**
 
 - 阶段 0~3：骨架、鉴权、配置、AI Key ✅
 - 阶段 4：教案拆分 + 年龄适配 + 差异比对 ✅
@@ -204,9 +204,52 @@ type 值：0=工作日，1=周末，2=法定节假日，3=调班工作日。
 - 阶段 8：全局异常处理、审计日志、路由守卫 ✅
 - 二期：对外只读 REST API（`/api/v1`）✅
 - 附加功能：日期批量导出 Word ✅（详见第 14 节）
+- **dev3.0 阶段 0**：界面重构（app_shell 共享布局、首页仪表盘、迁移 4 页、清理 date-test）✅
 
 **低优先级待办：**
-- 数据库 ERD 完整图（随模型实现逐步补齐，当前共 6 张业务表）
+- 数据库 ERD 完整图（随模型实现逐步补齐，当前共 7 张业务表含 export_records）
+
+---
+
+## dev3.0 阶段 0 — 界面重构（2026-06-09 完成，M-UI0）
+
+### 变更内容
+
+| 类型 | 文件 | 说明 |
+|------|------|------|
+| 新增 | `app/ui/components/__init__.py` | 组件包初始化 |
+| 新增 | `app/ui/components/app_shell.py` | 共享布局组件（纯函数 + 两种渲染方式） |
+| 新增 | `tests/test_app_shell_menu.py` | app_shell 纯函数单测（10 用例）|
+| 重写 | `app/ui/pages/home.py` | 首页改为仪表盘（欢迎信息 + 班级信息 + 快捷卡片）|
+| 修改 | `app/ui/pages/settings.py` | 替换 ui.header() 为 render_shell |
+| 修改 | `app/ui/pages/daily_plan.py` | 替换 ui.header() 为 render_shell |
+| 修改 | `app/ui/pages/prompt_mgmt.py` | 替换 ui.header() 为 render_shell |
+| 修改 | `app/ui/pages/user_admin.py` | 替换 ui.header() 为 render_shell |
+| 修改 | `app/main.py` | 移除 date_test import |
+| 删除 | `app/ui/pages/date_test.py` | 开发测试页已清理 |
+
+### app_shell 设计
+
+```
+app/ui/components/app_shell.py
+├── get_menu_items(role, active=None) -> list[dict]  # 纯函数，可单测
+├── get_display_name(user) -> str                    # 纯函数，可单测
+├── app_shell(user, active)                          # async context manager，新页面用
+└── render_shell(user, active)                       # async 函数，迁移既有页面用
+```
+
+**菜单分组**：
+
+| 分组 | 菜单项 key | 角色限制 |
+|------|-----------|----------|
+| 教学管理 | daily-plan, game-observation | 所有角色 |
+| 配置中心 | settings, prompts | 所有角色 |
+| 账号中心 | profile, user-admin | user-admin 仅 sys_admin |
+
+### 测试结果
+
+- `pytest tests/ -v`：**261 passed, 0 failed**（原 228 + 新增 10 + 调整 23）
+- 手动验证：仪表盘/菜单/4 个功能页/date-test 404 全部通过 ✅
 
 ---
 
