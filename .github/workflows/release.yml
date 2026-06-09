@@ -1,0 +1,193 @@
+name: Release Build
+
+# 推送 v* 格式的 tag 时触发（例如 v1.0.0、v1.2.3-beta）
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write       # 创建 GitHub Release 并上传附件
+  packages: write       # 推送到 GitHub Container Registry (ghcr.io)
+
+jobs:
+  # ── Windows 桌面版（.exe） ────────────────────────────────────────────────
+  build-windows:
+    name: Build Windows EXE
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        run: pyinstaller kindergartenManager.spec
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: dist/幼儿园教学管理系统.exe
+          retention-days: 7
+
+  # ── Linux 桌面版（二进制） ────────────────────────────────────────────────
+  build-linux:
+    name: Build Linux Binary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y gcc
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        run: pyinstaller kindergartenManager.spec
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-binary
+          path: dist/幼儿园教学管理系统
+          retention-days: 7
+
+  # ── Docker 镜像（服务器版） ────────────────────────────────────────────────
+  build-docker:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/kindergartenmanager
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── 创建 GitHub Release ──────────────────────────────────────────────────
+  create-release:
+    name: Create GitHub Release
+    needs: [build-windows, build-linux, build-docker]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-exe
+          path: artifacts/
+
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-binary
+          path: artifacts/
+
+      - name: Make Linux binary executable
+        run: chmod +x "artifacts/幼儿园教学管理系统"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+          body: |
+            ## 幼儿园教学管理系统 ${{ github.ref_name }}
+
+            ### 下载说明
+
+            | 平台 | 文件 | 说明 |
+            |------|------|------|
+            | Windows | `幼儿园教学管理系统.exe` | 双击运行，自动打开浏览器 |
+            | Linux | `幼儿园教学管理系统` | 赋权后运行（见下方命令） |
+            | Docker | `ghcr.io/ywyz/kindergartenmanager:${{ github.ref_name }}` | 服务器部署 |
+
+            ### Windows 桌面版
+
+            1. 下载 `幼儿园教学管理系统.exe`
+            2. 在同一目录创建 `.env` 文件（参考下方配置说明）
+            3. 双击运行，浏览器自动打开 http://localhost:8080
+
+            > ⚠️ **Windows 安全提示**：首次运行可能触发 Windows Defender 警告，点击"更多信息" → "仍要运行"即可。这是 PyInstaller 打包程序的常见问题，不影响安全性。
+
+            ### Linux 桌面版
+
+            ```bash
+            chmod +x 幼儿园教学管理系统
+            # 在同目录创建 .env 文件后运行：
+            ./幼儿园教学管理系统
+            ```
+
+            ### Docker 服务器版
+
+            ```bash
+            # 下载 docker-compose.yml（见仓库根目录）后：
+            docker compose up -d
+            ```
+
+            或直接拉取镜像：
+            ```bash
+            docker pull ghcr.io/ywyz/kindergartenmanager:${{ github.ref_name }}
+            ```
+
+            ### .env 配置说明（必须创建）
+
+            ```env
+            # 数据库（留空使用内嵌 SQLite，仅适合单机单用户）
+            # DATABASE_URL=mysql+aiomysql://user:password@host:3306/kindergarten_db
+
+            # 必填：随机32字节字符串（用于加密 AI Key）
+            ENCRYPTION_KEY=your-32-byte-encryption-key-here!!
+
+            # 必填：随机字符串（用于 JWT 签名）
+            JWT_SECRET=your-random-jwt-secret-here
+
+            # 节假日 API（留空时节假日功能降级）
+            HOLIDAY_API_URL=https://timor.tech/api/holiday/info/
+            ```
+
+            详细使用说明请查阅 [用户手册](docs/USER_MANUAL.md)。
