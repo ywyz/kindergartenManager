@@ -7,6 +7,10 @@
     /       — 登录页
     /home   — 主页占位
 """
+import sys
+import threading
+import webbrowser
+
 from nicegui import app, ui
 
 # 导入页面模块以注册 @ui.page 路由（必须在 ui.run 前执行）
@@ -40,6 +44,13 @@ def _on_global_exception(exc: Exception) -> None:
 
 
 def main() -> None:
+    from app.core.startup import run_startup_migrations
+    run_startup_migrations()
+
+    # 打包模式（PyInstaller）：自动打开系统默认浏览器
+    if getattr(sys, "frozen", False):
+        threading.Timer(1.5, lambda: webbrowser.open("http://localhost:8080")).start()
+
     # 全局异常日志
     app.on_exception(_on_global_exception)
     # 路由守卫：未登录访问受限页面重定向到 /

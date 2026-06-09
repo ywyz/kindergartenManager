@@ -15,7 +15,11 @@ config = context.config
 
 # Override sqlalchemy.url with value from Settings (env-based).
 # Alembic uses configparser interpolation, so '%' must be escaped as '%%'.
-sync_url = settings.DATABASE_URL.replace("+aiomysql", "+pymysql")
+_db_url = settings.DATABASE_URL or "sqlite:///./kindergarten.db"
+if "+aiosqlite" in _db_url:
+    sync_url = _db_url.replace("+aiosqlite", "")
+else:
+    sync_url = _db_url.replace("+aiomysql", "+pymysql")
 config.set_main_option("sqlalchemy.url", sync_url.replace("%", "%%"))
 
 # Interpret the config file for Python logging.
