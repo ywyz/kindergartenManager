@@ -74,3 +74,32 @@ async def test_save_export_record_tenant_isolation(async_session):
 
     assert len(rows) == 1
     assert rows[0].file_name == "t1.docx"
+
+
+@pytest.mark.asyncio
+async def test_save_observation_export_record_with_observation_id(async_session):
+    """写入观察导出记录时，observation_id 字段正确持久化。"""
+    record = await save_export_record(
+        async_session,
+        tenant_id=1,
+        user_id=2,
+        daily_plan_id=None,
+        file_name="obs_export.docx",
+        file_path="/abs/obs_export.docx",
+        observation_id=42,
+    )
+    assert record.observation_id == 42
+
+
+@pytest.mark.asyncio
+async def test_save_export_record_observation_id_defaults_to_none(async_session):
+    """未传 observation_id 时，字段默认为 None（向后兼容）。"""
+    record = await save_export_record(
+        async_session,
+        tenant_id=1,
+        user_id=2,
+        daily_plan_id=10,
+        file_name="plan_export.docx",
+        file_path="/abs/plan_export.docx",
+    )
+    assert record.observation_id is None

@@ -31,6 +31,7 @@ from app.integration.ai_client.generate_client import (
     DEFAULT_OUTDOOR_GAME_PROMPT,
 )
 from app.integration.ai_client.lesson_plan_client import DEFAULT_SPLIT_PROMPT, split_lesson_plan
+from app.integration.ai_client.observation_client import DEFAULT_OBSERVATION_PROMPT
 from app.repository.ai_key_repository import get_active_ai_key, get_decrypted_key
 from app.repository.prompt_repository import (
     get_active_prompt,
@@ -72,6 +73,10 @@ _TASK_CONFIG = {
         "label": "一日活动反思提示词",
         "placeholder": DEFAULT_DAILY_REFLECTION_PROMPT,
     },
+    "game_observation": {
+        "label": "游戏观察提示词",
+        "placeholder": DEFAULT_OBSERVATION_PROMPT,
+    },
 }
 
 # 每种任务类型的输出格式要求（展示在编辑器上方）
@@ -91,6 +96,11 @@ _TASK_SCHEMA: dict[str, str] = {
     "area_game": "输出纯文本（非 JSON），按提示词中定义的格式生成区域游戏方案",
     "outdoor_game": "输出纯文本（非 JSON），按提示词中定义的格式生成户外游戏方案",
     "daily_reflection": "输出纯文本（非 JSON），按提示词中定义的格式生成一日活动反思",
+    "game_observation": (
+        "输出 JSON，必须包含以下 4 个字段（key 名称不可修改）：\n"
+        '{"observation_goal": "...", "observation_record": "...", '
+        '"evaluation_analysis": "...", "support_strategy": "..."}'
+    ),
 }
 
 # 测试区输入框提示文字

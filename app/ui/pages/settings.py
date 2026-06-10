@@ -207,12 +207,12 @@ async def settings_page() -> None:
             )
 
         # ══════════════════════════════════════════════════════════════════════
-        # 区块三：AI 接口配置
+        # 区块三：AI 接口配置 — 文本模型
         # ══════════════════════════════════════════════════════════════════════
         with ui.card().classes("w-full"):
-            ui.label("AI 接口配置").classes("text-lg font-bold text-blue-700 mb-2")
+            ui.label("AI 接口配置 — 文本模型").classes("text-lg font-bold text-blue-700 mb-2")
             ui.label(
-                "API Key 保存后以脱敏形式显示，如需更新请直接输入新 Key。"
+                "用于教案拆分、年龄适配、一日活动生成等文本任务。API Key 保存后以脱敏形式显示。"
             ).classes("text-xs text-gray-500 mb-3")
 
             ai_url_input = ui.input(
@@ -289,7 +289,7 @@ async def settings_page() -> None:
                         return
 
                 async with AsyncSessionLocal() as session:
-                    await save_ai_key(session, tenant_id, user_id, url, plain_key, model)
+                    await save_ai_key(session, tenant_id, user_id, url, plain_key, model, key_type="text")
 
                 masked = _mask_api_key(plain_key)
                 _current_masked[0] = masked
@@ -302,7 +302,7 @@ async def settings_page() -> None:
                 ai_msg.text = "连接测试中……"
 
                 async with AsyncSessionLocal() as session:
-                    ai_key_record = await get_active_ai_key(session, tenant_id, user_id)
+                    ai_key_record = await get_active_ai_key(session, tenant_id, user_id, key_type="text")
 
                 if ai_key_record is None:
                     ai_msg.text = "请先保存 AI 接口配置"
@@ -344,11 +344,128 @@ async def settings_page() -> None:
                     "bg-gray-100 text-gray-700"
                 )
 
+        # ══════════════════════════════════════════════════════════════════════
+        # 区块四：AI 接口配置 — 视觉模型
+        # ══════════════════════════════════════════════════════════════════════
+        with ui.card().classes("w-full"):
+            ui.label("AI 接口配置 — 视觉模型").classes("text-lg font-bold text-green-700 mb-2")
+            ui.label(
+                "用于游戏观察图片分析（key_type=vision），与文本模型独立配置。"
+            ).classes("text-xs text-gray-500 mb-3")
+
+            vision_url_input = ui.input(
+                label="视觉模型 API 地址",
+                placeholder="如：https://api.openai.com/v1",
+            ).classes("w-full")
+
+            vision_model_input = ui.input(
+                label="视觉模型名称",
+                placeholder="如：gpt-4o / qwen-vl-plus",
+            ).classes("w-full mt-2")
+
+            vision_key_input = ui.input(
+                label="视觉模型 API Key",
+                placeholder="输入 API Key（保存后脱敏显示）",
+                password=True,
+                password_toggle_button=True,
+            ).classes("w-full mt-2")
+
+            vision_msg = ui.label("").classes("text-sm mt-1")
+            _vision_masked: list[str] = [""]
+
+            async def save_vision_key_handler() -> None:
+                vision_msg.classes(remove="text-green-600 text-red-500")
+                url = vision_url_input.value.strip()
+                model = vision_model_input.value.strip()
+                key_val = vision_key_input.value.strip()
+
+                if not url:
+                    vision_msg.text = "请输入视觉模型 API 地址"
+                    vision_msg.classes(add="text-red-500")
+                    return
+                if not model:
+                    vision_msg.text = "请输入视觉模型名称"
+                    vision_msg.classes(add="text-red-500")
+                    return
+
+                key_changed = key_val and key_val != _vision_masked[0]
+                if key_changed:
+                    plain_key = key_val
+                else:
+                    async with AsyncSessionLocal() as session:
+                        existing = await get_active_ai_key(session, tenant_id, user_id, key_type="vision")
+                    if existing is None:
+                        if not key_val:
+                            vision_msg.text = "请输入视觉模型 API Key"
+                            vision_msg.classes(add="text-red-500")
+                            return
+                        plain_key = key_val
+                    else:
+                        try:
+                            plain_key = get_decrypted_key(existing)
+                        except CryptoError:
+                            vision_msg.text = "已有 Key 解密失败，请重新输入"
+                            vision_msg.classes(add="text-red-500")
+                            return
+
+                async with AsyncSessionLocal() as session:
+                    await save_ai_key(session, tenant_id, user_id, url, plain_key, model, key_type="vision")
+
+                masked = _mask_api_key(plain_key)
+                _vision_masked[0] = masked
+                vision_key_input.value = masked
+                vision_msg.text = "视觉模型配置已保存"
+                vision_msg.classes(add="text-green-600")
+
+            async def verify_vision_connection() -> None:
+                vision_msg.classes(remove="text-green-600 text-red-500")
+                vision_msg.text = "连接测试中……"
+
+                async with AsyncSessionLocal() as session:
+                    ai_vision_key = await get_active_ai_key(session, tenant_id, user_id, key_type="vision")
+
+                if ai_vision_key is None:
+                    vision_msg.text = "请先保存视觉模型配置"
+                    vision_msg.classes(add="text-red-500")
+                    return
+                try:
+                    plain_key = get_decrypted_key(ai_vision_key)
+                except CryptoError:
+                    vision_msg.text = "Key 解密失败，请重新保存"
+                    vision_msg.classes(add="text-red-500")
+                    return
+
+                base_url = ai_vision_key.api_base_url.rstrip("/")
+                try:
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        resp = await client.get(
+                            f"{base_url}/models",
+                            headers={"Authorization": f"Bearer {plain_key}"},
+                        )
+                    if resp.is_success:
+                        vision_msg.text = "✓ 视觉模型连接成功"
+                        vision_msg.classes(add="text-green-600")
+                    else:
+                        vision_msg.text = f"连接失败（HTTP {resp.status_code}）"
+                        vision_msg.classes(add="text-red-500")
+                except Exception as exc:
+                    vision_msg.text = f"连接失败（{type(exc).__name__}）"
+                    vision_msg.classes(add="text-red-500")
+
+            with ui.row().classes("mt-3 gap-3"):
+                ui.button("保存视觉模型", on_click=save_vision_key_handler).classes(
+                    "bg-green-600 text-white"
+                )
+                ui.button("验证连接", on_click=verify_vision_connection).classes(
+                    "bg-gray-100 text-gray-700"
+                )
+
     # ── 加载已有配置并回填 ──────────────────────────────────────────────────────
     async with AsyncSessionLocal() as session:
         semester = await get_active_semester(session, tenant_id, user_id)
         class_cfg = await get_class_config(session, tenant_id, user_id)
-        ai_key_record = await get_active_ai_key(session, tenant_id, user_id)
+        ai_key_record = await get_active_ai_key(session, tenant_id, user_id, key_type="text")
+        ai_vision_record = await get_active_ai_key(session, tenant_id, user_id, key_type="vision")
 
     if semester:
         semester_name_input.value = semester.semester_name
@@ -373,3 +490,16 @@ async def settings_page() -> None:
             ai_key_input.value = ""
             ai_msg.text = "Key 解密失败，请重新配置"
             ai_msg.classes(add="text-red-500")
+
+    if ai_vision_record:
+        vision_url_input.value = ai_vision_record.api_base_url
+        vision_model_input.value = ai_vision_record.model_name
+        try:
+            plain_v = get_decrypted_key(ai_vision_record)
+            masked_v = _mask_api_key(plain_v)
+            _vision_masked[0] = masked_v
+            vision_key_input.value = masked_v
+        except CryptoError:
+            vision_key_input.value = ""
+            vision_msg.text = "视觉模型 Key 解密失败，请重新配置"
+            vision_msg.classes(add="text-red-500")

@@ -5,14 +5,18 @@ from unittest.mock import patch
 from app.auth.jwt import decode_access_token
 from app.auth.password import hash_password
 from app.core.exceptions import AuthError
+from app.repository.invite_code_repository import create_code
 from app.repository.user_repository import create_user
 from app.service.auth_service import (
+    approve_user,
     change_password,
     create_user_by_admin,
     list_users_for_admin,
     login,
+    register_user,
     reset_user_password_by_admin,
     set_user_active_by_admin,
+    update_profile_display_name,
 )
 
 
@@ -256,6 +260,113 @@ async def test_list_users_for_admin_with_filter(async_session):
     )
     assert total == 2
     assert {u.username for u in users} == {"teacher_a", "teacher_b"}
+
+
+# ── register_user / approve_user / update_profile_display_name 测试 ──────────
+
+
+async def test_register_user_invalid_invite_code_raises(async_session):
+    """无效邀请码注册时抛出业务异常。"""
+    from app.core.exceptions import AppError
+    with pytest.raises((AppError, AuthError, ValueError)):
+        await register_user(
+            async_session,
+            invite_code="NOTEXIST",
+            username="newuser",
+            password="Pass1234!",
+            display_name="新教师",
+        )
+
+
+async def test_register_user_deactivated_invite_code_raises(async_session):
+    """已停用邀请码注册时抛出业务异常。"""
+    from app.core.exceptions import AppError
+    # 创建一个停用的邀请码
+    invite = await create_code(
+        async_session,
+        tenant_id=1,
+        code="DEACTIVATED",
+        created_by=None,
+    )
+    # 先停用
+    from app.repository.invite_code_repository import set_code_active
+    await set_code_active(async_session, tenant_id=1, code="DEACTIVATED", is_active=False)
+
+    with pytest.raises((AppError, AuthError, ValueError)):
+        await register_user(
+            async_session,
+            invite_code="DEACTIVATED",
+            username="newuser",
+            password="Pass1234!",
+        )
+
+
+async def test_register_user_valid_invite_code_creates_pending_user(async_session):
+    """有效邀请码注册后，创建 is_active=False, role=teacher 的用户，tenant 来自邀请码。"""
+    invite = await create_code(
+        async_session,
+        tenant_id=2,
+        code="VALID123",
+        created_by=None,
+    )
+
+    user = await register_user(
+        async_session,
+        invite_code="VALID123",
+        username="pending_teacher",
+        password="Pass1234!",
+        display_name="待审核教师",
+    )
+
+    assert user.is_active is False
+    assert user.role.value == "teacher"
+    assert user.tenant_id == 2
+    assert user.username == "pending_teacher"
+
+
+async def test_approve_user_allows_login(async_session):
+    """审核通过后，用户可以正常登录。"""
+    # 先注册一个待审核用户
+    invite = await create_code(
+        async_session,
+        tenant_id=1,
+        code="APPROVE123",
+        created_by=None,
+    )
+    user = await register_user(
+        async_session,
+        invite_code="APPROVE123",
+        username="pending2",
+        password="Pass1234!",
+    )
+
+    # 未审核时不能登录
+    with pytest.raises(AuthError):
+        await login(async_session, tenant_id=1, username="pending2", password="Pass1234!")
+
+    # 审核通过
+    await approve_user(async_session, tenant_id=1, user_id=user.id)
+
+    # 审核后可以登录
+    token = await login(async_session, tenant_id=1, username="pending2", password="Pass1234!")
+    assert token is not None
+
+
+async def test_update_profile_display_name(async_session):
+    """更新显示名后，从 DB 取回的用户的 display_name 字段正确。"""
+    from app.repository.user_repository import get_user_by_id
+    user = await _make_user(async_session, username="disp_user", password="Pass1234!")
+
+    await update_profile_display_name(
+        async_session,
+        tenant_id=1,
+        user_id=user.id,
+        display_name="王老师",
+    )
+
+    updated = await get_user_by_id(async_session, tenant_id=1, user_id=user.id)
+    assert updated is not None
+    assert updated.display_name == "王老师"
 
 
 async def test_create_user_by_admin_writes_audit(async_session):

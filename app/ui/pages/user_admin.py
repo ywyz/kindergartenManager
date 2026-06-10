@@ -14,11 +14,13 @@ from app.auth.jwt import decode_access_token
 from app.core.database import AsyncSessionLocal
 from app.core.exceptions import AuthError
 from app.service.auth_service import (
+    approve_user,
     create_user_by_admin,
     list_users_for_admin,
     reset_user_password_by_admin,
     set_user_active_by_admin,
 )
+from app.service.invite_service import generate_invite_code, list_invite_codes, toggle_invite_code
 from app.ui.components.app_shell import render_shell
 
 
@@ -254,3 +256,103 @@ async def user_admin_page() -> None:
         next_btn.on_click(next_page)
 
         await reload_table(reset_page=True)
+
+        # ── 待审核用户 ────────────────────────────────────────────────
+        ui.separator().classes("my-4")
+        ui.label("待审核用户").classes("text-xl font-bold text-orange-600")
+
+        pending_container = ui.column().classes("w-full gap-2")
+        pending_msg = ui.label("").classes("text-sm")
+
+        async def load_pending() -> None:
+            pending_container.clear()
+            async with AsyncSessionLocal() as session:
+                users_pending, _ = await list_users_for_admin(
+                    session,
+                    tenant_id=tenant_id,
+                    admin_role=admin_role,
+                    limit=50,
+                    offset=0,
+                )
+            pending = [u for u in users_pending if not u.is_active]
+            with pending_container:
+                if not pending:
+                    ui.label("暂无待审核用户").classes("text-gray-400 text-sm")
+                else:
+                    for u in pending:
+                        with ui.card().classes("w-full"):
+                            with ui.row().classes("w-full justify-between items-center"):
+                                ui.label(f"{u.username}  ({u.display_name or '—'})").classes("text-sm")
+
+                                async def _approve(user_obj=u) -> None:
+                                    try:
+                                        async with AsyncSessionLocal() as s:
+                                            await approve_user(s, tenant_id=tenant_id, user_id=user_obj.id)
+                                        _set_msg(pending_msg, f"已审核通过：{user_obj.username}", is_error=False)
+                                        await load_pending()
+                                        await reload_table(reset_page=False)
+                                    except Exception as ex:
+                                        _set_msg(pending_msg, str(ex), is_error=True)
+
+                                ui.button("审核通过", on_click=_approve, icon="check").props("size=sm").classes(
+                                    "bg-green-600 text-white"
+                                )
+
+        await load_pending()
+
+        # ── 邀请码管理 ────────────────────────────────────────────────
+        ui.separator().classes("my-4")
+        ui.label("邀请码管理").classes("text-xl font-bold text-purple-600")
+
+        invite_note_input = ui.input(label="备注（可选）", placeholder="如：2026届新教师").classes("w-full")
+        invite_container = ui.column().classes("w-full gap-2")
+        invite_msg = ui.label("").classes("text-sm")
+
+        async def refresh_invites() -> None:
+            invite_container.clear()
+            async with AsyncSessionLocal() as session:
+                codes = await list_invite_codes(session, tenant_id=tenant_id)
+            with invite_container:
+                if not codes:
+                    ui.label("暂无邀请码").classes("text-gray-400 text-sm")
+                else:
+                    for code_obj in codes:
+                        with ui.card().classes("w-full"):
+                            with ui.row().classes("w-full justify-between items-center"):
+                                status_cls = "text-green-600" if code_obj.is_active else "text-gray-400 line-through"
+                                ui.label(
+                                    f"{code_obj.code}  {code_obj.note or ''}  {'（有效）' if code_obj.is_active else '（已停用）'}"
+                                ).classes(f"text-sm {status_cls}")
+
+                                async def _toggle(c=code_obj) -> None:
+                                    try:
+                                        async with AsyncSessionLocal() as s:
+                                            await toggle_invite_code(
+                                                s, tenant_id=tenant_id, code=c.code, is_active=not c.is_active
+                                            )
+                                        await refresh_invites()
+                                    except Exception as ex:
+                                        _set_msg(invite_msg, str(ex), is_error=True)
+
+                                ui.button(
+                                    "停用" if code_obj.is_active else "启用",
+                                    on_click=_toggle,
+                                ).props("size=sm flat")
+
+        async def create_invite() -> None:
+            try:
+                async with AsyncSessionLocal() as session:
+                    await generate_invite_code(
+                        session,
+                        tenant_id=tenant_id,
+                        created_by=admin_user_id,
+                        note=invite_note_input.value.strip() or None,
+                    )
+                _set_msg(invite_msg, "邀请码已生成", is_error=False)
+                invite_note_input.value = ""
+                await refresh_invites()
+            except Exception as ex:
+                _set_msg(invite_msg, str(ex), is_error=True)
+
+        ui.button("生成邀请码", on_click=create_invite, icon="add").classes("bg-purple-600 text-white")
+        await refresh_invites()

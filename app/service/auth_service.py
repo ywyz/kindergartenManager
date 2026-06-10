@@ -10,14 +10,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.jwt import create_access_token
 from app.auth.password import hash_password, verify_password
 from app.core.audit import log_audit
-from app.core.exceptions import AuthError
+from app.core.exceptions import AppError, AuthError
 from app.core.models.user import UserRole
+from app.repository.invite_code_repository import get_active_by_code
 from app.repository.user_repository import (
+    create_pending_user,
     create_user,
     get_user_by_id,
     get_user_by_username,
     list_users_by_tenant,
     query_users_by_tenant,
+    update_display_name,
     update_password,
     update_user_active,
 )
@@ -249,3 +252,114 @@ async def reset_user_password_by_admin(
         user_id=admin_user_id,
         target_user_id=target_user_id,
     )
+
+
+async def register_user(
+    session: AsyncSession,
+    invite_code: str,
+    username: str,
+    password: str,
+    display_name: str | None = None,
+) -> object:
+    """通过邀请码自助注册，创建 is_active=False 的待审核教师账号。
+
+    流程：校验邀请码（有效且激活）→ 取得 tenant_id →
+          检查同租户用户名唯一性 → Argon2 哈希密码 → 创建待审核用户 → 审计
+
+    Args:
+        session: 异步数据库会话。
+        invite_code: 邀请码字符串。
+        username: 注册用户名（同租户唯一）。
+        password: 明文密码（至少 8 位）。
+        display_name: 显示名/真实姓名（可选）。
+
+    Returns:
+        新建的 User 对象（is_active=False，role=teacher）。
+
+    Raises:
+        AppError: 邀请码无效或已停用。
+        ValueError: 用户名已存在或密码过短。
+    """
+    if len(password) < 8:
+        raise ValueError("密码长度不能少于 8 位")
+
+    invite = await get_active_by_code(session, invite_code)
+    if invite is None:
+        raise AppError("邀请码无效或已停用，请联系管理员获取有效邀请码")
+
+    tenant_id = invite.tenant_id
+
+    # 同租户用户名唯一性检查
+    existing = await get_user_by_username(session, tenant_id=tenant_id, username=username)
+    if existing is not None:
+        raise ValueError("该用户名已被注册，请更换用户名")
+
+    try:
+        user = await create_pending_user(
+            session,
+            tenant_id=tenant_id,
+            username=username,
+            hashed_password=hash_password(password),
+            display_name=display_name,
+        )
+    except IntegrityError as exc:
+        raise ValueError("该用户名已被注册，请更换用户名") from exc
+
+    log_audit("register", tenant_id=tenant_id, user_id=user.id, username=username)
+    return user
+
+
+async def approve_user(
+    session: AsyncSession,
+    tenant_id: int,
+    user_id: int,
+) -> None:
+    """审核通过：将指定用户的 is_active 设为 True。
+
+    Args:
+        session: 异步数据库会话。
+        tenant_id: 租户 ID。
+        user_id: 待审核用户 ID。
+
+    Raises:
+        ValueError: 用户不存在。
+    """
+    changed = await update_user_active(
+        session,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        is_active=True,
+    )
+    if not changed:
+        raise ValueError("目标账号不存在")
+
+    log_audit("approve_user", tenant_id=tenant_id, user_id=user_id)
+
+
+async def update_profile_display_name(
+    session: AsyncSession,
+    tenant_id: int,
+    user_id: int,
+    display_name: str | None,
+) -> None:
+    """更新用户个人资料的显示名。
+
+    Args:
+        session: 异步数据库会话。
+        tenant_id: 租户 ID。
+        user_id: 用户 ID。
+        display_name: 新显示名（None 表示清空）。
+
+    Raises:
+        ValueError: 用户不存在。
+    """
+    changed = await update_display_name(
+        session,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        display_name=display_name,
+    )
+    if not changed:
+        raise ValueError("用户不存在")
+
+    log_audit("update_display_name", tenant_id=tenant_id, user_id=user_id)

@@ -72,3 +72,14 @@ async def home_page() -> None:
                             ui.label("拍照 · AI 分析 · 导出报告").classes(
                                 "text-xs text-gray-400"
                             )
+
+                with ui.card().classes(
+                    "flex-1 min-w-48 cursor-pointer hover:shadow-md transition-shadow"
+                ).on("click", lambda: ui.navigate.to("/profile")):
+                    with ui.row().classes("items-center gap-3"):
+                        ui.icon("person").classes("text-3xl text-purple-600")
+                        with ui.column().classes("gap-0"):
+                            ui.label("个人资料").classes("font-semibold text-gray-800")
+                            ui.label("修改显示名 · 修改密码").classes(
+                                "text-xs text-gray-400"
+                            )

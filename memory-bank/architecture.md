@@ -3,7 +3,6 @@
 ## 1. 当前阶段
 
 - 项目阶段：M2/M3 已完成（阶段 0~8 全部完成）；二期对外只读 REST API 已落地。
-- 账号体系补充：已完成第二阶段（管理员初始化脚本、账号创建/启停/重置密码、筛选分页），首期不开放公开自助注册。
 - 开发策略：先架构后编码；每完成一个步骤同步更新本文件与 progress.md
 
 ## 2. 业务与权限边界（已确认）
@@ -112,17 +111,15 @@
 | `app/core/models/class_config.py` | ClassConfig ORM 模型 |
 | `app/auth/password.py` | Argon2 密码哈希与验证（passlib） |
 | `app/auth/jwt.py` | JWT 生成/验证（python-jose HS256），payload 含 sub/tenant_id/role/exp |
-| `app/service/auth_service.py` | 登录逻辑（查用户→验密码→签 JWT）；修改密码；管理员账号创建、筛选分页、启停与重置密码（仅 `sys_admin`） |
+| `app/service/auth_service.py` | 登录逻辑（查用户→验密码→签 JWT）；修改密码 |
 | `app/service/date_service.py` | 纯函数：`get_week_number`、`get_weekday_cn`、`is_workday`、`is_within_semester` |
-| `app/repository/user_repository.py` | 按用户名/ID 查询用户；更新密码；启停状态更新；用户筛选分页查询 |
+| `app/repository/user_repository.py` | 按用户名/ID 查询用户；更新密码 |
 | `app/repository/semester_repository.py` | `get_active_semester`、`upsert_active_semester` |
 | `app/repository/class_repository.py` | `get_class_config`、`upsert_class_config` |
 | `app/integration/holiday_client/client.py` | 法定节假日判定；法定节假日缓存 `dict[str, tuple[bool, str\|None, int]]`（含 day_type）；特殊节日缓存 `dict[str, list[str]]`；`is_holiday`、`is_near_holiday`、`get_holiday_name`、`get_special_day_tags`（sync，本地硬编码）、`is_adjusted_workday` |
 | `app/ui/pages/login.py` | 登录页（路由 `/`），token 写入 `app.storage.user` |
 | `app/ui/pages/home.py` | 首页（路由 `/home`），快捷导航按钮 |
 | `app/ui/pages/settings.py` | 配置页（路由 `/settings`），学期配置、班级配置、AI 接口配置（含脱敏展示与验证连接） |
-| `app/ui/pages/user_admin.py` | 账号管理页（路由 `/user-admin`），系统管理员创建账号、筛选分页、启停账号、重置密码 |
-| `app/jobs/bootstrap_admin.py` | 系统管理员初始化脚本（环境变量控制、幂等创建） |
 | `app/ui/pages/date_test.py` | 日期测试页（路由 `/date-test`），嵌入 DatePanel |
 
 ## 10. 阶段 3 已实现文件清单
@@ -192,139 +189,11 @@ type 值：0=工作日，1=周末，2=法定节假日，3=调班工作日。
 - 状态提示（颜色区分）：法定节假日（含节日名称）/ 调班工作日 / 临近节假日 / 特殊节日标签 / 节假日信息不可用
 - 不阻止用户继续操作
 
-## 11. 当前状态（截至 2026-06-09）
+## 11. 待后续实现
 
-**所有首期阶段（0~8）及二期对外只读 REST API 均已完成。dev3.0（游戏观察子系统）阶段 0 界面重构已完成。**
-
-- 阶段 0~3：骨架、鉴权、配置、AI Key ✅
-- 阶段 4：教案拆分 + 年龄适配 + 差异比对 ✅
-- 阶段 5：提示词管理 ✅
-- 阶段 6：Word 单条导出 + 导出记录 ✅（详见第 12、13 节）
-- 阶段 7：一日活动辅助生成（晨间活动/晨间谈话/区域/户外/反思）✅
-- 阶段 8：全局异常处理、审计日志、路由守卫 ✅
-- 二期：对外只读 REST API（`/api/v1`）✅
-- 附加功能：日期批量导出 Word ✅（详见第 14 节）
-- **dev3.0 阶段 0**：界面重构（app_shell 共享布局、首页仪表盘、迁移 4 页、清理 date-test）✅
-- **dev3.0 阶段 A**：Pillow 依赖 + 图片配置项 ✅
-- **dev3.0 阶段 B**：6 个数据模型变更（ORM + Alembic 迁移均已完成 ✅，M-DB 达成）
-- **dev3.0 阶段 C**：图片压缩处理 + 可插拔存储抽象（BlobBackend）✅
-- **dev3.0 阶段 D**：仓库层（观察记录/图片/邀请码 + ai_key/user 扩充）✅
-
-**低优先级待办：**
-- 数据库 ERD 完整图（随模型实现逐步补齐）
-- 里程碑 M-DB：✅ 已完成（2026-06-09）
-  - 迁移 `54c20d37a461`：新建 game_observation / game_observation_image / invite_code 表，ai_api_key 加 key_type，user 加 display_name
-  - 迁移 `ff6b88b2ee1e`：prompt_template.task_type Enum 扩展加 game_observation
-
----
-
-## dev3.0 阶段 0 — 界面重构（2026-06-09 完成，M-UI0）
-
-### 变更内容
-
-| 类型 | 文件 | 说明 |
-|------|------|------|
-| 新增 | `app/ui/components/__init__.py` | 组件包初始化 |
-| 新增 | `app/ui/components/app_shell.py` | 共享布局组件（纯函数 + 两种渲染方式） |
-| 新增 | `tests/test_app_shell_menu.py` | app_shell 纯函数单测（10 用例）|
-| 重写 | `app/ui/pages/home.py` | 首页改为仪表盘（欢迎信息 + 班级信息 + 快捷卡片）|
-| 修改 | `app/ui/pages/settings.py` | 替换 ui.header() 为 render_shell |
-| 修改 | `app/ui/pages/daily_plan.py` | 替换 ui.header() 为 render_shell |
-| 修改 | `app/ui/pages/prompt_mgmt.py` | 替换 ui.header() 为 render_shell |
-| 修改 | `app/ui/pages/user_admin.py` | 替换 ui.header() 为 render_shell |
-| 修改 | `app/main.py` | 移除 date_test import |
-| 删除 | `app/ui/pages/date_test.py` | 开发测试页已清理 |
-
-### app_shell 设计
-
-```
-app/ui/components/app_shell.py
-├── get_menu_items(role, active=None) -> list[dict]  # 纯函数，可单测
-├── get_display_name(user) -> str                    # 纯函数，可单测
-├── app_shell(user, active)                          # async context manager，新页面用
-└── render_shell(user, active)                       # async 函数，迁移既有页面用
-```
-
-**菜单分组**：
-
-| 分组 | 菜单项 key | 角色限制 |
-|------|-----------|----------|
-| 教学管理 | daily-plan, game-observation | 所有角色 |
-| 配置中心 | settings, prompts | 所有角色 |
-| 账号中心 | profile, user-admin | user-admin 仅 sys_admin |
-
-### 测试结果
-
-- `pytest tests/ -q`：**298 passed, 0 failed**（截至 2026-06-09，Phase B/C/D 完成后）
-- 手动验证：仪表盘/菜单/4 个功能页/date-test 404 全部通过 ✅
-
----
-
-## dev3.0 阶段 A — 基础设施（2026-06-09 完成）
-
-| 类型 | 文件 | 说明 |
-|------|------|------|
-| 新增配置 | `app/core/config.py` | `IMAGE_STORAGE_BACKEND`（默认 `mysql_blob`）、`IMAGE_MAX_BYTES`（默认 1048576）|
-| 新增依赖 | `requirements.txt` | `Pillow>=10.0.0` |
-| 新增测试 | `tests/test_config_image_settings.py` | 3 用例，全绿 |
-
----
-
-## dev3.0 阶段 B — 数据模型（2026-06-09 完成，Alembic 迁移待执行）
-
-### ORM 模型变更
-
-| 类型 | 文件 | 变更内容 |
-|------|------|----------|
-| 修改 | `app/core/models/ai_key.py` | 新增 `key_type` ENUM('text','vision')，server_default='text' |
-| 修改 | `app/core/models/user.py` | 新增 `display_name` VARCHAR(64) NULL |
-| 新建 | `app/core/models/game_observation.py` | 游戏观察记录表（17 字段）|
-| 新建 | `app/core/models/game_observation_image.py` | 观察图片表（LargeBinary + MySQL LONGBLOB variant）|
-| 新建 | `app/core/models/invite_code.py` | 邀请码表（code UNIQUE）|
-| 修改 | `app/core/models/prompt_template.py` | Enum 增加 `game_observation` 值 |
-| 修改 | `app/core/models/__init__.py` | 导入 3 个新 model |
-| 修改 | `app/core/exceptions.py` | 新增 `AppError`（通用业务异常）|
-
-### 数据库表（dev3.0 新增，Alembic 待执行）
-
-| 表名 | 主要字段 | 状态 |
-|------|---------|------|
-| `game_observation` | id, tenant_id, user_id, obs_date, time_range, big_env, game_area, grade, class_name, adult/child count, child_names/age, observer, 4个AI字段 | ⏳ 待迁移 |
-| `game_observation_image` | id, tenant_id, user_id, observation_id, image_index, storage_backend, blob_content(LONGBLOB), mime_type, file_size | ⏳ 待迁移 |
-| `invite_code` | id, tenant_id, code(UNIQUE), note, is_active, created_by | ⏳ 待迁移 |
-| `ai_api_key` | 新增列 `key_type` ENUM('text','vision') | ⏳ 待迁移 |
-| `user` | 新增列 `display_name` VARCHAR(64) NULL | ⏳ 待迁移 |
-| `prompt_template` | task_type Enum 增加 `game_observation` | ⏳ 待迁移 |
-
-> 待执行：`alembic upgrade head`（里程碑 M-DB）
-
----
-
-## dev3.0 阶段 C — 图片处理与存储（2026-06-09 完成）
-
-| 文件 | 职责 |
-|------|------|
-| `app/integration/image_processing.py` | `compress_image(data, max_bytes) -> CompressedImage`；超限时等比缩放+降 JPEG 质量；非图片字节抛 `AppError` |
-| `app/integration/image_storage/base.py` | `ImageStorageBackend` ABC：`put(data, mime) -> dict` / `get(stored) -> bytes` |
-| `app/integration/image_storage/blob_backend.py` | `BlobImageStorage`：put 返回 `{"blob_content": data}`，与 DB session 解耦 |
-| `app/integration/image_storage/__init__.py` | `get_storage_backend(backend_name=None)` 工厂；未知后端抛 `ValueError` |
-
----
-
-## dev3.0 阶段 D — 仓库层（2026-06-09 完成）
-
-| 文件 | 主要函数 |
-|------|---------|
-| `app/repository/observation_repository.py` | `save_observation` / `get_observation_by_id` / `list_observations`（分页+过滤）/ `update_observation` |
-| `app/repository/observation_image_repository.py` | `add_image` / `list_images_by_observation`（按 image_index 升序）/ `get_image` / `delete_images_by_observation` |
-| `app/repository/invite_code_repository.py` | `create_code` / `get_active_by_code` / `list_codes` / `set_code_active` |
-| `app/repository/ai_key_repository.py`（扩充）| `save_ai_key(key_type='text')` / `get_active_ai_key(key_type='text')`：text/vision 各自独立 active，互不影响 |
-| `app/repository/user_repository.py`（扩充）| `create_pending_user`（is_active=False）/ `update_display_name` |
-
-### 关键设计
-
-- `ai_key_repository`：`key_type` 参数默认 `'text'`，向后兼容现有 settings.py 等调用方无需修改
-- `observation_image_repository`：`list_images_by_observation` 按 `image_index` 升序，保证 Word 导出时图片顺序稳定
+- 数据库 ERD 完整图（随模型实现逐步补齐）。
+- 阶段 6（Word 导出、导出历史）。
+- 阶段 7（一日活动辅助生成）。
 
 ---
 
@@ -441,30 +310,4 @@ process_lesson_plan(session, tenant_id, user_id, raw_text, grade, *, split_syste
 **租户隔离**：每个 API Key 绑定唯一 `tenant_id`，所有业务查询以鉴权得到的 `tenant_id` 为强制过滤条件，调用方无法越权读取其他租户数据。**未配置** `API_KEYS` 时对外接口默认关闭（返回 401）。详见 [docs/API.md](../docs/API.md)。
 
 仓库层新增只读查询：`daily_plan_repository.list_daily_plans` / `get_daily_plan_by_id`、`semester_repository.list_semesters`、`class_repository.list_class_configs`——均强制携带 `tenant_id` 过滤。
-
----
-
-## 14. 日期批量导出（2026-06-08）
-
-### 新增功能
-
-用户可在「每日计划」页面底部选择开始~结束日期范围，将区间内所有已保存计划合并导出为单个 Word 文档（表格按日期升序排列，相邻表格间留一空行）。
-
-### 核心变更
-
-| 文件 | 变更内容 |
-|------|----------|
-| `app/integration/word_export/exporter.py` | 新增 `export_batch_daily_plans(plans_with_diffs)` — 按 `plan_date` 升序排列；首个 plan 作为主文档，后续 plan 用 `copy.deepcopy` 追加表格 XML；相邻表格间插入空段落；空列表返回合法空文档；模板缺失时降级兼容 |
-| `app/ui/pages/daily_plan.py` | 新增「批量导出」卡片：日期范围选择器（`bind_value` 直读 `.value`）、输入校验（start≤end）、调用 `list_daily_plans(..., limit=200)` 范围查询、循环 `compute_diff` + `export_batch_daily_plans`、写入 `export_record`（`daily_plan_id=None`）、`log_audit("batch_export_word")`、`ui.download` 触发下载 |
-| `tests/test_word_exporter.py` | 新增 `TestBatchExport`：`test_batch_empty_list_returns_valid_bytes` / `test_batch_single_plan_has_one_table` / `test_batch_multiple_plans_sorted_by_date` |
-
-### Bug 修复（BL-05）
-
-| 编号 | 问题 | 决策 |
-|------|------|------|
-| BL-05 | 批量导出按钮点击后 `TypeError: strptime() argument 1 must be str, not list`；根因：`ui.date(...).on("update:model-value", lambda e: ..., e.args)` 中 `e.args` 为 NiceGUI 事件参数 list | 删除 `batch_state` dict 及 `on(...)` 监听器，改为在 `_batch_export()` 中直接读 `batch_start_input.value` / `batch_end_input.value`（已由 `bind_value` 双向绑定） |
-
-### 测试基准
-
-全量回归：**251 passed**（新增 9 个测试用例：`TestBatchExport` × 3 + `TestExportDailyPlan` 新增用例 × 3 + 其他 × 3）。
 

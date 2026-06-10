@@ -75,3 +75,8 @@ async def login_page() -> None:
         ui.button("登录", on_click=do_login).classes(
             "w-full mt-4 bg-blue-600 text-white"
         )
+
+        ui.separator().classes("mt-4")
+        with ui.row().classes("w-full justify-center"):
+            ui.label("还没有账号？").classes("text-sm text-gray-400")
+            ui.link("立即注册", "/register").classes("text-sm text-blue-600 ml-1")

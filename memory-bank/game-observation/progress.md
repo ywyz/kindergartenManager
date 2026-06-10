@@ -134,6 +134,88 @@
 | D.3 | 扩充 `app/repository/ai_key_repository.py`（key_type 参数，向后兼容默认 'text'） | ✅ |
 | D.4 | 新建 `app/repository/invite_code_repository.py`（create/get_active/list/set_active） | ✅ |
 | D.5 | 扩充 `app/repository/user_repository.py`（create_pending_user/update_display_name） | ✅ |
+| 测试 | 16/16 passed | ✅ |
+
+---
+
+## 阶段 E~I（2026-06-10）
+
+### 阶段 E：AI 视觉客户端 ✅
+
+| 步骤 | 内容 | 状态 |
+|------|------|------|
+| E.T | `tests/test_vision_base.py`（5）+ `tests/test_observation_client.py`（4）先红 | ✅ |
+| E.1 | 新建 `app/integration/ai_client/vision_base.py`（call_ai_vision，60s超时，3次重试） | ✅ |
+| E.2 | 新建 `app/integration/ai_client/observation_client.py`（generate_observation，4字段JSON） | ✅ |
+| 测试 | 9/9 passed | ✅ |
+| 顺带修复 | `app/core/config.py` 补充 IMAGE_STORAGE_BACKEND/IMAGE_MAX_BYTES；安装 Pillow | ✅ |
+| 全量回归 | **307 passed, 0 failed** | ✅ |
+
+### 阶段 F：服务层 ✅
+
+| 步骤 | 内容 | 状态 |
+|------|------|------|
+| F.T | `test_observation_service.py`（4）+ 扩充 `test_auth_service.py`（5）+ `test_invite_service.py`（2）| ✅ |
+| F.1+F.2 | 新建 `app/service/observation_service.py`（generate_observation_content + save_observation_with_images） | ✅ |
+| F.3 | 扩充 `app/service/auth_service.py`（register_user / approve_user / update_profile_display_name） | ✅ |
+| F.4 | 新建 `app/service/invite_service.py`（generate_invite_code / list / toggle） | ✅ |
+| 测试 | 28/28 passed | ✅ |
+| 全量回归 | **318 passed, 0 failed** | ✅ |
+
+### 阶段 G：Word 导出 ✅
+
+| 步骤 | 内容 | 状态 |
+|------|------|------|
+| G.T | `test_observation_exporter.py`（8）+ 扩充 `test_export_repository.py`（2）先红 | ✅ |
+| G.1 | 新建 `app/integration/word_export/observation_exporter.py`（export_observation，字段映射+图片横排） | ✅ |
+| G.2 | Alembic 迁移 `6553de463329`：export_records 新增 observation_id 列 | ✅ |
+| G.2 | 扩充 `app/repository/export_repository.py`（observation_id 参数） | ✅ |
+| 测试 | 13/13 passed | ✅ |
+| 全量回归 | **328 passed, 0 failed** | ✅ |
+
+### 阶段 H：UI 页面 ✅
+
+| 步骤 | 内容 | 状态 |
+|------|------|------|
+| H.T | `test_observation_ui_helpers.py`（14 用例）先红 | ✅ |
+| H.1 | `settings.py` 拆分文本/视觉模型两块（各自独立保存/脱敏/验证） | ✅ |
+| H.2+H.3 | 新建 `app/ui/pages/game_observation.py`（表单+上传+生成+保存+导出+历史） | ✅ |
+| H.4 | `prompt_mgmt.py` 新增 `game_observation` Tab（含内置提示词） | ✅ |
+| H.5 | 新建 `app/ui/pages/register.py`（邀请码注册）+ middleware `/register` 白名单 + login 注册入口 | ✅ |
+| H.6 | 新建 `app/ui/pages/profile.py`（显示名 + 修改密码） | ✅ |
+| H.7 | `user_admin.py` 新增待审核筛选+审核 + 邀请码管理区块 | ✅ |
+| H.8 | `home.py` 新增「个人资料」快捷卡片；`main.py` 注册所有新路由 | ✅ |
+| 测试 | 14/14 passed | ✅ |
+| 全量回归 | **342 passed, 0 failed** | ✅ |
+
+### 阶段 I：收尾 ✅
+
+| 步骤 | 内容 | 状态 |
+|------|------|------|
+| I.1 | 审计核查：ai_observation ✅ / export_observation ✅ / register ✅ / approve_user ✅ / invite_code_create ✅ | ✅ |
+| I.2 | 更新 progress.md（本文档） | ✅ |
+| I.3 | 最终全量回归：342 passed, 0 failed | ✅ |
+
+**Alembic head：`6553de463329`**
+
+---
+
+## 测试用例统计（截至 2026-06-10）
+
+| 阶段 | 新增文件 | 用例数 | 状态 |
+|------|------|--------|------|
+| 0 | test_app_shell_menu.py | 10 | ✅ |
+| A | test_config_image_settings.py | 3 | ✅ |
+| B | test_migrations_smoke.py | 9 | ✅ |
+| C | test_image_processing.py + test_image_storage_blob.py | 9 | ✅ |
+| D | 5 个仓库层测试文件 | 16 | ✅ |
+| E | test_vision_base.py + test_observation_client.py | 9 | ✅ |
+| F | test_observation_service.py + 扩充 test_auth_service + test_invite_service | 28 | ✅ |
+| G | test_observation_exporter.py + 扩充 test_export_repository | 13 | ✅ |
+| H | test_observation_ui_helpers.py | 14 | ✅ |
+| **合计（游戏观察子系统新增）** | | **111** | ✅ |
+| **总计** | | **342 passed** | ✅ |
+| D.5 | 扩充 `app/repository/user_repository.py`（create_pending_user/update_display_name） | ✅ |
 | 测试 | 16/16 passed（新增）| ✅ |
 
 **全量回归（pytest tests/ -q）**
