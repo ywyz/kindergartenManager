@@ -22,6 +22,7 @@ from app.integration.holiday_client.client import is_near_holiday
 from app.integration.word_export.exporter import export_batch_daily_plans, export_daily_plan
 from app.repository.class_repository import get_class_config
 from app.repository.daily_plan_repository import (
+    delete_daily_plan,
     get_daily_plan_by_date,
     list_daily_plans,
     save_daily_plan,
@@ -501,6 +502,52 @@ async def daily_plan_page() -> None:
 
             save_btn = ui.button("保存草稿", on_click=_save_draft).classes(
                 "bg-green-600 text-white"
+            )
+
+            async def _delete_draft() -> None:
+                if not state["selected_date"]:
+                    save_msg.classes(remove="text-green-600 text-red-500", add="text-orange-500")
+                    save_msg.text = "⚠ 请先选择日期"
+                    return
+                with ui.dialog() as dlg, ui.card():
+                    ui.label("确定要删除当天的草稿吗？删除后无法恢复。").classes("text-base")
+                    with ui.row().classes("gap-3 mt-3"):
+                        ui.button(
+                            "确认删除",
+                            on_click=lambda: dlg.submit("yes"),
+                        ).classes("bg-red-600 text-white")
+                        ui.button("取消", on_click=lambda: dlg.submit("no"))
+                result = await dlg
+                if result == "yes":
+                    try:
+                        async with AsyncSessionLocal() as session:
+                            deleted = await delete_daily_plan(
+                                session,
+                                tenant_id=tenant_id,
+                                user_id=user_id,
+                                plan_date=state["selected_date"],
+                            )
+                        if deleted:
+                            save_msg.classes(remove="text-green-600 text-orange-500", add="text-gray-500")
+                            save_msg.text = "✅ 草稿已删除"
+                            # 清空表单
+                            for area in (
+                                goal_area, prep_area, key_area, difficult_area,
+                                adapted_area, original_area, morning_activity_area,
+                                morning_talk_area, area_game_area,
+                                outdoor_activity_area, daily_reflection_area,
+                            ):
+                                area.value = ""
+                            raw_text_area.value = ""
+                        else:
+                            save_msg.classes(add="text-orange-500")
+                            save_msg.text = "⚠ 未找到当天草稿"
+                    except Exception as e:
+                        save_msg.classes(add="text-red-500")
+                        save_msg.text = f"❌ 删除失败：{e}"
+
+            ui.button("删除草稿", icon="delete", on_click=_delete_draft).classes(
+                "bg-red-500 text-white"
             )
 
         # ── 导出 Word 区块 ────────────────────────────────────────────────────

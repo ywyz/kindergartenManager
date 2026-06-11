@@ -643,4 +643,36 @@ Step 6 Word 导出手测通过。阶段 7「一键生成一日活动」核心已
 - 推送 `dev2.0` 并合并 → `main`（M2 里程碑）。
 - 生产启用对外 API 前：在 `.env` 配置 `API_KEYS`（建议同时配置 `API_SIGNING_SECRET`），并经反向代理限制来源。
 
+---
+
+## 2026-06-11（dev3.0 验收 Bug 修复）
+
+### 背景
+
+dev3.0（游戏观察子系统）进入 E~I 阶段验收，发现 3 个 Bug 及 1 项功能缺失，已修复。
+
+### Bug 修复
+
+| 编号 | 现象 | 根因 | 修复 |
+|------|------|------|------|
+| BL-GO-01 | 上传照片后计数不更新，`AttributeError: 'UploadEventArguments' object has no attribute 'content'` | NiceGUI 新版将上传事件 `content` 改为 `file: FileUpload`，`read()` 变为 async | `handle_upload` 改 async，`e.content.read()` → `await e.file.read()` |
+| BL-GO-02 | 历史区块加载 `ValueError: not enough values to unpack (expected 2, got 0)` | `list_observations()` 返回 `list`，代码用 `records, _ =` 解包 | `records = await list_observations(...)` |
+| BL-GO-03 | 「观察者」字段为空，未自动填入登录用户姓名 | JWT payload 不含 `username`/`display_name`，`get_display_name()` 始终返回 `""` | `create_access_token()` 新增可选参数写入 payload；`login()` 传入用户信息 |
+
+### 功能补全
+
+- `app/ui/pages/prompt_mgmt.py`：提示词管理增加「游戏观察」标签页，支持查看/编辑/版本管理游戏观察提示词。
+
+### 待实现（Backlog，已在 game-observation/progress.md 详细记录）
+
+| 编号 | 功能 | 优先级 |
+|------|------|--------|
+| FEAT-GO-01 | 生成观察记录时显示进度提示 | 中 |
+| FEAT-GO-02 | 游戏观察历史记录增加删除功能 | 高 |
+| FEAT-GO-03 | 每日活动计划增加删除功能 | 高 |
+
+### 全量测试
+
+- **342 passed, 0 failed**（与 dev3.0 交付基准一致，新修复向后兼容）
+
 

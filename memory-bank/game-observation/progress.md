@@ -196,7 +196,79 @@
 | I.2 | 更新 progress.md（本文档） | ✅ |
 | I.3 | 最终全量回归：342 passed, 0 failed | ✅ |
 
+### 手动验收结果 ✅（2026-06-11）
+
+| 测试项 | 结果 |
+|--------|------|
+| **M-CORE F-1**：sys_admin 生成邀请码 → `/register` 注册 → 提示等待审核 | ✅ |
+| **M-CORE F-2**：sys_admin 审核用户 → 用户登录成功 | ✅ |
+| **M-CORE F-3**：停用邀请码 → 注册提示无效 → 启用后恢复 | ✅ |
+| **G-1**：上传 1~3 张照片 → 生成观察记录 → 四段内容回填 → 保存 → 导出 docx | ✅ |
+| **G-2**：导出后 export_records.observation_id 有值 | ✅ |
+| **H-1**：设置页文本/视觉模型分别配置保存 | ✅ |
+| **H-2**：游戏观察完整流程（上传→生成→保存→导出→历史列表） | ✅ |
+| **H-3**：历史记录重新导出下载 docx 成功 | ✅ |
+| **H-4**：邀请码注册 → 审核 → 登录 → 个人资料修改显示名 | ✅ |
+
+**里程碑 M-UI（dev3.0）：✅ 已完成**
+
 **Alembic head：`6553de463329`**
+
+---
+
+## 2026-06-11 — dev3.0 验收 Bug 修复 + 功能补全
+
+### Bug 修复记录
+
+| 编号 | 现象 | 根因 | 修复文件 | 状态 |
+|------|------|------|---------|------|
+| BL-GO-01 | 上传照片后「已上传：0 张」不更新，控制台 `AttributeError: 'UploadEventArguments' object has no attribute 'content'` | NiceGUI 新版 API 变更：`UploadEventArguments` 已将 `content`（file-like）改为 `file: FileUpload`，且 `FileUpload.read()` 为 async 方法 | `app/ui/pages/game_observation.py` — `handle_upload` 改为 async，`e.content.read()` → `await e.file.read()` | ✅ |
+| BL-GO-02 | 历史记录区块加载时 `ValueError: not enough values to unpack (expected 2, got 0)` | `list_observations()` 返回 `list[GameObservation]`，但代码以 `records, _ = await list_observations(...)` 尝试解包为二元组，空列表时崩溃 | `app/ui/pages/game_observation.py` — `refresh_history` 改为 `records = await list_observations(...)` | ✅ |
+| BL-GO-03 | 「观察者」字段始终为空，未自动填入登录用户姓名 | `create_access_token()` 生成的 JWT payload 不含 `username`/`display_name`，导致 `get_display_name(user)` 读不到值，始终返回 `""` | `app/auth/jwt.py` — 新增可选参数 `username: str = ""`、`display_name: str \| None = None` 写入 payload；`app/service/auth_service.py` — `login()` 传入 `user.username` / `user.display_name` | ✅ |
+
+### 功能补全
+
+| 项目 | 内容 | 状态 |
+|------|------|------|
+| 提示词管理新增「游戏观察」Tab | `app/ui/pages/prompt_mgmt.py` — `_TEST_PLACEHOLDER` 增加 `game_observation`；Tabs 增加 `tab_game_observation = ui.tab("游戏观察")`；Tab panels 增加对应面板调用 `_build_task_panel(..., "game_observation")` | ✅ |
+
+### 回归测试
+
+| 覆盖范围 | 结果 |
+|---------|------|
+| `test_jwt.py`（5）+ `test_auth_service.py`（22）+ `test_observation_repository.py`（4） | **31 passed, 0 failed** |
+
+> **注意**：BL-GO-03 修复后，已登录用户的旧 token 中不含 `username`/`display_name`，需**重新登录**才能使观察者字段自动填入。
+
+---
+
+## 待实现功能（Backlog）
+
+### FEAT-GO-01：生成中状态提示
+
+- **背景**：点击「生成观察记录」后按钮虽有 `loading` 状态（spinner），但首次使用时用户无法感知是否已触发（特别是视觉模型调用时间较长，30~60 秒）。
+- **需求**：点击后在页面明显位置显示进度提示（如「⏳ AI 正在分析照片，请稍候……」）；完成/失败时替换为对应的成功/错误提示。
+- **影响文件**：`app/ui/pages/game_observation.py` — `do_generate()` 函数，在 `generate_btn.props("loading=true")` 后立即 `show_info("⏳ AI 正在分析照片，请稍候……")` 或类似 toast。
+- **优先级**：中（体验问题，不影响功能）。
+
+### FEAT-GO-02：删除已保存观察记录
+
+- **背景**：历史记录列表目前只有「重新导出」按钮，无法删除错误或冗余的观察记录。
+- **需求**：每条历史记录右侧增加「删除」按钮，点击后弹出确认对话框，确认后删除 `game_observation` 及关联 `game_observation_image`（CASCADE）。
+- **影响文件**：
+  - `app/repository/observation_repository.py` — 新增 `delete_observation(session, tenant_id, user_id, observation_id) -> bool`
+  - `app/repository/observation_image_repository.py` — 已有 `delete_images_by_observation`，可复用
+  - `app/ui/pages/game_observation.py` — `refresh_history()` 中各条记录增加删除按钮 + 确认弹窗 + 刷新历史列表
+- **优先级**：高（用户明确需求）。
+
+### FEAT-GO-03：删除每日活动计划记录
+
+- **背景**：`/daily-plan` 页面目前无删除功能，历史计划（草稿、错误记录）无法清除。
+- **需求**：在每日活动计划页增加「删除当前草稿」按钮（或在历史列表中每条增加删除按钮），点击确认后删除 `daily_plan` 记录。
+- **影响文件**：
+  - `app/repository/daily_plan_repository.py` — 新增 `delete_daily_plan(session, tenant_id, user_id, daily_plan_id) -> bool`
+  - `app/ui/pages/daily_plan.py` — 增加删除按钮与确认交互
+- **优先级**：高（用户明确需求）。
 
 ---
 

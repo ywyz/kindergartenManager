@@ -30,8 +30,15 @@ from app.integration.word_export.observation_exporter import export_observation
 from app.repository.ai_key_repository import get_active_ai_key, get_decrypted_key
 from app.repository.class_repository import get_class_config
 from app.repository.export_repository import save_export_record
-from app.repository.observation_image_repository import list_images_by_observation
-from app.repository.observation_repository import list_observations, get_observation_by_id
+from app.repository.observation_image_repository import (
+    delete_images_by_observation,
+    list_images_by_observation,
+)
+from app.repository.observation_repository import (
+    delete_observation,
+    list_observations,
+    get_observation_by_id,
+)
 from app.service.observation_service import (
     generate_observation_content,
     save_observation_with_images,
@@ -131,7 +138,12 @@ async def game_observation_page() -> None:
 
         def show_success(msg: str) -> None:
             success_label.set_text(msg)
-            success_label.classes(remove="hidden")
+            success_label.classes(remove="hidden text-blue-600", add="text-green-600")
+            error_label.classes(add="hidden")
+
+        def show_info(msg: str) -> None:
+            success_label.set_text(msg)
+            success_label.classes(remove="hidden text-green-600", add="text-blue-600")
             error_label.classes(add="hidden")
 
         # ── 基本信息 ──────────────────────────────────────────────
@@ -182,11 +194,11 @@ async def game_observation_page() -> None:
             image_count_label = ui.label("已上传：0 张").classes("text-gray-500 text-sm")
             preview_row = ui.row().classes("gap-2 flex-wrap mt-2")
 
-            def handle_upload(e) -> None:
+            async def handle_upload(e) -> None:
                 if len(state["images"]) >= 3:
                     show_error("最多只能上传 3 张图片")
                     return
-                data = e.content.read()
+                data = await e.file.read()
                 state["images"].append(data)
                 image_count_label.set_text(f"已上传：{len(state['images'])} 张")
                 with preview_row:
@@ -230,6 +242,7 @@ async def game_observation_page() -> None:
         async def do_generate() -> None:
             generate_btn.props("loading=true")
             error_label.classes(add="hidden")
+            show_info("⏳ AI 正在分析照片，请稍候……")
             try:
                 if not validate_image_count(len(state["images"])):
                     show_error("请先上传 1~3 张游戏照片再生成")
@@ -384,7 +397,7 @@ async def game_observation_page() -> None:
             history_container.clear()
             try:
                 async with AsyncSessionLocal() as session:
-                    records, _ = await list_observations(
+                    records = await list_observations(
                         session,
                         tenant_id=tenant_id,
                         user_id=user_id,
@@ -436,6 +449,33 @@ async def game_observation_page() -> None:
                                     ui.button("重新导出", icon="download", on_click=_reexport).props(
                                         "size=sm flat"
                                     ).classes("text-blue-600")
+
+                                    async def _delete(r=rec) -> None:
+                                        with ui.dialog() as dlg, ui.card():
+                                            ui.label("确定要删除这条观察记录吗？删除后无法恢复。").classes("text-base")
+                                            with ui.row().classes("gap-3 mt-3"):
+                                                ui.button(
+                                                    "确认删除",
+                                                    on_click=lambda: dlg.submit("yes"),
+                                                ).classes("bg-red-600 text-white")
+                                                ui.button("取消", on_click=lambda: dlg.submit("no"))
+                                        result = await dlg
+                                        if result == "yes":
+                                            try:
+                                                async with AsyncSessionLocal() as s:
+                                                    await delete_images_by_observation(
+                                                        s, tenant_id=tenant_id, observation_id=r.id
+                                                    )
+                                                    await delete_observation(
+                                                        s, tenant_id=tenant_id, user_id=user_id, observation_id=r.id
+                                                    )
+                                                await refresh_history()
+                                            except Exception as ex:
+                                                show_error(f"删除失败：{ex}")
+
+                                    ui.button("删除", icon="delete", on_click=_delete).props(
+                                        "size=sm flat"
+                                    ).classes("text-red-500")
             except Exception as e:
                 logger.error("加载历史记录失败", exc_info=e)
                 with history_container:

@@ -112,6 +112,7 @@ _TEST_PLACEHOLDER: dict[str, str] = {
     "area_game": "输入背景信息进行测试（如：中班，可用室内区域：美工区、建构区……）",
     "outdoor_game": "输入背景信息进行测试（如：中班，可用户外区域：操场、沙池……）",
     "daily_reflection": "输入当日活动概述进行测试（如：中班，今日开展了春天主题活动……）",
+    "game_observation": "描述观察场景背景进行文字测试（如：中班建构区，5岁幼儿用积木搭建房屋，观察约15分钟……）\n⚠ 注意：实际生成需上传照片并使用视觉模型，此处仅供提示词文本调试",
 }
 
 
@@ -153,6 +154,7 @@ async def prompt_mgmt_page() -> None:
             tab_area_game = ui.tab("区域游戏")
             tab_outdoor_game = ui.tab("户外游戏")
             tab_daily_reflection = ui.tab("一日反思")
+            tab_game_observation = ui.tab("游戏观察")
 
         with ui.tab_panels(tabs, value=tab_split).classes("w-full"):
             with ui.tab_panel(tab_split):
@@ -169,6 +171,8 @@ async def prompt_mgmt_page() -> None:
                 await _build_task_panel(tenant_id, user_id, "outdoor_game")
             with ui.tab_panel(tab_daily_reflection):
                 await _build_task_panel(tenant_id, user_id, "daily_reflection")
+            with ui.tab_panel(tab_game_observation):
+                await _build_task_panel(tenant_id, user_id, "game_observation")
 
 
 async def _build_task_panel(tenant_id: int, user_id: int, task_type: str) -> None:

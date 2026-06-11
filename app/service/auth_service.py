@@ -53,6 +53,8 @@ async def login(
         user_id=user.id,
         tenant_id=user.tenant_id,
         role=user.role.value,
+        username=user.username,
+        display_name=user.display_name,
     )
 
 

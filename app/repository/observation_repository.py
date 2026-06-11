@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models.game_observation import GameObservation
@@ -125,6 +125,24 @@ async def update_observation(
             GameObservation.id == observation_id,
         )
         .values(**fields)
+    )
+    await session.commit()
+    return bool(result.rowcount)
+
+
+async def delete_observation(
+    session: AsyncSession,
+    tenant_id: int,
+    user_id: int,
+    observation_id: int,
+) -> bool:
+    """删除指定观察记录，强制 tenant_id + user_id 双重过滤，返回是否删除成功。"""
+    result = await session.execute(
+        delete(GameObservation).where(
+            GameObservation.tenant_id == tenant_id,
+            GameObservation.user_id == user_id,
+            GameObservation.id == observation_id,
+        )
     )
     await session.commit()
     return bool(result.rowcount)
