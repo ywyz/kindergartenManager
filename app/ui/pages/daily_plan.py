@@ -539,6 +539,7 @@ async def daily_plan_page() -> None:
                             ):
                                 area.value = ""
                             raw_text_area.value = ""
+                            await refresh_history()
                         else:
                             save_msg.classes(add="text-orange-500")
                             save_msg.text = "⚠ 未找到当天草稿"
@@ -787,8 +788,68 @@ async def daily_plan_page() -> None:
         )
 
     # ------------------------------------------------------------------
-    # 内部函数：加载已有草稿
+    # 历史记录区块
     # ------------------------------------------------------------------
+    ui.separator().classes("my-2")
+    ui.label("历史活动计划").classes("text-lg font-semibold text-gray-700 mt-2")
+
+    history_container = ui.column().classes("w-full gap-2 mt-1")
+
+    async def refresh_history() -> None:
+        history_container.clear()
+        try:
+            async with AsyncSessionLocal() as session:
+                plans, _ = await list_daily_plans(
+                    session,
+                    tenant_id,
+                    user_id=user_id,
+                    limit=20,
+                )
+            with history_container:
+                if not plans:
+                    ui.label("暂无历史记录").classes("text-gray-400 text-sm")
+                else:
+                    for plan in plans:
+                        with ui.card().classes("w-full"):
+                            with ui.row().classes("w-full justify-between items-center"):
+                                ui.label(
+                                    f"{plan.plan_date}  第{plan.week_number}周 {plan.weekday_cn}  "
+                                    f"{plan.grade or ''} {plan.class_name or ''}"
+                                ).classes("text-sm text-gray-700")
+
+                                async def _delete_plan(p=plan) -> None:
+                                    with ui.dialog() as dlg, ui.card():
+                                        ui.label(
+                                            f"确定要删除「{p.plan_date}」的活动计划吗？删除后无法恢复。"
+                                        ).classes("text-base")
+                                        with ui.row().classes("gap-3 mt-3"):
+                                            ui.button(
+                                                "确认删除",
+                                                on_click=lambda: dlg.submit("yes"),
+                                            ).classes("bg-red-600 text-white")
+                                            ui.button("取消", on_click=lambda: dlg.submit("no"))
+                                    result = await dlg
+                                    if result == "yes":
+                                        try:
+                                            async with AsyncSessionLocal() as s:
+                                                await delete_daily_plan(
+                                                    s,
+                                                    tenant_id=tenant_id,
+                                                    user_id=user_id,
+                                                    plan_date=p.plan_date,
+                                                )
+                                            await refresh_history()
+                                        except Exception as ex:
+                                            ui.notify(f"删除失败：{ex}", type="negative")
+
+                                ui.button("删除", icon="delete", on_click=_delete_plan).props(
+                                    "size=sm flat"
+                                ).classes("text-red-500")
+        except Exception:
+            with history_container:
+                ui.label("加载历史失败").classes("text-red-500 text-sm")
+
+    await refresh_history()
     async def _load_draft(selected: date | None) -> None:
         """根据选定日期加载已有草稿，回填各字段。"""
         if not selected:
