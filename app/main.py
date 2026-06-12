@@ -19,6 +19,7 @@ from app.ui.pages import user_admin  # noqa: F401
 from app.ui.pages import game_observation  # noqa: F401
 from app.ui.pages import register  # noqa: F401
 from app.ui.pages import profile  # noqa: F401
+from app.ui.pages import setup  # noqa: F401
 
 from app.api import create_api_router
 from app.auth.middleware import AuthMiddleware

@@ -10,8 +10,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.auth.jwt import decode_access_token
 
-# 无需登录即可访问的页面路由（登录页本身、注册页）
-UNRESTRICTED_PAGE_ROUTES: set[str] = {"/", "/register"}
+# 无需登录即可访问的页面路由（登录页本身、注册页、初始化向导）
+UNRESTRICTED_PAGE_ROUTES: set[str] = {"/", "/register", "/setup"}
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
