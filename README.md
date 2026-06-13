@@ -32,7 +32,44 @@
 | 文档导出 | python-docx |
 | 测试 | pytest + pytest-asyncio（SQLite 内存库隔离） |
 
-## 快速开始
+## 安装
+
+### Windows（推荐：安装向导）
+
+1. 从 [Releases](https://github.com/ywyz/kindergartenManager/releases) 下载 `KindergartenManager-Setup-*.exe`
+2. 双击运行安装向导
+3. 从开始菜单或桌面启动，浏览器自动打开 http://localhost:8080
+4. 访问 http://localhost:8080/setup 创建管理员账号
+
+**零配置**：首次启动自动使用内嵌 SQLite，无需配置数据库。
+
+### Ubuntu/Debian（推荐：.deb 安装包）
+
+```bash
+sudo dpkg -i kindergarten-manager_*.deb
+# 服务自动启动，访问 http://localhost:8080/setup
+```
+
+配置文件：`/etc/kindergarten-manager/env`（首次安装自动生成随机密钥）
+
+```bash
+systemctl status kindergarten-manager   # 查看服务状态
+journalctl -u kindergarten-manager -f   # 实时日志
+```
+
+### Docker（服务器部署）
+
+```bash
+# 克隆仓库后
+docker compose up -d
+```
+
+或使用镜像：
+```bash
+docker pull ghcr.io/ywyz/kindergartenmanager:latest
+```
+
+### 源码运行（开发/自定义部署）
 
 ```bash
 # 1. 克隆并进入项目
@@ -42,42 +79,34 @@ cd kindergartenManager
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 
-# 3. 配置环境变量
+# 3. 配置环境变量（可选，留空使用 SQLite 零配置）
 cp .env.example .env
-# 编辑 .env，填写 DATABASE_URL / ENCRYPTION_KEY / JWT_SECRET / HOLIDAY_API_URL 等
+# 如需 MySQL：编辑 .env，填写 DATABASE_URL / ENCRYPTION_KEY / JWT_SECRET
 
-# 4. 执行数据库迁移
-.venv/bin/alembic upgrade head
-
-# 5. 启动应用（默认 http://0.0.0.0:8080）
+# 4. 启动应用（默认 http://0.0.0.0:8080）
 .venv/bin/python -m app.main
+# 首次启动自动执行数据库迁移，访问 /setup 创建管理员账号
 
-# 5.1 首次初始化系统管理员（可重复执行，已存在则跳过）
-.venv/bin/python -m app.jobs.bootstrap_admin
-
-# 6. 运行测试
+# 5. 运行测试
 .venv/bin/pytest tests/ -q
 ```
 
-> ⚠️ `ENCRYPTION_KEY` 与 `JWT_SECRET` 必须与生产环境保持一致，否则已加密的 AI Key 无法解密、已签发的 JWT 失效。
+> ⚠️ **生产环境**：请在 `.env` 中显式配置 `ENCRYPTION_KEY` 和 `JWT_SECRET`，避免重启后密钥变化导致数据无法解密。
 
 ## 环境变量
 
 | 变量 | 必填 | 说明 |
 |------|------|------|
-| `DATABASE_URL` | 是 | `mysql+aiomysql://user:pass@host:3306/db` |
-| `ENCRYPTION_KEY` | 是 | AI Key 加密密钥（取前 32 字节构造 Fernet Key） |
-| `JWT_SECRET` | 是 | JWT 签名密钥，同时用于 `app.storage.user` 加密 |
+| `DATABASE_URL` | 否 | 留空使用内嵌 SQLite；MySQL：`mysql+aiomysql://user:pass@host:3306/db` |
+| `ENCRYPTION_KEY` | 推荐 | AI Key 加密密钥；留空自动生成并持久化到 `.kindergarten_secrets` |
+| `JWT_SECRET` | 推荐 | JWT 签名密钥；留空自动生成并持久化 |
 | `JWT_EXPIRE_MINUTES` | 否 | access token 有效期，默认 60 |
-| `HOLIDAY_API_URL` | 是 | 中国法定节假日 API 地址 |
+| `HOLIDAY_API_URL` | 否 | 中国法定节假日 API，默认 timor.tech |
 | `LOG_LEVEL` | 否 | 日志级别，默认 INFO |
-| `API_KEYS` | 否 | 对外 API 鉴权，`"key:tenant_id"` 逗号分隔；为空则对外 API 关闭 |
+| `API_KEYS` | 否 | 对外 API 鉴权，`"key:tenant_id"` 逗号分隔；为空则接口关闭 |
 | `API_SIGNING_SECRET` | 否 | 对外 API HMAC 签名密钥；非空时强制校验签名 |
-| `API_SIGNATURE_MAX_SKEW` | 否 | 签名时间戳允许偏移秒数，默认 300 |
-| `BOOTSTRAP_ADMIN_ENABLED` | 否 | 是否允许执行管理员初始化脚本，默认 false |
-| `BOOTSTRAP_ADMIN_TENANT_ID` | 否 | 初始化管理员所属租户，默认 1 |
-| `BOOTSTRAP_ADMIN_USERNAME` | 否 | 初始化管理员用户名，默认 sysadmin |
-| `BOOTSTRAP_ADMIN_PASSWORD` | 否 | 初始化管理员密码，留空则脚本拒绝执行 |
+| `BOOTSTRAP_ADMIN_ENABLED` | 否 | 允许脚本方式初始化管理员，默认 false |
+| `BOOTSTRAP_ADMIN_PASSWORD` | 否 | 脚本方式初始化时的管理员密码 |
 
 ## 目录结构
 

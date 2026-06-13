@@ -41,7 +41,8 @@ async def bootstrap_admin(
     if not enabled:
         return "skip: BOOTSTRAP_ADMIN_ENABLED=false"
 
-    db_host = make_url(database_url).host
+    # 空串表示内嵌 SQLite，视为本地数据库
+    db_host = make_url(database_url).host if database_url else None
     local_hosts = {None, "localhost", "127.0.0.1", "::1"}
     if (db_host not in local_hosts) and (not allow_remote):
         return "error: remote database blocked, set BOOTSTRAP_ADMIN_ALLOW_REMOTE=true to continue"
@@ -88,7 +89,7 @@ async def reset_admin_password(
     database_url: str,
 ) -> str:
     """重置 sys_admin 密码（需旧密码验证），返回执行结果说明。"""
-    db_host = make_url(database_url).host
+    db_host = make_url(database_url).host if database_url else None
     local_hosts = {None, "localhost", "127.0.0.1", "::1"}
     if (db_host not in local_hosts) and (not allow_remote):
         return "error: remote database blocked, set BOOTSTRAP_ADMIN_ALLOW_REMOTE=true to continue"

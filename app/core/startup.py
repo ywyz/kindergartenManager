@@ -27,7 +27,7 @@ def _get_alembic_script_location() -> str:
 
 def _build_sync_url(database_url: str | None) -> str:
     """将异步驱动 URL 转换为 Alembic 所需的同步驱动 URL。"""
-    if database_url is None:
+    if not database_url:
         if getattr(sys, "frozen", False):
             exe_dir = os.path.dirname(sys.executable)
             return f"sqlite:///{exe_dir}/kindergarten.db"

@@ -7,6 +7,8 @@
     /       — 登录页
     /home   — 主页占位
 """
+import sys
+
 from nicegui import app, ui
 
 # 导入页面模块以注册 @ui.page 路由（必须在 ui.run 前执行）
@@ -25,6 +27,7 @@ from app.api import create_api_router
 from app.auth.middleware import AuthMiddleware
 from app.core.config import settings
 from app.core.logging import get_logger
+from app.core.startup import run_startup_migrations
 
 logger = get_logger("app.main")
 
@@ -43,6 +46,9 @@ def _on_global_exception(exc: Exception) -> None:
 
 
 def main() -> None:
+    # 启动前同步执行数据库迁移（失败记录日志但不阻断启动）
+    run_startup_migrations()
+
     # 全局异常日志
     app.on_exception(_on_global_exception)
     # 路由守卫：未登录访问受限页面重定向到 /
@@ -50,13 +56,16 @@ def main() -> None:
     # 对外只读 REST API（二期）：/api/v1，API Key + 可选 HMAC 签名鉴权
     app.include_router(create_api_router())
 
+    # 打包版（PyInstaller frozen）自动打开浏览器；开发/服务器模式不弹窗
+    _show_browser = getattr(sys, "frozen", False)
+
     ui.run(
         host="0.0.0.0",
         port=8080,
         title="幼儿园教学管理系统",
         storage_secret=settings.JWT_SECRET,  # 用于加密 app.storage.user
         reload=False,
-        show=False,  # 不自动打开浏览器（服务器环境）
+        show=_show_browser,
         favicon="📚",
     )
 

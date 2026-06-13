@@ -1,0 +1,22 @@
+[Unit]
+Description=幼儿园教学管理系统
+Documentation=https://github.com/ywyz/kindergartenManager
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/lib/kindergarten-manager
+EnvironmentFile=/etc/kindergarten-manager/env
+ExecStart=/opt/kindergarten-manager/KindergartenManager
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kindergarten-manager
+
+# 安全加固（基础）
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
