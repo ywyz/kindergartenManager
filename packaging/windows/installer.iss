@@ -11,11 +11,11 @@
 
 #define MyAppName     "幼儿园教学管理系统"
 #define MyAppExeName  "KindergartenManager.exe"
-#define MyAppID       "D4E8F2A1-B3C7-4096-9E5A-2F1D6B8C3A47"
 #define SourceDir     "..\..\dist\KindergartenManager"
 
 [Setup]
-AppId={{#MyAppID}
+; AppId GUID: {{...} 语法中 {{ 转义为 {, 最终 AppId = {D4E8F2A1-B3C7-4096-9E5A-2F1D6B8C3A47}
+AppId={{D4E8F2A1-B3C7-4096-9E5A-2F1D6B8C3A47}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher=ywyz
