@@ -192,3 +192,61 @@ type 值：0=工作日，1=周末，2=法定节假日，3=调班工作日。
 
 仓库层新增只读查询：`daily_plan_repository.list_daily_plans` / `get_daily_plan_by_id`、`semester_repository.list_semesters`、`class_repository.list_class_configs`——均强制携带 `tenant_id` 过滤。
 
+
+## 9. SQLite 兼容性与 Windows EXE 首次运行支持（2026-06-13）
+
+### SQLite 迁移链修复
+
+Windows EXE 打包使用内嵌 SQLite，迁移链存在 3 处 MySQL 专属语法，已全部修复：
+
+| 迁移文件 | 原问题 | 修复方案 |
+|----------|--------|----------|
+| `54c20d37a461` | `server_default='text'` → SQL `DEFAULT text`（无引号），SQLite 语法错误 | 改为 `server_default=sa.text("'text'")` |
+| `46b9fd5613c3` | 全新 SQLite 无 `model_name` 列时直接 UPDATE/ALTER 失败 | `sa.inspect()` 检测列存在性，不存在则 `op.add_column` |
+| `f6d79ac6bf21` | 全新 SQLite 无 `daily_plan` 表时直接 ALTER 失败 | `inspector.get_table_names()` 检测，不存在则 `op.create_table` |
+
+`alembic/env.py` 同步修复：
+- 新增 `render_as_batch=True`（支持 SQLite 的 `op.alter_column`）
+- PyInstaller 路径一致性：`sys.frozen` 检测 + `os.path.dirname(sys.executable)` 绝对路径
+
+### 首次运行配置向导
+
+#### 新增模块
+
+| 模块 | 路径 | 职责 |
+|------|------|------|
+| `SetupState` | `app/core/setup_state.py` | `is_setup_complete()` / `mark_setup_complete()`；标记文件 `.kindergarten_setup_complete`；纯文件检查，无 DB 查询；路径适配 PyInstaller |
+| `EnvWriter` | `app/core/env_writer.py` | `read_dot_env()` / `write_dot_env()`；原子更新 `.env` 文件；路径适配 PyInstaller |
+
+#### 新增配置字段
+
+| 字段 | 默认值 | 说明 |
+|------|--------|------|
+| `PORT` | `8080` | 应用监听端口，可通过 `.env` 覆盖，`ui.run(port=settings.PORT)` |
+
+#### 首次运行触发机制
+
+```
+frozen exe 启动
+  └─ ui.run(show=True)  →  浏览器打开 /
+     /  login_page()  →  is_setup_complete()==False  →  navigate.to('/setup')
+     /setup  →  is_setup_complete()==False  →  渲染 4 步向导
+
+向导完成
+  └─ mark_setup_complete()  →  写 .kindergarten_setup_complete
+
+后续启动
+  └─ /  →  is_setup_complete()==True  →  正常渲染登录表单
+     /setup  →  is_setup_complete()==True  →  渲染密码重置表单
+```
+
+#### 向导 4 步结构（`app/ui/pages/setup.py`）
+
+| 步骤 | 内容 | 可跳过 | 后端调用 |
+|------|------|--------|----------|
+| Step 1：数据库 & 端口 | 数据库模式（SQLite/MySQL）+ 端口；有变更时写 `.env` + 自动重启 | ✅ | `write_dot_env()` |
+| Step 2：创建管理员账号 | 用户名 / 姓名 / 密码 | ❌ | `register_user()` |
+| Step 3：AI 接口配置 | API URL / Key / 模型名称 | ✅ | `save_ai_key()` |
+| Step 4：完成 | 配置摘要 + 前往登录 | — | `mark_setup_complete()` |
+
+自动重启机制：`subprocess.Popen([sys.executable] + sys.argv[1:])` → 等待 0.8s 确认子进程存活 → `os._exit(0)`；失败降级为"请手动关闭并重新启动"提示。

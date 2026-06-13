@@ -61,7 +61,7 @@ def main() -> None:
 
     ui.run(
         host="0.0.0.0",
-        port=8080,
+        port=settings.PORT,
         title="幼儿园教学管理系统",
         storage_secret=settings.JWT_SECRET,  # 用于加密 app.storage.user
         reload=False,

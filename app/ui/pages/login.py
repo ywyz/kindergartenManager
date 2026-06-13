@@ -10,6 +10,7 @@ from nicegui import app, ui
 from app.core.database import AsyncSessionLocal
 from app.core.exceptions import AuthError
 from app.core.logging import get_logger
+from app.core.setup_state import is_setup_complete
 from app.service.auth_service import login as auth_login
 
 _logger = get_logger(__name__)
@@ -19,6 +20,11 @@ _TENANT_ID = 1  # 首期固定租户，后续可由子域名或配置项注入
 
 @ui.page("/")
 async def login_page() -> None:
+    # 首次运行检测：setup 未完成时重定向到初始化向导（同步文件检查，无 DB 查询）
+    if not is_setup_complete():
+        ui.navigate.to("/setup")
+        return
+
     async def do_login() -> None:
         error_label.visible = False
         username_val = username_input.value.strip()

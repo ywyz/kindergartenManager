@@ -77,7 +77,7 @@ def upgrade() -> None:
     sa.UniqueConstraint('code', name='uq_invite_code')
     )
     op.create_index(op.f('ix_invite_code_tenant_id'), 'invite_code', ['tenant_id'], unique=False)
-    op.add_column('ai_api_key', sa.Column('key_type', sa.Enum('text', 'vision', name='ai_key_type'), server_default='text', nullable=False))
+    op.add_column('ai_api_key', sa.Column('key_type', sa.Enum('text', 'vision', name='ai_key_type'), server_default=sa.text("'text'"), nullable=False))
     op.add_column('user', sa.Column('display_name', sa.String(length=64), nullable=True))
     # ### end Alembic commands ###
 

@@ -315,3 +315,87 @@ cp .env.example .env
 
 
 > Stage 4（教案拆分/年龄适配）及后续阶段的开发进度详见 [daily-plan/progress.md](daily-plan/progress.md)。
+
+---
+
+## 2026-06-13（Windows EXE SQLite 兼容性修复 + 首次运行配置向导）
+
+### 背景
+
+v3.0.0-beta.2 Windows EXE 打包后在全新 Windows 机器上首次运行出现两类问题：
+1. `/setup` 页面返回 500 错误：`OperationalError: no such column: user.display_name`
+2. 首次运行时没有任何引导页面，用户不知道需要访问 `/setup`
+
+### 1. SQLite 迁移链兼容性修复
+
+**根本原因链：**
+- 迁移 `54c20d37a461` 中 `server_default='text'`（Python 字符串）被 SQLAlchemy 渲染为 SQL `DEFAULT text`（无引号），SQLite 将 `text` 视为标识符而非字符串字面量 → `op.add_column` 失败 → 整个事务回滚 → `user.display_name` 列永远无法创建
+- MySQL 不受影响（MySQL 对 ENUM 列 DEFAULT 有特殊宽松处理）
+
+**修复文件：**
+
+| 文件 | 修复内容 |
+|------|----------|
+| `alembic/versions/54c20d37a461_dev3_0_phase_b_new_tables_and_columns.py` | `server_default='text'` → `server_default=sa.text("'text'")` |
+| `alembic/versions/46b9fd5613c3_add_model_name_to_ai_api_key.py` | 用 `sa.inspect()` 检查 `model_name` 列是否存在：不存在时 `op.add_column`，存在时走 MySQL 的 UPDATE+ALTER 路径 |
+| `alembic/versions/f6d79ac6bf21_add_daily_plan_table.py` | 检查 `daily_plan` 表是否存在：不存在时直接 `op.create_table`（全新 SQLite），存在时走 MySQL 的 ALTER 路径 |
+| `alembic/env.py` | ① 添加 PyInstaller 路径一致性（`sys.frozen` 检测 + `os.path.dirname(sys.executable)`）；② 两个 `context.configure()` 均添加 `render_as_batch=True` |
+
+**验证：**
+- SQLite 迁移链从空库完整运行到 HEAD（`4e2e0e079e56`）✅
+- `user.display_name`、`ai_api_key.key_type` 等关键列均正确创建 ✅
+- MySQL 生产用户已迁移版本不受影响（alembic_version 不重置）✅
+
+### 2. 首次运行环境配置向导（First-Run Setup Wizard）
+
+**新增文件：**
+
+| 文件 | 职责 |
+|------|------|
+| `app/core/setup_state.py` | `is_setup_complete()` / `mark_setup_complete()`：纯文件检查（`.kindergarten_setup_complete` 标记文件），无 DB 查询，路径适配 PyInstaller |
+| `app/core/env_writer.py` | `read_dot_env()` / `write_dot_env()`：原子更新 `.env` 文件，路径适配 PyInstaller |
+| `tests/test_setup_state.py` | 6 个单元测试 |
+| `tests/test_env_writer.py` | 10 个单元测试 |
+
+**修改文件：**
+
+| 文件 | 变更 |
+|------|------|
+| `app/core/config.py` | 新增 `PORT: int = 8080` 字段（通过 `.env` 持久化，修改后需重启） |
+| `app/main.py` | `ui.run(port=settings.PORT, ...)` 替换硬编码 `8080` |
+| `app/ui/pages/login.py` | 登录页顶部同步检测 `is_setup_complete()`：未完成 → `navigate.to('/setup')` |
+| `app/ui/pages/setup.py` | **完整重写**为 4 步向导（未完成时），已完成时退化为原有密码重置表单 |
+
+**向导 4 步设计：**
+
+| 步骤 | 内容 | 可跳过 |
+|------|------|--------|
+| Step 1：数据库 & 端口 | 数据库模式（SQLite/MySQL）+ 端口号；有变更时写 `.env` 并尝试自动重启 | ✅（"使用默认配置"按钮） |
+| Step 2：创建管理员账号 | 用户名 / 姓名 / 密码 / 确认密码；调用 `register_user()` | ❌（必填）|
+| Step 3：AI 接口配置 | API URL / API Key / 模型名称；调用 `save_ai_key()` | ✅（"跳过，稍后配置"）|
+| Step 4：完成 | 显示配置摘要；调用 `mark_setup_complete()`；跳转登录 | — |
+
+**自动触发机制：**
+- `main.py`：`show=True`（frozen 模式）→ 浏览器自动打开 `/`
+- `login.py`：`is_setup_complete() == False` → 重定向到 `/setup`
+- 标记文件写入后：`/` 正常渲染登录表单，`/setup` 显示密码重置表单
+
+**重启机制：** Step 1 有配置变更时，先尝试 `subprocess.Popen([sys.executable] + sys.argv[1:])`（等待 0.8s 确认子进程存活），成功则 `os._exit(0)`；失败降级为"请手动关闭并重新启动应用"提示。
+
+### 测试统计
+
+| 时间节点 | 测试数 |
+|---------|--------|
+| 本次修复前（dev3.0 交付基准） | 342 passed |
+| SQLite 迁移修复后 | 367 passed（+25：迁移 smoke test 重验）|
+| 首次运行向导实现后 | **383 passed** |
+
+### Alembic 当前 HEAD
+
+- `4e2e0e079e56`（drop_invite_code_table）
+
+### 全量测试
+
+```
+383 passed, 0 failed, 0 warnings（Python 3.14.4）
+```

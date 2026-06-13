@@ -70,6 +70,10 @@ class Settings(BaseSettings):
     JWT_SECRET: str = ""
     JWT_EXPIRE_MINUTES: int = 60
 
+    # ── 应用端口 ──────────────────────────────────────────────────────────────
+    # 可在 .env 中设置 PORT=xxxx 更改监听端口，修改后需重启生效
+    PORT: int = 8080
+
     # ── 节假日 ───────────────────────────────────────────────────────────────
     HOLIDAY_API_URL: str = "https://timor.tech/api/holiday/info/"
     LOG_LEVEL: str = "INFO"
