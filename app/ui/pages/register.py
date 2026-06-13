@@ -1,14 +1,13 @@
 """注册页面（路由：/register）。
 
 功能：
-  - 用户凭邀请码自助注册（无需登录即可访问）
-  - 注册后创建 is_active=False 的待审核账号
-  - 成功后提示等待管理员审核
+  - 用户自助注册（无需邀请码，无需登录即可访问）
+  - 若系统尚无用户，第一个注册者自动成为 sys_admin（立即可登录）
+  - 后续注册者创建 is_active=False 的待审核账号，需管理员审核
 """
 from nicegui import ui
 
 from app.core.database import AsyncSessionLocal
-from app.core.exceptions import AppError
 from app.core.logging import get_logger
 from app.service.auth_service import register_user
 
@@ -20,13 +19,12 @@ async def register_page() -> None:
     with ui.column().classes("w-full max-w-md mx-auto mt-16 p-8 gap-4"):
         ui.label("注册账号").classes("text-2xl font-bold text-blue-700 text-center")
         ui.label(
-            "请联系管理员获取邀请码，注册后需等待管理员审核激活。"
+            "首个注册账号将自动成为系统管理员；后续账号需管理员审核激活。"
         ).classes("text-sm text-gray-500 text-center")
 
         error_label = ui.label("").classes("text-red-600 text-sm hidden")
         success_label = ui.label("").classes("text-green-600 text-sm hidden")
 
-        invite_input = ui.input(label="邀请码", placeholder="请输入邀请码").classes("w-full")
         username_input = ui.input(label="用户名", placeholder="4~64个字符").classes("w-full")
         display_name_input = ui.input(label="姓名（显示名）", placeholder="如：李老师").classes("w-full")
         password_input = ui.input(
@@ -47,16 +45,11 @@ async def register_page() -> None:
             error_label.classes(add="hidden")
             success_label.classes(add="hidden")
 
-            invite = invite_input.value.strip()
             username = username_input.value.strip()
             display_name = display_name_input.value.strip() or None
             pwd = password_input.value
             pwd2 = password2_input.value
 
-            if not invite:
-                error_label.set_text("请输入邀请码")
-                error_label.classes(remove="hidden")
-                return
             if not username or len(username) < 4:
                 error_label.set_text("用户名不能少于 4 位")
                 error_label.classes(remove="hidden")
@@ -73,21 +66,22 @@ async def register_page() -> None:
             register_btn.props("loading=true")
             try:
                 async with AsyncSessionLocal() as session:
-                    await register_user(
+                    user = await register_user(
                         session,
-                        invite_code=invite,
                         username=username,
                         password=pwd,
                         display_name=display_name,
                     )
-                success_label.set_text(
-                    "✓ 注册成功！您的账号已创建，请等待管理员审核激活后再登录。"
-                )
+                if user.is_active:
+                    success_label.set_text(
+                        "✓ 注册成功！您是系统的第一个用户，已自动获得管理员权限，可直接登录。"
+                    )
+                else:
+                    success_label.set_text(
+                        "✓ 注册成功！您的账号已创建，请等待管理员审核激活后再登录。"
+                    )
                 success_label.classes(remove="hidden")
                 register_btn.props("disabled=true")
-            except AppError as e:
-                error_label.set_text(e.message)
-                error_label.classes(remove="hidden")
             except ValueError as e:
                 error_label.set_text(str(e))
                 error_label.classes(remove="hidden")

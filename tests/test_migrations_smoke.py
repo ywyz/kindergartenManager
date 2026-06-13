@@ -184,22 +184,17 @@ async def test_game_observation_image_blob_roundtrip(async_session):
     assert img.image_index == 1
 
 
-# ─── TB5：invite_code 唯一约束 ────────────────────────────────────────────────
+# ─── TB5：invite_code 表已删除（邀请码功能移除） ─────────────────────────────
 
 @pytest.mark.asyncio
-async def test_invite_code_unique_constraint(async_session):
-    """InviteCode.code 唯一约束：插入重复 code 抛 IntegrityError。"""
-    from app.core.models.invite_code import InviteCode
-
-    code1 = InviteCode(tenant_id=1, code="ABC123", is_active=True)
-    code2 = InviteCode(tenant_id=1, code="ABC123", is_active=True)  # 重复
-
-    async_session.add(code1)
-    await async_session.commit()
-
-    async_session.add(code2)
-    with pytest.raises(IntegrityError):
-        await async_session.commit()
+async def test_invite_code_table_removed(async_session):
+    """invite_code 表已通过迁移删除，ORM 模型已不存在。"""
+    import importlib
+    import sys
+    assert "app.core.models.invite_code" not in sys.modules, \
+        "invite_code 模型不应再存在于已加载模块中"
+    with pytest.raises((ImportError, ModuleNotFoundError)):
+        importlib.import_module("app.core.models.invite_code")
 
 
 # ─── TB6：prompt_template 枚举扩展 ───────────────────────────────────────────

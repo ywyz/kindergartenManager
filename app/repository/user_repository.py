@@ -14,6 +14,7 @@ async def create_user(
     username: str,
     hashed_password: str,
     role: UserRole | str,
+    display_name: str | None = None,
 ) -> User:
     """创建用户并持久化到数据库，返回已持久化的 User 对象。"""
     user = User(
@@ -21,6 +22,7 @@ async def create_user(
         username=username,
         hashed_password=hashed_password,
         role=UserRole(role) if isinstance(role, str) else role,
+        display_name=display_name,
     )
     session.add(user)
     await session.commit()
@@ -88,6 +90,17 @@ async def list_users_by_tenant(
         .order_by(User.created_at.desc())
     )
     return list(result.scalars().all())
+
+
+async def has_any_user(
+    session: AsyncSession,
+    tenant_id: int,
+) -> bool:
+    """检查指定租户是否已有任意用户，用于判断注册者是否是第一个用户。"""
+    result = await session.execute(
+        select(func.count()).select_from(User).where(User.tenant_id == tenant_id)
+    )
+    return (result.scalar_one() or 0) > 0
 
 
 async def update_user_active(

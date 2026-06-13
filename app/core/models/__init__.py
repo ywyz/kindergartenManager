@@ -8,7 +8,6 @@ from app.core.models.prompt_template import PromptTemplate  # noqa: F401
 from app.core.models.export_record import ExportRecord  # noqa: F401
 from app.core.models.game_observation import GameObservation  # noqa: F401
 from app.core.models.game_observation_image import GameObservationImage  # noqa: F401
-from app.core.models.invite_code import InviteCode  # noqa: F401
 
 __all__ = [
     "User",
@@ -20,5 +19,4 @@ __all__ = [
     "ExportRecord",
     "GameObservation",
     "GameObservationImage",
-    "InviteCode",
 ]

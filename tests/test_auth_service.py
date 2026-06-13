@@ -5,7 +5,6 @@ from unittest.mock import patch
 from app.auth.jwt import decode_access_token
 from app.auth.password import hash_password
 from app.core.exceptions import AuthError
-from app.repository.invite_code_repository import create_code
 from app.repository.user_repository import create_user
 from app.service.auth_service import (
     approve_user,
@@ -265,91 +264,76 @@ async def test_list_users_for_admin_with_filter(async_session):
 # ── register_user / approve_user / update_profile_display_name 测试 ──────────
 
 
-async def test_register_user_invalid_invite_code_raises(async_session):
-    """无效邀请码注册时抛出业务异常。"""
-    from app.core.exceptions import AppError
-    with pytest.raises((AppError, AuthError, ValueError)):
-        await register_user(
-            async_session,
-            invite_code="NOTEXIST",
-            username="newuser",
-            password="Pass1234!",
-            display_name="新教师",
-        )
+async def test_first_user_becomes_sys_admin_and_active(async_session):
+    """空库第一个注册用户自动成为 sys_admin（is_active=True），可立即登录。"""
+    user = await register_user(async_session, username="first_admin", password="Pass1234!")
+
+    assert user.role.value == "sys_admin"
+    assert user.is_active is True
+    assert user.tenant_id == 1
 
 
-async def test_register_user_deactivated_invite_code_raises(async_session):
-    """已停用邀请码注册时抛出业务异常。"""
-    from app.core.exceptions import AppError
-    # 创建一个停用的邀请码
-    invite = await create_code(
-        async_session,
-        tenant_id=1,
-        code="DEACTIVATED",
-        created_by=None,
-    )
-    # 先停用
-    from app.repository.invite_code_repository import set_code_active
-    await set_code_active(async_session, tenant_id=1, code="DEACTIVATED", is_active=False)
+async def test_first_user_can_login_immediately(async_session):
+    """第一个注册用户注册后无需审核可直接登录。"""
+    await register_user(async_session, username="first_admin", password="Pass1234!")
 
-    with pytest.raises((AppError, AuthError, ValueError)):
-        await register_user(
-            async_session,
-            invite_code="DEACTIVATED",
-            username="newuser",
-            password="Pass1234!",
-        )
+    token = await login(async_session, tenant_id=1, username="first_admin", password="Pass1234!")
+    assert token is not None
 
 
-async def test_register_user_valid_invite_code_creates_pending_user(async_session):
-    """有效邀请码注册后，创建 is_active=False, role=teacher 的用户，tenant 来自邀请码。"""
-    invite = await create_code(
-        async_session,
-        tenant_id=2,
-        code="VALID123",
-        created_by=None,
-    )
+async def test_second_user_becomes_teacher_and_inactive(async_session):
+    """已有用户后，第二个注册者成为 teacher（is_active=False），需管理员审核。"""
+    await register_user(async_session, username="first_admin", password="Pass1234!")
+    second = await register_user(async_session, username="second_teacher", password="Pass1234!")
 
-    user = await register_user(
-        async_session,
-        invite_code="VALID123",
-        username="pending_teacher",
-        password="Pass1234!",
-        display_name="待审核教师",
-    )
+    assert second.role.value == "teacher"
+    assert second.is_active is False
 
-    assert user.is_active is False
-    assert user.role.value == "teacher"
-    assert user.tenant_id == 2
-    assert user.username == "pending_teacher"
+
+async def test_second_user_cannot_login_before_approval(async_session):
+    """后续注册用户在审核前不能登录。"""
+    await register_user(async_session, username="first_admin", password="Pass1234!")
+    await register_user(async_session, username="pending_user", password="Pass1234!")
+
+    with pytest.raises(AuthError):
+        await login(async_session, tenant_id=1, username="pending_user", password="Pass1234!")
+
+
+async def test_register_duplicate_username_raises(async_session):
+    """同用户名注册两次时抛出 ValueError。"""
+    await register_user(async_session, username="duplicate", password="Pass1234!")
+
+    with pytest.raises(ValueError, match="已被注册"):
+        await register_user(async_session, username="duplicate", password="Pass5678!")
+
+
+async def test_register_short_password_raises(async_session):
+    """密码过短时抛出 ValueError。"""
+    with pytest.raises(ValueError, match="密码"):
+        await register_user(async_session, username="short_pwd_user", password="1234567")
 
 
 async def test_approve_user_allows_login(async_session):
-    """审核通过后，用户可以正常登录。"""
-    # 先注册一个待审核用户
-    invite = await create_code(
-        async_session,
-        tenant_id=1,
-        code="APPROVE123",
-        created_by=None,
-    )
-    user = await register_user(
-        async_session,
-        invite_code="APPROVE123",
-        username="pending2",
-        password="Pass1234!",
-    )
+    """审核通过后，待审核用户可以正常登录。"""
+    await register_user(async_session, username="admin_user", password="Pass1234!")
+    pending = await register_user(async_session, username="pending2", password="Pass1234!")
 
-    # 未审核时不能登录
     with pytest.raises(AuthError):
         await login(async_session, tenant_id=1, username="pending2", password="Pass1234!")
 
-    # 审核通过
-    await approve_user(async_session, tenant_id=1, user_id=user.id)
+    await approve_user(async_session, tenant_id=1, user_id=pending.id)
 
-    # 审核后可以登录
     token = await login(async_session, tenant_id=1, username="pending2", password="Pass1234!")
     assert token is not None
+
+
+async def test_register_with_display_name(async_session):
+    """注册时传入显示名，返回的用户对象应包含该显示名。"""
+    user = await register_user(
+        async_session, username="teacher_li", password="Pass1234!", display_name="李老师"
+    )
+
+    assert user.display_name == "李老师"
 
 
 async def test_update_profile_display_name(async_session):

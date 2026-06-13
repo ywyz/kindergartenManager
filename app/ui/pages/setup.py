@@ -80,70 +80,16 @@ async def setup_page(request: Request) -> None:
 
 
 def _render_init_form() -> None:
-    """渲染初始化管理员账号表单（无 sys_admin 时）。"""
-    ui.label("创建系统管理员").classes("text-xl font-semibold mt-2")
-    ui.label("数据库中尚无管理员账号，请在下方创建第一个系统管理员。").classes(
-        "text-gray-600 text-sm mb-2"
+    """系统尚无管理员时的提示：引导用户去注册页注册第一个账号。"""
+    ui.label("系统初始化").classes("text-xl font-semibold mt-2")
+    ui.markdown(
+        "数据库中尚无管理员账号。\n\n"
+        "**请访问注册页面注册第一个账号：**\n\n"
+        "第一个注册的用户将自动获得 **系统管理员** 权限，可直接登录使用。"
+    ).classes("text-gray-700 text-sm mb-2")
+    ui.link("前往注册页 →", "/register").classes(
+        "text-blue-600 font-semibold text-base mt-2"
     )
-
-    username_input = ui.input("管理员用户名", placeholder="sysadmin").classes("w-full")
-    password_input = ui.input(
-        "密码（至少8位）", password=True, password_toggle_button=True
-    ).classes("w-full")
-    confirm_input = ui.input(
-        "确认密码", password=True, password_toggle_button=True
-    ).classes("w-full")
-    status_label = ui.label("").classes("text-sm mt-1")
-
-    async def _do_init() -> None:
-        username = username_input.value.strip()
-        password = password_input.value
-        confirm = confirm_input.value
-
-        if not username:
-            status_label.set_text("❌ 用户名不能为空")
-            status_label.classes(replace="text-red-600 text-sm mt-1")
-            return
-        if len(password) < 8:
-            status_label.set_text("❌ 密码至少 8 位")
-            status_label.classes(replace="text-red-600 text-sm mt-1")
-            return
-        if password != confirm:
-            status_label.set_text("❌ 两次密码不一致")
-            status_label.classes(replace="text-red-600 text-sm mt-1")
-            return
-
-        tenant_id = settings.BOOTSTRAP_ADMIN_TENANT_ID
-        try:
-            async with AsyncSessionLocal() as session:
-                existing = await get_user_by_username(
-                    session, tenant_id=tenant_id, username=username
-                )
-                if existing is not None:
-                    status_label.set_text(f"❌ 用户名 {username!r} 已存在")
-                    status_label.classes(replace="text-red-600 text-sm mt-1")
-                    return
-                user = await create_user(
-                    session,
-                    tenant_id=tenant_id,
-                    username=username,
-                    hashed_password=hash_password(password),
-                    role=UserRole.sys_admin,
-                )
-            log_audit(
-                "setup_init_admin",
-                tenant_id=tenant_id,
-                user_id=user.id,
-                username=username,
-            )
-            status_label.set_text(f"✅ 管理员账号 {username!r} 创建成功！")
-            status_label.classes(replace="text-green-600 text-sm mt-1")
-            ui.link("前往登录 →", "/").classes("text-blue-600 mt-2")
-        except Exception as exc:
-            status_label.set_text(f"❌ 创建失败：{exc}")
-            status_label.classes(replace="text-red-600 text-sm mt-1")
-
-    ui.button("创建管理员", on_click=_do_init).classes("w-full mt-2 bg-green-600")
 
 
 def _render_reset_form() -> None:

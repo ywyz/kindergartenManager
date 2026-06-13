@@ -20,7 +20,6 @@ from app.service.auth_service import (
     reset_user_password_by_admin,
     set_user_active_by_admin,
 )
-from app.service.invite_service import generate_invite_code, list_invite_codes, toggle_invite_code
 from app.ui.components.app_shell import render_shell
 
 
@@ -299,60 +298,3 @@ async def user_admin_page() -> None:
                                 )
 
         await load_pending()
-
-        # ── 邀请码管理 ────────────────────────────────────────────────
-        ui.separator().classes("my-4")
-        ui.label("邀请码管理").classes("text-xl font-bold text-purple-600")
-
-        invite_note_input = ui.input(label="备注（可选）", placeholder="如：2026届新教师").classes("w-full")
-        invite_container = ui.column().classes("w-full gap-2")
-        invite_msg = ui.label("").classes("text-sm")
-
-        async def refresh_invites() -> None:
-            invite_container.clear()
-            async with AsyncSessionLocal() as session:
-                codes = await list_invite_codes(session, tenant_id=tenant_id)
-            with invite_container:
-                if not codes:
-                    ui.label("暂无邀请码").classes("text-gray-400 text-sm")
-                else:
-                    for code_obj in codes:
-                        with ui.card().classes("w-full"):
-                            with ui.row().classes("w-full justify-between items-center"):
-                                status_cls = "text-green-600" if code_obj.is_active else "text-gray-400 line-through"
-                                ui.label(
-                                    f"{code_obj.code}  {code_obj.note or ''}  {'（有效）' if code_obj.is_active else '（已停用）'}"
-                                ).classes(f"text-sm {status_cls}")
-
-                                async def _toggle(c=code_obj) -> None:
-                                    try:
-                                        async with AsyncSessionLocal() as s:
-                                            await toggle_invite_code(
-                                                s, tenant_id=tenant_id, code=c.code, is_active=not c.is_active
-                                            )
-                                        await refresh_invites()
-                                    except Exception as ex:
-                                        _set_msg(invite_msg, str(ex), is_error=True)
-
-                                ui.button(
-                                    "停用" if code_obj.is_active else "启用",
-                                    on_click=_toggle,
-                                ).props("size=sm flat")
-
-        async def create_invite() -> None:
-            try:
-                async with AsyncSessionLocal() as session:
-                    await generate_invite_code(
-                        session,
-                        tenant_id=tenant_id,
-                        created_by=admin_user_id,
-                        note=invite_note_input.value.strip() or None,
-                    )
-                _set_msg(invite_msg, "邀请码已生成", is_error=False)
-                invite_note_input.value = ""
-                await refresh_invites()
-            except Exception as ex:
-                _set_msg(invite_msg, str(ex), is_error=True)
-
-        ui.button("生成邀请码", on_click=create_invite, icon="add").classes("bg-purple-600 text-white")
-        await refresh_invites()
