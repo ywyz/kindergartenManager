@@ -288,7 +288,7 @@ jobs:
 
             | 变量 | 必填 | 说明 |
             |------|------|------|
-            | `DATABASE_URL` | 否 | 留空使用内嵌 SQLite；MySQL 示例：`******host:3306/db` |
+            | `DATABASE_URL` | 否 | 留空使用内嵌 SQLite；MySQL 示例：`mysql+aiomysql://user:pass@host:3306/db` |
             | `ENCRYPTION_KEY` | 推荐 | AI Key 加密密钥，留空自动生成并持久化 |
             | `JWT_SECRET` | 推荐 | JWT 签名密钥，留空自动生成并持久化 |
             | `HOLIDAY_API_URL` | 否 | 节假日 API，默认 `https://timor.tech/api/holiday/info/` |
