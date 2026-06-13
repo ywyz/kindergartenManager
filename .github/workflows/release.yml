@@ -172,10 +172,30 @@ jobs:
         id: ver
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Download all artifacts
+      # 显式按名称下载，跳过 Docker 构建缓存（*.dockerbuild）等非发布 artifact
+      - name: Download windows-installer
         uses: actions/download-artifact@v4
         with:
-          path: artifacts/
+          name: windows-installer
+          path: artifacts/windows-installer/
+
+      - name: Download windows-portable
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-portable
+          path: artifacts/windows-portable/
+
+      - name: Download linux-deb
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-deb
+          path: artifacts/linux-deb/
+
+      - name: Download linux-portable
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-portable
+          path: artifacts/linux-portable/
 
       - name: List artifacts
         run: find artifacts/ -type f | sort
