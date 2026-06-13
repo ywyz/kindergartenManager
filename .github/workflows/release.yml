@@ -1,6 +1,6 @@
 name: Release Build
 
-# 推送 v* 格式的 tag 时触发（例如 v1.0.0、v1.2.3-beta）
+# 推送 v* 格式的 tag 时触发（例如 v3.0.0-beta.1、v1.2.3）
 on:
   push:
     tags:
@@ -10,10 +10,14 @@ permissions:
   contents: write       # 创建 GitHub Release 并上传附件
   packages: write       # 推送到 GitHub Container Registry (ghcr.io)
 
+# Node.js 24 opt-in（Node.js 20 将于 2026-06-16 强制替换）
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
-  # ── Windows 桌面版（.exe） ────────────────────────────────────────────────
+  # ── Windows 安装包 + 便携包 ───────────────────────────────────────────────
   build-windows:
-    name: Build Windows EXE
+    name: Build Windows (Installer + ZIP)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,25 +27,53 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Build with PyInstaller
+      - name: Build with PyInstaller (onedir)
         run: pyinstaller kindergartenManager.spec
 
-      - name: Upload Windows artifact
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+
+      - name: Extract version (strip leading v)
+        id: ver
+        shell: bash
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build Windows installer (Inno Setup)
+        shell: cmd
+        run: |
+          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" ^
+            packaging\windows\installer.iss ^
+            /DMyAppVersion=${{ steps.ver.outputs.version }}
+
+      - name: Create portable ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "dist\KindergartenManager\*" `
+            -DestinationPath "dist\KindergartenManager-${{ steps.ver.outputs.version }}-windows-portable.zip"
+
+      - name: Upload Windows installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: windows-exe
-          path: dist/幼儿园教学管理系统.exe
+          name: windows-installer
+          path: dist/KindergartenManager-Setup-${{ steps.ver.outputs.version }}.exe
           retention-days: 7
 
-  # ── Linux 桌面版（二进制） ────────────────────────────────────────────────
+      - name: Upload Windows portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-portable
+          path: dist/KindergartenManager-${{ steps.ver.outputs.version }}-windows-portable.zip
+          retention-days: 7
+
+  # ── Linux .deb + 便携包 ───────────────────────────────────────────────────
   build-linux:
-    name: Build Linux Binary
+    name: Build Linux (deb + tar.gz)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -52,22 +84,41 @@ jobs:
           cache: 'pip'
 
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y gcc
+        run: sudo apt-get update && sudo apt-get install -y gcc dpkg-dev
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Build with PyInstaller
+      - name: Build with PyInstaller (onedir)
         run: pyinstaller kindergartenManager.spec
 
-      - name: Upload Linux artifact
+      - name: Extract version (strip leading v)
+        id: ver
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build .deb package
+        run: bash packaging/debian/build-deb.sh ${{ steps.ver.outputs.version }}
+
+      - name: Create portable tar.gz
+        run: |
+          tar -czf "dist/KindergartenManager-${{ steps.ver.outputs.version }}-linux-portable.tar.gz" \
+            -C dist KindergartenManager
+
+      - name: Upload Linux deb artifact
         uses: actions/upload-artifact@v4
         with:
-          name: linux-binary
-          path: dist/幼儿园教学管理系统
+          name: linux-deb
+          path: dist/kindergarten-manager_${{ steps.ver.outputs.version }}_amd64.deb
+          retention-days: 7
+
+      - name: Upload Linux portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-portable
+          path: dist/KindergartenManager-${{ steps.ver.outputs.version }}-linux-portable.tar.gz
           retention-days: 7
 
   # ── Docker 镜像（服务器版） ────────────────────────────────────────────────
@@ -92,10 +143,12 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository_owner }}/kindergartenmanager
+          # latest 仅随正式版（无 - 后缀 tag）更新，beta/rc 不覆盖 latest
+          flavor: |
+            latest=auto
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -115,26 +168,47 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download Windows artifact
+      - name: Extract version
+        id: ver
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      # Download each build artifact by explicit name to avoid accidentally
+      # pulling in Docker GHA build-cache artifacts (*.dockerbuild) which are
+      # not release assets and can fail to extract.
+      - name: Download windows-installer
         uses: actions/download-artifact@v4
         with:
-          name: windows-exe
-          path: artifacts/
+          name: windows-installer
+          path: artifacts/windows-installer
 
-      - name: Download Linux artifact
+      - name: Download windows-portable
         uses: actions/download-artifact@v4
         with:
-          name: linux-binary
-          path: artifacts/
+          name: windows-portable
+          path: artifacts/windows-portable
 
-      - name: Make Linux binary executable
-        run: chmod +x "artifacts/幼儿园教学管理系统"
+      - name: Download linux-deb
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-deb
+          path: artifacts/linux-deb
+
+      - name: Download linux-portable
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-portable
+          path: artifacts/linux-portable
+
+      - name: List artifacts
+        run: find artifacts/ -type f | sort
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/*
+          # tag 中含 "-"（如 beta、rc）则标记为 prerelease
+          prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true
+          files: artifacts/**/*
           body: |
             ## 幼儿园教学管理系统 ${{ github.ref_name }}
 
@@ -142,52 +216,84 @@ jobs:
 
             | 平台 | 文件 | 说明 |
             |------|------|------|
-            | Windows | `幼儿园教学管理系统.exe` | 双击运行，自动打开浏览器 |
-            | Linux | `幼儿园教学管理系统` | 赋权后运行（见下方命令） |
-            | Docker | `ghcr.io/ywyz/kindergartenmanager:${{ github.ref_name }}` | 服务器部署 |
+            | Windows | `KindergartenManager-Setup-${{ steps.ver.outputs.version }}.exe` | 安装向导（推荐） |
+            | Windows | `KindergartenManager-${{ steps.ver.outputs.version }}-windows-portable.zip` | 便携包（解压即用） |
+            | Ubuntu/Debian | `kindergarten-manager_${{ steps.ver.outputs.version }}_amd64.deb` | .deb 安装包（含 systemd） |
+            | Ubuntu/Linux | `KindergartenManager-${{ steps.ver.outputs.version }}-linux-portable.tar.gz` | 便携包（解压即用） |
+            | Docker | `ghcr.io/ywyz/kindergartenmanager:${{ steps.ver.outputs.version }}` | 服务器部署 |
 
-            ### Windows 桌面版
+            ---
 
-            1. 下载 `幼儿园教学管理系统.exe`
-            2. 在同一目录创建 `.env` 文件（参考下方配置说明）
-            3. 双击运行，浏览器自动打开 http://localhost:8080
+            ### 🪟 Windows 安装版（推荐）
 
-            > ⚠️ **Windows 安全提示**：首次运行可能触发 Windows Defender 警告，点击"更多信息" → "仍要运行"即可。这是 PyInstaller 打包程序的常见问题，不影响安全性。
+            1. 下载 `KindergartenManager-Setup-${{ steps.ver.outputs.version }}.exe`
+            2. 双击运行安装向导，按提示完成安装
+            3. 从开始菜单或桌面快捷方式启动
+            4. 程序自动打开浏览器至 http://localhost:8080
+            5. 访问 http://localhost:8080/setup 创建管理员账号
 
-            ### Linux 桌面版
+            > ⚠️ **Windows 安全提示**：首次运行可能触发 Windows Defender 警告，点击"更多信息" → "仍要运行"即可。
+
+            **零配置模式（内嵌 SQLite）**：直接安装即可使用，无需额外配置数据库。
+
+            **MySQL 模式**：在安装目录创建 `.env` 文件，填写 `DATABASE_URL=mysql+aiomysql://...`，重启程序。
+
+            ---
+
+            ### 🐧 Ubuntu/Debian 安装版（含 systemd 自动启动）
 
             ```bash
-            chmod +x 幼儿园教学管理系统
-            # 在同目录创建 .env 文件后运行：
-            ./幼儿园教学管理系统
+            # 下载 .deb 并安装
+            sudo dpkg -i kindergarten-manager_${{ steps.ver.outputs.version }}_amd64.deb
+
+            # 服务自动启动，访问：
+            # http://localhost:8080/setup
             ```
 
-            ### Docker 服务器版
+            配置文件：`/etc/kindergarten-manager/env`（安装时自动生成随机密钥）
 
             ```bash
-            # 下载 docker-compose.yml（见仓库根目录）后：
+            # 查看服务状态
+            systemctl status kindergarten-manager
+
+            # 查看日志
+            journalctl -u kindergarten-manager -f
+            ```
+
+            ---
+
+            ### 🐳 Docker 服务器版
+
+            ```bash
+            # 使用仓库中的 docker-compose.yml（含 MySQL 8）
             docker compose up -d
+
+            # 或直接拉取镜像（使用外部 MySQL）
+            docker pull ghcr.io/ywyz/kindergartenmanager:${{ steps.ver.outputs.version }}
             ```
 
-            或直接拉取镜像：
+            **最简 Docker 启动（SQLite，演示用）**：
             ```bash
-            docker pull ghcr.io/ywyz/kindergartenmanager:${{ github.ref_name }}
+            docker run -d \
+              -p 8080:8080 \
+              -e ENCRYPTION_KEY="$(head -c 32 /dev/urandom | base64)" \
+              -e JWT_SECRET="$(head -c 64 /dev/urandom | base64)" \
+              -v kg-data:/app \
+              ghcr.io/ywyz/kindergartenmanager:${{ steps.ver.outputs.version }}
             ```
 
-            ### .env 配置说明（必须创建）
+            ---
 
-            ```env
-            # 数据库（留空使用内嵌 SQLite，仅适合单机单用户）
-            # DATABASE_URL=mysql+aiomysql://user:password@host:3306/kindergarten_db
+            ### ⚙️ 环境变量说明（服务器/MySQL 模式必填）
 
-            # 必填：随机32字节字符串（用于加密 AI Key）
-            ENCRYPTION_KEY=your-32-byte-encryption-key-here!!
+            | 变量 | 必填 | 说明 |
+            |------|------|------|
+            | `DATABASE_URL` | 否 | 留空使用内嵌 SQLite；MySQL 示例：`mysql+aiomysql://user:pass@host:3306/db` |
+            | `ENCRYPTION_KEY` | 推荐 | AI Key 加密密钥，留空自动生成并持久化 |
+            | `JWT_SECRET` | 推荐 | JWT 签名密钥，留空自动生成并持久化 |
+            | `HOLIDAY_API_URL` | 否 | 节假日 API，默认 `https://timor.tech/api/holiday/info/` |
 
-            # 必填：随机字符串（用于 JWT 签名）
-            JWT_SECRET=your-random-jwt-secret-here
-
-            # 节假日 API（留空时节假日功能降级）
-            HOLIDAY_API_URL=https://timor.tech/api/holiday/info/
-            ```
+            > ⚠️ **重要**：生产/服务器环境请在配置文件中显式设置 `ENCRYPTION_KEY` 和 `JWT_SECRET`，
+            > 避免每次重启生成新密钥导致已加密数据无法解密。
 
             详细使用说明请查阅 [用户手册](docs/USER_MANUAL.md)。
