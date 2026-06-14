@@ -17,10 +17,10 @@
 
 from nicegui import app, ui
 
-from app.auth.jwt import decode_access_token
 from app.core.database import AsyncSessionLocal
 from app.core.exceptions import AiCallError, AiParseError, ConfigError
 from app.core.logging import get_logger
+from app.core.user_context import get_current_user
 from app.integration.ai_client.adapt_client import DEFAULT_ADAPT_PROMPT, adapt_activity_process
 from app.integration.ai_client.base import call_ai_text
 from app.integration.ai_client.generate_client import (
@@ -31,6 +31,7 @@ from app.integration.ai_client.generate_client import (
     DEFAULT_OUTDOOR_GAME_PROMPT,
 )
 from app.integration.ai_client.lesson_plan_client import DEFAULT_SPLIT_PROMPT, split_lesson_plan
+from app.integration.ai_client.observation_client import DEFAULT_OBSERVATION_PROMPT
 from app.repository.ai_key_repository import get_active_ai_key, get_decrypted_key
 from app.repository.prompt_repository import (
     get_active_prompt,
@@ -38,6 +39,7 @@ from app.repository.prompt_repository import (
     rollback_to_version,
     save_new_version,
 )
+from app.ui.components.app_shell import render_shell
 
 logger = get_logger(__name__)
 
@@ -71,6 +73,10 @@ _TASK_CONFIG = {
         "label": "一日活动反思提示词",
         "placeholder": DEFAULT_DAILY_REFLECTION_PROMPT,
     },
+    "game_observation": {
+        "label": "游戏观察提示词",
+        "placeholder": DEFAULT_OBSERVATION_PROMPT,
+    },
 }
 
 # 每种任务类型的输出格式要求（展示在编辑器上方）
@@ -90,6 +96,11 @@ _TASK_SCHEMA: dict[str, str] = {
     "area_game": "输出纯文本（非 JSON），按提示词中定义的格式生成区域游戏方案",
     "outdoor_game": "输出纯文本（非 JSON），按提示词中定义的格式生成户外游戏方案",
     "daily_reflection": "输出纯文本（非 JSON），按提示词中定义的格式生成一日活动反思",
+    "game_observation": (
+        "输出 JSON，必须包含以下 4 个字段（key 名称不可修改）：\n"
+        '{"observation_goal": "...", "observation_record": "...", '
+        '"evaluation_analysis": "...", "support_strategy": "..."}'
+    ),
 }
 
 # 测试区输入框提示文字
@@ -101,41 +112,18 @@ _TEST_PLACEHOLDER: dict[str, str] = {
     "area_game": "输入背景信息进行测试（如：中班，可用室内区域：美工区、建构区……）",
     "outdoor_game": "输入背景信息进行测试（如：中班，可用户外区域：操场、沙池……）",
     "daily_reflection": "输入当日活动概述进行测试（如：中班，今日开展了春天主题活动……）",
+    "game_observation": "描述观察场景背景进行文字测试（如：中班建构区，5岁幼儿用积木搭建房屋，观察约15分钟……）\n⚠ 注意：实际生成需上传照片并使用视觉模型，此处仅供提示词文本调试",
 }
-
-
-def _get_current_user() -> dict | None:
-    """从 storage 中解码当前用户信息，未登录返回 None。"""
-    token = app.storage.user.get("token")
-    if not token:
-        return None
-    try:
-        return decode_access_token(token)
-    except Exception:
-        return None
 
 
 @ui.page("/prompts")
 async def prompt_mgmt_page() -> None:
-    user = _get_current_user()
-    if not user:
-        ui.navigate.to("/")
-        return
+    user = get_current_user()
 
     tenant_id: int = user["tenant_id"]
     user_id: int = int(user["sub"])
 
-    # ── 顶部导航 ─────────────────────────────────────────────────────────────
-    with ui.header().classes("bg-blue-700 text-white items-center px-4"):
-        ui.label("幼儿园教学管理系统").classes("text-lg font-bold flex-1")
-        ui.button(
-            "返回主页",
-            on_click=lambda: ui.navigate.to("/home"),
-        ).classes("text-white")
-        ui.button(
-            "退出登录",
-            on_click=lambda: (app.storage.user.clear(), ui.navigate.to("/")),
-        ).classes("text-white ml-2")
+    await render_shell(user, active="prompts")
 
     with ui.column().classes("w-full max-w-3xl mx-auto p-6 gap-6"):
         ui.label("提示词管理").classes("text-xl font-bold text-blue-700")
@@ -152,6 +140,7 @@ async def prompt_mgmt_page() -> None:
             tab_area_game = ui.tab("区域游戏")
             tab_outdoor_game = ui.tab("户外游戏")
             tab_daily_reflection = ui.tab("一日反思")
+            tab_game_observation = ui.tab("游戏观察")
 
         with ui.tab_panels(tabs, value=tab_split).classes("w-full"):
             with ui.tab_panel(tab_split):
@@ -168,6 +157,8 @@ async def prompt_mgmt_page() -> None:
                 await _build_task_panel(tenant_id, user_id, "outdoor_game")
             with ui.tab_panel(tab_daily_reflection):
                 await _build_task_panel(tenant_id, user_id, "daily_reflection")
+            with ui.tab_panel(tab_game_observation):
+                await _build_task_panel(tenant_id, user_id, "game_observation")
 
 
 async def _build_task_panel(tenant_id: int, user_id: int, task_type: str) -> None:

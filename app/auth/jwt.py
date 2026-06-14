@@ -9,13 +9,21 @@ from app.core.exceptions import AuthError
 _ALGORITHM = "HS256"
 
 
-def create_access_token(user_id: int, tenant_id: int, role: str) -> str:
+def create_access_token(
+    user_id: int,
+    tenant_id: int,
+    role: str,
+    username: str = "",
+    display_name: str | None = None,
+) -> str:
     """生成 JWT access token。
 
     payload 字段：
     - sub: str(user_id)
     - tenant_id: int
     - role: str
+    - username: str
+    - display_name: str | None
     - exp: UTC 过期时间戳
     """
     expire = datetime.now(tz=timezone.utc) + timedelta(
@@ -25,6 +33,8 @@ def create_access_token(user_id: int, tenant_id: int, role: str) -> str:
         "sub": str(user_id),
         "tenant_id": tenant_id,
         "role": role,
+        "username": username,
+        "display_name": display_name,
         "exp": expire,
     }
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=_ALGORITHM)

@@ -1,0 +1,65 @@
+#!/bin/bash
+# postinst — 安装后脚本
+set -e
+
+CONFIG_DIR=/etc/kindergarten-manager
+DATA_DIR=/var/lib/kindergarten-manager
+
+# ── 创建数据目录 ──────────────────────────────────────────────────────────────
+mkdir -p "$DATA_DIR/exports"
+
+# ── 生成配置文件（仅首次安装） ───────────────────────────────────────────────
+if [ ! -f "$CONFIG_DIR/env" ]; then
+    mkdir -p "$CONFIG_DIR"
+
+    # 生成随机密钥（使用 /dev/urandom，始终可用）
+    ENCRYPTION_KEY=$(head -c 32 /dev/urandom | base64 | tr -d '=+/' | head -c 43)
+    JWT_SECRET=$(head -c 64 /dev/urandom | base64 | tr -d '=+/' | head -c 86)
+
+    cat > "$CONFIG_DIR/env" <<EOF
+# 幼儿园教学管理系统 — 运行时配置
+# 修改后需重启服务：systemctl restart kindergarten-manager
+
+# 数据库连接（留空使用内嵌 SQLite，适合单机演示）
+# MySQL 示例：mysql+aiomysql://user:password@localhost:3306/kindergarten_db
+DATABASE_URL=
+
+# 加密密钥（自动生成，重要：请勿随意修改，密钥改变后已加密数据将无法解密）
+ENCRYPTION_KEY=${ENCRYPTION_KEY}
+
+# JWT 签名密钥（自动生成）
+JWT_SECRET=${JWT_SECRET}
+
+JWT_EXPIRE_MINUTES=60
+HOLIDAY_API_URL=https://timor.tech/api/holiday/info/
+LOG_LEVEL=INFO
+EOF
+    chmod 600 "$CONFIG_DIR/env"
+    echo "配置文件已生成：$CONFIG_DIR/env"
+fi
+
+# ── 设置数据目录权限 ─────────────────────────────────────────────────────────
+chmod 755 "$DATA_DIR"
+chmod 755 "$DATA_DIR/exports"
+
+# ── 注册并启动 systemd 服务 ──────────────────────────────────────────────────
+systemctl daemon-reload
+systemctl enable kindergarten-manager.service
+
+if [ "$1" = "configure" ]; then
+    systemctl start kindergarten-manager.service || true
+fi
+
+echo ""
+echo "=========================================="
+echo "  幼儿园教学管理系统安装完成"
+echo "=========================================="
+echo "  访问地址：http://localhost:8080"
+echo "  初始化：  http://localhost:8080/setup"
+echo "  配置文件：$CONFIG_DIR/env"
+echo "  数据目录：$DATA_DIR"
+echo ""
+echo "  如需使用 MySQL，请编辑 $CONFIG_DIR/env"
+echo "  修改 DATABASE_URL 后执行："
+echo "    systemctl restart kindergarten-manager"
+echo "=========================================="

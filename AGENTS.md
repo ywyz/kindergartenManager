@@ -2,29 +2,33 @@
 
 ## 项目概述
 
-**语言：Python 3.12**。单体应用，NiceGUI 前后端一体化，MySQL 8 云端存储，OpenAI 兼容 API 接入。
-首期专注"教学管理-每日活动计划"模块，其余模块仅保留接口预留。
+**语言：Python 3.12+**。Monorepo 架构，NiceGUI 主系统 + FastAPI 子系统，Docker Compose AIO 编排。
+当前为**单用户模式**（登录功能后续恢复），默认 SQLite，可选 MySQL。
 
 详见：
 - 产品需求：[memory-bank/PRD.md](memory-bank/PRD.md)
 - 技术栈选型：[memory-bank/tech-stack.md](memory-bank/tech-stack.md)
-- 实施计划：[memory-bank/plan.md](memory-bank/plan.md)
+- 实施计划：[memory-bank/implementation-plan.md](memory-bank/implementation-plan.md)
 
 ## 目录结构规范
 
 ```
 app/
   ui/              # NiceGUI 页面与组件（每个页面独立文件）
-  api/             # 预留：对外 REST API（首期不实现）
+  api/             # 对外 REST API
   service/         # 业务逻辑（教案拆分、年龄适配、生成建议）
   repository/      # 数据访问层（SQL 查询封装）
   integration/
-    ai_client/     # OpenAI 兼容调用（httpx + tenacity）
-    holiday_client/# 节假日接口（带本地缓存与降级）
-    word_export/   # Word 导出（python-docx 主方案）
-  auth/            # JWT、RBAC、密码策略
-  core/            # 配置、日志、异常定义、常量
+    ai_client/     # OpenAI 兼容调用（渐进迁移到 ai-service）
+    holiday_client/# 节假日接口（渐进迁移到 holiday-service）
+    word_export/   # Word 导出（渐进迁移到 word-service）
+  auth/            # JWT、RBAC、密码策略（保留待恢复登录功能）
+  core/            # 配置、日志、异常定义、常量、引导
   jobs/            # APScheduler 定时任务
+services/          # 子系统（各为独立 FastAPI Docker 容器）
+  ai-service/      # AI 调用微服务
+  word-service/    # Word 导出微服务
+  holiday-service/ # 节假日微服务
 alembic/           # 数据库迁移脚本
 tests/             # pytest 测试
 memory-bank/       # 项目文档（PRD、技术栈、计划）
@@ -115,8 +119,28 @@ HOLIDAY_API_URL=<节假日API地址>
 | M3 | 稳定性与安全加固 |
 | M4 | 上线试运行 |
 | M5（二期） | 对外 REST API + 数据库只读视图 |
+| M6 | Docker Compose AIO + 子系统拆分 + Caddy HTTPS |
+| M7 | 恢复登录与多用户支持 |
 
-**首期禁止实现** `app/api/` 下的对外接口，该目录仅做目录预留。
+## 部署方式
+
+### Docker Compose AIO（生产）
+```bash
+# 生产模式：Caddy + 主系统 + MySQL
+docker compose up -d
+
+# 开发模式：仅主系统 + MySQL（直接暴露端口）
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
+### 本地开发（无 Docker）
+```bash
+# 默认 SQLite，直接运行
+.venv/bin/python -m app.main
+```
+
+### 子系统开发
+每个子系统在 `services/` 下独立运行或作为 Docker 容器加入编排。
 
 ## 常见开发陷阱
 

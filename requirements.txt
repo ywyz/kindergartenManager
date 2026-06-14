@@ -29,6 +29,9 @@ tenacity>=8.3.0
 # Word 导出
 python-docx>=1.1.0
 
+# 图片处理（游戏观察子系统）
+Pillow>=10.0.0
+
 # 定时任务
 apscheduler>=3.10.0
 

@@ -1,0 +1,12 @@
+Package: kindergarten-manager
+Version: 3.0.0-beta.1
+Architecture: amd64
+Maintainer: ywyz <https://github.com/ywyz>
+Section: education
+Priority: optional
+Description: 幼儿园教学管理系统
+ 一站式幼儿园每日活动计划 AI 辅助生成、Word 导出与云端存档工具。
+ 基于 NiceGUI + SQLAlchemy，支持 SQLite（零配置）与 MySQL（多用户）两种数据库。
+Depends: libc6 (>= 2.17)
+Suggests: mysql-server
+Homepage: https://github.com/ywyz/kindergartenManager

@@ -11,6 +11,7 @@ async def save_export_record(
     daily_plan_id: int | None,
     file_name: str,
     file_path: str,
+    observation_id: int | None = None,
 ) -> ExportRecord:
     """写入一条导出记录。
 
@@ -21,6 +22,7 @@ async def save_export_record(
         daily_plan_id: 关联的教案 ID，可为 None。
         file_name: 导出文件名（含扩展名）。
         file_path: 导出文件的绝对路径。
+        observation_id: 关联的游戏观察记录 ID，可为 None。
 
     Returns:
         已持久化的 ExportRecord 对象。
@@ -31,6 +33,7 @@ async def save_export_record(
         daily_plan_id=daily_plan_id,
         file_name=file_name,
         file_path=file_path,
+        observation_id=observation_id,
     )
     session.add(record)
     await session.flush()

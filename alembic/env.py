@@ -1,3 +1,5 @@
+import os
+import sys
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
@@ -15,7 +17,14 @@ config = context.config
 
 # Override sqlalchemy.url with value from Settings (env-based).
 # Alembic uses configparser interpolation, so '%' must be escaped as '%%'.
-_db_url = settings.DATABASE_URL or "sqlite:///./kindergarten.db"
+# PyInstaller 打包模式下使用可执行文件目录的绝对路径，与 startup.py 保持一致。
+_db_url = settings.DATABASE_URL
+if not _db_url:
+    if getattr(sys, "frozen", False):
+        _exe_dir = os.path.dirname(sys.executable)
+        _db_url = f"sqlite:///{_exe_dir}/kindergarten.db"
+    else:
+        _db_url = "sqlite:///./kindergarten.db"
 if "+aiosqlite" in _db_url:
     sync_url = _db_url.replace("+aiosqlite", "")
 else:
@@ -55,6 +64,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        render_as_batch=True,  # SQLite 需要批处理模式来支持 ALTER TABLE
     )
 
     with context.begin_transaction():
@@ -76,7 +86,9 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            render_as_batch=True,  # SQLite 需要批处理模式来支持 ALTER TABLE
         )
 
         with context.begin_transaction():

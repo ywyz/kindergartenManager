@@ -23,20 +23,35 @@ def upgrade() -> None:
 
     列 model_name 可能已存在（来自另一台机器的未提交迁移）。
     若不存在则新增；若已存在则修改为 NOT NULL + server_default。
+    SQLite 全新数据库中列不存在，直接 ADD COLUMN；MySQL 有已有数据则先回填再 ALTER。
     """
-    # 回填已有 NULL 值（另一台机器添加列时未设置默认值）
-    op.execute(
-        "UPDATE ai_api_key SET model_name = 'gpt-4o-mini' WHERE model_name IS NULL"
-    )
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    existing_columns = {col["name"] for col in inspector.get_columns("ai_api_key")}
 
-    # 将列修改为 NOT NULL，并设置 server_default
-    op.alter_column(
-        "ai_api_key",
-        "model_name",
-        existing_type=sa.String(128),
-        nullable=False,
-        server_default="gpt-4o-mini",
-    )
+    if "model_name" not in existing_columns:
+        # 全新数据库（如 SQLite 首次安装）：直接添加列
+        op.add_column(
+            "ai_api_key",
+            sa.Column(
+                "model_name",
+                sa.String(128),
+                nullable=False,
+                server_default=sa.text("'gpt-4o-mini'"),
+            ),
+        )
+    else:
+        # 已有数据（MySQL 等）：先回填 NULL 值，再设置 NOT NULL 约束
+        op.execute(
+            "UPDATE ai_api_key SET model_name = 'gpt-4o-mini' WHERE model_name IS NULL"
+        )
+        op.alter_column(
+            "ai_api_key",
+            "model_name",
+            existing_type=sa.String(128),
+            nullable=False,
+            server_default="gpt-4o-mini",
+        )
 
 
 def downgrade() -> None:

@@ -28,6 +28,9 @@ class ExportRecord(Base):
     # 关联教案（外键逻辑约束，不做数据库级外键以简化迁移）
     daily_plan_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
+    # 关联游戏观察记录（逻辑外键 → game_observation.id）
+    observation_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+
     # 文件信息
     file_name: Mapped[str] = mapped_column(String(256), nullable=False)
     file_path: Mapped[str] = mapped_column(String(512), nullable=False)

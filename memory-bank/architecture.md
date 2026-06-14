@@ -2,54 +2,43 @@
 
 ## 1. 当前阶段
 
-- 项目阶段：M2/M3 已完成（阶段 0~8 全部完成）；二期对外只读 REST API 已落地。
-- 账号体系补充：已完成第二阶段（管理员初始化脚本、账号创建/启停/重置密码、筛选分页），首期不开放公开自助注册。
+- 项目阶段：M2/M3 已完成；二期 REST API 已落地；v3.0.1 单用户模式重构完成。
+- 架构方向：Docker Compose AIO 编排，Monorepo，渐进式微服务化。
 - 开发策略：先架构后编码；每完成一个步骤同步更新本文件与 progress.md
 
-## 2. 业务与权限边界（已确认）
+## 2. 当前模式（v3.0.1+）
 
-- 教师：创建、编辑、导出、查看同班计划；不可跨班查看。
-- 教研管理员：可查看、编辑、批注教学计划；可管理提示词。
-- 系统管理员：独立后台管理界面（低优先级，后续实现）。
-- 多设备登录：token 独立；设备管理和强制下线功能为低优先级需求。
+### 单用户模式
+- 登录功能已移除（后续恢复），根路径 `/` 重定向到 `/home`
+- 系统启动自动创建默认管理员（`app/core/bootstrap.py`）
+- 用户上下文通过 `app/core/user_context.py` 提供固定身份（tenant_id=1, user_id=1）
+- `app/auth/` 模块完整保留，供后续恢复登录功能
 
-## 3. 核心流程约束（已确认）
+### 数据库
+- 默认 SQLite（无需配置），可在 /settings 页面切换到 MySQL
+- MySQL 配置通过独立字段（服务器、端口、用户名、密码、数据库名）保存到 .env
 
-- 教案改写：覆盖多个活动字段，核心优先活动过程。
-- 差异标红：导出时以活动过程差异为主进行红字标注。
-- 提示词：共 7 种任务类型，分别独立配置与版本管理：`split`（教案拆分）/ `adapt`（年龄适配）/ `morning_exercise`（晨间活动）/ `morning_talk`（晨间谈话）/ `area_game`（区域游戏）/ `outdoor_game`（户外游戏）/ `daily_reflection`（一日活动反思）。
-- 提示词回滚：仅影响后续生成，不回溯重算已保存草稿。
+### 部署架构
+- **生产**：Docker Compose AIO（Caddy + 主系统 + MySQL + 子系统）
+- **开发**：本地直接运行（SQLite），或 `docker-compose.dev.yml` 
+- **反向代理**：Caddy 替代 Nginx，支持自动 HTTPS（域名配置后自动申请 Let's Encrypt 证书）
 
-## 4. 日历与节假日规则（已确认）
+## 3. 业务与权限边界
 
-- `is_holiday`：基于中国法定节假日接口判定，返回语义固定为法定节假日 True、工作日 False。
-- 周末判定：独立于 `is_holiday`，由额外规则处理（例如 date_service 或 UI 提示层）。
-- `near_holiday`：仅法定节假日前一天为 True，不包含周末前一天。
-- 额外节日标签：支持不放假节日（首批包含 5 月 12 日全国防灾减灾日）。
-- 节假日信息异常时不阻断主流程，UI 给出“信息暂不可用”提示。
+- 当前：单用户模式，默认管理员拥有所有权限
+- 后续恢复：教师、教研管理员、系统管理员三角色 RBAC
+- 多设备登录：token 独立；设备管理和强制下线功能为低优先级需求
 
-## 5. Word 导出结构（已确认）
+> 一日活动计划子系统（教案拆分 / 年龄适配 / 提示词管理 / Word 导出 / 一日活动生成）的核心流程约束、日历规则与导出规则详见 [daily-plan/design.md](daily-plan/design.md)。
 
-- 唯一模板来源：`templates/teacherplan.docx`。
-- 表格结构：2 列多行，左列固定 8 行标题，右列为内容并包含部分子分割。
-- 晨间活动固定字段：体能大循环 / 集体游戏 / 自选游戏。
-- 其中“集体游戏”“自选游戏”后需拼接具体生成内容。
-
-## 6. 导出与存档规则（已确认）
-
-- 同一日期允许多次导出，生成多条导出记录。
-- `file_path` 存储相对路径（相对仓库或导出根目录）。
-- 浏览器下载由 `ui.download` 触发，与 `file_path` 字段存储形式解耦。
-- 需要导出历史页面，支持查看与重新下载。
-
-## 7. 目录结构与模块职责（Step 0.1 完成后）
+## 3. 目录结构与模块职责（Step 0.1 完成后）
 
 以下目录已创建，每个目录的职责如下：
 
 | 目录 | 职责 |
 |------|------|
 | `app/` | 应用根包，所有业务代码入口 |
-| `app/ui/` | NiceGUI 页面与组件，每个页面独立文件（如 `pages/login.py`、`components/date_panel.py`）；禁止在此层做权限逻辑 |
+| `app/ui/` | NiceGUI 页面与组件，每个页面独立文件（如 `pages/login.py`、`pages/setup.py`、`components/date_panel.py`）；禁止在此层做权限逻辑 |
 | `app/api/` | 对外只读 REST API（二期）：`/api/v1` 路由、API Key + 可选 HMAC 签名鉴权；供子系统（幼儿园信息管理主系统）读取教学计划数据 |
 | `app/service/` | 业务逻辑层：教案拆分协调、年龄适配、差异比对、日期计算、登录逻辑等；不直接发 HTTP 请求 |
 | `app/repository/` | 数据访问层：封装所有 SQL 查询，返回模型对象；所有查询必须携带 `tenant_id` 过滤条件 |
@@ -58,7 +47,7 @@
 | `app/integration/word_export/` | Word 导出：`python-docx` 主方案，严格依照 `templates/teacherplan.docx` 结构，差异段落标红 |
 | `app/auth/` | JWT 生成/验证、RBAC 权限校验、密码哈希（Argon2）、路由守卫中间件（`middleware.py`）；权限逻辑统一在此层，不下沉到 UI |
 | `app/core/` | 配置（`pydantic-settings`）、日志（JSON 结构化）、审计日志（`audit.py`）、数据库连接（`AsyncEngine`）、异常定义、常量、加密工具 |
-| `app/jobs/` | APScheduler 定时任务（如缓存清理、审计归档等） |
+| `app/jobs/` | 管理脚本：`bootstrap_admin.py`（系统管理员初始化 / 密码重置，支持 `--init` / `--reset-password` 交互式 CLI）；APScheduler 定时任务预留位 |
 | `alembic/` | 数据库迁移脚本（Alembic），所有 schema 变更必须通过此处，禁止应用启动时 `create_all()` |
 | `tests/` | pytest 测试，每个 service 函数必须有单元测试；AI/Word/数据库操作用 mock/fixture 隔离 |
 | `exports/` | 导出的 Word 文件（运行时生成，不入仓，已在 `.gitignore` 中排除） |
@@ -70,7 +59,7 @@
 - **禁止**：`app/api/` 首期不实现；应用启动时不得 `create_all()`；service 层不直接发 HTTP 请求
 - **Python 包**：`alembic/`、`exports/`、`templates/`、`memory-bank/` 均非 Python 包（无 `__init__.py`）
 
-## 8. 阶段 0 已实现文件清单
+## 4. 阶段 0 已实现文件清单
 
 | 文件 | 职责 |
 |------|------|
@@ -88,7 +77,7 @@
 - `Base` 必须在所有 model 文件中被导入后，`alembic revision --autogenerate` 才能检测到新表
 - 当 `DATABASE_URL` 含 URL 编码字符（如 `%40`）时，`alembic/env.py` 写入 `sqlalchemy.url` 前必须将 `%` 转义为 `%%`，避免 `configparser` 插值异常
 
-## 9. 阶段 1 & 2 已实现文件清单
+## 5. 阶段 1 & 2 已实现文件清单
 
 ### 数据库表（Alembic 当前 head：最新迁移版本，含 ai_api_key 表）
 
@@ -112,20 +101,18 @@
 | `app/core/models/class_config.py` | ClassConfig ORM 模型 |
 | `app/auth/password.py` | Argon2 密码哈希与验证（passlib） |
 | `app/auth/jwt.py` | JWT 生成/验证（python-jose HS256），payload 含 sub/tenant_id/role/exp |
-| `app/service/auth_service.py` | 登录逻辑（查用户→验密码→签 JWT）；修改密码；管理员账号创建、筛选分页、启停与重置密码（仅 `sys_admin`） |
+| `app/service/auth_service.py` | 登录逻辑（查用户→验密码→签 JWT）；修改密码 |
 | `app/service/date_service.py` | 纯函数：`get_week_number`、`get_weekday_cn`、`is_workday`、`is_within_semester` |
-| `app/repository/user_repository.py` | 按用户名/ID 查询用户；更新密码；启停状态更新；用户筛选分页查询 |
+| `app/repository/user_repository.py` | 按用户名/ID 查询用户；更新密码 |
 | `app/repository/semester_repository.py` | `get_active_semester`、`upsert_active_semester` |
 | `app/repository/class_repository.py` | `get_class_config`、`upsert_class_config` |
 | `app/integration/holiday_client/client.py` | 法定节假日判定；法定节假日缓存 `dict[str, tuple[bool, str\|None, int]]`（含 day_type）；特殊节日缓存 `dict[str, list[str]]`；`is_holiday`、`is_near_holiday`、`get_holiday_name`、`get_special_day_tags`（sync，本地硬编码）、`is_adjusted_workday` |
 | `app/ui/pages/login.py` | 登录页（路由 `/`），token 写入 `app.storage.user` |
 | `app/ui/pages/home.py` | 首页（路由 `/home`），快捷导航按钮 |
 | `app/ui/pages/settings.py` | 配置页（路由 `/settings`），学期配置、班级配置、AI 接口配置（含脱敏展示与验证连接） |
-| `app/ui/pages/user_admin.py` | 账号管理页（路由 `/user-admin`），系统管理员创建账号、筛选分页、启停账号、重置密码 |
-| `app/jobs/bootstrap_admin.py` | 系统管理员初始化脚本（环境变量控制、幂等创建） |
 | `app/ui/pages/date_test.py` | 日期测试页（路由 `/date-test`），嵌入 DatePanel |
 
-## 10. 阶段 3 已实现文件清单
+## 6. 阶段 3 已实现文件清单
 
 ### 核心模块
 
@@ -192,123 +179,21 @@ type 值：0=工作日，1=周末，2=法定节假日，3=调班工作日。
 - 状态提示（颜色区分）：法定节假日（含节日名称）/ 调班工作日 / 临近节假日 / 特殊节日标签 / 节假日信息不可用
 - 不阻止用户继续操作
 
-## 11. 当前状态（截至 2026-06-09）
+> 一日活动计划子系统（Stage 4~7）已实现文件清单详见 [daily-plan/design.md](daily-plan/design.md)。
 
-**所有首期阶段（0~8）及二期对外只读 REST API 均已完成。**
-
-- 阶段 0~3：骨架、鉴权、配置、AI Key ✅
-- 阶段 4：教案拆分 + 年龄适配 + 差异比对 ✅
-- 阶段 5：提示词管理 ✅
-- 阶段 6：Word 单条导出 + 导出记录 ✅（详见第 12、13 节）
-- 阶段 7：一日活动辅助生成（晨间活动/晨间谈话/区域/户外/反思）✅
-- 阶段 8：全局异常处理、审计日志、路由守卫 ✅
-- 二期：对外只读 REST API（`/api/v1`）✅
-- 附加功能：日期批量导出 Word ✅（详见第 14 节）
-
-**低优先级待办：**
-- 数据库 ERD 完整图（随模型实现逐步补齐，当前共 6 张业务表）
-
----
-
-## 12. 阶段 4 已实现文件清单
-
-### 核心模块
+## 7. 阶段 8：收尾与稳定性
 
 | 文件 | 职责 |
 |------|------|
-| `app/core/exceptions.py` | 新增 `AiCallError`（AI 接口调用失败）、`AiParseError`（AI 返回内容解析失败） |
-| `app/core/models/daily_plan.py` | `DailyPlan` ORM 模型；含教案拆分字段、改写文、一日活动、晨间谈话、反思共 20 列 |
-| `app/integration/ai_client/base.py` | 通用 `call_ai()` — httpx 超时 60s + tenacity 重试 3次（指数退避）；HTTP 错误提取响应体写入 `AiCallError.message` |
-| `app/integration/ai_client/lesson_plan_client.py` | `split_lesson_plan()` — 教案拆分，输出 5 个结构化字段；内置默认 system prompt；prompt_repository 查询优先（Step 5 接入后生效） |
-| `app/integration/ai_client/adapt_client.py` | `adapt_activity_process()` — 年龄适配改写；内置三段式 prompt（小班/中班/大班策略）；输出 `adapted_process` 字符串 |
-| `app/service/diff_service.py` | `compute_diff()` — 按标点/换行分句；`difflib.SequenceMatcher` 逐句比对；返回改写文视角 `[{text, changed}]` |
-| `app/service/lesson_plan_service.py` | `process_lesson_plan()` — 编排全流程（AI Key → 拆分 → 适配 → 差异）；`LessonPlanResult` dataclass |
-| `app/repository/daily_plan_repository.py` | `save_daily_plan`（同日期 upsert）、`get_daily_plan_by_date` |
-| `app/ui/pages/daily_plan.py` | 每日活动计划页（路由 `/daily-plan`）；DatePanel 复用；AI 拆分 + 回填 + 保存草稿；刷新后草稿自动加载。**一日活动各小节（晨间活动/晨间谈话/区域游戏/户外游戏）合并为单个「一键生成一日活动」按钮**，内部 `asyncio.gather(..., return_exceptions=True)` 并发生成、单项失败不阻断；「集体活动」拆分按钮与「一日活动反思」按钮保持独立 |
-| `app/integration/word_export/exporter.py` | `export_daily_plan(daily_plan, diff_result)` — 主方案打开 `templates/teacherplan.docx`（19 行 2 列）按既有单元格结构分子字段填充；`_parse_fields` 解析生成文本为子字段分格写入；活动过程差异标红（`RGBColor(255,0,0)`）、宋体；模板缺失/异常时降级 `_export_from_scratch`（8 行从零建表） |
-
-### 数据库表（新增）
-
-| 表名 | 迁移版本 | 主要字段 |
-|------|---------|----------|
-| `daily_plan` | `f6d79ac6bf21` | id, tenant_id, user_id, plan_date, week_number, weekday_cn, grade, class_name, activity_goal, activity_prep, activity_key, activity_difficult, activity_process_original, activity_process_adapted, morning_activity, indoor_area, outdoor_activity, morning_talk_topic, morning_talk_questions, daily_reflection |
-
----
-
-## 13. 阶段 5 已实现文件清单
-
-### 数据库表（新增）
-
-| 表名 | 迁移版本 | 主要字段 |
-|------|---------|----------|
-| `prompt_template` | `bcd07e51527d` → `e2a3f1b8c9d0` | id, tenant_id, user_id, task_type(Enum×7), version, content, is_active, created_at, updated_at |
-
-**Alembic 当前 head**：`e2a3f1b8c9d0`（含全部 6 张业务表）
-
-**task_type Enum 枚举值**：`split` / `adapt` / `morning_exercise` / `morning_talk` / `area_game` / `outdoor_game` / `daily_reflection`
-
-### 核心模块（新增 / 修改）
-
-| 文件 | 职责 |
-|------|------|
-| `app/core/models/prompt_template.py` | `PromptTemplate` ORM 模型；联合索引 `(tenant_id, user_id, task_type)` |
-| `app/repository/prompt_repository.py` | `get_active_prompt` / `save_new_version` / `rollback_to_version` / `list_versions` 四个异步函数 |
-| `app/integration/ai_client/generate_client.py` | 5 种一日活动类型的内置默认提示词；`GENERATE_DEFAULTS: dict[str, str]` 供服务层查取；`_build_prefix`（班级 + 教学周）/`_holiday_hint`（near_holiday=True 注入临近节假日提示，daily_reflection 不注入）；`_build_user_content` 消费 `week_number`/`weekday`/`near_holiday` |
-| `app/integration/ai_client/lesson_plan_client.py` | `DEFAULT_SPLIT_PROMPT` 追加格式约束（禁 Markdown / 无数字编号换行 / 无多余空行）；KI-01 修复 |
-| `app/integration/ai_client/adapt_client.py` | `DEFAULT_ADAPT_PROMPT` 追加格式约束（禁 Markdown / 纯文本 / 标点约束）；KI-01 修复 |
-| `app/service/lesson_plan_service.py` | `process_lesson_plan()` 新增：`split_system_prompt` / `adapt_system_prompt` 为 None 时先查 DB 激活版本，有则覆盖 |
-| `app/ui/pages/prompt_mgmt.py` | 提示词管理页（路由 `/prompts`）；7 Tab；每 Tab 含编辑区 + 保存 + 历史版本 + 回滚 |
-| `app/ui/pages/home.py` | 新增"提示词管理"导航按钮（紫色，跳转 `/prompts`） |
-
-### 一日活动提示词格式规范（已确认）
-
-| 活动类型 | 格式要点 |
-|---------|---------|
-| 晨间活动 `morning_exercise` | 体能大循环（集体游戏/自主游戏/重点指导）+ 活动目标3条 + 指导要点3条 |
-| 晨间谈话 `morning_talk` | 谈话主题 + 问题设计3条 |
-| 区域游戏 `area_game` | 游戏区域（选2个，用" 、 "分隔）+ 重点指导（选1个）+ 活动目标3条 + 指导要点3条 |
-| 户外游戏 `outdoor_game` | 游戏区域（选2个，用" 、 "分隔）+ 重点指导（选1个）+ 活动目标3条 + 指导要点3条 |
-| 一日活动反思 `daily_reflection` | 自然段落（无编号），100~200字，含亮点/问题/调整策略 |
-
-### 已知问题与决策记录（阶段 4）
-
-| 编号 | 问题 | 决策 |
-|------|------|------|
-| BL-03 | `DatePanel.on_date_change` 为 async 函数时，`_update_info` 未 await 导致 state 不更新 | `_update_info` 末尾使用 `asyncio.iscoroutine()` 判断后 await；已修复 |
-| BL-04 | AI 调用失败时 UI 显示通用提示，无法定位原因 | `base.py` 提取 HTTP 错误响应体；`daily_plan.py` 显示 `e.message`；已修复 |
-| KI-01 | AI 返回字段含 markdown 标记（`**重点：**`）、格式不一致 | **待修复**：Step 5 提示词管理时强化 prompt 格式约束 |
-
-### AI 客户端接口说明
-
-```python
-# 通用 AI 调用（httpx + tenacity）
-call_ai(messages, api_base_url, api_key, model_name, response_schema, *, _client) -> dict
-
-# 教案拆分（返回 5 字段 dict）
-split_lesson_plan(raw_text, api_base_url, api_key, model_name, system_prompt, *, _client) -> dict
-# 返回键：activity_goal / activity_prep / activity_key / activity_difficult / activity_process
-
-# 年龄适配（返回改写后文本字符串）
-adapt_activity_process(original, grade, api_base_url, api_key, model_name, system_prompt, *, _client) -> str
-
-# 差异比对（纯本地，无 AI 调用）
-compute_diff(original, adapted) -> list[{"text": str, "changed": bool}]
-
-# 教案拆分服务（编排入口）
-process_lesson_plan(session, tenant_id, user_id, raw_text, grade, *, split_system_prompt, adapt_system_prompt, _ai_client) -> LessonPlanResult
-```
-
-### 阶段 8：收尾与稳定性
-
-| 文件 | 职责 |
-|------|------|
-| `app/auth/middleware.py` | `AuthMiddleware`（`BaseHTTPMiddleware`）路由守卫：受限页面校验 `app.storage.user` 中 JWT token，无效则清空 storage 重定向 `/`；非页面路由（静态资源/`_nicegui`）放行；白名单 `UNRESTRICTED_PAGE_ROUTES = {"/"}` |
-| `app/core/audit.py` | `log_audit(action, *, tenant_id, user_id, **detail)` 结构化审计日志（logger 名 `audit`）；接入点：login_success / change_password（auth_service）、ai_split（lesson_plan_service）、ai_generate（generate_service）、export_word（daily_plan 页面）；审计调用绝不抛异常 |
+| `app/auth/middleware.py` | `AuthMiddleware`（`BaseHTTPMiddleware`）路由守卫：受限页面校验 `app.storage.user` 中 JWT token，无效则清空 storage 重定向 `/`；非页面路由（静态资源/`_nicegui`）放行；白名单 `UNRESTRICTED_PAGE_ROUTES = {"/", "/register", "/setup"}` |
+| `app/core/audit.py` | `log_audit(action, *, tenant_id, user_id, **detail)` 结构化审计日志（logger 名 `audit`）；接入点：login_success / change_password（auth_service）、ai_split（lesson_plan_service）、ai_generate（generate_service）、export_word（daily_plan 页面）、setup_init_admin / setup_reset_password（setup 页面）；审计调用绝不抛异常 |
 | `app/main.py` | `app.on_exception(_on_global_exception)` 记录未捕获异常（ERROR + traceback）；`app.add_middleware(AuthMiddleware)` 注册路由守卫 |
+| `app/ui/pages/setup.py` | 系统初始化向导（路由 `/setup`，白名单免登录）；双层保护：网络层（仅 localhost 或 `BOOTSTRAP_ADMIN_ALLOW_REMOTE=true`）+ 应用层（Reset 模式需旧密码验证）；自动运行 Alembic 迁移；无 sys_admin 时显示 Init 表单，已有时显示 Reset 表单 |
+| `app/jobs/bootstrap_admin.py` | 系统管理员初始化 CLI：`--init` 模式创建 sys_admin，`--reset-password` 模式重置密码（需旧密码验证）；env 变量缺失时交互式提示 |
 
 **异常体系**（`app/core/exceptions.py`）：`AuthError`、`CryptoError`、`ConfigError`、`AiCallError`、`AiParseError`（均带 `message` 属性）。页面层捕获业务异常展示友好提示（`e.message`），不暴露堆栈；未预期异常由 `app.on_exception` 记录完整 traceback。
 
-### 二期：对外只读 REST API
+## 8. 对外只读 REST API
 
 作为「幼儿园信息管理主系统」的子系统，本模块对外提供教学计划数据的**只读** REST API（路由前缀 `/api/v1`）。
 
@@ -324,29 +209,61 @@ process_lesson_plan(session, tenant_id, user_id, raw_text, grade, *, split_syste
 
 仓库层新增只读查询：`daily_plan_repository.list_daily_plans` / `get_daily_plan_by_id`、`semester_repository.list_semesters`、`class_repository.list_class_configs`——均强制携带 `tenant_id` 过滤。
 
----
 
-## 14. 日期批量导出（2026-06-08）
+## 9. SQLite 兼容性与 Windows EXE 首次运行支持（2026-06-13）
 
-### 新增功能
+### SQLite 迁移链修复
 
-用户可在「每日计划」页面底部选择开始~结束日期范围，将区间内所有已保存计划合并导出为单个 Word 文档（表格按日期升序排列，相邻表格间留一空行）。
+Windows EXE 打包使用内嵌 SQLite，迁移链存在 3 处 MySQL 专属语法，已全部修复：
 
-### 核心变更
+| 迁移文件 | 原问题 | 修复方案 |
+|----------|--------|----------|
+| `54c20d37a461` | `server_default='text'` → SQL `DEFAULT text`（无引号），SQLite 语法错误 | 改为 `server_default=sa.text("'text'")` |
+| `46b9fd5613c3` | 全新 SQLite 无 `model_name` 列时直接 UPDATE/ALTER 失败 | `sa.inspect()` 检测列存在性，不存在则 `op.add_column` |
+| `f6d79ac6bf21` | 全新 SQLite 无 `daily_plan` 表时直接 ALTER 失败 | `inspector.get_table_names()` 检测，不存在则 `op.create_table` |
 
-| 文件 | 变更内容 |
-|------|----------|
-| `app/integration/word_export/exporter.py` | 新增 `export_batch_daily_plans(plans_with_diffs)` — 按 `plan_date` 升序排列；首个 plan 作为主文档，后续 plan 用 `copy.deepcopy` 追加表格 XML；相邻表格间插入空段落；空列表返回合法空文档；模板缺失时降级兼容 |
-| `app/ui/pages/daily_plan.py` | 新增「批量导出」卡片：日期范围选择器（`bind_value` 直读 `.value`）、输入校验（start≤end）、调用 `list_daily_plans(..., limit=200)` 范围查询、循环 `compute_diff` + `export_batch_daily_plans`、写入 `export_record`（`daily_plan_id=None`）、`log_audit("batch_export_word")`、`ui.download` 触发下载 |
-| `tests/test_word_exporter.py` | 新增 `TestBatchExport`：`test_batch_empty_list_returns_valid_bytes` / `test_batch_single_plan_has_one_table` / `test_batch_multiple_plans_sorted_by_date` |
+`alembic/env.py` 同步修复：
+- 新增 `render_as_batch=True`（支持 SQLite 的 `op.alter_column`）
+- PyInstaller 路径一致性：`sys.frozen` 检测 + `os.path.dirname(sys.executable)` 绝对路径
 
-### Bug 修复（BL-05）
+### 首次运行配置向导
 
-| 编号 | 问题 | 决策 |
+#### 新增模块
+
+| 模块 | 路径 | 职责 |
 |------|------|------|
-| BL-05 | 批量导出按钮点击后 `TypeError: strptime() argument 1 must be str, not list`；根因：`ui.date(...).on("update:model-value", lambda e: ..., e.args)` 中 `e.args` 为 NiceGUI 事件参数 list | 删除 `batch_state` dict 及 `on(...)` 监听器，改为在 `_batch_export()` 中直接读 `batch_start_input.value` / `batch_end_input.value`（已由 `bind_value` 双向绑定） |
+| `SetupState` | `app/core/setup_state.py` | `is_setup_complete()` / `mark_setup_complete()`；标记文件 `.kindergarten_setup_complete`；纯文件检查，无 DB 查询；路径适配 PyInstaller |
+| `EnvWriter` | `app/core/env_writer.py` | `read_dot_env()` / `write_dot_env()`；原子更新 `.env` 文件；路径适配 PyInstaller |
 
-### 测试基准
+#### 新增配置字段
 
-全量回归：**251 passed**（新增 9 个测试用例：`TestBatchExport` × 3 + `TestExportDailyPlan` 新增用例 × 3 + 其他 × 3）。
+| 字段 | 默认值 | 说明 |
+|------|--------|------|
+| `PORT` | `8080` | 应用监听端口，可通过 `.env` 覆盖，`ui.run(port=settings.PORT)` |
 
+#### 首次运行触发机制
+
+```
+frozen exe 启动
+  └─ ui.run(show=True)  →  浏览器打开 /
+     /  login_page()  →  is_setup_complete()==False  →  navigate.to('/setup')
+     /setup  →  is_setup_complete()==False  →  渲染 4 步向导
+
+向导完成
+  └─ mark_setup_complete()  →  写 .kindergarten_setup_complete
+
+后续启动
+  └─ /  →  is_setup_complete()==True  →  正常渲染登录表单
+     /setup  →  is_setup_complete()==True  →  渲染密码重置表单
+```
+
+#### 向导 4 步结构（`app/ui/pages/setup.py`）
+
+| 步骤 | 内容 | 可跳过 | 后端调用 |
+|------|------|--------|----------|
+| Step 1：数据库 & 端口 | 数据库模式（SQLite/MySQL）+ 端口；有变更时写 `.env` + 自动重启 | ✅ | `write_dot_env()` |
+| Step 2：创建管理员账号 | 用户名 / 姓名 / 密码 | ❌ | `register_user()` |
+| Step 3：AI 接口配置 | API URL / Key / 模型名称 | ✅ | `save_ai_key()` |
+| Step 4：完成 | 配置摘要 + 前往登录 | — | `mark_setup_complete()` |
+
+自动重启机制：`subprocess.Popen([sys.executable] + sys.argv[1:])` → 等待 0.8s 确认子进程存活 → `os._exit(0)`；失败降级为"请手动关闭并重新启动"提示。

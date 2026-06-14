@@ -1,0 +1,9 @@
+#!/bin/bash
+# prerm — 卸载前脚本
+set -e
+
+# 停止服务（卸载前）
+if systemctl is-active --quiet kindergarten-manager.service 2>/dev/null; then
+    systemctl stop kindergarten-manager.service || true
+fi
+systemctl disable kindergarten-manager.service 2>/dev/null || true

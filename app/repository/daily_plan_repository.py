@@ -2,7 +2,7 @@
 
 from datetime import date, datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models.daily_plan import DailyPlan
@@ -143,3 +143,21 @@ async def list_daily_plans(
     )
     records = list((await session.execute(list_stmt)).scalars().all())
     return records, total
+
+
+async def delete_daily_plan(
+    session: AsyncSession,
+    tenant_id: int,
+    user_id: int,
+    plan_date: date,
+) -> bool:
+    """删除指定日期的每日计划，强制 tenant_id + user_id 双重过滤，返回是否删除成功。"""
+    result = await session.execute(
+        delete(DailyPlan).where(
+            DailyPlan.tenant_id == tenant_id,
+            DailyPlan.user_id == user_id,
+            DailyPlan.plan_date == plan_date,
+        )
+    )
+    await session.commit()
+    return bool(result.rowcount)

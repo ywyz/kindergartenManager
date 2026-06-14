@@ -1,20 +1,22 @@
 """配置页面（路由：/settings）。
 
-包含两个配置区块：
+包含配置区块：
 1. 学期配置：学期名称、开始日期、结束日期
 2. 班级配置：年级、班级名称、区域内容、户外内容
-
-页面加载时从数据库读取已有配置并回填。
-所有操作需登录，未登录自动跳回 /。
+3. AI 文本模型 / 视觉模型
+4. 数据库配置（SQLite / MySQL）
+5. 端口配置
 """
 from datetime import date
 
 import httpx
 from nicegui import app, ui
 
-from app.auth.jwt import decode_access_token
+from app.core.config import settings as app_settings
 from app.core.database import AsyncSessionLocal
+from app.core.env_writer import read_dot_env, write_dot_env
 from app.core.exceptions import CryptoError
+from app.core.user_context import get_current_user
 from app.repository.ai_key_repository import (
     get_active_ai_key,
     get_decrypted_key,
@@ -25,6 +27,7 @@ from app.repository.semester_repository import (
     get_active_semester,
     upsert_active_semester,
 )
+from app.ui.components.app_shell import render_shell
 
 _GRADES = ["小班", "中班", "大班"]
 
@@ -36,38 +39,14 @@ def _mask_api_key(plain: str) -> str:
     return "sk-****"
 
 
-def _get_current_user() -> dict | None:
-    """从 storage 中解码当前用户信息，未登录返回 None。"""
-    token = app.storage.user.get("token")
-    if not token:
-        return None
-    try:
-        return decode_access_token(token)
-    except Exception:
-        return None
-
-
 @ui.page("/settings")
 async def settings_page() -> None:
-    user = _get_current_user()
-    if not user:
-        ui.navigate.to("/")
-        return
+    user = get_current_user()
 
     tenant_id: int = user["tenant_id"]
     user_id: int = int(user["sub"])
 
-    # ── 顶部导航 ────────────────────────────────────────────────────────────────
-    with ui.header().classes("bg-blue-700 text-white items-center px-4"):
-        ui.label("幼儿园教学管理系统").classes("text-lg font-bold flex-1")
-        ui.button(
-            "返回主页",
-            on_click=lambda: ui.navigate.to("/home"),
-        ).classes("text-white")
-        ui.button(
-            "退出登录",
-            on_click=lambda: (app.storage.user.clear(), ui.navigate.to("/")),
-        ).classes("text-white ml-2")
+    await render_shell(user, active="settings")
 
     with ui.column().classes("w-full max-w-2xl mx-auto p-6 gap-6"):
 
@@ -216,12 +195,12 @@ async def settings_page() -> None:
             )
 
         # ══════════════════════════════════════════════════════════════════════
-        # 区块三：AI 接口配置
+        # 区块三：AI 接口配置 — 文本模型
         # ══════════════════════════════════════════════════════════════════════
         with ui.card().classes("w-full"):
-            ui.label("AI 接口配置").classes("text-lg font-bold text-blue-700 mb-2")
+            ui.label("AI 接口配置 — 文本模型").classes("text-lg font-bold text-blue-700 mb-2")
             ui.label(
-                "API Key 保存后以脱敏形式显示，如需更新请直接输入新 Key。"
+                "用于教案拆分、年龄适配、一日活动生成等文本任务。API Key 保存后以脱敏形式显示。"
             ).classes("text-xs text-gray-500 mb-3")
 
             ai_url_input = ui.input(
@@ -298,7 +277,7 @@ async def settings_page() -> None:
                         return
 
                 async with AsyncSessionLocal() as session:
-                    await save_ai_key(session, tenant_id, user_id, url, plain_key, model)
+                    await save_ai_key(session, tenant_id, user_id, url, plain_key, model, key_type="text")
 
                 masked = _mask_api_key(plain_key)
                 _current_masked[0] = masked
@@ -311,7 +290,7 @@ async def settings_page() -> None:
                 ai_msg.text = "连接测试中……"
 
                 async with AsyncSessionLocal() as session:
-                    ai_key_record = await get_active_ai_key(session, tenant_id, user_id)
+                    ai_key_record = await get_active_ai_key(session, tenant_id, user_id, key_type="text")
 
                 if ai_key_record is None:
                     ai_msg.text = "请先保存 AI 接口配置"
@@ -353,11 +332,128 @@ async def settings_page() -> None:
                     "bg-gray-100 text-gray-700"
                 )
 
+        # ══════════════════════════════════════════════════════════════════════
+        # 区块四：AI 接口配置 — 视觉模型
+        # ══════════════════════════════════════════════════════════════════════
+        with ui.card().classes("w-full"):
+            ui.label("AI 接口配置 — 视觉模型").classes("text-lg font-bold text-green-700 mb-2")
+            ui.label(
+                "用于游戏观察图片分析（key_type=vision），与文本模型独立配置。"
+            ).classes("text-xs text-gray-500 mb-3")
+
+            vision_url_input = ui.input(
+                label="视觉模型 API 地址",
+                placeholder="如：https://api.openai.com/v1",
+            ).classes("w-full")
+
+            vision_model_input = ui.input(
+                label="视觉模型名称",
+                placeholder="如：gpt-4o / qwen-vl-plus",
+            ).classes("w-full mt-2")
+
+            vision_key_input = ui.input(
+                label="视觉模型 API Key",
+                placeholder="输入 API Key（保存后脱敏显示）",
+                password=True,
+                password_toggle_button=True,
+            ).classes("w-full mt-2")
+
+            vision_msg = ui.label("").classes("text-sm mt-1")
+            _vision_masked: list[str] = [""]
+
+            async def save_vision_key_handler() -> None:
+                vision_msg.classes(remove="text-green-600 text-red-500")
+                url = vision_url_input.value.strip()
+                model = vision_model_input.value.strip()
+                key_val = vision_key_input.value.strip()
+
+                if not url:
+                    vision_msg.text = "请输入视觉模型 API 地址"
+                    vision_msg.classes(add="text-red-500")
+                    return
+                if not model:
+                    vision_msg.text = "请输入视觉模型名称"
+                    vision_msg.classes(add="text-red-500")
+                    return
+
+                key_changed = key_val and key_val != _vision_masked[0]
+                if key_changed:
+                    plain_key = key_val
+                else:
+                    async with AsyncSessionLocal() as session:
+                        existing = await get_active_ai_key(session, tenant_id, user_id, key_type="vision")
+                    if existing is None:
+                        if not key_val:
+                            vision_msg.text = "请输入视觉模型 API Key"
+                            vision_msg.classes(add="text-red-500")
+                            return
+                        plain_key = key_val
+                    else:
+                        try:
+                            plain_key = get_decrypted_key(existing)
+                        except CryptoError:
+                            vision_msg.text = "已有 Key 解密失败，请重新输入"
+                            vision_msg.classes(add="text-red-500")
+                            return
+
+                async with AsyncSessionLocal() as session:
+                    await save_ai_key(session, tenant_id, user_id, url, plain_key, model, key_type="vision")
+
+                masked = _mask_api_key(plain_key)
+                _vision_masked[0] = masked
+                vision_key_input.value = masked
+                vision_msg.text = "视觉模型配置已保存"
+                vision_msg.classes(add="text-green-600")
+
+            async def verify_vision_connection() -> None:
+                vision_msg.classes(remove="text-green-600 text-red-500")
+                vision_msg.text = "连接测试中……"
+
+                async with AsyncSessionLocal() as session:
+                    ai_vision_key = await get_active_ai_key(session, tenant_id, user_id, key_type="vision")
+
+                if ai_vision_key is None:
+                    vision_msg.text = "请先保存视觉模型配置"
+                    vision_msg.classes(add="text-red-500")
+                    return
+                try:
+                    plain_key = get_decrypted_key(ai_vision_key)
+                except CryptoError:
+                    vision_msg.text = "Key 解密失败，请重新保存"
+                    vision_msg.classes(add="text-red-500")
+                    return
+
+                base_url = ai_vision_key.api_base_url.rstrip("/")
+                try:
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        resp = await client.get(
+                            f"{base_url}/models",
+                            headers={"Authorization": f"Bearer {plain_key}"},
+                        )
+                    if resp.is_success:
+                        vision_msg.text = "✓ 视觉模型连接成功"
+                        vision_msg.classes(add="text-green-600")
+                    else:
+                        vision_msg.text = f"连接失败（HTTP {resp.status_code}）"
+                        vision_msg.classes(add="text-red-500")
+                except Exception as exc:
+                    vision_msg.text = f"连接失败（{type(exc).__name__}）"
+                    vision_msg.classes(add="text-red-500")
+
+            with ui.row().classes("mt-3 gap-3"):
+                ui.button("保存视觉模型", on_click=save_vision_key_handler).classes(
+                    "bg-green-600 text-white"
+                )
+                ui.button("验证连接", on_click=verify_vision_connection).classes(
+                    "bg-gray-100 text-gray-700"
+                )
+
     # ── 加载已有配置并回填 ──────────────────────────────────────────────────────
     async with AsyncSessionLocal() as session:
         semester = await get_active_semester(session, tenant_id, user_id)
         class_cfg = await get_class_config(session, tenant_id, user_id)
-        ai_key_record = await get_active_ai_key(session, tenant_id, user_id)
+        ai_key_record = await get_active_ai_key(session, tenant_id, user_id, key_type="text")
+        ai_vision_record = await get_active_ai_key(session, tenant_id, user_id, key_type="vision")
 
     if semester:
         semester_name_input.value = semester.semester_name
@@ -382,3 +478,154 @@ async def settings_page() -> None:
             ai_key_input.value = ""
             ai_msg.text = "Key 解密失败，请重新配置"
             ai_msg.classes(add="text-red-500")
+
+    if ai_vision_record:
+        vision_url_input.value = ai_vision_record.api_base_url
+        vision_model_input.value = ai_vision_record.model_name
+        try:
+            plain_v = get_decrypted_key(ai_vision_record)
+            masked_v = _mask_api_key(plain_v)
+            _vision_masked[0] = masked_v
+            vision_key_input.value = masked_v
+        except CryptoError:
+            vision_key_input.value = ""
+            vision_msg.text = "视觉模型 Key 解密失败，请重新配置"
+            vision_msg.classes(add="text-red-500")
+
+        # ══════════════════════════════════════════════════════════════════════
+        # 区块五：数据库配置
+        # ══════════════════════════════════════════════════════════════════════
+        with ui.card().classes("w-full"):
+            ui.label("数据库配置").classes("text-lg font-bold text-blue-700 mb-2")
+            ui.label(
+                "默认使用 SQLite（无需额外配置）。切换到 MySQL 需填写连接信息。"
+            ).classes("text-sm text-gray-500 mb-2")
+
+            current_env = read_dot_env()
+            current_db_url = current_env.get("DATABASE_URL", "")
+            is_mysql = current_db_url.startswith("mysql")
+
+            # 解析已有 MySQL URL 的各字段
+            _parsed_host = ""
+            _parsed_port = "3306"
+            _parsed_user = ""
+            _parsed_password = ""
+            _parsed_dbname = ""
+            if is_mysql and "://" in current_db_url:
+                try:
+                    from urllib.parse import urlparse
+                    parsed = urlparse(current_db_url.replace("mysql+aiomysql", "mysql"))
+                    _parsed_host = parsed.hostname or ""
+                    _parsed_port = str(parsed.port or 3306)
+                    _parsed_user = parsed.username or ""
+                    _parsed_password = parsed.password or ""
+                    _parsed_dbname = parsed.path.lstrip("/") if parsed.path else ""
+                except Exception:
+                    pass
+
+            db_mode_radio = ui.radio(
+                {"sqlite": "📦 SQLite（内嵌，推荐）", "mysql": "🗄️ MySQL（外部数据库）"},
+                value="mysql" if is_mysql else "sqlite",
+            ).classes("mb-2")
+
+            # MySQL 独立字段容器
+            mysql_fields = ui.column().classes("w-full gap-2")
+            mysql_fields.bind_visibility_from(
+                db_mode_radio, "value", backward=lambda v: v == "mysql"
+            )
+            with mysql_fields:
+                db_host_input = ui.input(
+                    label="服务器地址", value=_parsed_host, placeholder="localhost"
+                ).classes("w-full")
+                db_port_input = ui.input(
+                    label="端口", value=_parsed_port, placeholder="3306"
+                ).classes("w-full")
+                db_user_input = ui.input(
+                    label="用户名", value=_parsed_user, placeholder="root"
+                ).classes("w-full")
+                db_pass_input = ui.input(
+                    label="密码", value=_parsed_password,
+                    password=True, password_toggle_button=True,
+                ).classes("w-full")
+                db_name_input = ui.input(
+                    label="数据库名", value=_parsed_dbname, placeholder="kindergarten"
+                ).classes("w-full")
+
+            ui.label(
+                "⚠️ 切换数据库后原有数据不会自动迁移，请提前备份。"
+            ).classes("text-xs text-amber-600 mt-1")
+
+            db_status = ui.label("").classes("text-sm mt-2")
+
+            async def _save_db_config() -> None:
+                db_status.set_text("")
+                if db_mode_radio.value == "sqlite":
+                    new_url = ""
+                else:
+                    host = db_host_input.value.strip()
+                    port = db_port_input.value.strip() or "3306"
+                    user_val = db_user_input.value.strip()
+                    pwd_val = db_pass_input.value
+                    dbname = db_name_input.value.strip()
+
+                    if not host or not user_val or not dbname:
+                        db_status.set_text("❌ 服务器地址、用户名和数据库名为必填项")
+                        db_status.classes(replace="text-red-600 text-sm mt-2")
+                        return
+
+                    new_url = f"mysql+aiomysql://{user_val}:{pwd_val}@{host}:{port}/{dbname}"
+
+                try:
+                    write_dot_env({"DATABASE_URL": new_url})
+                    db_status.set_text("✅ 数据库配置已保存，需重启应用生效")
+                    db_status.classes(replace="text-green-600 text-sm mt-2")
+                except RuntimeError as exc:
+                    db_status.set_text(f"❌ 保存失败：{exc}")
+                    db_status.classes(replace="text-red-600 text-sm mt-2")
+
+            ui.button("保存数据库配置", on_click=_save_db_config).classes(
+                "mt-2 bg-blue-600 text-white"
+            )
+
+        # ══════════════════════════════════════════════════════════════════════
+        # 区块六：端口配置
+        # ══════════════════════════════════════════════════════════════════════
+        with ui.card().classes("w-full"):
+            ui.label("应用端口").classes("text-lg font-bold text-blue-700 mb-2")
+
+            current_port = int(current_env.get("PORT", str(app_settings.PORT)))
+            port_input = ui.number(
+                label="监听端口",
+                value=current_port,
+                min=1024,
+                max=65535,
+                format="%d",
+            ).classes("w-full")
+
+            port_status = ui.label("").classes("text-sm mt-2")
+
+            async def _save_port() -> None:
+                port_status.set_text("")
+                try:
+                    new_port = int(port_input.value or app_settings.PORT)
+                except (ValueError, TypeError):
+                    port_status.set_text("❌ 端口号格式错误")
+                    port_status.classes(replace="text-red-600 text-sm mt-2")
+                    return
+
+                if new_port < 1024 or new_port > 65535:
+                    port_status.set_text("❌ 端口范围 1024~65535")
+                    port_status.classes(replace="text-red-600 text-sm mt-2")
+                    return
+
+                try:
+                    write_dot_env({"PORT": str(new_port)})
+                    port_status.set_text("✅ 端口配置已保存，需重启应用生效")
+                    port_status.classes(replace="text-green-600 text-sm mt-2")
+                except RuntimeError as exc:
+                    port_status.set_text(f"❌ 保存失败：{exc}")
+                    port_status.classes(replace="text-red-600 text-sm mt-2")
+
+            ui.button("保存端口配置", on_click=_save_port).classes(
+                "mt-2 bg-blue-600 text-white"
+            )

@@ -7,7 +7,7 @@
 
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Index, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, Enum, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -34,6 +34,12 @@ class AiApiKey(Base):
     )
     # 仅存密文；明文禁止出现在此字段
     api_key_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    # Key 类型：text（文本模型）/ vision（视觉模型），同类型只有一条 active 记录
+    key_type: Mapped[str] = mapped_column(
+        Enum("text", "vision", name="ai_key_type"),
+        nullable=False,
+        server_default="text",
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False

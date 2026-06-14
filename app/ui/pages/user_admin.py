@@ -14,11 +14,13 @@ from app.auth.jwt import decode_access_token
 from app.core.database import AsyncSessionLocal
 from app.core.exceptions import AuthError
 from app.service.auth_service import (
+    approve_user,
     create_user_by_admin,
     list_users_for_admin,
     reset_user_password_by_admin,
     set_user_active_by_admin,
 )
+from app.ui.components.app_shell import render_shell
 
 
 _ROLES = ["teacher", "teaching_admin", "sys_admin"]
@@ -52,13 +54,7 @@ async def user_admin_page() -> None:
             ui.button("返回主页", on_click=lambda: ui.navigate.to("/home")).classes("bg-gray-100")
         return
 
-    with ui.header().classes("bg-blue-700 text-white items-center px-4"):
-        ui.label("账号管理").classes("text-lg font-bold flex-1")
-        ui.button("返回主页", on_click=lambda: ui.navigate.to("/home")).classes("text-white")
-        ui.button(
-            "退出登录",
-            on_click=lambda: (app.storage.user.clear(), ui.navigate.to("/")),
-        ).classes("text-white ml-2")
+    await render_shell(user, active="user-admin")
 
     with ui.column().classes("w-full max-w-4xl mx-auto p-6 gap-6"):
         ui.label("创建账号").classes("text-xl font-bold text-blue-700")
@@ -259,3 +255,46 @@ async def user_admin_page() -> None:
         next_btn.on_click(next_page)
 
         await reload_table(reset_page=True)
+
+        # ── 待审核用户 ────────────────────────────────────────────────
+        ui.separator().classes("my-4")
+        ui.label("待审核用户").classes("text-xl font-bold text-orange-600")
+
+        pending_container = ui.column().classes("w-full gap-2")
+        pending_msg = ui.label("").classes("text-sm")
+
+        async def load_pending() -> None:
+            pending_container.clear()
+            async with AsyncSessionLocal() as session:
+                users_pending, _ = await list_users_for_admin(
+                    session,
+                    tenant_id=tenant_id,
+                    admin_role=admin_role,
+                    limit=50,
+                    offset=0,
+                )
+            pending = [u for u in users_pending if not u.is_active]
+            with pending_container:
+                if not pending:
+                    ui.label("暂无待审核用户").classes("text-gray-400 text-sm")
+                else:
+                    for u in pending:
+                        with ui.card().classes("w-full"):
+                            with ui.row().classes("w-full justify-between items-center"):
+                                ui.label(f"{u.username}  ({u.display_name or '—'})").classes("text-sm")
+
+                                async def _approve(user_obj=u) -> None:
+                                    try:
+                                        async with AsyncSessionLocal() as s:
+                                            await approve_user(s, tenant_id=tenant_id, user_id=user_obj.id)
+                                        _set_msg(pending_msg, f"已审核通过：{user_obj.username}", is_error=False)
+                                        await load_pending()
+                                        await reload_table(reset_page=False)
+                                    except Exception as ex:
+                                        _set_msg(pending_msg, str(ex), is_error=True)
+
+                                ui.button("审核通过", on_click=_approve, icon="check").props("size=sm").classes(
+                                    "bg-green-600 text-white"
+                                )
+
+        await load_pending()

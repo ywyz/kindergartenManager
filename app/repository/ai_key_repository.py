@@ -23,8 +23,9 @@ async def save_ai_key(
     api_base_url: str,
     plain_api_key: str,
     model_name: str = "gpt-4o-mini",
+    key_type: str = "text",
 ) -> AiApiKey:
-    """加密 API Key 后入库，同时将该用户旧记录标记为 inactive。
+    """加密 API Key 后入库，同时将该用户同类型旧记录标记为 inactive。
 
     Args:
         session: 异步数据库会话。
@@ -33,16 +34,18 @@ async def save_ai_key(
         api_base_url: AI 接口地址（如 https://api.openai.com/v1）。
         plain_api_key: 明文 API Key（函数内部立即加密，不写日志）。
         model_name: 模型名称（如 gpt-4o-mini、deepseek-chat）。
+        key_type: Key 类型：'text'（文本模型）或 'vision'（视觉模型），默认 'text'。
 
     Returns:
         新建的 AiApiKey 记录（`api_key_encrypted` 为密文）。
     """
-    # 将当前用户的已有 active 记录设为 inactive
+    # 只 deactivate 同类型的旧记录，不影响另一类型
     await session.execute(
         update(AiApiKey)
         .where(
             AiApiKey.tenant_id == tenant_id,
             AiApiKey.user_id == user_id,
+            AiApiKey.key_type == key_type,
             AiApiKey.is_active.is_(True),
         )
         .values(is_active=False, updated_at=datetime.now(timezone.utc))
@@ -57,6 +60,7 @@ async def save_ai_key(
         api_base_url=api_base_url,
         model_name=model_name,
         api_key_encrypted=encrypted,
+        key_type=key_type,
         is_active=True,
     )
     session.add(new_key)
@@ -69,6 +73,7 @@ async def get_active_ai_key(
     session: AsyncSession,
     tenant_id: int,
     user_id: int,
+    key_type: str = "text",
 ) -> AiApiKey | None:
     """查询该用户当前激活的 AI Key 记录。
 
@@ -76,6 +81,7 @@ async def get_active_ai_key(
         session: 异步数据库会话。
         tenant_id: 租户 ID。
         user_id: 用户 ID。
+        key_type: Key 类型：'text'（文本模型）或 'vision'（视觉模型），默认 'text'。
 
     Returns:
         激活的 `AiApiKey` 对象；未配置时返回 None。
@@ -84,6 +90,7 @@ async def get_active_ai_key(
         select(AiApiKey).where(
             AiApiKey.tenant_id == tenant_id,
             AiApiKey.user_id == user_id,
+            AiApiKey.key_type == key_type,
             AiApiKey.is_active.is_(True),
         )
     )

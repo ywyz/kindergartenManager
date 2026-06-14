@@ -1,0 +1,11 @@
+#!/bin/bash
+# postrm — 卸载后脚本
+set -e
+
+systemctl daemon-reload 2>/dev/null || true
+
+if [ "$1" = "purge" ]; then
+    # purge 模式：彻底清理配置（apt purge）
+    rm -rf /etc/kindergarten-manager
+    echo "配置文件已清除。数据目录 /var/lib/kindergarten-manager 已保留（如需删除请手动执行）。"
+fi

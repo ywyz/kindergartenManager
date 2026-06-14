@@ -7,12 +7,15 @@ from app.auth.password import hash_password
 from app.core.exceptions import AuthError
 from app.repository.user_repository import create_user
 from app.service.auth_service import (
+    approve_user,
     change_password,
     create_user_by_admin,
     list_users_for_admin,
     login,
+    register_user,
     reset_user_password_by_admin,
     set_user_active_by_admin,
+    update_profile_display_name,
 )
 
 
@@ -256,6 +259,98 @@ async def test_list_users_for_admin_with_filter(async_session):
     )
     assert total == 2
     assert {u.username for u in users} == {"teacher_a", "teacher_b"}
+
+
+# ── register_user / approve_user / update_profile_display_name 测试 ──────────
+
+
+async def test_first_user_becomes_sys_admin_and_active(async_session):
+    """空库第一个注册用户自动成为 sys_admin（is_active=True），可立即登录。"""
+    user = await register_user(async_session, username="first_admin", password="Pass1234!")
+
+    assert user.role.value == "sys_admin"
+    assert user.is_active is True
+    assert user.tenant_id == 1
+
+
+async def test_first_user_can_login_immediately(async_session):
+    """第一个注册用户注册后无需审核可直接登录。"""
+    await register_user(async_session, username="first_admin", password="Pass1234!")
+
+    token = await login(async_session, tenant_id=1, username="first_admin", password="Pass1234!")
+    assert token is not None
+
+
+async def test_second_user_becomes_teacher_and_inactive(async_session):
+    """已有用户后，第二个注册者成为 teacher（is_active=False），需管理员审核。"""
+    await register_user(async_session, username="first_admin", password="Pass1234!")
+    second = await register_user(async_session, username="second_teacher", password="Pass1234!")
+
+    assert second.role.value == "teacher"
+    assert second.is_active is False
+
+
+async def test_second_user_cannot_login_before_approval(async_session):
+    """后续注册用户在审核前不能登录。"""
+    await register_user(async_session, username="first_admin", password="Pass1234!")
+    await register_user(async_session, username="pending_user", password="Pass1234!")
+
+    with pytest.raises(AuthError):
+        await login(async_session, tenant_id=1, username="pending_user", password="Pass1234!")
+
+
+async def test_register_duplicate_username_raises(async_session):
+    """同用户名注册两次时抛出 ValueError。"""
+    await register_user(async_session, username="duplicate", password="Pass1234!")
+
+    with pytest.raises(ValueError, match="已被注册"):
+        await register_user(async_session, username="duplicate", password="Pass5678!")
+
+
+async def test_register_short_password_raises(async_session):
+    """密码过短时抛出 ValueError。"""
+    with pytest.raises(ValueError, match="密码"):
+        await register_user(async_session, username="short_pwd_user", password="1234567")
+
+
+async def test_approve_user_allows_login(async_session):
+    """审核通过后，待审核用户可以正常登录。"""
+    await register_user(async_session, username="admin_user", password="Pass1234!")
+    pending = await register_user(async_session, username="pending2", password="Pass1234!")
+
+    with pytest.raises(AuthError):
+        await login(async_session, tenant_id=1, username="pending2", password="Pass1234!")
+
+    await approve_user(async_session, tenant_id=1, user_id=pending.id)
+
+    token = await login(async_session, tenant_id=1, username="pending2", password="Pass1234!")
+    assert token is not None
+
+
+async def test_register_with_display_name(async_session):
+    """注册时传入显示名，返回的用户对象应包含该显示名。"""
+    user = await register_user(
+        async_session, username="teacher_li", password="Pass1234!", display_name="李老师"
+    )
+
+    assert user.display_name == "李老师"
+
+
+async def test_update_profile_display_name(async_session):
+    """更新显示名后，从 DB 取回的用户的 display_name 字段正确。"""
+    from app.repository.user_repository import get_user_by_id
+    user = await _make_user(async_session, username="disp_user", password="Pass1234!")
+
+    await update_profile_display_name(
+        async_session,
+        tenant_id=1,
+        user_id=user.id,
+        display_name="王老师",
+    )
+
+    updated = await get_user_by_id(async_session, tenant_id=1, user_id=user.id)
+    assert updated is not None
+    assert updated.display_name == "王老师"
 
 
 async def test_create_user_by_admin_writes_audit(async_session):

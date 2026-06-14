@@ -1,0 +1,26 @@
+# docker-compose.dev.yml — 开发环境覆盖配置
+#
+# 用法：docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# 特点：
+# - 主系统直接暴露端口（无需 Caddy）
+# - 可选禁用 MySQL（使用 SQLite）
+# - 挂载源码实现热重载
+
+services:
+  # 开发模式：直接暴露主系统端口
+  app:
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    volumes:
+      - ./app:/app/app:ro
+      - ./templates:/app/templates:ro
+      - exports:/app/exports
+
+  # 开发模式：Caddy 可选（不启动）
+  caddy:
+    profiles:
+      - with-caddy
+
+volumes:
+  exports:
