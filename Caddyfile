@@ -1,0 +1,16 @@
+# Caddyfile — 反向代理配置
+#
+# 开发模式（IP + HTTP）：使用下面的 :80 配置
+# 生产模式（域名 + HTTPS）：将 :80 替换为你的域名，如 kindergarten.example.com
+#
+# Caddy 会自动为域名申请 Let's Encrypt 证书并续期。
+
+:80 {
+	# 主系统反向代理
+	reverse_proxy app:8080
+}
+
+# ── 生产模式示例（取消注释并替换域名）────────────────────────
+# kindergarten.example.com {
+# 	reverse_proxy app:8080
+# }

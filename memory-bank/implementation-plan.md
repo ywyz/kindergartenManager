@@ -411,3 +411,117 @@
 
 
 > 阶段 4~8（教案拆分、提示词管理、Word 导出、一日活动生成、收尾加固）的实施计划详见 [daily-plan/design.md](daily-plan/design.md)。
+
+---
+
+## 阶段 M6：Docker Compose AIO + 子系统拆分 + Caddy HTTPS
+
+> v3.0.1 已完成单用户模式重构（取消登录、默认 SQLite、简化 setup）。
+> M6 目标：将系统容器化，建立微服务架构基础。
+
+### Step M6.1 ✅ — 主系统容器化 + Caddy 反向代理
+
+**指令**
+- 更新 `docker-compose.yml`：AIO 编排（Caddy + app + MySQL）
+- 创建 `Caddyfile`：反向代理到主系统（开发用 HTTP，生产切换域名 HTTPS）
+- 创建 `docker-compose.dev.yml`：开发覆盖（直接暴露端口、禁用 Caddy）
+- 更新 `Dockerfile`：主系统镜像构建
+
+**验证**
+- `docker compose up -d` 启动成功
+- Caddy 反向代理到主系统 :8080
+- `docker compose -f docker-compose.yml -f docker-compose.dev.yml up` 直接暴露端口
+
+---
+
+### Step M6.2 — 子系统骨架创建
+
+**指令**
+在 `services/` 下创建三个子系统骨架：
+
+1. `services/ai-service/`：FastAPI 骨架 + `GET /health` + Dockerfile
+2. `services/word-service/`：FastAPI 骨架 + `GET /health` + Dockerfile
+3. `services/holiday-service/`：FastAPI 骨架 + `GET /health` + Dockerfile
+
+每个子系统包含：
+- `app/main.py`（FastAPI 入口）
+- `Dockerfile`（基于 python:3.12-slim）
+- `requirements.txt`（fastapi, uvicorn, 及各自专属依赖）
+
+**验证**
+- 每个子系统可独立启动：`cd services/ai-service && uvicorn app.main:app`
+- `GET /health` 返回 `{"status": "ok"}`
+
+---
+
+### Step M6.3 — 子系统加入 Docker Compose 编排
+
+**指令**
+- 在 `docker-compose.yml` 中添加 ai-service、word-service、holiday-service 服务定义
+- 配置 Docker 内部网络（kindergarten_net），子系统不暴露外部端口
+- 主系统通过服务名（如 `http://ai-service:8001`）调用子系统
+
+**验证**
+- `docker compose up -d` 启动所有服务
+- 主系统容器可通过 `curl http://ai-service:8001/health` 访问子系统
+
+---
+
+### Step M6.4 — holiday-service 功能迁移（首个拆分）
+
+**指令**
+- 将 `app/integration/holiday_client/client.py` 的核心逻辑迁移到 `services/holiday-service/`
+- 在 holiday-service 中实现 REST API：
+  - `GET /api/v1/holiday/{date}` → 法定节假日判定
+  - `GET /api/v1/holiday/{date}/near` → 是否临近节假日
+  - `GET /api/v1/holiday/{date}/workday` → 调班工作日判定
+  - `GET /api/v1/special-days/{date}` → 特殊节日标签
+- 修改主系统 `app/integration/holiday_client/client.py`：改为 HTTP 调用 holiday-service
+
+**验证**
+- holiday-service 独立运行，API 返回正确结果
+- 主系统通过 Docker 网络调用 holiday-service，日期功能正常
+
+---
+
+### Step M6.5 — ai-service 功能迁移
+
+**指令**
+- 将 `app/integration/ai_client/` 的核心逻辑迁移到 `services/ai-service/`
+- 在 ai-service 中实现 REST API：
+  - `POST /api/v1/split` → 教案拆分
+  - `POST /api/v1/adapt` → 年龄适配
+  - `POST /api/v1/generate` → 一日活动生成
+  - `POST /api/v1/observe` → 游戏观察生成（含视觉模型）
+- 主系统通过 HTTP 调用 ai-service
+
+**验证**
+- 主系统 AI 功能正常（拆分、适配、生成）
+- ai-service 容器独立处理 AI 调用
+
+---
+
+### Step M6.6 — word-service 功能迁移
+
+**指令**
+- 将 `app/integration/word_export/` 的核心逻辑迁移到 `services/word-service/`
+- 在 word-service 中实现 REST API：
+  - `POST /api/v1/export/daily-plan` → 导出每日活动计划 Word
+  - `POST /api/v1/export/observation` → 导出游戏观察 Word
+  - `POST /api/v1/export/batch` → 批量导出
+- 主系统通过 HTTP 调用 word-service，接收生成的 Word 文件
+
+**验证**
+- Word 导出功能正常（单导出、批量导出）
+- word-service 容器独立处理模板填充和文件生成
+
+---
+
+## 阶段 M7：恢复登录与多用户支持
+
+> 待 M6 稳定后启动
+
+### Step M7.1 — 恢复登录页面和 AuthMiddleware
+### Step M7.2 — 恢复注册和用户管理页面
+### Step M7.3 — 恢复个人资料页面
+### Step M7.4 — 多用户数据隔离验证

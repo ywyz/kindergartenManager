@@ -1,4 +1,37 @@
 services:
+  # ── 反向代理（Caddy：自动 HTTPS + 反向代理）──────────────────────────────
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    networks:
+      - kindergarten_net
+
+  # ── 主系统（NiceGUI 前后端一体化）──────────────────────────────────────
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: mysql+aiomysql://${MYSQL_USER:-kindergarten}:${MYSQL_PASSWORD:-kg_pass_2024}@db:3306/${MYSQL_DATABASE:-kindergarten_db}
+    env_file:
+      - .env
+    volumes:
+      - exports:/app/exports
+    restart: unless-stopped
+    networks:
+      - kindergarten_net
+
+  # ── 数据库（MySQL，生产模式）──────────────────────────────────────────────
   db:
     image: mysql:8
     environment:
@@ -15,23 +48,15 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - kindergarten_net
 
-  app:
-    build: .
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      # 覆盖 .env 中的 DATABASE_URL，使用容器内 MySQL 服务
-      DATABASE_URL: mysql+aiomysql://${MYSQL_USER:-kindergarten}:${MYSQL_PASSWORD:-kg_pass_2024}@db:3306/${MYSQL_DATABASE:-kindergarten_db}
-    env_file:
-      - .env
-    ports:
-      - "${APP_PORT:-8080}:8080"
-    volumes:
-      - exports:/app/exports
-    restart: unless-stopped
+networks:
+  kindergarten_net:
+    driver: bridge
 
 volumes:
   db_data:
   exports:
+  caddy_data:
+  caddy_config:

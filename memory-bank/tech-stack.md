@@ -8,7 +8,7 @@
 - 鉴权：JWT + RBAC（角色权限）
 - AI 调用：OpenAI 兼容接口（httpx + tenacity 重试）
 - 文档导出：python-docx（Word 模板填充与红字标注）
-- 部署：Ubuntu + systemd + Nginx（反向代理）
+- 部署：Docker Compose AIO（Caddy 反向代理 + 自动 HTTPS）
 - 任务调度：APScheduler（先替代消息队列，降低复杂度）
 - 测试：pytest
 - 配置管理：pydantic-settings（.env 分环境）
@@ -62,9 +62,8 @@
 - 差异标红：基于“原活动过程 vs 年龄适配后活动过程”逐段比对后写入红色字体
 
 ### 6) 部署与运维
-- Ubuntu 22.04 LTS
-- systemd 托管应用进程
-- Nginx 做 HTTPS 与反向代理
+- Docker Compose AIO 编排（本地开发 + 远程生产）
+- Caddy 做 HTTPS 终止与反向代理（替代 Nginx，自动证书管理）
 - 日志：JSON 格式（便于后续接日志平台）
 - 备份：MySQL 每日备份 + 导出文件目录定期归档
 
@@ -87,22 +86,28 @@ alembic/
 tests/
 ```
 
-## 升级路线（不改栈，只扩边界）
-1. 阶段 1（现在）
-- 单体上线，先做教学管理核心闭环（可用优先）。
+## 演进路线（渐进式微服务化）
 
-2. 阶段 2（稳定后）
-- 增加对外 REST API + 数据库只读视图。
-- 增加 API Key + 签名鉴权（服务间调用）。
+### 阶段 1（已完成）— 单体上线
+- NiceGUI 单体应用，教学管理核心闭环。
+- 默认 SQLite，可选 MySQL。单用户模式。
 
-3. 阶段 3（规模增长后）
-- 将耗时任务（导出、批量生成）拆到独立 worker。
-- 需要时再引入 Redis/Celery，而不是首期提前复杂化。
+### 阶段 2（当前）— Docker Compose AIO + 子系统拆分
+- Docker Compose 编排：主系统 + Caddy + 可选 MySQL。
+- 渐进式拆分 `app/integration/` 为独立 FastAPI 子系统容器。
+- 子系统顺序：holiday-service → ai-service → word-service。
+- Caddy 替代 Nginx，提供自动 HTTPS。
 
-## 不推荐首期采用的方案
-- 微服务 + K8s：运维成本过高，不符合“最简单”。
-- Node/Java 多语言混合：团队负担和维护复杂度上升。
-- 首期就上消息队列与事件总线：收益小于复杂度。
+### 阶段 3（后续）— 功能扩展
+- 恢复登录与多用户。新增子系统（学生出勤等）。
+
+### 阶段 4（规模增长后）
+- 如需引入 Redis/Celery 或 Kubernetes。
+
+## 不推荐当前采用的方案
+- Kubernetes：Docker Compose 满足当前需求。
+- 多语言混合：统一 Python 降低维护成本。
+- 消息队列/事件总线：当前收益不足。
 
 ## 一句话建议
-先用 Python 单体（NiceGUI + MySQL + SQLAlchemy + Alembic + python-docx + systemd+Nginx）把系统做稳做通，再在同一代码基线上逐步拆分能力，这是你当前阶段性价比最高的路线。
+Docker Compose AIO 编排 Python 微服务（NiceGUI 主系统 + FastAPI 子系统 + Caddy），Monorepo 渐进式拆分，是当前阶段最优路线。
