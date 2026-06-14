@@ -63,7 +63,14 @@ async def setup_page(request: Request) -> None:
             )
             return
 
-        if is_setup_complete():
+        setup_done = is_setup_complete()
+        if not setup_done and await _has_sys_admin():
+            # 数据库中已存在 sys_admin，但标记文件缺失（向导中途退出或重启导致）。
+            # 补写标记文件，进入重置/登录模式，避免用户被困在向导 Step 2 无法继续。
+            mark_setup_complete()
+            setup_done = True
+
+        if setup_done:
             await _render_reset_mode()
         else:
             await _render_first_run_wizard()
@@ -74,6 +81,9 @@ async def setup_page(request: Request) -> None:
 async def _render_reset_mode() -> None:
     """已完成初始化时：运行迁移 + 显示管理员密码重置表单（原有逻辑）。"""
     ui.label("系统管理").classes("text-2xl font-bold mb-2")
+    with ui.row().classes("items-center gap-3 mb-2"):
+        ui.label("管理员账号已存在。").classes("text-gray-600 text-sm")
+        ui.link("→ 前往登录", "/").classes("text-blue-600 text-sm font-medium")
 
     migration_label = ui.label("正在检查数据库迁移...").classes("text-gray-500 text-sm")
     try:
@@ -363,12 +373,23 @@ async def _render_first_run_wizard() -> None:
             step2_error = ui.label("").classes("text-red-600 text-sm")
 
             async def _create_admin() -> None:
+                step2_error.set_text("")
+
+                # ── 幂等检查：本次向导会话中已完成创建，直接进入下一步 ────────────
+                if state.get("admin_user_id"):
+                    saved_username = state.get("admin_username", "（已创建）")
+                    step2_error.set_text(
+                        f"ℹ️ 管理员「{saved_username}」已创建，继续下一步。"
+                    )
+                    step2_error.classes(replace="text-blue-600 text-sm")
+                    stepper.next()
+                    return
+
                 username = username_in.value.strip()
                 display_name = display_name_in.value.strip() or None
                 pwd = password_in.value
                 pwd2 = password2_in.value
 
-                step2_error.set_text("")
                 if len(username) < 4:
                     step2_error.set_text("❌ 用户名至少 4 位")
                     return
@@ -382,6 +403,7 @@ async def _render_first_run_wizard() -> None:
                     step2_error.set_text("❌ 两次密码不一致")
                     return
 
+                create_btn.props("loading")
                 try:
                     async with AsyncSessionLocal() as session:
                         user = await register_user(
@@ -403,10 +425,12 @@ async def _render_first_run_wizard() -> None:
                     step2_error.set_text(
                         f"❌ 创建失败：{type(exc).__name__}（{exc}）"
                     )
+                finally:
+                    create_btn.props(remove="loading")
 
             with ui.row().classes("mt-3 gap-2"):
                 ui.button("上一步", on_click=stepper.previous).props("flat")
-                ui.button(
+                create_btn = ui.button(
                     "创建账号", on_click=_create_admin, icon="person_add"
                 ).classes("bg-blue-600 text-white")
 

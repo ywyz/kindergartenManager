@@ -209,3 +209,63 @@ class TestResetAdminPassword:
         )
 
         assert "error" in result and "remote" in result
+
+
+# ─── 向导入口状态同步（Bug 修复：sys_admin 已存在但文件缺失时） ──────────────
+
+class TestSetupPageStateSyncOnPartialSetup:
+    """验证：数据库中已有 sys_admin 但 .kindergarten_setup_complete 文件缺失时，
+    setup_page 应自动补写标记文件并进入重置/登录模式，而非继续显示向导 Step 2。
+    这是"任何用户名都提示已被注册"bug 的根本修复测试。
+    """
+
+    async def test_has_sys_admin_triggers_mark_complete(self, async_session, tmp_path):
+        """sys_admin 已存在时，is_setup_complete 为 False → mark_setup_complete 被调用。"""
+        from pathlib import Path
+        from app.core.setup_state import is_setup_complete, mark_setup_complete
+
+        state_file = tmp_path / ".kindergarten_setup_complete"
+        assert not state_file.exists()
+
+        # 模拟 _has_sys_admin 返回 True
+        with patch("app.core.setup_state._get_state_path", return_value=state_file):
+            # 调用 mark_setup_complete 后文件应存在
+            assert not is_setup_complete()
+            mark_setup_complete()
+            assert is_setup_complete()
+
+    async def test_no_sys_admin_no_file_shows_wizard(self, async_session):
+        """无 sys_admin 且无标记文件时，_has_sys_admin 返回 False，向导正常显示。"""
+        from app.ui.pages.setup import _has_sys_admin
+
+        mock_ctx = MagicMock()
+        mock_ctx.__aenter__ = AsyncMock(return_value=async_session)
+        mock_ctx.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("app.ui.pages.setup.AsyncSessionLocal", return_value=mock_ctx):
+            result = await _has_sys_admin()
+
+        assert result is False  # 空库 → 向导正常显示
+
+    async def test_sys_admin_exists_has_sys_admin_returns_true(self, async_session):
+        """数据库中已有 sys_admin 时，_has_sys_admin 返回 True → 应触发状态同步。"""
+        from app.core.models.user import UserRole
+        from app.repository.user_repository import create_user
+        from app.ui.pages.setup import _has_sys_admin
+
+        await create_user(
+            async_session,
+            tenant_id=1,
+            username="orphaned_admin",
+            hashed_password=hash_password("somepass123"),
+            role=UserRole.sys_admin,
+        )
+
+        mock_ctx = MagicMock()
+        mock_ctx.__aenter__ = AsyncMock(return_value=async_session)
+        mock_ctx.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("app.ui.pages.setup.AsyncSessionLocal", return_value=mock_ctx):
+            result = await _has_sys_admin()
+
+        assert result is True  # 已有 admin → 应进入重置模式而非继续向导
