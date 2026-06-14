@@ -20,11 +20,11 @@ from datetime import date, datetime, timezone
 
 from nicegui import app, ui
 
-from app.auth.jwt import decode_access_token
 from app.core.audit import log_audit
 from app.core.database import AsyncSessionLocal
 from app.core.exceptions import AiCallError, AiParseError, AppError, ConfigError
 from app.core.logging import get_logger
+from app.core.user_context import get_current_user
 from app.integration.image_storage.blob_backend import BlobImageStorage
 from app.integration.word_export.observation_exporter import export_observation
 from app.repository.ai_key_repository import get_active_ai_key, get_decrypted_key
@@ -77,28 +77,12 @@ def validate_image_count(count: int) -> bool:
     return 1 <= count <= 3
 
 
-# ─── 页面工具函数 ──────────────────────────────────────────────────────────────
-
-
-def _get_current_user() -> dict | None:
-    token = app.storage.user.get("token")
-    if not token:
-        return None
-    try:
-        return decode_access_token(token)
-    except Exception:
-        return None
-
-
 # ─── 页面路由 ──────────────────────────────────────────────────────────────────
 
 
 @ui.page("/game-observation")
 async def game_observation_page() -> None:
-    user = _get_current_user()
-    if not user:
-        ui.navigate.to("/")
-        return
+    user = get_current_user()
 
     tenant_id: int = user["tenant_id"]
     user_id: int = int(user["sub"])

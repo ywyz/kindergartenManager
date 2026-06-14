@@ -8,24 +8,20 @@ from app.ui.components.app_shell import get_display_name, get_menu_items
 
 
 class TestGetMenuItems:
-    def test_teacher_cannot_see_admin_items(self):
-        """role=teacher 时，菜单不含账号管理和邀请码管理。"""
+    def test_teacher_sees_core_items(self):
+        """role=teacher 时，菜单包含核心项，不含已移除项。"""
         items = get_menu_items("teacher")
         keys = [item["key"] for item in items]
+        assert "daily-plan" in keys
+        assert "settings" in keys
         assert "user-admin" not in keys
-        assert "invite-code" not in keys
+        assert "profile" not in keys
 
-    def test_sys_admin_sees_all_items(self):
-        """role=sys_admin 时，菜单包含账号管理。"""
-        items = get_menu_items("sys_admin")
-        keys = [item["key"] for item in items]
-        assert "user-admin" in keys
-
-    def test_teaching_admin_cannot_see_user_admin(self):
-        """role=teaching_admin 时，菜单不含账号管理。"""
-        items = get_menu_items("teaching_admin")
-        keys = [item["key"] for item in items]
-        assert "user-admin" not in keys
+    def test_sys_admin_sees_same_items(self):
+        """单用户模式下 sys_admin 与 teacher 看到相同菜单。"""
+        admin_items = get_menu_items("sys_admin")
+        teacher_items = get_menu_items("teacher")
+        assert [i["key"] for i in admin_items] == [i["key"] for i in teacher_items]
 
     def test_all_roles_see_core_items(self):
         """所有角色均可见核心菜单项：每日活动计划、设置、提示词管理。"""

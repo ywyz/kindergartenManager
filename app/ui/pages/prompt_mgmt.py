@@ -17,10 +17,10 @@
 
 from nicegui import app, ui
 
-from app.auth.jwt import decode_access_token
 from app.core.database import AsyncSessionLocal
 from app.core.exceptions import AiCallError, AiParseError, ConfigError
 from app.core.logging import get_logger
+from app.core.user_context import get_current_user
 from app.integration.ai_client.adapt_client import DEFAULT_ADAPT_PROMPT, adapt_activity_process
 from app.integration.ai_client.base import call_ai_text
 from app.integration.ai_client.generate_client import (
@@ -116,23 +116,9 @@ _TEST_PLACEHOLDER: dict[str, str] = {
 }
 
 
-def _get_current_user() -> dict | None:
-    """从 storage 中解码当前用户信息，未登录返回 None。"""
-    token = app.storage.user.get("token")
-    if not token:
-        return None
-    try:
-        return decode_access_token(token)
-    except Exception:
-        return None
-
-
 @ui.page("/prompts")
 async def prompt_mgmt_page() -> None:
-    user = _get_current_user()
-    if not user:
-        ui.navigate.to("/")
-        return
+    user = get_current_user()
 
     tenant_id: int = user["tenant_id"]
     user_id: int = int(user["sub"])

@@ -14,10 +14,10 @@ from pathlib import Path
 
 from nicegui import app, ui
 
-from app.auth.jwt import decode_access_token
 from app.core.database import AsyncSessionLocal
 from app.core.audit import log_audit
 from app.core.exceptions import AiCallError, AiParseError, ConfigError
+from app.core.user_context import get_current_user
 from app.integration.holiday_client.client import is_near_holiday
 from app.integration.word_export.exporter import export_batch_daily_plans, export_daily_plan
 from app.repository.class_repository import get_class_config
@@ -37,22 +37,9 @@ from app.ui.components.date_panel import DatePanel
 from app.ui.components.app_shell import render_shell
 
 
-def _get_current_user() -> dict | None:
-    token = app.storage.user.get("token")
-    if not token:
-        return None
-    try:
-        return decode_access_token(token)
-    except Exception:
-        return None
-
-
 @ui.page("/daily-plan")
 async def daily_plan_page() -> None:
-    user = _get_current_user()
-    if not user:
-        ui.navigate.to("/")
-        return
+    user = get_current_user()
 
     tenant_id: int = user["tenant_id"]
     user_id: int = int(user["sub"])

@@ -55,23 +55,6 @@ _ALL_MENU_ITEMS: list[dict] = [
         "route": "/prompts",
         "roles": None,
     },
-    # 账号中心
-    {
-        "group": "账号中心",
-        "key": "profile",
-        "label": "个人资料",
-        "icon": "person",
-        "route": "/profile",
-        "roles": None,
-    },
-    {
-        "group": "账号中心",
-        "key": "user-admin",
-        "label": "账号管理",
-        "icon": "manage_accounts",
-        "route": "/user-admin",
-        "roles": ["sys_admin"],
-    },
 ]
 
 
@@ -141,8 +124,7 @@ async def app_shell(user: dict, active: str) -> AsyncIterator[None]:
         groups.setdefault(item["group"], []).append(item)
 
     def _do_logout() -> None:
-        app.storage.user.clear()
-        ui.navigate.to("/")
+        pass  # 单用户模式：保留接口但无实际操作
 
     # ── 顶栏 ────────────────────────────────────────────────────────────────
     with ui.header().classes("bg-blue-700 text-white items-center px-4 gap-2"):
@@ -151,10 +133,6 @@ async def app_shell(user: dict, active: str) -> AsyncIterator[None]:
         ).classes("text-white")
         ui.label("幼儿园教学管理系统").classes("text-lg font-bold flex-1")
         ui.label(display_name).classes("text-sm text-blue-100")
-        ui.button(
-            icon="logout",
-            on_click=_do_logout,
-        ).props("flat round dense").tooltip("退出登录").classes("text-white")
 
     # ── 左侧抽屉 ────────────────────────────────────────────────────────────
     with ui.left_drawer(value=True, bordered=True).classes(

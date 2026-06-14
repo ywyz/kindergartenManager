@@ -4,8 +4,9 @@
     python -m app.main
 
 页面路由：
-    /       — 登录页
-    /home   — 主页占位
+    /       — 重定向到 /home
+    /home   — 主页
+    /setup  — AI 配置
 """
 import sys
 
@@ -17,14 +18,12 @@ from app.ui.pages import login  # noqa: F401
 from app.ui.pages import settings  # noqa: F401
 from app.ui.pages import daily_plan  # noqa: F401
 from app.ui.pages import prompt_mgmt  # noqa: F401
-from app.ui.pages import user_admin  # noqa: F401
 from app.ui.pages import game_observation  # noqa: F401
-from app.ui.pages import register  # noqa: F401
-from app.ui.pages import profile  # noqa: F401
 from app.ui.pages import setup  # noqa: F401
 
 from app.api import create_api_router
 from app.auth.middleware import AuthMiddleware
+from app.core.bootstrap import run_bootstrap
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.core.startup import run_startup_migrations
@@ -49,9 +48,12 @@ def main() -> None:
     # 启动前同步执行数据库迁移（失败记录日志但不阻断启动）
     run_startup_migrations()
 
+    # 启动后引导默认用户（单用户模式）
+    app.on_startup(run_bootstrap)
+
     # 全局异常日志
     app.on_exception(_on_global_exception)
-    # 路由守卫：未登录访问受限页面重定向到 /
+    # 路由守卫：单用户模式仅做根路径重定向
     app.add_middleware(AuthMiddleware)
     # 对外只读 REST API（二期）：/api/v1，API Key + 可选 HMAC 签名鉴权
     app.include_router(create_api_router())

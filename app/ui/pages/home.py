@@ -2,30 +2,17 @@
 
 显示欢迎信息、当前班级信息和快捷入口卡片。
 """
-from nicegui import app, ui
+from nicegui import ui
 
-from app.auth.jwt import decode_access_token
 from app.core.database import AsyncSessionLocal
+from app.core.user_context import get_current_user
 from app.repository.class_repository import get_class_config
 from app.ui.components.app_shell import app_shell, get_display_name
 
 
-def _get_current_user() -> dict | None:
-    token = app.storage.user.get("token")
-    if not token:
-        return None
-    try:
-        return decode_access_token(token)
-    except Exception:
-        return None
-
-
 @ui.page("/home")
 async def home_page() -> None:
-    user = _get_current_user()
-    if not user:
-        ui.navigate.to("/")
-        return
+    user = get_current_user()
 
     tenant_id: int = user["tenant_id"]
     user_id: int = int(user["sub"])

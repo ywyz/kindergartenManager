@@ -1,9 +1,7 @@
 """测试 app.core.setup_state 模块。
 
-覆盖：
-- is_setup_complete()：标记文件不存在返回 False，存在返回 True
-- mark_setup_complete()：创建标记文件
-- 边界：写入权限异常时静默忽略，不抛出
+注意：setup_state 标记文件机制在单用户模式重构中已弃用。
+这些测试保留以确保模块本身未被破坏（若后续恢复登录功能）。
 """
 from pathlib import Path
 from unittest.mock import patch
