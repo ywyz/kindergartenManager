@@ -8,6 +8,11 @@ from app.core.models.prompt_template import PromptTemplate  # noqa: F401
 from app.core.models.export_record import ExportRecord  # noqa: F401
 from app.core.models.game_observation import GameObservation  # noqa: F401
 from app.core.models.game_observation_image import GameObservationImage  # noqa: F401
+from app.core.models.listening_record import ListeningRecord  # noqa: F401
+from app.core.models.listening_domain import ListeningDomain  # noqa: F401
+from app.core.models.listening_image import ListeningImage  # noqa: F401
+from app.core.models.listening_indicator import ListeningIndicatorResult  # noqa: F401
+from app.core.models.indicator_catalog import IndicatorCatalog  # noqa: F401
 
 __all__ = [
     "User",
@@ -19,4 +24,9 @@ __all__ = [
     "ExportRecord",
     "GameObservation",
     "GameObservationImage",
+    "ListeningRecord",
+    "ListeningDomain",
+    "ListeningImage",
+    "ListeningIndicatorResult",
+    "IndicatorCatalog",
 ]

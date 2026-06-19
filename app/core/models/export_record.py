@@ -31,6 +31,9 @@ class ExportRecord(Base):
     # 关联游戏观察记录（逻辑外键 → game_observation.id）
     observation_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
+    # 关联一对一倾听记录（逻辑外键 → listening_record.id）
+    listening_record_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+
     # 文件信息
     file_name: Mapped[str] = mapped_column(String(256), nullable=False)
     file_path: Mapped[str] = mapped_column(String(512), nullable=False)

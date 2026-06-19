@@ -1,7 +1,7 @@
 """
 Step 2.3 — 日期计算服务单元测试
 """
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
@@ -10,6 +10,7 @@ from app.service.date_service import (
     get_weekday_cn,
     is_within_semester,
     is_workday,
+    pick_three_workdays,
 )
 
 
@@ -113,3 +114,46 @@ class TestIsWithinSemester:
 
     def test_after_end_is_outside(self):
         assert is_within_semester(self.start, self.end, date(2026, 1, 17)) is False
+
+
+# ──────────────────────────────────────────────
+# pick_three_workdays — 自动选取三个工作日
+# ──────────────────────────────────────────────
+class TestPickThreeWorkdays:
+    # 2026-04：4/1 为周三 → 三周首个工作日应为 4/1(三)、4/6(一)、4/13(一)
+    def test_returns_three_workdays(self):
+        result = pick_three_workdays(2026, 4)
+        assert len(result) == 3
+        assert all(d.weekday() < 5 for d in result)
+
+    def test_no_holiday_default_dates(self):
+        result = pick_three_workdays(2026, 4)
+        assert result == [date(2026, 4, 1), date(2026, 4, 6), date(2026, 4, 13)]
+
+    def test_three_distinct_weeks(self):
+        result = pick_three_workdays(2026, 4)
+        mondays = {d - timedelta(days=d.weekday()) for d in result}
+        assert len(mondays) == 3  # 分属三个不同自然周
+
+    def test_skip_holiday(self):
+        # 4/1 设为法定节假日 → 第一周改取 4/2(周四)
+        holidays = {date(2026, 4, 1)}
+        result = pick_three_workdays(2026, 4, is_holiday=lambda d: d in holidays)
+        assert result[0] == date(2026, 4, 2)
+        assert date(2026, 4, 1) not in result
+
+    def test_holiday_api_unavailable_not_blocking(self):
+        # is_holiday 始终返回 None（API 不可用）→ 不阻断，与无节假日一致
+        result = pick_three_workdays(2026, 4, is_holiday=lambda d: None)
+        assert result == [date(2026, 4, 1), date(2026, 4, 6), date(2026, 4, 13)]
+
+    def test_skip_weekend_only_first_week(self):
+        # 2026-08：8/1 为周六，首周仅含周末 → 跳过，取 8/3、8/10、8/17
+        result = pick_three_workdays(2026, 8)
+        assert result == [date(2026, 8, 3), date(2026, 8, 10), date(2026, 8, 17)]
+        assert date(2026, 8, 1) not in result and date(2026, 8, 2) not in result
+
+    def test_insufficient_workdays_returns_partial(self):
+        # 全部日期标记为节假日 → 返回空列表，不抛异常
+        result = pick_three_workdays(2026, 4, is_holiday=lambda d: True)
+        assert result == []

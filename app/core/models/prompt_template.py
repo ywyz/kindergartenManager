@@ -43,6 +43,7 @@ class PromptTemplate(Base):
             "outdoor_game",
             "daily_reflection",
             "game_observation",
+            "one_on_one_listening",
             name="prompt_task_type",
         ),
         nullable=False,
