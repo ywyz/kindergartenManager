@@ -34,10 +34,10 @@ DEFAULT_OBSERVATION_PROMPT = """\
 请严格按照以下 JSON 格式输出，不要输出任何其他内容：
 
 {
-  "observation_goal": "观察目标（根据游戏情境描述观察的重点，2~3句话）",
-  "observation_record": "观察记录（详细描述幼儿游戏过程中的行为表现，3~5句话）",
-  "evaluation_analysis": "评价分析（分析幼儿在游戏中的发展水平和学习特点，2~3句话）",
-  "support_strategy": "支持策略（提出具体的教师支持建议，2~3条）"
+  "observation_goal": "观察目标（根据游戏情境描述观察的重点，分点讲述）",
+  "observation_record": "观察记录（详细描述幼儿游戏过程中的行为表现，详细描述不少于500字）",
+  "evaluation_analysis": "评价分析（分析幼儿在游戏中的发展水平和学习特点，从幼儿园五大领域分点描述，）",
+  "support_strategy": "支持策略（提出具体的教师支持建议，分点进行阐述）"
 }
 
 要求：
