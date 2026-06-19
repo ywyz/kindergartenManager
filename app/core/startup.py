@@ -9,6 +9,8 @@ import logging
 import os
 import sys
 
+from app.core.paths import app_data_dir
+
 logger = logging.getLogger("app.startup")
 
 
@@ -28,10 +30,8 @@ def _get_alembic_script_location() -> str:
 def _build_sync_url(database_url: str | None) -> str:
     """将异步驱动 URL 转换为 Alembic 所需的同步驱动 URL。"""
     if not database_url:
-        if getattr(sys, "frozen", False):
-            exe_dir = os.path.dirname(sys.executable)
-            return f"sqlite:///{exe_dir}/kindergarten.db"
-        return "sqlite:///./kindergarten.db"
+        db_path = app_data_dir() / "kindergarten.db"
+        return f"sqlite:///{db_path.as_posix()}"
     if "+aiosqlite" in database_url:
         return database_url.replace("+aiosqlite", "")
     if "+aiomysql" in database_url:

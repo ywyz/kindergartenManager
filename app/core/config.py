@@ -8,22 +8,19 @@
 """
 import logging
 import secrets
-import sys
 from pathlib import Path
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core.paths import app_data_dir
+
 logger = logging.getLogger("app.config")
 
 
 def _secrets_file_path() -> Path:
-    """返回自动生成密钥的持久化文件路径。"""
-    if getattr(sys, "frozen", False):
-        # PyInstaller 打包模式：保存在可执行文件同目录
-        return Path(sys.executable).parent / ".kindergarten_secrets"
-    # 开发 / Docker / systemd 模式：保存在工作目录
-    return Path.cwd() / ".kindergarten_secrets"
+    """返回自动生成密钥的持久化文件路径（位于用户可写数据目录）。"""
+    return app_data_dir() / ".kindergarten_secrets"
 
 
 def _read_kv_file(path: Path) -> dict[str, str]:

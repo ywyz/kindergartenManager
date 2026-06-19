@@ -7,15 +7,14 @@
 这与 app.core.config 中 _secrets_file_path() 的路径逻辑一致，
 保证 .env 文件始终与 .kindergarten_secrets 文件位于同一目录。
 """
-import sys
 from pathlib import Path
+
+from app.core.paths import app_data_dir
 
 
 def get_env_path() -> Path:
-    """返回 .env 文件的绝对路径。"""
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent / ".env"
-    return Path.cwd() / ".env"
+    """返回 .env 文件的绝对路径（位于用户可写数据目录）。"""
+    return app_data_dir() / ".env"
 
 
 def read_dot_env() -> dict[str, str]:
