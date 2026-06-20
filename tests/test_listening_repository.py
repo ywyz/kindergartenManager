@@ -134,3 +134,26 @@ async def test_indicator_result_crud(async_session):
 
     await delete_indicator_results_by_record(async_session, 1, 10)
     assert await list_indicator_results(async_session, 1, 10) == []
+
+
+@pytest.mark.asyncio
+async def test_delete_domains_by_record(async_session):
+    """delete_domains_by_record 删除该记录全部领域，tenant 隔离、不影响其它记录。"""
+    from app.repository.listening_repository import (
+        delete_domains_by_record,
+        list_domains_by_record,
+        save_domain,
+    )
+
+    for d in ["健康", "语言"]:
+        await save_domain(async_session, tenant_id=1, user_id=1, record_id=10, domain=d)
+    await save_domain(async_session, tenant_id=1, user_id=1, record_id=11, domain="健康")
+
+    # 错误租户不删除
+    await delete_domains_by_record(async_session, 99, 10)
+    assert len(await list_domains_by_record(async_session, 1, 10)) == 2
+
+    await delete_domains_by_record(async_session, 1, 10)
+    assert await list_domains_by_record(async_session, 1, 10) == []
+    # 其它记录不受影响
+    assert len(await list_domains_by_record(async_session, 1, 11)) == 1

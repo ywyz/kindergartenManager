@@ -104,3 +104,54 @@ def compress_image(data: bytes, max_bytes: int = 1_048_576) -> CompressedImage:
         width=w,
         height=h,
     )
+
+
+def normalize_to_landscape(data: bytes) -> bytes:
+    """将图片统一为横版（宽 ≥ 高）。
+
+    处理步骤：
+      1. 按 EXIF 方向校正（手机照片常见）。
+      2. 透明通道转白底 RGB。
+      3. 若仍为竖版（高 > 宽）则顺时针旋转 90°。
+    幂等：横版输入仅经 EXIF 校正与 JPEG 重编码后原样返回（方向不变）。
+
+    Args:
+        data: 原始图片字节。
+
+    Returns:
+        归一后的 JPEG 字节（横版）。
+
+    Raises:
+        AppError: 非图片字节或无法解码时抛出。
+    """
+    try:
+        from PIL import Image, ImageOps
+    except ImportError as e:  # pragma: no cover
+        raise AppError("Pillow 未安装，无法处理图片") from e
+
+    try:
+        img = Image.open(io.BytesIO(data))
+        img.load()
+    except Exception as exc:
+        raise AppError(f"图片解码失败，请确认上传的是合法图片文件：{exc}") from exc
+
+    # 1. EXIF 方向校正
+    img = ImageOps.exif_transpose(img)
+
+    # 2. 透明通道转白底
+    if img.mode in ("RGBA", "LA", "P"):
+        bg = Image.new("RGB", img.size, (255, 255, 255))
+        if img.mode == "P":
+            img = img.convert("RGBA")
+        bg.paste(img, mask=img.split()[-1] if img.mode in ("RGBA", "LA") else None)
+        img = bg
+    elif img.mode != "RGB":
+        img = img.convert("RGB")
+
+    # 3. 竖版 → 顺时针旋转 90° 变横版（ROTATE_270 = 顺时针 90°）
+    if img.height > img.width:
+        img = img.transpose(Image.ROTATE_270)
+
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=95, optimize=True)
+    return buf.getvalue()

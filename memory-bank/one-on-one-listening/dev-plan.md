@@ -15,9 +15,10 @@
 | P4 | AI 客户端 `listening_client` + 提示词 task_type | ✅ mock 单测 | ✅ 完成 |
 | P5 | 服务层 `listening_service`（生成 + 持久化） | ✅ mock 单测 | ✅ 完成 |
 | P6 | Word 导出 `listening_exporter`（三模式） | ✅ 导出单测 | ✅ 完成 |
-| P7 | UI 页面 + 菜单 + 路由 | 🧑 手动测试 | ✅ 已实现，⏸ 待手动测试 |
-| P8 | 导出 UI（三模式 + zip）+ 历史多选 | 🧑 手动测试 | ⬜ 未开始 |
-| P9 | 文档收尾 + 全量回归 | ✅ `pytest tests/ -v` | ⬜ 未开始 |
+| P7 | UI 页面 + 菜单 + 路由 | 🧑 手动测试 | ✅ 完成（手测已反馈通过） |
+| P8 | 导出 UI（三模式 + zip）+ 历史多选 + 详情 + 编辑覆盖 + 删除 | 🧑 手动测试 | ✅ 已实现，自测通过，⏸ 待手动验收 |
+| P8d | 体验增强：领域时间(C)/提示词Tab/领域Tab布局/横版统一/一键导入15张+生成全部 | ✅ 纯函数单测 + 🧑 手动 | ✅ 已实现，自测通过 |
+| P9 | 文档收尾 + 全量回归 | ✅ `pytest tests/ -v` | ✅ 完成（全量 461 passed） |
 
 > 详细文件清单与手动测试清单见 [progress.md](progress.md)。
 
@@ -151,16 +152,29 @@
 - 历史列表：年月/姓名筛选 + 多选幼儿 →「批量按领域导出（zip）」。
 - zip 打包辅助（`io.BytesIO` + `zipfile`）；`ui.download` 下发；写 `export_records`（listening_record_id）。
 - 审计 `export_listening`。
+- **实现补充（已落地）**：只读「详情」弹窗、历史「编辑」载入表单 → 覆盖保存（`update_record_with_all`）、删除（含图片+确认弹窗）。后端：`load_record_detail` / `to_export_payload` / `update_record_with_all`、`save_export_record(listening_record_id)`、`indicator_repository.list_indicators_by_ids`、`listening_repository.delete_domains_by_record`。
 
 **验证**：🧑 手动：三种导出下载并用 Word 打开核对（中文、打勾、图片、布局）。
 
 ---
 
+## P8d — 体验增强 ✅纯函数单测 + 🧑手动
+
+1. **领域时间（方案 C）**：每领域独立年/月 + 各自「自动选取本领域工作日」；顶部「一键为所有领域按各自年月选取」（逐领域用其自身年月）；顶部年月仅默认预填。修复原全局选取覆盖所有领域为同月同日的问题。
+2. **提示词 Tab**：`prompt_mgmt.py` 增 `one_on_one_listening`（`DEFAULT_LISTENING_PROMPT` + 倾听 JSON schema + 视觉测试提示）。
+3. **领域 Tab 布局**：`ui.expansion` 列表 → `ui.tabs` + `ui.tab_panels`，点 tab 显示一个领域。
+4. **图片统一横版**：`image_processing.normalize_to_landscape`（EXIF 校正 + 竖版顺时针旋转 90°，幂等），上传/一键导入即归一。
+5. **一键导入 15 张**：`distribute_images_by_filename`（按文件名每 3 张分配五领域）+ `validate_bulk_import_count`；恰好 15 张否则报错、覆盖各域、仅放置；另「生成全部领域」串行 5 次。
+
+**验证**：`test_image_processing`（横版归一）、`test_listening_ui_helpers`（分配/zip/批量文件名/摘要）；🧑 手动见 progress.md 验收清单。
+
+---
+
 ## P9 — 文档收尾 + 回归 ✅自动测试
 
-- 更新 `memory-bank/architecture.md`（新表清单、模块清单、子系统说明）与 `memory-bank/progress.md`。
-- 更新本目录 `progress.md`（如建）记录各阶段完成情况。
-- 全量回归 `pytest tests/ -v`，确保 0 失败。
+- 更新 `memory-bank/architecture.md`（新表清单、模块清单、子系统说明 §10）与 `memory-bank/progress.md`。
+- 更新本目录 `progress.md` 记录各阶段完成情况。
+- 全量回归 `pytest tests/ -v`，确保 0 失败（已达 **461 passed**）。
 
 ---
 

@@ -222,6 +222,21 @@ async def update_domain(
     return bool(result.rowcount)
 
 
+async def delete_domains_by_record(
+    session: AsyncSession,
+    tenant_id: int,
+    record_id: int,
+) -> None:
+    """删除某记录下的全部领域（tenant 隔离），供覆盖保存重建使用。"""
+    await session.execute(
+        delete(ListeningDomain).where(
+            ListeningDomain.tenant_id == tenant_id,
+            ListeningDomain.record_id == record_id,
+        )
+    )
+    await session.commit()
+
+
 # ─── 指标结果表 listening_indicator_result ─────────────────────────────────
 
 

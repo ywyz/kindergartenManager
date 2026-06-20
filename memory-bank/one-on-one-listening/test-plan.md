@@ -15,9 +15,13 @@
 | `tests/test_listening_image_repository.py` | P2 | 图片仓库 |
 | `tests/test_date_service.py`（追加） | P3 | `pick_three_workdays` |
 | `tests/test_listening_client.py` | P4 | AI 客户端 |
-| `tests/test_listening_service.py` | P5 | 服务层 |
+| `tests/test_listening_service.py` | P5 / P8a | 服务层；`load_record_detail`/`to_export_payload`/`update_record_with_all` |
 | `tests/test_listening_exporter.py` | P6 | Word 导出 |
-| `tests/test_listening_ui_helpers.py` | P7 | UI 纯函数 |
+| `tests/test_listening_ui_helpers.py` | P7 / P8b | UI 纯函数；分配/zip/批量文件名/摘要 |
+| `tests/test_export_repository.py`（追加） | P8a | `save_export_record(listening_record_id)` |
+| `tests/test_indicator_repository.py`（追加） | P8a | `list_indicators_by_ids` |
+| `tests/test_listening_repository.py`（追加） | P8a | `delete_domains_by_record` |
+| `tests/test_image_processing.py`（追加） | P8d#4 | `normalize_to_landscape` 横版归一 |
 
 ---
 
@@ -102,6 +106,30 @@
 - `test_default_year_month`：默认取当前年月。
 
 > 页面交互（上传、生成、保存、导出）由 🧑 手动测试覆盖（见 dev-plan P7/P8）。
+
+## P8a / P8d — 后端装配与图片归一（自动）
+
+**`test_export_repository.py`（追加）**
+- `test_save_export_record_with_listening_record_id`：`listening_record_id` 持久化；未传默认 None。
+
+**`test_indicator_repository.py`（追加）**
+- `test_list_indicators_by_ids`：按 id 批量返回 `{id: catalog}`；空列表→空 dict；跨租户取不到。
+
+**`test_listening_repository.py`（追加）**
+- `test_delete_domains_by_record`：删除该记录全部领域、tenant 隔离、不影响其它记录。
+
+**`test_listening_service.py`（追加）**
+- `test_load_record_detail`：装配主表+领域+图片+指标（sort_order 经 catalog 映射）；tenant 隔离返回 None。
+- `test_to_export_payload`：纯函数 images→tuple、indicators 保留 sort_order/stars。
+- `test_update_record_with_all`：覆盖更新主表并重建子表，计数与值正确；`_not_found` → `AppError`。
+
+**`test_image_processing.py`（追加）**
+- `test_normalize_portrait_to_landscape` / `_landscape_unchanged` / `_idempotent` / `_non_image_raises`。
+
+**`test_listening_ui_helpers.py`（追加）**
+- `test_build_batch_export_filename` / `test_validate_bulk_import_count` / `test_distribute_images_by_filename`（按文件名排序分配）/ `test_pack_domain_files_to_zip` / `test_format_record_summary`。
+
+> 全量回归：**461 passed**。
 
 ## 手动测试清单（🧑 大目标验收）
 

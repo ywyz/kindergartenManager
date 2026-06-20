@@ -81,3 +81,25 @@ async def test_list_available_stages(async_session):
     stages = await list_available_stages(async_session, 1)
     assert ("小班", "下学期") in stages
     assert len(stages) == 1
+
+
+@pytest.mark.asyncio
+async def test_list_indicators_by_ids(async_session):
+    """list_indicators_by_ids 按 id 批量返回 {id: catalog}，强制 tenant 过滤。"""
+    from app.repository.indicator_repository import (
+        list_indicators,
+        list_indicators_by_ids,
+    )
+
+    await _seed(async_session)
+    health = await list_indicators(async_session, 1, "小班", "下学期", "健康")
+    ids = [c.id for c in health]
+
+    mapping = await list_indicators_by_ids(async_session, 1, ids)
+    assert set(mapping.keys()) == set(ids)
+    assert {mapping[i].sort_order for i in ids} == {0, 1}
+
+    # 空列表 → 空 dict
+    assert await list_indicators_by_ids(async_session, 1, []) == {}
+    # 跨租户取不到
+    assert await list_indicators_by_ids(async_session, 99, ids) == {}

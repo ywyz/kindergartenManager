@@ -103,3 +103,32 @@ async def test_save_export_record_observation_id_defaults_to_none(async_session)
         file_path="/abs/plan_export.docx",
     )
     assert record.observation_id is None
+
+
+@pytest.mark.asyncio
+async def test_save_export_record_with_listening_record_id(async_session):
+    """写入倾听导出记录时，listening_record_id 字段正确持久化。"""
+    record = await save_export_record(
+        async_session,
+        tenant_id=1,
+        user_id=2,
+        daily_plan_id=None,
+        file_name="listening_export.docx",
+        file_path="/abs/listening_export.docx",
+        listening_record_id=77,
+    )
+    assert record.listening_record_id == 77
+
+
+@pytest.mark.asyncio
+async def test_save_export_record_listening_id_defaults_to_none(async_session):
+    """未传 listening_record_id 时，字段默认为 None（向后兼容）。"""
+    record = await save_export_record(
+        async_session,
+        tenant_id=1,
+        user_id=2,
+        daily_plan_id=None,
+        file_name="plan.docx",
+        file_path="/abs/plan.docx",
+    )
+    assert record.listening_record_id is None

@@ -178,3 +178,161 @@ async def test_save_record_with_all(async_session):
     health_imgs = await list_images_by_record(async_session, 1, rid, domain="健康")
     assert health_imgs[0].image_description == "d1"
     assert health_imgs[0].blob_content == b"\xff\xd8\xffimg"
+
+
+# ─── P8a — 详情装配 / 导出转换 / 覆盖更新 ─────────────────────────────────────
+
+
+async def _seed_catalog_multi(session):
+    """健康(2 指标 sort 0/1) + 语言(1 指标 sort 0)，返回 {domain: [catalog_id...]}。"""
+    from app.core.models.indicator_catalog import IndicatorCatalog
+    from app.repository.indicator_repository import list_indicators
+
+    specs = {"健康": 2, "语言": 1}
+    for domain, n in specs.items():
+        for i in range(n):
+            session.add(IndicatorCatalog(
+                tenant_id=1, grade="小班", term="下学期", domain=domain,
+                level1_name="L1", level2_name=f"{domain}指标{i}", sort_order=i,
+                standard_star1="a", standard_star2="b", standard_star3="c",
+            ))
+    await session.commit()
+    out = {}
+    for domain in specs:
+        cats = await list_indicators(session, 1, "小班", "下学期", domain)
+        out[domain] = [c.id for c in cats]
+    return out
+
+
+async def _save_two_domain_record(session, cat_ids):
+    """保存一条含 健康(2图/2指标,3月) + 语言(1图/1指标,4月) 的记录，返回 (rid, record_data)。"""
+    ci = CompressedImage(data=b"\xff\xd8\xffimg", mime_type="image/jpeg", width=20, height=10)
+    domains = [
+        {
+            "domain": "健康", "obs_year": 2026, "obs_month": 3,
+            "date_1": date(2026, 3, 2), "date_2": date(2026, 3, 9), "date_3": date(2026, 3, 16),
+            "goals": "健康目标", "evaluation": "健康评价", "support_strategy": "健康策略",
+            "compressed_images": [ci, ci],
+            "image_descriptions": ["健图1", "健图2"],
+            "indicator_results": [
+                {"catalog_id": cat_ids["健康"][0], "stars": 2},
+                {"catalog_id": cat_ids["健康"][1], "stars": 1},
+            ],
+        },
+        {
+            "domain": "语言", "obs_year": 2026, "obs_month": 4,
+            "date_1": date(2026, 4, 6), "date_2": None, "date_3": None,
+            "goals": "语言目标", "evaluation": "语言评价", "support_strategy": "语言策略",
+            "compressed_images": [ci],
+            "image_descriptions": ["语图1"],
+            "indicator_results": [{"catalog_id": cat_ids["语言"][0], "stars": 3}],
+        },
+    ]
+    record_data = {
+        "tenant_id": 1, "user_id": 1, "obs_year": 2026, "obs_month": 3,
+        "child_name": "小明", "adult_count": 1, "child_age": "4岁",
+        "grade": "小班", "term": "下学期", "class_name": "向日葵班", "observer": "王老师",
+    }
+    rid = await save_record_with_all(
+        session, record_data=record_data, domains=domains, storage=BlobImageStorage(),
+    )
+    return rid, record_data
+
+
+async def test_load_record_detail(async_session):
+    """load_record_detail 装配主表 + 领域 + 图片 + 指标（含 sort_order 映射）。"""
+    from app.service.listening_service import load_record_detail
+
+    cat_ids = await _seed_catalog_multi(async_session)
+    rid, _ = await _save_two_domain_record(async_session, cat_ids)
+
+    detail = await load_record_detail(async_session, 1, rid)
+    assert detail is not None
+    assert detail["record"]["child_name"] == "小明"
+    assert len(detail["domains"]) == 2
+
+    health = next(d for d in detail["domains"] if d["domain"] == "健康")
+    assert health["obs_month"] == 3
+    assert len(health["images"]) == 2
+    assert health["images"][0]["description"] == "健图1"
+    assert [i["sort_order"] for i in health["indicators"]] == [0, 1]
+    assert [i["stars"] for i in health["indicators"]] == [2, 1]
+    assert health["indicators"][0]["level2_name"] == "健康指标0"
+
+    lang = next(d for d in detail["domains"] if d["domain"] == "语言")
+    assert lang["obs_month"] == 4
+    assert len(lang["images"]) == 1
+
+    # tenant 隔离
+    assert await load_record_detail(async_session, 99, rid) is None
+
+
+def test_to_export_payload():
+    """to_export_payload 纯函数：images→tuple，indicators 保留 sort_order/stars。"""
+    from app.service.listening_service import to_export_payload
+
+    detail = {
+        "record": {"child_name": "小明", "adult_count": 1, "child_age": "4岁", "obs_year": 2026},
+        "domains": [{
+            "domain": "健康", "obs_year": 2026, "obs_month": 3,
+            "date_1": None, "date_2": None, "date_3": None,
+            "goals": "g", "evaluation": "e", "support_strategy": "s",
+            "images": [{"data": b"x", "description": "d1"}, {"data": b"y", "description": None}],
+            "indicators": [{"catalog_id": 5, "sort_order": 1, "stars": 2}],
+        }],
+    }
+    record, domains = to_export_payload(detail)
+    assert record == {"child_name": "小明", "adult_count": 1, "child_age": "4岁"}
+    assert domains[0]["images"] == [(b"x", "d1"), (b"y", "")]
+    assert domains[0]["indicators"] == [{"sort_order": 1, "stars": 2}]
+
+
+async def test_update_record_with_all(async_session):
+    """update_record_with_all 覆盖更新主表并重建子表，计数与值正确。"""
+    from app.repository.listening_image_repository import list_images_by_record
+    from app.repository.listening_repository import (
+        get_record_by_id, list_domains_by_record, list_indicator_results,
+    )
+    from app.service.listening_service import load_record_detail, update_record_with_all
+
+    cat_ids = await _seed_catalog_multi(async_session)
+    rid, record_data = await _save_two_domain_record(async_session, cat_ids)
+
+    ci = CompressedImage(data=b"\xff\xd8\xffnew", mime_type="image/jpeg", width=20, height=10)
+    new_domains = [{
+        "domain": "健康", "obs_year": 2026, "obs_month": 5,
+        "date_1": date(2026, 5, 4), "date_2": None, "date_3": None,
+        "goals": "新目标", "evaluation": "新评价", "support_strategy": "新策略",
+        "compressed_images": [ci],
+        "image_descriptions": ["新图"],
+        "indicator_results": [{"catalog_id": cat_ids["健康"][0], "stars": 3}],
+    }]
+    new_record_data = {**record_data, "child_name": "小明明", "obs_month": 5}
+
+    out_rid = await update_record_with_all(
+        async_session, record_id=rid, record_data=new_record_data,
+        domains=new_domains, storage=BlobImageStorage(),
+    )
+    assert out_rid == rid
+
+    assert (await get_record_by_id(async_session, 1, rid)).child_name == "小明明"
+    assert len(await list_domains_by_record(async_session, 1, rid)) == 1  # 旧 2 领域被替换
+    assert len(await list_images_by_record(async_session, 1, rid)) == 1
+    assert len(await list_indicator_results(async_session, 1, rid)) == 1
+
+    detail = await load_record_detail(async_session, 1, rid)
+    assert detail["domains"][0]["goals"] == "新目标"
+    assert detail["domains"][0]["obs_month"] == 5
+
+
+async def test_update_record_with_all_not_found(async_session):
+    """更新不存在/无权限的记录 → AppError。"""
+    from app.core.exceptions import AppError
+    from app.service.listening_service import update_record_with_all
+
+    record_data = {"tenant_id": 1, "user_id": 1, "child_name": "x"}
+    with pytest.raises(AppError):
+        await update_record_with_all(
+            async_session, record_id=99999, record_data=record_data,
+            domains=[], storage=BlobImageStorage(),
+        )

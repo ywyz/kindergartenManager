@@ -46,6 +46,26 @@ async def get_indicator_by_id(
     return result.scalar_one_or_none()
 
 
+async def list_indicators_by_ids(
+    session: AsyncSession,
+    tenant_id: int,
+    catalog_ids: list[int],
+) -> dict[int, IndicatorCatalog]:
+    """按 id 批量查询指标定义，返回 {id: IndicatorCatalog}，强制 tenant_id 过滤。
+
+    供导出/详情装配时将 listening_indicator_result.catalog_id 映射回 sort_order。
+    """
+    if not catalog_ids:
+        return {}
+    result = await session.execute(
+        select(IndicatorCatalog).where(
+            IndicatorCatalog.tenant_id == tenant_id,
+            IndicatorCatalog.id.in_(catalog_ids),
+        )
+    )
+    return {c.id: c for c in result.scalars().all()}
+
+
 async def list_available_stages(
     session: AsyncSession,
     tenant_id: int,
