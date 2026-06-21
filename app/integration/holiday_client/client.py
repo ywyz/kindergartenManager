@@ -33,15 +33,17 @@ logger = get_logger(__name__)
 # ──────────────────────────────────────────────
 
 _cache: dict[str, tuple[bool, str | None, int]] = {}
+_year_cache: dict[int, set[date]] = {}
 _cache_populated_date: date | None = None
 
 
 def _ensure_cache_fresh() -> None:
-    """若缓存日期不是今天，清空缓存。"""
-    global _cache, _cache_populated_date
+    """若缓存日期不是今天，清空缓存（单日缓存 + 年节假日缓存）。"""
+    global _cache, _year_cache, _cache_populated_date
     today = date.today()
     if _cache_populated_date != today:
         _cache.clear()
+        _year_cache.clear()
         _cache_populated_date = today
 
 
@@ -111,6 +113,62 @@ async def is_holiday(
         logger.warning(
             "节假日 API 调用失败，降级处理",
             extra={"date": date_str, "error": str(exc)},
+        )
+        return None
+
+
+async def get_legal_holidays_in_year(
+    year: int,
+    *,
+    _transport: httpx.AsyncBaseTransport | None = None,
+) -> set[date] | None:
+    """一次性查询整年的法定节假日集合（单请求，避免逐日并发触发限流）。
+
+    用于「一对一倾听」批量选取工作日时排除节假日。复用 timor.tech 的「年」接口：
+      GET {base}/year/{year}
+      → {"code":0, "holiday": {"MM-DD": {"holiday": true/false, "date": "YYYY-MM-DD", ...}}}
+    仅取 holiday==True（法定休息日）；holiday==False 为调班工作日，不计入。
+
+    返回：
+    - set[date]：该年全部法定节假日日期（可能为空集）
+    - None：API 调用失败（降级，调用方不阻断）
+    每天结果内存缓存，跨天自动失效。
+    """
+    _ensure_cache_fresh()
+    if year in _year_cache:
+        return _year_cache[year]
+
+    # 由配置的「info」接口推导「year」接口地址
+    base = settings.HOLIDAY_API_URL.rstrip("/")
+    if base.rsplit("/", 1)[-1] == "info":
+        base = base.rsplit("/", 1)[0]
+    url = f"{base}/year/{year}"
+
+    client_kwargs: dict = {"timeout": 10.0}
+    if _transport is not None:
+        client_kwargs["transport"] = _transport
+
+    try:
+        async with httpx.AsyncClient(**client_kwargs) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            data = resp.json()
+            holiday_map = data.get("holiday") or {}
+            result: set[date] = set()
+            for entry in holiday_map.values():
+                if isinstance(entry, dict) and entry.get("holiday") is True:
+                    iso = entry.get("date")
+                    if iso:
+                        try:
+                            result.add(date.fromisoformat(iso))
+                        except (ValueError, TypeError):
+                            continue
+            _year_cache[year] = result
+            return result
+    except Exception as exc:
+        logger.warning(
+            "节假日年接口调用失败，降级处理",
+            extra={"year": year, "error": str(exc)},
         )
         return None
 

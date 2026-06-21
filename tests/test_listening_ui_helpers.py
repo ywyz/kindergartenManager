@@ -61,8 +61,9 @@ def test_build_batch_export_filename():
 
 def test_validate_bulk_import_count():
     assert validate_bulk_import_count(15) is True
+    assert validate_bulk_import_count(16) is True  # 超出也合法（取前 15）
+    assert validate_bulk_import_count(20) is True
     assert validate_bulk_import_count(14) is False
-    assert validate_bulk_import_count(16) is False
     assert validate_bulk_import_count(0) is False
 
 

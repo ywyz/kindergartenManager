@@ -2,7 +2,8 @@
 日期计算服务 — 纯函数，无 IO，无数据库依赖。
 """
 import calendar
-from datetime import date, timedelta
+import random
+from datetime import date
 from typing import Callable, Optional
 
 
@@ -43,45 +44,38 @@ def pick_three_workdays(
     year: int,
     month: int,
     is_holiday: Optional[Callable[[date], Optional[bool]]] = None,
+    rng: Optional[random.Random] = None,
 ) -> list[date]:
-    """从指定年月的前三个「含工作日」自然周中，各取该周第一个工作日。
+    """从指定年月的全部工作日中随机选取 3 个不同日期，按时间升序返回。
 
-    用于「一对一倾听」自动选取 3 个观察工作日（每周一个，分布在三周）。
+    用于「一对一倾听」自动选取 3 个观察工作日（分布于全月，避免总是月初、1 号）。
 
     规则：
-    - 按周一为周首划分自然周，仅统计落在本月内的日期。
     - 工作日 = 周一~周五，且非法定节假日（由 is_holiday 判定）。
-    - 依周次顺序，每周取第一个工作日；某周无工作日则跳过该周，继续下一周。
-    - 最多返回 3 个；若可用工作日不足 3 个则返回已找到的（不抛异常，供 UI 提示补全）。
+    - 从本月全部候选工作日中随机取 3 个不同日期，升序返回。
+    - 候选不足 3 个则返回全部（升序，不抛异常，供 UI 提示补全）。
 
     Args:
         year: 年份。
         month: 月份（1~12）。
-        is_holiday: 可选回调 (date) -> bool | None。返回 True 表示法定节假日需跳过；
-            返回 False 或 None（如 API 不可用）均视为非节假日，不阻断（降级原则）。
+        is_holiday: 可选回调 (date) -> bool | None。返回 True 表示法定节假日需排除；
+            返回 False 或 None（如 API 不可用）均视为非节假日（降级原则）。
+        rng: 可选随机源（注入以便测试确定性）；默认使用模块级 random（每次点击结果不同）。
 
     Returns:
         最多 3 个 date，按时间升序。
     """
     num_days = calendar.monthrange(year, month)[1]
-
-    # 按周一锚点分组：key=该周的周一日期，value=本月内该周的日期列表（升序）
-    weeks: dict[date, list[date]] = {}
+    candidates: list[date] = []
     for day in range(1, num_days + 1):
         d = date(year, month, day)
-        monday = d - timedelta(days=d.weekday())
-        weeks.setdefault(monday, []).append(d)
+        if d.weekday() >= 5:  # 周末
+            continue
+        if is_holiday is not None and is_holiday(d) is True:
+            continue  # 法定节假日排除
+        candidates.append(d)
 
-    picked: list[date] = []
-    for monday in sorted(weeks.keys()):
-        if len(picked) >= 3:
-            break
-        for d in weeks[monday]:
-            if d.weekday() >= 5:  # 周末
-                continue
-            if is_holiday is not None and is_holiday(d) is True:
-                continue  # 法定节假日跳过
-            picked.append(d)
-            break  # 该周取到一个即可
-
-    return picked
+    if len(candidates) <= 3:
+        return candidates  # 已升序
+    chooser = rng or random
+    return sorted(chooser.sample(candidates, 3))

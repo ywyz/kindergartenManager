@@ -14,7 +14,6 @@
 """
 from __future__ import annotations
 
-import asyncio
 import base64
 import io
 import zipfile
@@ -27,7 +26,7 @@ from app.core.database import AsyncSessionLocal
 from app.core.exceptions import AiCallError, AiParseError, AppError, ConfigError
 from app.core.logging import get_logger
 from app.core.user_context import get_current_user
-from app.integration.holiday_client.client import is_holiday
+from app.integration.holiday_client.client import get_legal_holidays_in_year
 from app.integration.image_processing import (
     CompressedImage,
     compress_image,
@@ -117,9 +116,9 @@ def build_batch_export_filename(
     return f"{tenant_id}_{user_id}_{year}年{month}月_一对一倾听_批量按领域_{count}人.zip"
 
 
-def validate_bulk_import_count(count: int, expected: int = 15) -> bool:
-    """一键导入校验：必须恰好 15 张（5 领域 × 3 张）。"""
-    return count == expected
+def validate_bulk_import_count(count: int, minimum: int = 15) -> bool:
+    """一键导入校验：至少 15 张（5 领域 × 3 张）；超出的按文件名取前 15。"""
+    return count >= minimum
 
 
 def distribute_images_by_filename(
@@ -181,24 +180,16 @@ def _parse_iso_date(value: str | None) -> date | None:
         return None
 
 
-async def _auto_pick_workdays(year: int, month: int) -> list[date]:
-    """并发查询当月前三周工作日的节假日状态，返回 3 个工作日。"""
-    import calendar
+async def _auto_pick_workdays(year: int, month: int) -> tuple[list[date], bool]:
+    """单次查询整年法定节假日（避免逐日并发触发限流），随机返回本月 3 个工作日。
 
-    num_days = calendar.monthrange(year, month)[1]
-    weekday_dates = [
-        date(year, month, d)
-        for d in range(1, min(num_days, 21) + 1)
-        if date(year, month, d).weekday() < 5
-    ]
-    try:
-        results = await asyncio.gather(
-            *[is_holiday(d) for d in weekday_dates], return_exceptions=True
-        )
-        holiday_set = {d for d, r in zip(weekday_dates, results) if r is True}
-    except Exception:  # noqa: BLE001 — 节假日不可用时降级
-        holiday_set = set()
-    return pick_three_workdays(year, month, is_holiday=lambda d: d in holiday_set)
+    Returns:
+        (dates, holidays_available)：holidays_available=False 表示节假日接口不可用（已降级，需人工核对）。
+    """
+    holidays = await get_legal_holidays_in_year(year)
+    holiday_set = holidays or set()
+    dates = pick_three_workdays(year, month, is_holiday=lambda d: d in holiday_set)
+    return dates, holidays is not None
 
 
 # ─── 页面路由 ──────────────────────────────────────────────────────────────────
@@ -472,13 +463,14 @@ async def one_on_one_listening_page() -> None:
             try:
                 y = int(s["year"].value or year_input.value or cur_year)
                 m = int(s["month"].value or month_select.value or cur_month)
-                wds = await _auto_pick_workdays(y, m)
+                wds, hol_ok = await _auto_pick_workdays(y, m)
                 for i, di in enumerate(s["date_inputs"]):
                     di.value = wds[i].isoformat() if i < len(wds) else ""
+                note = "" if hol_ok else "（节假日信息暂不可用，请人工核对）"
                 if len(wds) < 3:
-                    show_info(f"{d}领域仅找到 {len(wds)} 个工作日，请手动补全")
+                    show_info(f"{d}领域仅找到 {len(wds)} 个工作日，请手动补全{note}")
                 else:
-                    show_info(f"{d}领域工作日已填入，可手动调整", ok=True)
+                    show_info(f"{d}领域工作日已填入，可手动调整{note}", ok=hol_ok)
             except Exception as ex:  # noqa: BLE001
                 logger.error("领域自动选取工作日失败", exc_info=ex)
                 show_error(f"自动选取失败：{ex}")
@@ -494,18 +486,22 @@ async def one_on_one_listening_page() -> None:
         autopick_btn.props("loading=true")
         try:
             any_short = False
+            any_hol_unavailable = False
             for _d, st in domain_states.items():
                 y = int(st["year"].value or year_input.value or cur_year)
                 m = int(st["month"].value or month_select.value or cur_month)
-                workdays = await _auto_pick_workdays(y, m)
+                workdays, hol_ok = await _auto_pick_workdays(y, m)
+                if not hol_ok:
+                    any_hol_unavailable = True
                 for i, di in enumerate(st["date_inputs"]):
                     di.value = workdays[i].isoformat() if i < len(workdays) else ""
                 if len(workdays) < 3:
                     any_short = True
+            note = "（节假日信息暂不可用，请人工核对）" if any_hol_unavailable else ""
             if any_short:
-                show_info("已按各领域年月填入工作日；部分领域不足 3 天，请手动补全")
+                show_info(f"已按各领域年月填入工作日；部分领域不足 3 天，请手动补全{note}")
             else:
-                show_info("已按各领域年月填入工作日，可手动调整", ok=True)
+                show_info(f"已按各领域年月填入工作日，可手动调整{note}", ok=not any_hol_unavailable)
         except Exception as ex:  # noqa: BLE001
             logger.error("自动选取工作日失败", exc_info=ex)
             show_error(f"自动选取失败：{ex}")
@@ -531,9 +527,10 @@ async def one_on_one_listening_page() -> None:
     async def do_apply_bulk() -> None:
         files = bulk_state["files"]
         if not validate_bulk_import_count(len(files)):
-            show_error(f"一键导入需恰好 15 张照片（当前 {len(files)} 张）")
+            show_error(f"一键导入至少需要 15 张照片（当前 {len(files)} 张）")
             return
         try:
+            total = len(files)
             dist = distribute_images_by_filename(files, _UI_DOMAINS, per_domain=3)
             for d, imgs in dist.items():
                 st = domain_states.get(d)
@@ -544,7 +541,8 @@ async def one_on_one_listening_page() -> None:
                 _render_domain_previews(st)
             bulk_state["files"] = []
             bulk_count_label.set_text("已选 0 张")
-            show_info("已分配到五领域（每领域 3 张，统一横版），请逐领域或一键生成", ok=True)
+            extra = f"（共上传 {total} 张，已按文件名取前 15 张）" if total > 15 else ""
+            show_info(f"已分配到五领域（每领域 3 张，统一横版）{extra}，请逐领域或一键生成", ok=True)
         except AppError as ex:
             show_error(f"图片处理失败：{ex.message}")
         except Exception as ex:  # noqa: BLE001

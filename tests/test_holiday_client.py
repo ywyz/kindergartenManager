@@ -19,6 +19,7 @@ import pytest
 import app.integration.holiday_client.client as client_mod
 from app.integration.holiday_client.client import (
     get_holiday_name,
+    get_legal_holidays_in_year,
     get_special_day_tags,
     is_adjusted_workday,
     is_holiday,
@@ -81,10 +82,47 @@ def make_response(
 def clear_cache():
     """隔离每个测试的节假日缓存状态。"""
     client_mod._cache.clear()
+    client_mod._year_cache.clear()
     client_mod._cache_populated_date = None
     yield
     client_mod._cache.clear()
+    client_mod._year_cache.clear()
     client_mod._cache_populated_date = None
+
+
+# ──────────────────────────────────────────────
+# get_legal_holidays_in_year
+# ──────────────────────────────────────────────
+
+class TestGetLegalHolidaysInYear:
+    async def test_returns_legal_holiday_dates(self):
+        """仅 holiday==True 计入；调班工作日（holiday==False）排除；单次请求。"""
+        body = {
+            "code": 0,
+            "holiday": {
+                "05-01": {"holiday": True, "name": "劳动节", "date": "2026-05-01"},
+                "05-02": {"holiday": True, "name": "劳动节", "date": "2026-05-02"},
+                "05-09": {"holiday": False, "name": "劳动节(调班)", "date": "2026-05-09"},
+            },
+        }
+        transport = MockTransport(lambda req: httpx.Response(200, json=body))
+        result = await get_legal_holidays_in_year(2026, _transport=transport)
+        assert result == {date(2026, 5, 1), date(2026, 5, 2)}
+        assert transport.call_count == 1
+
+    async def test_caches_within_day(self):
+        """同年第二次查询命中缓存，不再发起 HTTP。"""
+        body = {"code": 0, "holiday": {"05-01": {"holiday": True, "date": "2026-05-01"}}}
+        transport = MockTransport(lambda req: httpx.Response(200, json=body))
+        await get_legal_holidays_in_year(2026, _transport=transport)
+        await get_legal_holidays_in_year(2026, _transport=transport)
+        assert transport.call_count == 1
+
+    async def test_api_failure_returns_none(self):
+        """API 5xx → 返回 None（降级）。"""
+        transport = MockTransport(lambda req: httpx.Response(500, text="err"))
+        result = await get_legal_holidays_in_year(2026, _transport=transport)
+        assert result is None
 
 
 # ──────────────────────────────────────────────
