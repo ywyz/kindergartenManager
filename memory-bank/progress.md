@@ -1,5 +1,26 @@
 # 进度记录
 
+## 2026-06-21（跨电脑复测交接）
+
+### 已完成
+
+- 处理一对一倾听第 1 轮测试反馈并推送 `dev3.1`：提交 `57fd14d`。
+- 修复 3 项问题：
+  - 自动选工作日节假日误判：改为按年拉取法定节假日并缓存，避免并发逐日请求触发 429。
+  - 一键导入图片：由“必须 15 张”调整为“至少 15 张，按文件名取前 15 张”。
+  - 工作日自动分配：由“固定前三周”调整为“全月随机 3 个工作日（排除周末与法定节假日）”。
+- 完成自动化验证：全量测试 `466 passed`。
+- 已创建并推送复测标签：`v3.1.0-beta2`（指向 `57fd14d`）。
+
+### 跨电脑复测建议
+
+- 若用安装包复测：直接下载 `v3.1.0-beta2` 对应构建产物（Actions/release 资产）。
+- 若用源码复测：拉取 `dev3.1` 最新后启动 `.venv/bin/python -m app.main`。
+- 进入「一对一倾听」优先复测 3 个回归点：
+  - 节假日日期不应被自动选为工作日（如 2026-05-01）。
+  - 上传超过 15 张时应自动取前 15 张并提示。
+  - 自动日期应分布在整月，不再集中在月初前三周。
+
 ## 2026-05-10
 
 ### 已完成
@@ -399,3 +420,26 @@ v3.0.0-beta.2 Windows EXE 打包后在全新 Windows 机器上首次运行出现
 ```
 383 passed, 0 failed, 0 warnings（Python 3.14.4）
 ```
+
+## 2026-06-20（dev3.1：一对一倾听 P8/P8d/P9）
+
+### 已完成
+
+- **P8a 后端**：`export_repository.save_export_record(listening_record_id=...)`；`listening_repository.delete_domains_by_record`；`indicator_repository.list_indicators_by_ids`；`listening_service.load_record_detail` / `to_export_payload`（纯函数）/ `update_record_with_all`（覆盖保存，与 `save_record_with_all` 共用 `_persist_domains`）。
+- **P8b 历史 UI**：`/one-on-one-listening` 底部历史区（年月/姓名筛选、只读详情弹窗、单条「导出合并」「导出按领域 zip」、多选「批量按领域 zip」、删除含图片+确认弹窗）；写 `export_records(listening_record_id)` + 审计 `export_listening`；表单内既有导出同步补审计与关联。
+- **P8c 编辑**：历史「编辑」载入记录到表单（DB blob 重建 `CompressedImage`）→ 覆盖保存；顶部「编辑中」横幅 +「取消编辑/新建」。
+- **P8d 体验增强**：① 领域时间方案 C（每领域独立年月 + 各自/一键自动选取工作日）；② 提示词页新增 `one_on_one_listening` Tab；③ 五领域改 `ui.tabs` 布局；④ 图片统一横版 `normalize_to_landscape`（上传即归一）；⑤ 一键导入 15 张按文件名分配五领域 +「生成全部领域」串行。
+- **P9 文档**：更新 `architecture.md`（§10 一对一倾听子系统）、`one-on-one-listening/{progress,dev-plan,test-plan}.md`、本文件。
+
+### 测试 / 冒烟
+
+- 全量回归 **461 passed**（基线 444 +17 新增）；一对一倾听相关 107 passed。
+- 本地 sqlite 启动冒烟：`NiceGUI ready`；`/one-on-one-listening`、`/prompts`、`/game-observation` 均 `HTTP 200`。
+
+### Alembic 当前 HEAD
+
+- `9ec29bdc3822`（dev3.1 seed indicator catalog）。
+
+### 待办
+
+- 🧑 用户手动验收一对一倾听全功能（见 `one-on-one-listening/progress.md` 验收清单）。

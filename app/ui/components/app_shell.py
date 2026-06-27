@@ -38,6 +38,14 @@ _ALL_MENU_ITEMS: list[dict] = [
         "route": "/game-observation",
         "roles": None,
     },
+    {
+        "group": "教学管理",
+        "key": "one-on-one-listening",
+        "label": "一对一倾听",
+        "icon": "hearing",
+        "route": "/one-on-one-listening",
+        "roles": None,
+    },
     # 配置中心
     {
         "group": "配置中心",

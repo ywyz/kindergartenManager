@@ -1,5 +1,3 @@
-import os
-import sys
 from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -7,17 +5,15 @@ from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.pool import StaticPool
 
 from app.core.config import settings
+from app.core.paths import app_data_dir
 
 
 def _resolve_database_url() -> str:
     if settings.DATABASE_URL:
         return settings.DATABASE_URL
-    # 未配置 DATABASE_URL：降级使用内嵌 SQLite
-    if getattr(sys, "frozen", False):
-        # PyInstaller 打包模式：数据库文件存放在可执行文件同级目录
-        exe_dir = os.path.dirname(sys.executable)
-        return f"sqlite+aiosqlite:///{exe_dir}/kindergarten.db"
-    return "sqlite+aiosqlite:///./kindergarten.db"
+    # 未配置 DATABASE_URL：降级使用内嵌 SQLite（写入用户可写数据目录）
+    db_path = app_data_dir() / "kindergarten.db"
+    return f"sqlite+aiosqlite:///{db_path.as_posix()}"
 
 
 def _build_engine():

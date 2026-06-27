@@ -110,7 +110,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,                      # 禁用 UPX：避免压缩 DLL 损坏导致打包版启动挂起/崩溃
     upx_exclude=[],
     console=True,                   # beta 保留控制台，便于排错
     disable_windowed_traceback=False,
@@ -127,7 +127,7 @@ coll = COLLECT(
     a.zipfiles,
     a.datas,
     strip=False,
-    upx=True,
+    upx=False,                      # 同上：禁用 UPX 压缩
     upx_exclude=[],
     name="KindergartenManager",     # dist/KindergartenManager/ 目录名
 )

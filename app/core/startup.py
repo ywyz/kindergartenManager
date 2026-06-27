@@ -9,6 +9,8 @@ import logging
 import os
 import sys
 
+from app.core.paths import app_data_dir
+
 logger = logging.getLogger("app.startup")
 
 
@@ -25,13 +27,16 @@ def _get_alembic_script_location() -> str:
     return "alembic"
 
 
-def _build_sync_url(database_url: str | None) -> str:
-    """将异步驱动 URL 转换为 Alembic 所需的同步驱动 URL。"""
+def build_sync_url(database_url: str | None) -> str:
+    """将异步驱动 URL 转换为 Alembic 所需的同步驱动 URL。
+
+    迁移（alembic/env.py）与应用运行时（app/core/database.py）必须经由本函数解析到
+    同一个 SQLite 文件，否则打包模式下会出现“迁移建表在 A 库、应用读 B 库”导致
+    no such table。空 URL 时统一落到 ``app_data_dir()/kindergarten.db``。
+    """
     if not database_url:
-        if getattr(sys, "frozen", False):
-            exe_dir = os.path.dirname(sys.executable)
-            return f"sqlite:///{exe_dir}/kindergarten.db"
-        return "sqlite:///./kindergarten.db"
+        db_path = app_data_dir() / "kindergarten.db"
+        return f"sqlite:///{db_path.as_posix()}"
     if "+aiosqlite" in database_url:
         return database_url.replace("+aiosqlite", "")
     if "+aiomysql" in database_url:
@@ -53,7 +58,7 @@ def run_startup_migrations() -> None:
 
         ini_path = _get_alembic_ini_path()
         script_location = _get_alembic_script_location()
-        sync_url = _build_sync_url(settings.DATABASE_URL)
+        sync_url = build_sync_url(settings.DATABASE_URL)
 
         alembic_cfg = Config(ini_path)
         alembic_cfg.set_main_option("script_location", script_location)

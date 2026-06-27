@@ -103,3 +103,47 @@ def test_non_image_bytes_raises():
     junk = b"this is not an image at all"
     with pytest.raises(AppError):
         compress_image(junk, max_bytes=1_048_576)
+
+
+# ─── TC3：横版统一 ──────────────────────────────────────────────
+
+def test_normalize_portrait_to_landscape():
+    """竖版图片归一后变横版（宽 ≥ 高）。"""
+    from PIL import Image
+
+    from app.integration.image_processing import normalize_to_landscape
+
+    out = normalize_to_landscape(_make_jpeg_bytes(300, 500))  # 竖版
+    img = Image.open(io.BytesIO(out))
+    assert img.width >= img.height
+
+
+def test_normalize_landscape_unchanged_orientation():
+    """横版图片归一后仍为横版，尺寸与方向不变。"""
+    from PIL import Image
+
+    from app.integration.image_processing import normalize_to_landscape
+
+    out = normalize_to_landscape(_make_jpeg_bytes(500, 300))  # 横版
+    img = Image.open(io.BytesIO(out))
+    assert (img.width, img.height) == (500, 300)
+
+
+def test_normalize_is_idempotent():
+    """对已归一图片再次归一，尺寸不再变化（幂等）。"""
+    from PIL import Image
+
+    from app.integration.image_processing import normalize_to_landscape
+
+    once = normalize_to_landscape(_make_jpeg_bytes(300, 500))
+    twice = normalize_to_landscape(once)
+    assert Image.open(io.BytesIO(once)).size == Image.open(io.BytesIO(twice)).size
+
+
+def test_normalize_non_image_raises():
+    """非图片字节归一时抛业务异常。"""
+    from app.core.exceptions import AppError
+    from app.integration.image_processing import normalize_to_landscape
+
+    with pytest.raises(AppError):
+        normalize_to_landscape(b"not an image")

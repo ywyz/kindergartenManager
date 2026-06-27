@@ -1,5 +1,3 @@
-import os
-import sys
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
@@ -9,6 +7,7 @@ from alembic import context
 
 from app.core.config import settings
 from app.core.database import Base  # noqa: F401
+from app.core.startup import build_sync_url
 import app.core.models  # noqa: F401 — 确保所有模型被加载，alembic autogenerate 才能发现
 
 # this is the Alembic Config object, which provides
@@ -16,19 +15,11 @@ import app.core.models  # noqa: F401 — 确保所有模型被加载，alembic a
 config = context.config
 
 # Override sqlalchemy.url with value from Settings (env-based).
-# Alembic uses configparser interpolation, so '%' must be escaped as '%%'.
-# PyInstaller 打包模式下使用可执行文件目录的绝对路径，与 startup.py 保持一致。
-_db_url = settings.DATABASE_URL
-if not _db_url:
-    if getattr(sys, "frozen", False):
-        _exe_dir = os.path.dirname(sys.executable)
-        _db_url = f"sqlite:///{_exe_dir}/kindergarten.db"
-    else:
-        _db_url = "sqlite:///./kindergarten.db"
-if "+aiosqlite" in _db_url:
-    sync_url = _db_url.replace("+aiosqlite", "")
-else:
-    sync_url = _db_url.replace("+aiomysql", "+pymysql")
+# 迁移目标库必须与应用运行时（app/core/database.py）解析到的 SQLite 文件完全一致，
+# 统一走 app.core.startup.build_sync_url（内部用 app_data_dir()）。否则打包模式下会
+# 出现“迁移建表在 exe 目录库、应用读 LOCALAPPDATA 库”，导致 no such table。
+# configparser 插值规则：% 须转义为 %%。
+sync_url = build_sync_url(settings.DATABASE_URL)
 config.set_main_option("sqlalchemy.url", sync_url.replace("%", "%%"))
 
 # Interpret the config file for Python logging.

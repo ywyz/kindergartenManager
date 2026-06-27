@@ -68,3 +68,38 @@ class TestDatabaseConfigSave:
             write_dot_env({"DATABASE_URL": url})
             result = read_dot_env()
             assert result["DATABASE_URL"] == url
+
+
+class TestMigrationAppPathConsistency:
+    """回归：打包模式下 Alembic 迁移目标库必须与应用运行时连接的 SQLite 文件一致。
+
+    历史 bug：env.py 用 ``{exe_dir}/kindergarten.db``，而 database.py 用
+    ``app_data_dir()/kindergarten.db``，导致迁移建表在 A 库、应用读 B 库，
+    页面报 ``no such table: class_config``。
+    """
+
+    def test_empty_url_migration_and_app_resolve_same_sqlite_file(self, monkeypatch):
+        """DATABASE_URL 为空时，迁移（build_sync_url）与应用（_resolve_database_url）
+        必须指向同一个 SQLite 文件，仅驱动前缀不同。"""
+        from app.core import database
+        from app.core.paths import app_data_dir
+        from app.core.startup import build_sync_url
+
+        monkeypatch.setattr(database.settings, "DATABASE_URL", "")
+
+        expected = (app_data_dir() / "kindergarten.db").as_posix()
+
+        migration_url = build_sync_url("")
+        app_url = database._resolve_database_url()
+
+        assert migration_url == f"sqlite:///{expected}"
+        assert app_url == f"sqlite+aiosqlite:///{expected}"
+        # 去掉异步驱动差异后必须是同一个文件
+        assert app_url.replace("+aiosqlite", "") == migration_url
+
+    def test_explicit_mysql_url_passthrough(self):
+        """显式配置 MySQL 异步 URL 时，迁移侧应转换为同步 pymysql 驱动且库名不变。"""
+        from app.core.startup import build_sync_url
+
+        sync = build_sync_url("mysql+aiomysql://u:p@h:3306/db")
+        assert sync == "mysql+pymysql://u:p@h:3306/db"

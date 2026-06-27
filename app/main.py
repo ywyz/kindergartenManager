@@ -8,6 +8,7 @@
     /home   — 主页
     /setup  — AI 配置
 """
+import multiprocessing
 import sys
 
 from nicegui import app, ui
@@ -19,6 +20,7 @@ from app.ui.pages import settings  # noqa: F401
 from app.ui.pages import daily_plan  # noqa: F401
 from app.ui.pages import prompt_mgmt  # noqa: F401
 from app.ui.pages import game_observation  # noqa: F401
+from app.ui.pages import one_on_one_listening  # noqa: F401
 from app.ui.pages import setup  # noqa: F401
 
 from app.api import create_api_router
@@ -59,10 +61,15 @@ def main() -> None:
     app.include_router(create_api_router())
 
     # 打包版（PyInstaller frozen）自动打开浏览器；开发/服务器模式不弹窗
-    _show_browser = getattr(sys, "frozen", False)
+    _frozen = getattr(sys, "frozen", False)
+    _show_browser = _frozen
+    # 打包桌面版仅监听本机回环：规避 Windows 防火墙弹窗，并避免 0.0.0.0
+    # 浏览器无法连接造成的“假死”观感；开发 / Docker / 服务器模式仍监听
+    # 0.0.0.0 以便外部访问。
+    _host = "127.0.0.1" if _frozen else "0.0.0.0"
 
     ui.run(
-        host="0.0.0.0",
+        host=_host,
         port=settings.PORT,
         title="幼儿园教学管理系统",
         storage_secret=settings.JWT_SECRET,  # 用于加密 app.storage.user
@@ -73,4 +80,6 @@ def main() -> None:
 
 
 if __name__ in {"__main__", "__mp_main__"}:
+    # 与 run.py 一致的 multiprocessing/PyInstaller 护栏（`python -m app.main` 入口）。
+    multiprocessing.freeze_support()
     main()

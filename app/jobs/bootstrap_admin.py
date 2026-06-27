@@ -167,7 +167,14 @@ async def _run_init() -> None:
         allow_remote=allow_remote,
         database_url=settings.DATABASE_URL,
     )
-    print(f"[Step 3/3] {message}")
+    # 同 _run_reset：bootstrap_admin 接收明文密码参数，避免将其返回值直接内插
+    # 日志，改为按状态前缀输出固定文案，规避 CodeQL 明文记录密码的误报。
+    if message.startswith("ok"):
+        print("[Step 3/3] ✅ 系统管理员账号已创建完成")
+    elif message.startswith("skip"):
+        print("[Step 3/3] ⏭️  系统管理员账号已存在或未启用，已跳过")
+    else:
+        print("[Step 3/3] ❌ 创建失败：请检查环境变量配置与数据库连接")
 
 
 async def _run_reset() -> None:
@@ -193,7 +200,17 @@ async def _run_reset() -> None:
         allow_remote=settings.BOOTSTRAP_ADMIN_ALLOW_REMOTE,
         database_url=settings.DATABASE_URL,
     )
-    print(f"[Step 2/2] {message}")
+    # 不要把 reset_admin_password 的返回值直接写入控制台/日志：该函数接收明文
+    # 密码参数，CodeQL(py/clear-text-logging) 会对异步函数做“参数→返回值”的保守
+    # 污点传播，将返回值误判为可能含密码。改为按状态前缀输出固定文案（返回值本身
+    # 仅含用户名等非敏感信息，绝不含密码）。
+    if message.startswith("ok"):
+        print("[Step 2/2] ✅ 密码已重置完成")
+    else:
+        print(
+            "[Step 2/2] ❌ 重置失败：请确认用户名存在且为系统管理员、"
+            "旧密码正确、新密码不少于 8 位、且数据库可访问。"
+        )
 
 
 async def _main() -> None:

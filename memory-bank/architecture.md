@@ -267,3 +267,47 @@ frozen exe 启动
 | Step 4：完成 | 配置摘要 + 前往登录 | — | `mark_setup_complete()` |
 
 自动重启机制：`subprocess.Popen([sys.executable] + sys.argv[1:])` → 等待 0.8s 确认子进程存活 → `os._exit(0)`；失败降级为"请手动关闭并重新启动"提示。
+
+## 10. 一对一倾听观察子系统（dev3.1）
+
+教师对**单个幼儿**按**健康/语言/社会/艺术/科学五大领域**做一对一倾听观察：每领域独立观察年月 + 3 个工作日 + 3 张幼儿绘画 → 每领域 1 次视觉 AI 调用，返回目标/3 图描述/各二级指标星级/综合评价/支持策略；持久化后支持历史查询、详情、编辑覆盖、删除与三种 Word 导出。设计/计划/测试详见 [one-on-one-listening/](one-on-one-listening/)。
+
+### 数据库表（迁移 `e3c0e63a65c4`、种子 `9ec29bdc3822`；Alembic head：`9ec29bdc3822`）
+
+| 表 | 说明 |
+|------|------|
+| `listening_record` | 主表：一个幼儿一次记录（obs_year/month、child_name、adult_count、child_age、grade、term、class_name、observer + tenant/user/时间戳） |
+| `listening_domain` | 每记录 5 条：领域级 obs_year/month、date_1/2/3、goals、evaluation、support_strategy |
+| `listening_image` | 每领域 ≤3 张（复用 BLOB 可插拔存储）：domain、image_index、blob_content、mime/尺寸、image_description |
+| `listening_indicator_result` | 每记录每领域每二级指标一条：catalog_id（逻辑外键→indicator_catalog）、stars(1~3，默认 3) |
+| `indicator_catalog` | 参考数据（迁移预置小班·下学期 5 领域共 30 个二级指标，tenant_id=1）：grade/term/domain/level1/level2/sort_order/standard_star1..3/max_stars |
+| `export_records`（增列） | `listening_record_id BIGINT NULL` 关联倾听导出 |
+| `prompt_template`（枚举增值） | task_type 增 `one_on_one_listening` |
+
+> `sort_order` 与模板行序严格一致，导出打勾 `√` 依此定位。
+
+### 核心模块
+
+| 文件 | 职责 |
+|------|------|
+| `app/core/models/{listening_record,listening_domain,listening_image,listening_indicator,indicator_catalog}.py` | 5 个 ORM 模型 |
+| `app/repository/indicator_repository.py` | `list_indicators` / `get_indicator_by_id` / `list_indicators_by_ids`（catalog_id→sort_order 批量映射）/ `list_available_stages` |
+| `app/repository/listening_repository.py` | record/domain/indicator_result 读写：`save_record`/`list_records`(分页+年月+姓名)/`get_record_by_id`/`update_record`/`delete_record`、`save_domain`/`list_domains_by_record`/`update_domain`/`delete_domains_by_record`、指标结果 CRUD |
+| `app/repository/listening_image_repository.py` | `add_image`/`list_images_by_record`(可按领域)/`get_image`/`delete_images_by_record` |
+| `app/integration/ai_client/listening_client.py` | `generate_listening_domain`（每领域 1 次视觉调用，强约束 JSON：goals/image_descriptions/indicators/evaluation/support_strategy）+ `DEFAULT_LISTENING_PROMPT` |
+| `app/integration/image_processing.py` | `compress_image`(≤1MB) + `normalize_to_landscape`（EXIF 校正 + 竖版顺时针旋转 90° 统一横版，幂等） |
+| `app/service/listening_service.py` | `generate_domain_content`（取视觉 Key→查提示词→查指标→压缩→AI→星级缺省补 3 星→审计 `ai_listening`）、`save_record_with_all`/`update_record_with_all`（新建/覆盖，共用 `_persist_domains`）、`load_record_detail`（DB→详情，sort_order 映射）、`to_export_payload`（纯函数→exporter 入参） |
+| `app/integration/word_export/listening_exporter.py` | 模板 `templates/OneOnOneListeningSmallSecond.docx`（5 表）；`export_combined`（单幼儿 1 档）/`export_split_by_domain`（单幼儿 5 档）/`export_batch_by_domain`（多幼儿按领域 5 档）；复用观察导出 `_set_font`/`_clear_cell` 等，模板缺失降级 |
+| `app/ui/pages/one_on_one_listening.py` | 路由 `/one-on-one-listening`：基本信息 + **一键导入 15 张**（按文件名分配五领域、统一横版）+ **五领域 Tab**（每域独立年月 + 自动选取本领域工作日 + 上传/生成）+ 顶部「一键为所有领域按各自年月选取」+「生成全部领域」+ 保存/覆盖保存 + 表单内三导出 + **历史区**（年月/姓名筛选、详情只读弹窗、单条导出合并/按领域 zip、批量按领域 zip、编辑载入、删除） |
+| `app/ui/pages/prompt_mgmt.py` | 新增 `one_on_one_listening` 提示词 Tab（多版本 + 回滚） |
+
+### 关键行为
+
+- **领域时间独立**：每领域各自 obs_year/month + 3 工作日；顶部年月仅默认预填；`pick_three_workdays`（前三周各取一工作日，排除法定节假日，API 不可用降级不阻断）。
+- **图片统一横版**：上传即 `normalize_to_landscape`（预览/AI/存储/导出一致）；一键导入恰好 15 张，按文件名排序每 3 张分配 健康/语言/社会/艺术/科学。
+- **导出三模式** + 审计 `export_listening` + 写 `export_records(listening_record_id)`；批量每幼儿恒 15 张。
+- **安全隔离**：全部查询强制 `tenant_id`；视觉 Key Fernet 加密入库、脱敏、不写日志；图片为隐私数据按 tenant 校验。
+
+### 测试
+
+`tests/test_listening_*.py`、`test_indicator_repository.py`、`test_image_processing.py`（横版归一）、`test_export_repository.py`（listening_record_id）、`test_listening_ui_helpers.py`（分配/zip/摘要等纯函数）。全量回归 **461 passed**。

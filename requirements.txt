@@ -18,7 +18,7 @@ pydantic-settings>=2.0.0
 # 鉴权与加密
 argon2-cffi>=23.1.0
 python-jose[cryptography]>=3.3.0
-cryptography>=42.0.0
+cryptography>=44.0.1   # 安全下限：修复 CVE-2024-26130 / CVE-2024-12797 等（构建时解析到最新）
 
 # HTTP 客户端
 httpx>=0.27.0
@@ -37,6 +37,16 @@ apscheduler>=3.10.0
 
 # 日志
 python-json-logger>=2.0.0
+
+# ── 传递依赖安全下限（修复 Dependabot 告警） ──────────────────────────────
+# 以下包由 nicegui / httpx 等间接引入；显式声明安全下限以提升依赖图最小解析版本。
+# 构建时仍会解析到各自最新版本；精确补丁版本以对应 GitHub 安全公告为准。
+aiohttp>=3.12.14          # 经 nicegui 引入；修复 ReDoS/请求走私等多个 CVE
+python-multipart>=0.0.18  # 经 nicegui/starlette 引入；修复 CVE-2024-53981(DoS)
+starlette>=0.47.2         # 经 nicegui/fastapi 引入；修复 CVE-2024-47874 / CVE-2025-54121
+lxml>=5.3.0               # 经 nicegui 引入；修复历史 XML 解析类 CVE
+urllib3>=2.5.0            # 传递依赖；修复 CVE-2025-50181 / CVE-2025-50182
+idna>=3.7                 # 经 httpx 引入；修复 CVE-2024-3651(DoS)
 
 # 测试
 pytest>=8.0.0

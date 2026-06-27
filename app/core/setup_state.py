@@ -4,15 +4,14 @@
 - PyInstaller 打包模式：可执行文件同级目录 .kindergarten_setup_complete
 - 开发 / Docker 模式：当前工作目录 .kindergarten_setup_complete
 """
-import sys
 from pathlib import Path
+
+from app.core.paths import app_data_dir
 
 
 def _get_state_path() -> Path:
-    """返回 setup 完成标记文件的路径。"""
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent / ".kindergarten_setup_complete"
-    return Path.cwd() / ".kindergarten_setup_complete"
+    """返回 setup 完成标记文件的路径（位于用户可写数据目录）。"""
+    return app_data_dir() / ".kindergarten_setup_complete"
 
 
 def is_setup_complete() -> bool:
