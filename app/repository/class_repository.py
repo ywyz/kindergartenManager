@@ -33,6 +33,7 @@ async def upsert_class_config(
     class_name: str,
     indoor_areas: str | None,
     outdoor_content: str | None,
+    teacher_name: str | None = None,
 ) -> ClassConfig:
     """
     保存班级配置：若已存在则更新，否则新建。
@@ -44,6 +45,7 @@ async def upsert_class_config(
     if existing:
         existing.grade = grade
         existing.class_name = class_name
+        existing.teacher_name = teacher_name
         existing.indoor_areas = indoor_areas
         existing.outdoor_content = outdoor_content
         existing.updated_at = now
@@ -55,6 +57,7 @@ async def upsert_class_config(
         user_id=user_id,
         grade=grade,
         class_name=class_name,
+        teacher_name=teacher_name,
         indoor_areas=indoor_areas,
         outdoor_content=outdoor_content,
     )

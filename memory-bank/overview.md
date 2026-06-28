@@ -82,6 +82,10 @@
 │   ├── 多图上传 + 视觉 AI 生成观察报告 ──→ [ai-service]
 │   ├── Word 模板导出 ──→ [word-service]
 │   └── 历史查询与重新导出
+├── 自制教玩具
+│   ├── 读取年级 / 班级 / 教师姓名配置
+│   ├── 文本 AI 生成教玩具名称 / 所用材料 / 玩法 ──→ [ai-service]
+│   └── Word 模板导出与历史查询 ──→ [word-service]
 ├── 日历与节假日 ──→ [holiday-service]
 │   └── 法定节假日判定、调班检测、特殊节日标签
 └── 对外只读 REST API（/api/v1）
@@ -248,6 +252,8 @@ kindergartenManager/                  # 项目根（Monorepo）
 | [api-integration.md](api-integration.md) | 对外 REST API 集成说明 |
 | [daily-plan/design.md](daily-plan/design.md) | 一日活动计划子系统设计文档 |
 | [game-observation/design.md](game-observation/design.md) | 游戏观察子系统设计文档 |
+| [one-on-one-listening/design.md](one-on-one-listening/design.md) | 一对一倾听子系统设计文档 |
+| [homemadeteaching/design.md](homemadeteaching/design.md) | 自制教玩具子系统设计文档 |
 | [docs/API.md](../docs/API.md) | 对外 REST API 完整参考 |
 | [docs/DEVELOPER.md](../docs/DEVELOPER.md) | 开发者指南 |
 | [docs/USER_MANUAL.md](../docs/USER_MANUAL.md) | 用户手册 |

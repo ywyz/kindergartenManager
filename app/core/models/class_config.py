@@ -22,6 +22,7 @@ class ClassConfig(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     grade: Mapped[str] = mapped_column(String(16), nullable=False)       # 小班/中班/大班
     class_name: Mapped[str] = mapped_column(String(32), nullable=False)  # 如"阳光班"
+    teacher_name: Mapped[str | None] = mapped_column(String(64), nullable=True)  # 如"张老师"
     indoor_areas: Mapped[str | None] = mapped_column(Text, nullable=True)   # 区域内容描述
     outdoor_content: Mapped[str | None] = mapped_column(Text, nullable=True) # 户外内容描述
     created_at: Mapped[datetime] = mapped_column(
