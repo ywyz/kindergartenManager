@@ -13,7 +13,7 @@ DEFAULT_COURSE_REVIEW_ACTIVITY_PROMPT = """\
 {
   "activity_goal": "从原始教案中拆分出的活动目标",
   "activity_prep": "从原始教案中拆分出的活动准备",
-  "activity_process": "从原始教案中拆分出的活动过程",
+  "activity_process": "从原始教案中拆分出的活动过程;需要详案，包含老师说的话，但是不需要包含以上活动目标、活动准备、活动重点、活动难点，要按照教案格式，有换行。",
   "goal_adjusted": true,
   "goal_adjustment": "活动目标调整内容；不调整时为空字符串",
   "activity_goal_revised": "调整后的活动目标；不调整时保持原活动目标",
