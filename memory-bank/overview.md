@@ -86,6 +86,10 @@
 │   ├── 读取年级 / 班级 / 教师姓名配置
 │   ├── 文本 AI 生成教玩具名称 / 所用材料 / 玩法 ──→ [ai-service]
 │   └── Word 模板导出与历史查询 ──→ [word-service]
+├── 课程审议
+│   ├── 读取年龄段 / 班级 / 教师姓名配置
+│   ├── 文本 AI 拆分教案并生成审议调整 JSON ──→ [ai-service]
+│   └── Word 模板导出、历史查询、重新导出与删除 ──→ [word-service]
 ├── 日历与节假日 ──→ [holiday-service]
 │   └── 法定节假日判定、调班检测、特殊节日标签
 └── 对外只读 REST API（/api/v1）
@@ -148,11 +152,12 @@
 | `class_config` | 班级配置（年级/班级/教师姓名/室内区域/户外内容） | `67b4aef28796` / `2f7a9c1d4e8b` |
 | `ai_api_key` | AI 接口配置（加密存储） | `1a0d0e46f700` / `46b9fd5613c3` |
 | `daily_plan` | 每日活动计划（教案拆分+一日活动） | `f6d79ac6bf21` |
-| `prompt_template` | 提示词版本管理（含自制教玩具） | `bcd07e51527d` / `e2a3f1b8c9d0` / `c8b6d4e2a931` |
-| `export_record` | 导出记录（Word 文件路径） | `d60766786069` / `d5e4f3a2b1c0` |
+| `prompt_template` | 提示词版本管理（含自制教玩具、课程审议） | `bcd07e51527d` / `e2a3f1b8c9d0` / `c8b6d4e2a931` / `a6c4d8e2f9b1` |
+| `export_record` | 导出记录（Word 文件路径） | `d60766786069` / `d5e4f3a2b1c0` / `a6c4d8e2f9b1` |
 | `game_observation` | 游戏观察记录 | dev3.0 |
 | `game_observation_image` | 观察照片（MySQL BLOB） | dev3.0 |
 | `homemade_teaching_toy` | 自制教玩具记录 | `7c1e2a9b5d4f` |
+| `course_review_activity` | 课程审议记录 | `a6c4d8e2f9b1` |
 
 ---
 
@@ -254,6 +259,7 @@ kindergartenManager/                  # 项目根（Monorepo）
 | [game-observation/design.md](game-observation/design.md) | 游戏观察子系统设计文档 |
 | [one-on-one-listening/design.md](one-on-one-listening/design.md) | 一对一倾听子系统设计文档 |
 | [homemadeteaching/design.md](homemadeteaching/design.md) | 自制教玩具子系统设计文档 |
+| [coursereviewactivity/design.md](coursereviewactivity/design.md) | 课程审议记录子系统设计文档 |
 | [docs/API.md](../docs/API.md) | 对外 REST API 完整参考 |
 | [docs/DEVELOPER.md](../docs/DEVELOPER.md) | 开发者指南 |
 | [docs/USER_MANUAL.md](../docs/USER_MANUAL.md) | 用户手册 |

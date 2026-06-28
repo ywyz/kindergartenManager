@@ -37,6 +37,9 @@ class ExportRecord(Base):
     # 关联自制教玩具记录（逻辑外键 → homemade_teaching_toy.id）
     homemade_teaching_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
+    # 关联课程审议记录（逻辑外键 → course_review_activity.id）
+    course_review_activity_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+
     # 文件信息
     file_name: Mapped[str] = mapped_column(String(256), nullable=False)
     file_path: Mapped[str] = mapped_column(String(512), nullable=False)
