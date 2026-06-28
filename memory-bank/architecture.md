@@ -341,7 +341,7 @@ frozen exe 启动
 
 `tests/test_class_repository.py`、`test_homemade_teaching_repository.py`、`test_homemade_teaching_client.py`、`test_homemade_teaching_service.py`、`test_homemade_teaching_exporter.py`、`test_homemade_teaching_ui_helpers.py`、`test_export_repository.py`、`test_app_shell_menu.py`、`test_migrations_smoke.py`。相关回归 **54 passed**；临时 SQLite `alembic upgrade head` 通过。
 
-## 12. 课程审议记录子系统（dev3.3，待手动验收）
+## 12. 课程审议记录子系统（dev3.3，手动验收通过）
 
 教师填写活动名称、幼儿人数、活动时间并粘贴原始教案；系统读取设置中的年龄段、班级名称和教师姓名，调用文本 AI 拆分教案并生成课程审议调整内容，保存到数据库，并按 `templates/coursereviewactivity.docx` 导出 Word。设计/计划/测试详见 [coursereviewactivity/](coursereviewactivity/)。
 
@@ -366,4 +366,4 @@ frozen exe 启动
 
 ### 测试
 
-`tests/test_course_review_activity_repository.py`、`test_course_review_activity_client.py`、`test_course_review_activity_service.py`、`test_course_review_activity_exporter.py`、`test_course_review_activity_ui_helpers.py`、`test_export_repository.py`、`test_app_shell_menu.py`、`test_migrations_smoke.py`。课程审议相关回归 **60 passed**；全量回归 **529 passed**。
+`tests/test_course_review_activity_repository.py`、`test_course_review_activity_client.py`、`test_course_review_activity_service.py`、`test_course_review_activity_exporter.py`、`test_course_review_activity_ui_helpers.py`、`test_export_repository.py`、`test_app_shell_menu.py`、`test_migrations_smoke.py`。课程审议相关回归 **60 passed**；全量回归 **529 passed**；用户手动验收通过。
