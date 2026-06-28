@@ -111,6 +111,7 @@ class ClassConfigOut(BaseModel):
     user_id: int
     grade: str
     class_name: str
+    teacher_name: str | None = None
     indoor_areas: str | None = None
     outdoor_content: str | None = None
 
@@ -122,6 +123,7 @@ class ClassConfigOut(BaseModel):
             user_id=m.user_id,
             grade=m.grade,
             class_name=m.class_name,
+            teacher_name=m.teacher_name,
             indoor_areas=m.indoor_areas,
             outdoor_content=m.outdoor_content,
         )

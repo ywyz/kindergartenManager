@@ -443,3 +443,23 @@ v3.0.0-beta.2 Windows EXE 打包后在全新 Windows 机器上首次运行出现
 ### 待办
 
 - 🧑 用户手动验收一对一倾听全功能（见 `one-on-one-listening/progress.md` 验收清单）。
+
+## 2026-06-28（dev3.2：自制教玩具子系统启动）
+
+### 已完成
+
+- 完成项目文件与 `memory-bank` 阅读，确认复用一日活动计划、游戏观察、一对一倾听的分层模式。
+- 确认模板 `templates/homemadeteaching.docx`：标题 + 5 行 2 列表格，字段为班级、姓名、教玩具名称、所用材料、玩法。
+- 新建 `memory-bank/homemadeteaching/`：
+  - `design.md`
+  - `dev-plan.md`
+  - `test-plan.md`
+  - `progress.md`
+- 更新 `overview.md` 与 `architecture.md`，登记自制教玩具子系统设计入口与规划中的架构变更。
+
+### 当前计划
+
+- P1~P5 已实现：设置页教师姓名、`homemade_teaching_toy` 模型与仓库、AI JSON 客户端与服务层、Word 导出、NiceGUI 页面/菜单/首页入口/提示词 Tab。
+- 相关自动测试：54 passed；临时 SQLite `alembic upgrade head` 通过。
+- 全量回归：`pytest tests/ -q` → **497 passed**。
+- 用户手动验收：测试通过，能够运行（见 `homemadeteaching/progress.md`）。

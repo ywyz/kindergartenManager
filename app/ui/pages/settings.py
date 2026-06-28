@@ -153,6 +153,11 @@ async def settings_page() -> None:
                     placeholder="如：阳光班",
                 ).classes("flex-1")
 
+            teacher_name_input = ui.input(
+                label="教师姓名",
+                placeholder="如：张老师",
+            ).classes("w-full mt-2")
+
             indoor_areas_input = ui.textarea(
                 label="区域内容",
                 placeholder="描述班级室内区域活动内容……",
@@ -183,6 +188,7 @@ async def settings_page() -> None:
                             user_id,
                             grade=grade,
                             class_name=c_name,
+                            teacher_name=teacher_name_input.value.strip() or None,
                             indoor_areas=indoor_areas_input.value.strip() or None,
                             outdoor_content=outdoor_content_input.value.strip() or None,
                         )
@@ -463,6 +469,7 @@ async def settings_page() -> None:
     if class_cfg:
         grade_select.value = class_cfg.grade
         class_name_input.value = class_cfg.class_name
+        teacher_name_input.value = class_cfg.teacher_name or ""
         indoor_areas_input.value = class_cfg.indoor_areas or ""
         outdoor_content_input.value = class_cfg.outdoor_content or ""
 

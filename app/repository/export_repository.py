@@ -13,6 +13,7 @@ async def save_export_record(
     file_path: str,
     observation_id: int | None = None,
     listening_record_id: int | None = None,
+    homemade_teaching_id: int | None = None,
 ) -> ExportRecord:
     """写入一条导出记录。
 
@@ -25,6 +26,7 @@ async def save_export_record(
         file_path: 导出文件的绝对路径。
         observation_id: 关联的游戏观察记录 ID，可为 None。
         listening_record_id: 关联的一对一倾听记录 ID，可为 None。
+        homemade_teaching_id: 关联的自制教玩具记录 ID，可为 None。
 
     Returns:
         已持久化的 ExportRecord 对象。
@@ -37,6 +39,7 @@ async def save_export_record(
         file_path=file_path,
         observation_id=observation_id,
         listening_record_id=listening_record_id,
+        homemade_teaching_id=homemade_teaching_id,
     )
     session.add(record)
     await session.flush()

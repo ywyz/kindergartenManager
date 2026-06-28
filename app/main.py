@@ -21,6 +21,7 @@ from app.ui.pages import daily_plan  # noqa: F401
 from app.ui.pages import prompt_mgmt  # noqa: F401
 from app.ui.pages import game_observation  # noqa: F401
 from app.ui.pages import one_on_one_listening  # noqa: F401
+from app.ui.pages import homemade_teaching  # noqa: F401
 from app.ui.pages import setup  # noqa: F401
 
 from app.api import create_api_router

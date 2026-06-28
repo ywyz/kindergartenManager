@@ -46,6 +46,14 @@ _ALL_MENU_ITEMS: list[dict] = [
         "route": "/one-on-one-listening",
         "roles": None,
     },
+    {
+        "group": "教学管理",
+        "key": "homemade-teaching",
+        "label": "自制教玩具",
+        "icon": "extension",
+        "route": "/homemade-teaching",
+        "roles": None,
+    },
     # 配置中心
     {
         "group": "配置中心",

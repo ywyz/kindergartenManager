@@ -311,3 +311,31 @@ frozen exe 启动
 ### 测试
 
 `tests/test_listening_*.py`、`test_indicator_repository.py`、`test_image_processing.py`（横版归一）、`test_export_repository.py`（listening_record_id）、`test_listening_ui_helpers.py`（分配/zip/摘要等纯函数）。全量回归 **461 passed**。
+
+## 11. 自制教玩具子系统（dev3.2，待手动验收）
+
+教师在设置页维护年级、班级名称与教师姓名；系统读取这些配置后调用文本 AI，生成「教玩具名称 / 所用材料 / 玩法」结构化 JSON，保存到数据库，并按 `templates/homemadeteaching.docx` 导出 Word。设计/计划/测试详见 [homemadeteaching/](homemadeteaching/)。
+
+### 数据库变更
+
+| 表 | 说明 |
+|------|------|
+| `class_config`（增列，`2f7a9c1d4e8b`） | `teacher_name VARCHAR(64) NULL`，设置页填写的教师姓名 |
+| `homemade_teaching_toy`（`7c1e2a9b5d4f`） | 主表：grade、class_name、teacher_name、toy_name、materials、play_methods、ai_raw_json + tenant/user/时间戳 |
+| `prompt_template`（枚举增值，`c8b6d4e2a931`） | task_type 增 `homemade_teaching` |
+| `export_records`（增列，`d5e4f3a2b1c0`） | `homemade_teaching_id BIGINT NULL` 关联自制教玩具导出 |
+
+### 核心模块
+
+| 文件 | 职责 |
+|------|------|
+| `app/core/models/homemade_teaching.py` | `HomemadeTeachingToy` ORM 模型 |
+| `app/repository/homemade_teaching_repository.py` | 自制教玩具 CRUD，强制 tenant/user 隔离 |
+| `app/integration/ai_client/homemade_teaching_client.py` | 文本 AI JSON 生成客户端，校验 toy_name/materials/play_methods |
+| `app/service/homemade_teaching_service.py` | 取文本 AI Key、读取提示词、生成并审计 `ai_homemade_teaching` |
+| `app/integration/word_export/homemade_teaching_exporter.py` | 填充 `homemadeteaching.docx` 5 行表格，模板缺失降级 |
+| `app/ui/pages/homemade_teaching.py` | 路由 `/homemade-teaching`：生成、编辑、保存、导出、历史区 |
+
+### 测试
+
+`tests/test_class_repository.py`、`test_homemade_teaching_repository.py`、`test_homemade_teaching_client.py`、`test_homemade_teaching_service.py`、`test_homemade_teaching_exporter.py`、`test_homemade_teaching_ui_helpers.py`、`test_export_repository.py`、`test_app_shell_menu.py`、`test_migrations_smoke.py`。相关回归 **54 passed**；临时 SQLite `alembic upgrade head` 通过。

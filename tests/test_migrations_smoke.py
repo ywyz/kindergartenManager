@@ -218,3 +218,42 @@ async def test_prompt_template_game_observation_task_type(async_session):
 
     assert pt.task_type == "game_observation"
     assert pt.version == 1
+
+
+@pytest.mark.asyncio
+async def test_class_config_teacher_name_column(async_session):
+    """ClassConfig 可保存 teacher_name 字段。"""
+    from app.core.models.class_config import ClassConfig
+
+    cfg = ClassConfig(
+        tenant_id=1,
+        user_id=1,
+        grade="中班",
+        class_name="阳光班",
+        teacher_name="张老师",
+    )
+    async_session.add(cfg)
+    await async_session.commit()
+    await async_session.refresh(cfg)
+
+    assert cfg.teacher_name == "张老师"
+
+
+@pytest.mark.asyncio
+async def test_prompt_template_homemade_teaching_task_type(async_session):
+    """PromptTemplate 可保存 task_type='homemade_teaching'。"""
+    from app.core.models.prompt_template import PromptTemplate
+
+    pt = PromptTemplate(
+        tenant_id=1,
+        user_id=1,
+        task_type="homemade_teaching",
+        version=1,
+        content="你是自制教玩具设计助手...",
+        is_active=True,
+    )
+    async_session.add(pt)
+    await async_session.commit()
+    await async_session.refresh(pt)
+
+    assert pt.task_type == "homemade_teaching"
