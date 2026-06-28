@@ -462,4 +462,4 @@ v3.0.0-beta.2 Windows EXE 打包后在全新 Windows 机器上首次运行出现
 - P1~P5 已实现：设置页教师姓名、`homemade_teaching_toy` 模型与仓库、AI JSON 客户端与服务层、Word 导出、NiceGUI 页面/菜单/首页入口/提示词 Tab。
 - 相关自动测试：54 passed；临时 SQLite `alembic upgrade head` 通过。
 - 全量回归：`pytest tests/ -q` → **497 passed**。
-- 待执行：用户手动验收（见 `homemadeteaching/progress.md`）。
+- 用户手动验收：测试通过，能够运行（见 `homemadeteaching/progress.md`）。
