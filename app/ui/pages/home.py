@@ -70,3 +70,14 @@ async def home_page() -> None:
                             ui.label("修改显示名 · 修改密码").classes(
                                 "text-xs text-gray-400"
                             )
+
+                with ui.card().classes(
+                    "flex-1 min-w-48 cursor-pointer hover:shadow-md transition-shadow"
+                ).on("click", lambda: ui.navigate.to("/homemade-teaching")):
+                    with ui.row().classes("items-center gap-3"):
+                        ui.icon("extension").classes("text-3xl text-orange-600")
+                        with ui.column().classes("gap-0"):
+                            ui.label("自制教玩具").classes("font-semibold text-gray-800")
+                            ui.label("AI 生成 · 保存 · 导出").classes(
+                                "text-xs text-gray-400"
+                            )

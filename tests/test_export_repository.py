@@ -132,3 +132,18 @@ async def test_save_export_record_listening_id_defaults_to_none(async_session):
         file_path="/abs/plan.docx",
     )
     assert record.listening_record_id is None
+
+
+@pytest.mark.asyncio
+async def test_save_export_record_with_homemade_teaching_id(async_session):
+    """写入自制教玩具导出记录时，homemade_teaching_id 字段正确持久化。"""
+    record = await save_export_record(
+        async_session,
+        tenant_id=1,
+        user_id=2,
+        daily_plan_id=None,
+        file_name="homemade_export.docx",
+        file_path="/abs/homemade_export.docx",
+        homemade_teaching_id=88,
+    )
+    assert record.homemade_teaching_id == 88

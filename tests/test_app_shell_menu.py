@@ -13,6 +13,7 @@ class TestGetMenuItems:
         items = get_menu_items("teacher")
         keys = [item["key"] for item in items]
         assert "daily-plan" in keys
+        assert "homemade-teaching" in keys
         assert "settings" in keys
         assert "user-admin" not in keys
         assert "profile" not in keys
@@ -29,6 +30,7 @@ class TestGetMenuItems:
             items = get_menu_items(role)
             keys = [item["key"] for item in items]
             assert "daily-plan" in keys, f"role={role} 缺少 daily-plan"
+            assert "homemade-teaching" in keys, f"role={role} 缺少 homemade-teaching"
             assert "settings" in keys, f"role={role} 缺少 settings"
             assert "prompts" in keys, f"role={role} 缺少 prompts"
 

@@ -30,6 +30,7 @@ from app.integration.ai_client.generate_client import (
     DEFAULT_MORNING_TALK_PROMPT,
     DEFAULT_OUTDOOR_GAME_PROMPT,
 )
+from app.integration.ai_client.homemade_teaching_client import DEFAULT_HOMEMADE_TEACHING_PROMPT
 from app.integration.ai_client.lesson_plan_client import DEFAULT_SPLIT_PROMPT, split_lesson_plan
 from app.integration.ai_client.listening_client import DEFAULT_LISTENING_PROMPT
 from app.integration.ai_client.observation_client import DEFAULT_OBSERVATION_PROMPT
@@ -82,6 +83,10 @@ _TASK_CONFIG = {
         "label": "一对一倾听提示词",
         "placeholder": DEFAULT_LISTENING_PROMPT,
     },
+    "homemade_teaching": {
+        "label": "自制教玩具提示词",
+        "placeholder": DEFAULT_HOMEMADE_TEACHING_PROMPT,
+    },
 }
 
 # 每种任务类型的输出格式要求（展示在编辑器上方）
@@ -113,6 +118,10 @@ _TASK_SCHEMA: dict[str, str] = {
         '"evaluation": "综合评价约200字", "support_strategy": "支持策略约200字"}\n'
         "⚠ image_descriptions 数量须与图片数一致；indicators 覆盖该领域全部二级指标（按 sort_order）。"
     ),
+    "homemade_teaching": (
+        "输出 JSON，必须包含以下 3 个字段（key 名称不可修改）：\n"
+        '{"toy_name": "教玩具名称", "materials": "所用材料", "play_methods": "玩法"}'
+    ),
 }
 
 # 测试区输入框提示文字
@@ -126,6 +135,7 @@ _TEST_PLACEHOLDER: dict[str, str] = {
     "daily_reflection": "输入当日活动概述进行测试（如：中班，今日开展了春天主题活动……）",
     "game_observation": "描述观察场景背景进行文字测试（如：中班建构区，5岁幼儿用积木搭建房屋，观察约15分钟……）\n⚠ 注意：实际生成需上传照片并使用视觉模型，此处仅供提示词文本调试",
     "one_on_one_listening": "描述某领域绘画场景背景进行文字测试（如：小班健康领域，4岁幼儿绘画作品……）\n⚠ 注意：实际生成需为每个领域上传照片并使用视觉模型，此处仅供提示词文本调试",
+    "homemade_teaching": "输入年级、班级和教师姓名进行测试（如：中班阳光班，张老师，需要适合建构与合作的自制教玩具……）",
 }
 
 
@@ -155,6 +165,7 @@ async def prompt_mgmt_page() -> None:
             tab_daily_reflection = ui.tab("一日反思")
             tab_game_observation = ui.tab("游戏观察")
             tab_one_on_one_listening = ui.tab("一对一倾听")
+            tab_homemade_teaching = ui.tab("自制教玩具")
 
         with ui.tab_panels(tabs, value=tab_split).classes("w-full"):
             with ui.tab_panel(tab_split):
@@ -175,6 +186,8 @@ async def prompt_mgmt_page() -> None:
                 await _build_task_panel(tenant_id, user_id, "game_observation")
             with ui.tab_panel(tab_one_on_one_listening):
                 await _build_task_panel(tenant_id, user_id, "one_on_one_listening")
+            with ui.tab_panel(tab_homemade_teaching):
+                await _build_task_panel(tenant_id, user_id, "homemade_teaching")
 
 
 async def _build_task_panel(tenant_id: int, user_id: int, task_type: str) -> None:

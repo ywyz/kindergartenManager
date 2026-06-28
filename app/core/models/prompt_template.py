@@ -8,6 +8,7 @@
 - area_game：区域游戏
 - outdoor_game：户外游戏
 - daily_reflection：一日活动反思
+- homemade_teaching：自制教玩具
 """
 
 from datetime import datetime, timezone
@@ -44,6 +45,7 @@ class PromptTemplate(Base):
             "daily_reflection",
             "game_observation",
             "one_on_one_listening",
+            "homemade_teaching",
             name="prompt_task_type",
         ),
         nullable=False,

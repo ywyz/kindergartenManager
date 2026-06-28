@@ -144,15 +144,15 @@
 | 表名 | 用途 | 迁移版本 |
 |------|------|---------|
 | `users` | 账号、角色、密码哈希 | `5e03413fdeca` |
-| `invite_code` | 邀请码（自助注册） | dev3.0 |
 | `semester_config` | 学期配置 | `fd6d29f921b4` |
-| `class_config` | 班级配置（年级/室内区域/户外内容） | `67b4aef28796` |
+| `class_config` | 班级配置（年级/班级/教师姓名/室内区域/户外内容） | `67b4aef28796` / `2f7a9c1d4e8b` |
 | `ai_api_key` | AI 接口配置（加密存储） | `1a0d0e46f700` / `46b9fd5613c3` |
 | `daily_plan` | 每日活动计划（教案拆分+一日活动） | `f6d79ac6bf21` |
-| `prompt_template` | 提示词版本管理（7+1 种任务类型） | `bcd07e51527d` / `e2a3f1b8c9d0` |
-| `export_record` | 导出记录（Word 文件路径） | `d60766786069` |
+| `prompt_template` | 提示词版本管理（含自制教玩具） | `bcd07e51527d` / `e2a3f1b8c9d0` / `c8b6d4e2a931` |
+| `export_record` | 导出记录（Word 文件路径） | `d60766786069` / `d5e4f3a2b1c0` |
 | `game_observation` | 游戏观察记录 | dev3.0 |
 | `game_observation_image` | 观察照片（MySQL BLOB） | dev3.0 |
+| `homemade_teaching_toy` | 自制教玩具记录 | `7c1e2a9b5d4f` |
 
 ---
 
