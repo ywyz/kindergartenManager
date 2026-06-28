@@ -1,5 +1,20 @@
 # 进度记录
 
+## 2026-06-28（课程审议记录子系统）
+
+### 已完成
+
+- 新增课程审议记录模块：数据模型、仓库、AI 客户端、服务层、Word 导出器、NiceGUI 页面、菜单/首页入口、提示词管理入口。
+- 新增 Alembic 迁移 `a6c4d8e2f9b1`：创建 `course_review_activity` 表，扩展 `prompt_task_type`，为 `export_records` 增加 `course_review_activity_id`。
+- 新增 `memory-bank/coursereviewactivity/` 文档：设计、开发计划、测试计划、进度。
+- 分阶段自动测试：P1 `26 passed`，P2 `12 passed`，P3 `6 passed`，P4 `16 passed`。
+- 课程审议相关回归：`60 passed`；全量回归：`529 passed`。
+
+### 当前状态
+
+- 用户手动测试通过，课程审议记录子系统主流程完成。
+- 手测已覆盖：设置读取、AI 生成、编辑保存、导出 Word、历史重新导出、删除。
+
 ## 2026-06-21（跨电脑复测交接）
 
 ### 已完成

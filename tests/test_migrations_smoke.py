@@ -257,3 +257,60 @@ async def test_prompt_template_homemade_teaching_task_type(async_session):
     await async_session.refresh(pt)
 
     assert pt.task_type == "homemade_teaching"
+
+
+@pytest.mark.asyncio
+async def test_prompt_template_course_review_activity_task_type(async_session):
+    """PromptTemplate 可保存 task_type='course_review_activity'。"""
+    from app.core.models.prompt_template import PromptTemplate
+
+    pt = PromptTemplate(
+        tenant_id=1,
+        user_id=1,
+        task_type="course_review_activity",
+        version=1,
+        content="你是课程审议助手...",
+        is_active=True,
+    )
+    async_session.add(pt)
+    await async_session.commit()
+    await async_session.refresh(pt)
+
+    assert pt.task_type == "course_review_activity"
+
+
+@pytest.mark.asyncio
+async def test_course_review_activity_insertable(async_session):
+    """CourseReviewActivity 可插入并按字段读取。"""
+    from app.core.models.course_review_activity import CourseReviewActivity
+
+    record = CourseReviewActivity(
+        tenant_id=1,
+        user_id=1,
+        grade="小班",
+        class_name="阳光班",
+        teacher_name="张老师",
+        activity_name="圆形灯笼",
+        child_count="30",
+        activity_time="2026.06.28",
+        lesson_plan_original="原稿",
+        activity_goal="目标",
+        activity_prep="准备",
+        activity_process="过程",
+        goal_adjusted=False,
+        goal_adjustment="",
+        activity_goal_revised="目标",
+        prep_adjusted=False,
+        prep_adjustment="",
+        activity_prep_revised="准备",
+        process_adjustment="调整过程",
+        activity_process_revised="修改过程",
+        review_reason="调整理由",
+        revised_lesson_plan="二次修改稿",
+    )
+    async_session.add(record)
+    await async_session.commit()
+    await async_session.refresh(record)
+
+    assert record.id is not None
+    assert record.activity_name == "圆形灯笼"

@@ -46,6 +46,7 @@ class PromptTemplate(Base):
             "game_observation",
             "one_on_one_listening",
             "homemade_teaching",
+            "course_review_activity",
             name="prompt_task_type",
         ),
         nullable=False,

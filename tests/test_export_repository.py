@@ -147,3 +147,18 @@ async def test_save_export_record_with_homemade_teaching_id(async_session):
         homemade_teaching_id=88,
     )
     assert record.homemade_teaching_id == 88
+
+
+@pytest.mark.asyncio
+async def test_save_export_record_with_course_review_activity_id(async_session):
+    """写入课程审议导出记录时，course_review_activity_id 字段正确持久化。"""
+    record = await save_export_record(
+        async_session,
+        tenant_id=1,
+        user_id=2,
+        daily_plan_id=None,
+        file_name="course_review_export.docx",
+        file_path="/abs/course_review_export.docx",
+        course_review_activity_id=99,
+    )
+    assert record.course_review_activity_id == 99

@@ -30,6 +30,7 @@
 - 多设备登录：token 独立；设备管理和强制下线功能为低优先级需求
 
 > 一日活动计划子系统（教案拆分 / 年龄适配 / 提示词管理 / Word 导出 / 一日活动生成）的核心流程约束、日历规则与导出规则详见 [daily-plan/design.md](daily-plan/design.md)。
+> 课程审议记录子系统（教案拆分 / 审议调整 / 二次修改稿 / Word 导出）的设计详见 [coursereviewactivity/design.md](coursereviewactivity/design.md)。
 
 ## 3. 目录结构与模块职责（Step 0.1 完成后）
 
@@ -339,3 +340,30 @@ frozen exe 启动
 ### 测试
 
 `tests/test_class_repository.py`、`test_homemade_teaching_repository.py`、`test_homemade_teaching_client.py`、`test_homemade_teaching_service.py`、`test_homemade_teaching_exporter.py`、`test_homemade_teaching_ui_helpers.py`、`test_export_repository.py`、`test_app_shell_menu.py`、`test_migrations_smoke.py`。相关回归 **54 passed**；临时 SQLite `alembic upgrade head` 通过。
+
+## 12. 课程审议记录子系统（dev3.3，手动验收通过）
+
+教师填写活动名称、幼儿人数、活动时间并粘贴原始教案；系统读取设置中的年龄段、班级名称和教师姓名，调用文本 AI 拆分教案并生成课程审议调整内容，保存到数据库，并按 `templates/coursereviewactivity.docx` 导出 Word。设计/计划/测试详见 [coursereviewactivity/](coursereviewactivity/)。
+
+### 数据库变更
+
+| 表 | 说明 |
+|------|------|
+| `course_review_activity`（`a6c4d8e2f9b1`） | 主表：设置快照、活动信息、原稿、拆分字段、审议调整、二次修改稿、ai_raw_json + tenant/user/时间戳 |
+| `prompt_template`（枚举增值，`a6c4d8e2f9b1`） | task_type 增 `course_review_activity` |
+| `export_records`（增列，`a6c4d8e2f9b1`） | `course_review_activity_id BIGINT NULL` 关联课程审议导出 |
+
+### 核心模块
+
+| 文件 | 职责 |
+|------|------|
+| `app/core/models/course_review_activity.py` | `CourseReviewActivity` ORM 模型 |
+| `app/repository/course_review_activity_repository.py` | 课程审议 CRUD，强制 tenant/user 隔离 |
+| `app/integration/ai_client/course_review_activity_client.py` | 文本 AI JSON 生成客户端，校验审议字段与布尔字段 |
+| `app/service/course_review_activity_service.py` | 取文本 AI Key、读取提示词、生成并审计 `ai_course_review_activity` |
+| `app/integration/word_export/course_review_activity_exporter.py` | 填充 `coursereviewactivity.docx` 第一张空白表，移除示例内容，模板缺失降级 |
+| `app/ui/pages/course_review_activity.py` | 路由 `/course-review-activity`：生成、编辑、保存、导出、历史区 |
+
+### 测试
+
+`tests/test_course_review_activity_repository.py`、`test_course_review_activity_client.py`、`test_course_review_activity_service.py`、`test_course_review_activity_exporter.py`、`test_course_review_activity_ui_helpers.py`、`test_export_repository.py`、`test_app_shell_menu.py`、`test_migrations_smoke.py`。课程审议相关回归 **60 passed**；全量回归 **529 passed**；用户手动验收通过。

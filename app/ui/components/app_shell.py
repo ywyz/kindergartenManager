@@ -54,6 +54,14 @@ _ALL_MENU_ITEMS: list[dict] = [
         "route": "/homemade-teaching",
         "roles": None,
     },
+    {
+        "group": "教学管理",
+        "key": "course-review-activity",
+        "label": "课程审议",
+        "icon": "fact_check",
+        "route": "/course-review-activity",
+        "roles": None,
+    },
     # 配置中心
     {
         "group": "配置中心",

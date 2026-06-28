@@ -14,6 +14,7 @@ from app.core.models.listening_image import ListeningImage  # noqa: F401
 from app.core.models.listening_indicator import ListeningIndicatorResult  # noqa: F401
 from app.core.models.indicator_catalog import IndicatorCatalog  # noqa: F401
 from app.core.models.homemade_teaching import HomemadeTeachingToy  # noqa: F401
+from app.core.models.course_review_activity import CourseReviewActivity  # noqa: F401
 
 __all__ = [
     "User",
@@ -31,4 +32,5 @@ __all__ = [
     "ListeningIndicatorResult",
     "IndicatorCatalog",
     "HomemadeTeachingToy",
+    "CourseReviewActivity",
 ]

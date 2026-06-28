@@ -23,6 +23,9 @@ from app.core.logging import get_logger
 from app.core.user_context import get_current_user
 from app.integration.ai_client.adapt_client import DEFAULT_ADAPT_PROMPT, adapt_activity_process
 from app.integration.ai_client.base import call_ai_text
+from app.integration.ai_client.course_review_activity_client import (
+    DEFAULT_COURSE_REVIEW_ACTIVITY_PROMPT,
+)
 from app.integration.ai_client.generate_client import (
     DEFAULT_AREA_GAME_PROMPT,
     DEFAULT_DAILY_REFLECTION_PROMPT,
@@ -87,6 +90,10 @@ _TASK_CONFIG = {
         "label": "自制教玩具提示词",
         "placeholder": DEFAULT_HOMEMADE_TEACHING_PROMPT,
     },
+    "course_review_activity": {
+        "label": "课程审议提示词",
+        "placeholder": DEFAULT_COURSE_REVIEW_ACTIVITY_PROMPT,
+    },
 }
 
 # 每种任务类型的输出格式要求（展示在编辑器上方）
@@ -122,6 +129,15 @@ _TASK_SCHEMA: dict[str, str] = {
         "输出 JSON，必须包含以下 3 个字段（key 名称不可修改）：\n"
         '{"toy_name": "教玩具名称", "materials": "所用材料", "play_methods": "玩法"}'
     ),
+    "course_review_activity": (
+        "输出 JSON，必须包含以下字段（key 名称不可修改）：\n"
+        '{"activity_goal": "...", "activity_prep": "...", "activity_process": "...", '
+        '"goal_adjusted": true, "goal_adjustment": "...", '
+        '"activity_goal_revised": "...", "prep_adjusted": false, '
+        '"prep_adjustment": "", "activity_prep_revised": "...", '
+        '"process_adjustment": "...", "activity_process_revised": "...", '
+        '"review_reason": "...", "revised_lesson_plan": "..."}'
+    ),
 }
 
 # 测试区输入框提示文字
@@ -136,6 +152,7 @@ _TEST_PLACEHOLDER: dict[str, str] = {
     "game_observation": "描述观察场景背景进行文字测试（如：中班建构区，5岁幼儿用积木搭建房屋，观察约15分钟……）\n⚠ 注意：实际生成需上传照片并使用视觉模型，此处仅供提示词文本调试",
     "one_on_one_listening": "描述某领域绘画场景背景进行文字测试（如：小班健康领域，4岁幼儿绘画作品……）\n⚠ 注意：实际生成需为每个领域上传照片并使用视觉模型，此处仅供提示词文本调试",
     "homemade_teaching": "输入年级、班级和教师姓名进行测试（如：中班阳光班，张老师，需要适合建构与合作的自制教玩具……）",
+    "course_review_activity": "粘贴活动基本信息与完整教案进行测试（如：小班，活动名称圆形灯笼，幼儿30人，附完整教案……）",
 }
 
 
@@ -166,6 +183,7 @@ async def prompt_mgmt_page() -> None:
             tab_game_observation = ui.tab("游戏观察")
             tab_one_on_one_listening = ui.tab("一对一倾听")
             tab_homemade_teaching = ui.tab("自制教玩具")
+            tab_course_review_activity = ui.tab("课程审议")
 
         with ui.tab_panels(tabs, value=tab_split).classes("w-full"):
             with ui.tab_panel(tab_split):
@@ -188,6 +206,8 @@ async def prompt_mgmt_page() -> None:
                 await _build_task_panel(tenant_id, user_id, "one_on_one_listening")
             with ui.tab_panel(tab_homemade_teaching):
                 await _build_task_panel(tenant_id, user_id, "homemade_teaching")
+            with ui.tab_panel(tab_course_review_activity):
+                await _build_task_panel(tenant_id, user_id, "course_review_activity")
 
 
 async def _build_task_panel(tenant_id: int, user_id: int, task_type: str) -> None:
