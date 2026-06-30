@@ -53,3 +53,60 @@ Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: no
 
 [UninstallRun]
 Filename: "taskkill"; Parameters: "/F /IM {#MyAppExeName}"; Flags: runhidden
+
+[Code]
+var
+  AdminPage: TInputQueryWizardPage;
+
+procedure InitializeWizard;
+begin
+  AdminPage := CreateInputQueryPage(
+    wpSelectTasks,
+    'Initialize administrator',
+    'Create the first system administrator',
+    'This step is optional. If skipped, open http://localhost:8080/setup-admin after launch.'
+  );
+  AdminPage.Add('Admin username:', False);
+  AdminPage.Add('Admin password:', True);
+  AdminPage.Add('Confirm password:', True);
+  AdminPage.Values[0] := 'sysadmin';
+end;
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if CurPageID = AdminPage.ID then begin
+    if (AdminPage.Values[1] <> '') or (AdminPage.Values[2] <> '') then begin
+      if Length(AdminPage.Values[0]) < 4 then begin
+        MsgBox('Admin username must be at least 4 characters.', mbError, MB_OK);
+        Result := False;
+      end else if Length(AdminPage.Values[1]) < 8 then begin
+        MsgBox('Admin password must be at least 8 characters.', mbError, MB_OK);
+        Result := False;
+      end else if AdminPage.Values[1] <> AdminPage.Values[2] then begin
+        MsgBox('The two passwords do not match.', mbError, MB_OK);
+        Result := False;
+      end;
+    end;
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  PasswordFile: string;
+  ResultCode: Integer;
+begin
+  if (CurStep = ssPostInstall) and (not WizardSilent) and (AdminPage.Values[1] <> '') then begin
+    PasswordFile := ExpandConstant('{tmp}\km_admin_password.txt');
+    SaveStringToFile(PasswordFile, AdminPage.Values[1], False);
+    Exec(
+      ExpandConstant('{app}\{#MyAppExeName}'),
+      'bootstrap-admin --init --username "' + AdminPage.Values[0] + '" --password-file "' + PasswordFile + '" --allow-remote',
+      '',
+      SW_HIDE,
+      ewWaitUntilTerminated,
+      ResultCode
+    );
+    DeleteFile(PasswordFile);
+  end;
+end;

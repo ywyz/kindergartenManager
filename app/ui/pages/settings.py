@@ -16,12 +16,12 @@ from app.core.config import settings as app_settings
 from app.core.database import AsyncSessionLocal
 from app.core.env_writer import read_dot_env, write_dot_env
 from app.core.exceptions import CryptoError
-from app.core.user_context import get_current_user
 from app.repository.ai_key_repository import (
     get_active_ai_key,
     get_decrypted_key,
     save_ai_key,
 )
+from app.ui.auth_context import get_current_user_or_redirect
 from app.repository.class_repository import get_class_config, upsert_class_config
 from app.repository.semester_repository import (
     get_active_semester,
@@ -41,7 +41,9 @@ def _mask_api_key(plain: str) -> str:
 
 @ui.page("/settings")
 async def settings_page() -> None:
-    user = get_current_user()
+    user = await get_current_user_or_redirect(allowed_roles={"sys_admin"})
+    if not user:
+        return
 
     tenant_id: int = user["tenant_id"]
     user_id: int = int(user["sub"])
@@ -499,140 +501,127 @@ async def settings_page() -> None:
             vision_msg.text = "视觉模型 Key 解密失败，请重新配置"
             vision_msg.classes(add="text-red-500")
 
-        # ══════════════════════════════════════════════════════════════════════
-        # 区块五：数据库配置
-        # ══════════════════════════════════════════════════════════════════════
-        with ui.card().classes("w-full"):
-            ui.label("数据库配置").classes("text-lg font-bold text-blue-700 mb-2")
-            ui.label(
-                "默认使用 SQLite（无需额外配置）。切换到 MySQL 需填写连接信息。"
-            ).classes("text-sm text-gray-500 mb-2")
+        # nothing else belongs in this conditional; system settings below must
+        # render even before a vision key exists.
 
-            current_env = read_dot_env()
-            current_db_url = current_env.get("DATABASE_URL", "")
-            is_mysql = current_db_url.startswith("mysql")
+    # ══════════════════════════════════════════════════════════════════════
+    # 区块五：数据库配置
+    # ══════════════════════════════════════════════════════════════════════
+    with ui.card().classes("w-full"):
+        ui.label("数据库配置").classes("text-lg font-bold text-blue-700 mb-2")
+        ui.label(
+            "默认使用 SQLite（无需额外配置）。切换到 MySQL 需填写连接信息。"
+        ).classes("text-sm text-gray-500 mb-2")
 
-            # 解析已有 MySQL URL 的各字段
-            _parsed_host = ""
-            _parsed_port = "3306"
-            _parsed_user = ""
-            _parsed_password = ""
-            _parsed_dbname = ""
-            if is_mysql and "://" in current_db_url:
-                try:
-                    from urllib.parse import urlparse
-                    parsed = urlparse(current_db_url.replace("mysql+aiomysql", "mysql"))
-                    _parsed_host = parsed.hostname or ""
-                    _parsed_port = str(parsed.port or 3306)
-                    _parsed_user = parsed.username or ""
-                    _parsed_password = parsed.password or ""
-                    _parsed_dbname = parsed.path.lstrip("/") if parsed.path else ""
-                except Exception:
-                    pass
+        current_env = read_dot_env()
+        current_db_url = current_env.get("DATABASE_URL", "")
+        is_mysql = current_db_url.startswith("mysql")
 
-            db_mode_radio = ui.radio(
-                {"sqlite": "📦 SQLite（内嵌，推荐）", "mysql": "🗄️ MySQL（外部数据库）"},
-                value="mysql" if is_mysql else "sqlite",
-            ).classes("mb-2")
+        _parsed_host = ""
+        _parsed_port = "3306"
+        _parsed_user = ""
+        _parsed_password = ""
+        _parsed_dbname = ""
+        if is_mysql and "://" in current_db_url:
+            try:
+                from urllib.parse import urlparse
+                parsed = urlparse(current_db_url.replace("mysql+aiomysql", "mysql"))
+                _parsed_host = parsed.hostname or ""
+                _parsed_port = str(parsed.port or 3306)
+                _parsed_user = parsed.username or ""
+                _parsed_password = parsed.password or ""
+                _parsed_dbname = parsed.path.lstrip("/") if parsed.path else ""
+            except Exception:
+                pass
 
-            # MySQL 独立字段容器
-            mysql_fields = ui.column().classes("w-full gap-2")
-            mysql_fields.bind_visibility_from(
-                db_mode_radio, "value", backward=lambda v: v == "mysql"
-            )
-            with mysql_fields:
-                db_host_input = ui.input(
-                    label="服务器地址", value=_parsed_host, placeholder="localhost"
-                ).classes("w-full")
-                db_port_input = ui.input(
-                    label="端口", value=_parsed_port, placeholder="3306"
-                ).classes("w-full")
-                db_user_input = ui.input(
-                    label="用户名", value=_parsed_user, placeholder="root"
-                ).classes("w-full")
-                db_pass_input = ui.input(
-                    label="密码", value=_parsed_password,
-                    password=True, password_toggle_button=True,
-                ).classes("w-full")
-                db_name_input = ui.input(
-                    label="数据库名", value=_parsed_dbname, placeholder="kindergarten"
-                ).classes("w-full")
-
-            ui.label(
-                "⚠️ 切换数据库后原有数据不会自动迁移，请提前备份。"
-            ).classes("text-xs text-amber-600 mt-1")
-
-            db_status = ui.label("").classes("text-sm mt-2")
-
-            async def _save_db_config() -> None:
-                db_status.set_text("")
-                if db_mode_radio.value == "sqlite":
-                    new_url = ""
-                else:
-                    host = db_host_input.value.strip()
-                    port = db_port_input.value.strip() or "3306"
-                    user_val = db_user_input.value.strip()
-                    pwd_val = db_pass_input.value
-                    dbname = db_name_input.value.strip()
-
-                    if not host or not user_val or not dbname:
-                        db_status.set_text("❌ 服务器地址、用户名和数据库名为必填项")
-                        db_status.classes(replace="text-red-600 text-sm mt-2")
-                        return
-
-                    new_url = f"mysql+aiomysql://{user_val}:{pwd_val}@{host}:{port}/{dbname}"
-
-                try:
-                    write_dot_env({"DATABASE_URL": new_url})
-                    db_status.set_text("✅ 数据库配置已保存，需重启应用生效")
-                    db_status.classes(replace="text-green-600 text-sm mt-2")
-                except RuntimeError as exc:
-                    db_status.set_text(f"❌ 保存失败：{exc}")
-                    db_status.classes(replace="text-red-600 text-sm mt-2")
-
-            ui.button("保存数据库配置", on_click=_save_db_config).classes(
-                "mt-2 bg-blue-600 text-white"
-            )
-
-        # ══════════════════════════════════════════════════════════════════════
-        # 区块六：端口配置
-        # ══════════════════════════════════════════════════════════════════════
-        with ui.card().classes("w-full"):
-            ui.label("应用端口").classes("text-lg font-bold text-blue-700 mb-2")
-
-            current_port = int(current_env.get("PORT", str(app_settings.PORT)))
-            port_input = ui.number(
-                label="监听端口",
-                value=current_port,
-                min=1024,
-                max=65535,
-                format="%d",
+        db_mode_radio = ui.radio(
+            {"sqlite": "SQLite（内嵌，推荐）", "mysql": "MySQL（外部数据库）"},
+            value="mysql" if is_mysql else "sqlite",
+        ).classes("mb-2")
+        mysql_fields = ui.column().classes("w-full gap-2")
+        mysql_fields.bind_visibility_from(
+            db_mode_radio, "value", backward=lambda v: v == "mysql"
+        )
+        with mysql_fields:
+            db_host_input = ui.input(label="服务器地址", value=_parsed_host, placeholder="localhost").classes("w-full")
+            db_port_input = ui.input(label="端口", value=_parsed_port, placeholder="3306").classes("w-full")
+            db_user_input = ui.input(label="用户名", value=_parsed_user, placeholder="root").classes("w-full")
+            db_pass_input = ui.input(
+                label="密码",
+                value=_parsed_password,
+                password=True,
+                password_toggle_button=True,
             ).classes("w-full")
+            db_name_input = ui.input(label="数据库名", value=_parsed_dbname, placeholder="kindergarten").classes("w-full")
 
-            port_status = ui.label("").classes("text-sm mt-2")
+        ui.label("切换数据库后原有数据不会自动迁移，请提前备份。").classes(
+            "text-xs text-amber-600 mt-1"
+        )
+        db_status = ui.label("").classes("text-sm mt-2")
 
-            async def _save_port() -> None:
-                port_status.set_text("")
-                try:
-                    new_port = int(port_input.value or app_settings.PORT)
-                except (ValueError, TypeError):
-                    port_status.set_text("❌ 端口号格式错误")
-                    port_status.classes(replace="text-red-600 text-sm mt-2")
+        async def _save_db_config() -> None:
+            db_status.set_text("")
+            if db_mode_radio.value == "sqlite":
+                new_url = ""
+            else:
+                host = db_host_input.value.strip()
+                port = db_port_input.value.strip() or "3306"
+                user_val = db_user_input.value.strip()
+                pwd_val = db_pass_input.value
+                dbname = db_name_input.value.strip()
+                if not host or not user_val or not dbname:
+                    db_status.set_text("服务器地址、用户名和数据库名为必填项")
+                    db_status.classes(replace="text-red-600 text-sm mt-2")
                     return
+                new_url = f"mysql+aiomysql://{user_val}:{pwd_val}@{host}:{port}/{dbname}"
 
-                if new_port < 1024 or new_port > 65535:
-                    port_status.set_text("❌ 端口范围 1024~65535")
-                    port_status.classes(replace="text-red-600 text-sm mt-2")
-                    return
+            try:
+                write_dot_env({"DATABASE_URL": new_url})
+                db_status.set_text("数据库配置已保存，需重启应用生效")
+                db_status.classes(replace="text-green-600 text-sm mt-2")
+            except RuntimeError as exc:
+                db_status.set_text(f"保存失败：{exc}")
+                db_status.classes(replace="text-red-600 text-sm mt-2")
 
-                try:
-                    write_dot_env({"PORT": str(new_port)})
-                    port_status.set_text("✅ 端口配置已保存，需重启应用生效")
-                    port_status.classes(replace="text-green-600 text-sm mt-2")
-                except RuntimeError as exc:
-                    port_status.set_text(f"❌ 保存失败：{exc}")
-                    port_status.classes(replace="text-red-600 text-sm mt-2")
+        ui.button("保存数据库配置", on_click=_save_db_config).classes(
+            "mt-2 bg-blue-600 text-white"
+        )
 
-            ui.button("保存端口配置", on_click=_save_port).classes(
-                "mt-2 bg-blue-600 text-white"
-            )
+    # ══════════════════════════════════════════════════════════════════════
+    # 区块六：端口配置
+    # ══════════════════════════════════════════════════════════════════════
+    with ui.card().classes("w-full"):
+        ui.label("应用端口").classes("text-lg font-bold text-blue-700 mb-2")
+        current_port = int(current_env.get("PORT", str(app_settings.PORT)))
+        port_input = ui.number(
+            label="监听端口",
+            value=current_port,
+            min=1024,
+            max=65535,
+            format="%d",
+        ).classes("w-full")
+        port_status = ui.label("").classes("text-sm mt-2")
+
+        async def _save_port() -> None:
+            port_status.set_text("")
+            try:
+                new_port = int(port_input.value or app_settings.PORT)
+            except (ValueError, TypeError):
+                port_status.set_text("端口号格式错误")
+                port_status.classes(replace="text-red-600 text-sm mt-2")
+                return
+            if new_port < 1024 or new_port > 65535:
+                port_status.set_text("端口范围 1024~65535")
+                port_status.classes(replace="text-red-600 text-sm mt-2")
+                return
+            try:
+                write_dot_env({"PORT": str(new_port)})
+                port_status.set_text("端口配置已保存，需重启应用生效")
+                port_status.classes(replace="text-green-600 text-sm mt-2")
+            except RuntimeError as exc:
+                port_status.set_text(f"保存失败：{exc}")
+                port_status.classes(replace="text-red-600 text-sm mt-2")
+
+        ui.button("保存端口配置", on_click=_save_port).classes(
+            "mt-2 bg-blue-600 text-white"
+        )

@@ -25,7 +25,6 @@ from app.core.audit import log_audit
 from app.core.database import AsyncSessionLocal
 from app.core.exceptions import AiCallError, AiParseError, AppError, ConfigError
 from app.core.logging import get_logger
-from app.core.user_context import get_current_user
 from app.integration.holiday_client.client import get_legal_holidays_in_year
 from app.integration.image_processing import (
     CompressedImage,
@@ -60,7 +59,9 @@ from app.service.listening_service import (
     to_export_payload,
     update_record_with_all,
 )
+from app.ui.auth_context import get_current_user_or_redirect
 from app.ui.components.app_shell import get_display_name, render_shell
+from app.ui.error_messages import format_user_error
 
 logger = get_logger(__name__)
 
@@ -197,7 +198,9 @@ async def _auto_pick_workdays(year: int, month: int) -> tuple[list[date], bool]:
 
 @ui.page("/one-on-one-listening")
 async def one_on_one_listening_page() -> None:
-    user = get_current_user()
+    user = await get_current_user_or_redirect()
+    if not user:
+        return
     tenant_id: int = user["tenant_id"]
     user_id: int = int(user["sub"])
 
@@ -446,9 +449,9 @@ async def one_on_one_listening_page() -> None:
                 s["strategy"].value = result["support_strategy"]
                 show_info(f"{d}领域生成成功，请检查后保存", ok=True)
             except ConfigError as ex:
-                show_error(f"配置错误：{ex.message}")
+                show_error(format_user_error(ex))
             except (AiCallError, AiParseError) as ex:
-                show_error(f"AI 调用失败：{ex.message}")
+                show_error(format_user_error(ex))
             except AppError as ex:
                 show_error(f"生成失败：{ex.message}")
             except Exception as ex:  # noqa: BLE001

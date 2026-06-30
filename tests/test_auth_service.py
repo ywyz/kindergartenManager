@@ -9,6 +9,7 @@ from app.repository.user_repository import create_user
 from app.service.auth_service import (
     approve_user,
     change_password,
+    create_initial_admin,
     create_user_by_admin,
     list_users_for_admin,
     login,
@@ -121,7 +122,7 @@ async def test_change_password_wrong_old_password_raises(async_session):
 
 
 async def test_create_user_by_admin_success(async_session):
-    """系统管理员可创建新账号，新账号可登录。"""
+    """系统管理员可创建新账号，新账号可登录，显示名可保存。"""
     admin = await _make_user(async_session, username="root", role="sys_admin", password="RootPass!")
 
     created = await create_user_by_admin(
@@ -132,10 +133,12 @@ async def test_create_user_by_admin_success(async_session):
         username="new_teacher",
         password="TeacherPass!",
         role="teacher",
+        display_name="王老师",
     )
 
     assert created.username == "new_teacher"
     assert created.role.value == "teacher"
+    assert created.display_name == "王老师"
 
     token = await login(async_session, tenant_id=1, username="new_teacher", password="TeacherPass!")
     assert token is not None
@@ -264,35 +267,68 @@ async def test_list_users_for_admin_with_filter(async_session):
 # ── register_user / approve_user / update_profile_display_name 测试 ──────────
 
 
-async def test_first_user_becomes_sys_admin_and_active(async_session):
-    """空库第一个注册用户自动成为 sys_admin（is_active=True），可立即登录。"""
-    user = await register_user(async_session, username="first_admin", password="Pass1234!")
+async def test_create_initial_admin_when_no_admin(async_session):
+    """无 active sys_admin 时可创建首次管理员。"""
+    user = await create_initial_admin(
+        async_session,
+        tenant_id=1,
+        username="first_admin",
+        password="Pass1234!",
+        display_name="园长",
+    )
 
     assert user.role.value == "sys_admin"
     assert user.is_active is True
     assert user.tenant_id == 1
+    assert user.display_name == "园长"
 
 
-async def test_first_user_can_login_immediately(async_session):
-    """第一个注册用户注册后无需审核可直接登录。"""
-    await register_user(async_session, username="first_admin", password="Pass1234!")
+async def test_create_initial_admin_rejects_when_admin_exists(async_session):
+    """已有 active sys_admin 时不能重复初始化管理员。"""
+    await create_initial_admin(
+        async_session,
+        tenant_id=1,
+        username="first_admin",
+        password="Pass1234!",
+    )
 
-    token = await login(async_session, tenant_id=1, username="first_admin", password="Pass1234!")
-    assert token is not None
+    with pytest.raises(ValueError, match="已完成管理员初始化"):
+        await create_initial_admin(
+            async_session,
+            tenant_id=1,
+            username="second_admin",
+            password="Pass1234!",
+        )
 
 
-async def test_second_user_becomes_teacher_and_inactive(async_session):
-    """已有用户后，第二个注册者成为 teacher（is_active=False），需管理员审核。"""
-    await register_user(async_session, username="first_admin", password="Pass1234!")
-    second = await register_user(async_session, username="second_teacher", password="Pass1234!")
-
-    assert second.role.value == "teacher"
-    assert second.is_active is False
+async def test_register_without_admin_raises(async_session):
+    """没有系统管理员时，注册应提示先初始化管理员。"""
+    with pytest.raises(ValueError, match="初始化系统管理员"):
+        await register_user(async_session, username="first_user", password="Pass1234!")
 
 
-async def test_second_user_cannot_login_before_approval(async_session):
-    """后续注册用户在审核前不能登录。"""
-    await register_user(async_session, username="first_admin", password="Pass1234!")
+async def test_register_user_becomes_teacher_and_inactive(async_session):
+    """已有管理员后，注册者成为 teacher（is_active=False），需管理员审核。"""
+    await create_initial_admin(
+        async_session,
+        tenant_id=1,
+        username="first_admin",
+        password="Pass1234!",
+    )
+    user = await register_user(async_session, username="second_teacher", password="Pass1234!")
+
+    assert user.role.value == "teacher"
+    assert user.is_active is False
+
+
+async def test_registered_user_cannot_login_before_approval(async_session):
+    """注册用户在审核前不能登录。"""
+    await create_initial_admin(
+        async_session,
+        tenant_id=1,
+        username="first_admin",
+        password="Pass1234!",
+    )
     await register_user(async_session, username="pending_user", password="Pass1234!")
 
     with pytest.raises(AuthError):
@@ -301,6 +337,12 @@ async def test_second_user_cannot_login_before_approval(async_session):
 
 async def test_register_duplicate_username_raises(async_session):
     """同用户名注册两次时抛出 ValueError。"""
+    await create_initial_admin(
+        async_session,
+        tenant_id=1,
+        username="admin_user",
+        password="Pass1234!",
+    )
     await register_user(async_session, username="duplicate", password="Pass1234!")
 
     with pytest.raises(ValueError, match="已被注册"):
@@ -315,13 +357,24 @@ async def test_register_short_password_raises(async_session):
 
 async def test_approve_user_allows_login(async_session):
     """审核通过后，待审核用户可以正常登录。"""
-    await register_user(async_session, username="admin_user", password="Pass1234!")
+    admin = await create_initial_admin(
+        async_session,
+        tenant_id=1,
+        username="admin_user",
+        password="Pass1234!",
+    )
     pending = await register_user(async_session, username="pending2", password="Pass1234!")
 
     with pytest.raises(AuthError):
         await login(async_session, tenant_id=1, username="pending2", password="Pass1234!")
 
-    await approve_user(async_session, tenant_id=1, user_id=pending.id)
+    await approve_user(
+        async_session,
+        tenant_id=1,
+        admin_user_id=admin.id,
+        admin_role="sys_admin",
+        target_user_id=pending.id,
+    )
 
     token = await login(async_session, tenant_id=1, username="pending2", password="Pass1234!")
     assert token is not None
@@ -329,6 +382,12 @@ async def test_approve_user_allows_login(async_session):
 
 async def test_register_with_display_name(async_session):
     """注册时传入显示名，返回的用户对象应包含该显示名。"""
+    await create_initial_admin(
+        async_session,
+        tenant_id=1,
+        username="admin_display",
+        password="Pass1234!",
+    )
     user = await register_user(
         async_session, username="teacher_li", password="Pass1234!", display_name="李老师"
     )

@@ -10,7 +10,6 @@ from app.core.audit import log_audit
 from app.core.database import AsyncSessionLocal
 from app.core.exceptions import AiCallError, AiParseError, ConfigError
 from app.core.logging import get_logger
-from app.core.user_context import get_current_user
 from app.integration.word_export.homemade_teaching_exporter import export_homemade_teaching
 from app.repository.class_repository import get_class_config
 from app.repository.export_repository import save_export_record
@@ -21,7 +20,9 @@ from app.repository.homemade_teaching_repository import (
     list_homemade_teaching_toys,
 )
 from app.service.homemade_teaching_service import generate_homemade_teaching_content
+from app.ui.auth_context import get_current_user_or_redirect
 from app.ui.components.app_shell import render_shell
+from app.ui.error_messages import format_user_error
 
 logger = get_logger(__name__)
 
@@ -74,7 +75,9 @@ def format_setting_summary(context: dict) -> str:
 
 @ui.page("/homemade-teaching")
 async def homemade_teaching_page() -> None:
-    user = get_current_user()
+    user = await get_current_user_or_redirect()
+    if not user:
+        return
     tenant_id: int = user["tenant_id"]
     user_id: int = int(user["sub"])
 
@@ -203,9 +206,9 @@ async def homemade_teaching_page() -> None:
                 state["record_id"] = None
                 show_success("生成成功，请检查并保存")
             except ConfigError as exc:
-                show_error(exc.message)
+                show_error(format_user_error(exc))
             except (AiCallError, AiParseError) as exc:
-                show_error(exc.message)
+                show_error(format_user_error(exc))
             except Exception as exc:
                 logger.error("生成自制教玩具失败", exc_info=exc)
                 show_error(f"生成失败：{type(exc).__name__}: {exc}")

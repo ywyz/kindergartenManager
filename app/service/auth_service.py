@@ -10,14 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.jwt import create_access_token
 from app.auth.password import hash_password, verify_password
 from app.core.audit import log_audit
-from app.core.exceptions import AppError, AuthError
+from app.core.exceptions import AuthError
 from app.core.models.user import UserRole
 from app.repository.user_repository import (
     create_pending_user,
     create_user,
     get_user_by_id,
     get_user_by_username,
-    has_any_user,
+    has_active_sys_admin,
     list_users_by_tenant,
     query_users_by_tenant,
     update_display_name,
@@ -85,6 +85,60 @@ async def change_password(
     log_audit("change_password", tenant_id=tenant_id, user_id=user_id)
 
 
+async def create_initial_admin(
+    session: AsyncSession,
+    *,
+    tenant_id: int,
+    username: str,
+    password: str,
+    display_name: str | None = None,
+):
+    """创建首次系统管理员。
+
+    仅当当前租户不存在启用的 sys_admin 时允许创建，用于安装器初始化与
+    `/setup-admin` 首次启动兜底。
+    """
+    normalized_username = username.strip()
+    normalized_display_name = display_name.strip() if display_name else None
+
+    if await has_active_sys_admin(session, tenant_id=tenant_id):
+        raise ValueError("系统已完成管理员初始化")
+    if not normalized_username:
+        raise ValueError("用户名不能为空")
+    if len(normalized_username) > 64:
+        raise ValueError("用户名长度不能超过 64")
+    if len(password) < 8:
+        raise ValueError("密码长度不能少于 8 位")
+
+    existing = await get_user_by_username(
+        session,
+        tenant_id=tenant_id,
+        username=normalized_username,
+    )
+    if existing is not None:
+        raise ValueError("用户名已存在")
+
+    try:
+        user = await create_user(
+            session,
+            tenant_id=tenant_id,
+            username=normalized_username,
+            hashed_password=hash_password(password),
+            role=UserRole.sys_admin,
+            display_name=normalized_display_name,
+        )
+    except IntegrityError as exc:
+        raise ValueError("用户名已存在") from exc
+
+    log_audit(
+        "create_initial_admin",
+        tenant_id=tenant_id,
+        user_id=user.id,
+        username=user.username,
+    )
+    return user
+
+
 async def create_user_by_admin(
     session: AsyncSession,
     *,
@@ -94,10 +148,12 @@ async def create_user_by_admin(
     username: str,
     password: str,
     role: str = UserRole.teacher.value,
+    display_name: str | None = None,
 ):
     """由系统管理员创建账号（首期默认入口）。"""
     normalized_username = username.strip()
     normalized_role = role.strip()
+    normalized_display_name = display_name.strip() if display_name else None
 
     if admin_role != UserRole.sys_admin.value:
         raise AuthError("权限不足，仅系统管理员可创建账号")
@@ -128,6 +184,7 @@ async def create_user_by_admin(
             username=normalized_username,
             hashed_password=hash_password(password),
             role=target_role,
+            display_name=normalized_display_name,
         )
     except IntegrityError as exc:
         raise ValueError("用户名已存在") from exc
@@ -264,8 +321,7 @@ async def register_user(
 ) -> object:
     """自助注册：
 
-    - 若系统（tenant_id=1）尚无任何用户，注册者自动成为 sys_admin（is_active=True，可立即登录）。
-    - 否则创建 is_active=False 的待审核教师账号，需管理员审核通过后方可登录。
+    创建 is_active=False 的待审核教师账号，需管理员审核通过后方可登录。
 
     tenant_id 固定为 settings.BOOTSTRAP_ADMIN_TENANT_ID（默认 1，单学校部署）。
 
@@ -281,68 +337,77 @@ async def register_user(
 
     if len(password) < 8:
         raise ValueError("密码长度不能少于 8 位")
-    if not username or len(username) < 4:
+    normalized_username = username.strip()
+    normalized_display_name = display_name.strip() if display_name else None
+
+    if len(normalized_username) < 4:
         raise ValueError("用户名不能少于 4 位")
 
-    existing = await get_user_by_username(session, tenant_id=tenant_id, username=username)
+    if not await has_active_sys_admin(session, tenant_id=tenant_id):
+        raise ValueError("请先初始化系统管理员")
+
+    existing = await get_user_by_username(session, tenant_id=tenant_id, username=normalized_username)
     if existing is not None:
         raise ValueError("该用户名已被注册，请更换用户名")
 
-    is_first = not await has_any_user(session, tenant_id=tenant_id)
-
     try:
-        if is_first:
-            # 第一个注册用户自动成为系统管理员，立即激活
-            user = await create_user(
-                session,
-                tenant_id=tenant_id,
-                username=username,
-                hashed_password=hash_password(password),
-                role=UserRole.sys_admin,
-                display_name=display_name,
-            )
-        else:
-            # 后续用户创建为待审核教师账号
-            user = await create_pending_user(
-                session,
-                tenant_id=tenant_id,
-                username=username,
-                hashed_password=hash_password(password),
-                display_name=display_name,
-            )
+        user = await create_pending_user(
+            session,
+            tenant_id=tenant_id,
+            username=normalized_username,
+            hashed_password=hash_password(password),
+            display_name=normalized_display_name,
+        )
     except IntegrityError as exc:
         raise ValueError("该用户名已被注册，请更换用户名") from exc
 
-    log_audit("register", tenant_id=tenant_id, user_id=user.id, username=username,
-              role=user.role.value, is_first_user=is_first)
+    log_audit(
+        "register",
+        tenant_id=tenant_id,
+        user_id=user.id,
+        username=normalized_username,
+        role=user.role.value,
+        is_active=user.is_active,
+    )
     return user
 
 
 async def approve_user(
     session: AsyncSession,
+    *,
     tenant_id: int,
-    user_id: int,
+    admin_user_id: int,
+    admin_role: str,
+    target_user_id: int,
 ) -> None:
     """审核通过：将指定用户的 is_active 设为 True。
 
     Args:
         session: 异步数据库会话。
         tenant_id: 租户 ID。
-        user_id: 待审核用户 ID。
+        target_user_id: 待审核用户 ID。
 
     Raises:
         ValueError: 用户不存在。
     """
+    if admin_role != UserRole.sys_admin.value:
+        raise AuthError("权限不足，仅系统管理员可审核账号")
+
     changed = await update_user_active(
         session,
         tenant_id=tenant_id,
-        user_id=user_id,
+        user_id=target_user_id,
         is_active=True,
     )
     if not changed:
         raise ValueError("目标账号不存在")
 
-    log_audit("approve_user", tenant_id=tenant_id, user_id=user_id)
+    log_audit(
+        "approve_user",
+        tenant_id=tenant_id,
+        user_id=admin_user_id,
+        target_user_id=target_user_id,
+    )
 
 
 async def update_profile_display_name(

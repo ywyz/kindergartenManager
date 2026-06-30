@@ -4,34 +4,22 @@
   - 查看并修改显示名（真实姓名）
   - 修改密码
 """
-from nicegui import app, ui
-
-from app.auth.jwt import decode_access_token
+from nicegui import ui
 from app.core.database import AsyncSessionLocal
 from app.core.exceptions import AuthError
 from app.core.logging import get_logger
 from app.repository.user_repository import get_user_by_id
 from app.service.auth_service import change_password, update_profile_display_name
+from app.ui.auth_context import get_current_user_or_redirect
 from app.ui.components.app_shell import render_shell
 
 logger = get_logger(__name__)
 
 
-def _get_current_user() -> dict | None:
-    token = app.storage.user.get("token")
-    if not token:
-        return None
-    try:
-        return decode_access_token(token)
-    except Exception:
-        return None
-
-
 @ui.page("/profile")
 async def profile_page() -> None:
-    user = _get_current_user()
+    user = await get_current_user_or_redirect()
     if not user:
-        ui.navigate.to("/")
         return
 
     tenant_id: int = user["tenant_id"]

@@ -20,7 +20,6 @@ from nicegui import app, ui
 from app.core.database import AsyncSessionLocal
 from app.core.exceptions import AiCallError, AiParseError, ConfigError
 from app.core.logging import get_logger
-from app.core.user_context import get_current_user
 from app.integration.ai_client.adapt_client import DEFAULT_ADAPT_PROMPT, adapt_activity_process
 from app.integration.ai_client.base import call_ai_text
 from app.integration.ai_client.course_review_activity_client import (
@@ -44,7 +43,9 @@ from app.repository.prompt_repository import (
     rollback_to_version,
     save_new_version,
 )
+from app.ui.auth_context import get_current_user_or_redirect
 from app.ui.components.app_shell import render_shell
+from app.ui.error_messages import format_user_error
 
 logger = get_logger(__name__)
 
@@ -158,7 +159,9 @@ _TEST_PLACEHOLDER: dict[str, str] = {
 
 @ui.page("/prompts")
 async def prompt_mgmt_page() -> None:
-    user = get_current_user()
+    user = await get_current_user_or_redirect(allowed_roles={"teaching_admin", "sys_admin"})
+    if not user:
+        return
 
     tenant_id: int = user["tenant_id"]
     user_id: int = int(user["sub"])
@@ -401,13 +404,13 @@ async def _build_task_panel(tenant_id: int, user_id: int, task_type: str) -> Non
 
                 except AiParseError as e:
                     test_msg.classes(replace="text-sm text-red-500")
-                    test_msg.set_text(f"❌ 解析失败：{e.message}")
+                    test_msg.set_text(format_user_error(e))
                 except AiCallError as e:
                     test_msg.classes(replace="text-sm text-red-500")
-                    test_msg.set_text(f"❌ AI调用失败：{e.message}")
+                    test_msg.set_text(format_user_error(e))
                 except ConfigError as e:
                     test_msg.classes(replace="text-sm text-orange-500")
-                    test_msg.set_text(f"⚠ {e.message}")
+                    test_msg.set_text(format_user_error(e))
                 except Exception as e:
                     test_msg.classes(replace="text-sm text-red-500")
                     test_msg.set_text(f"❌ {type(e).__name__}: {e}")

@@ -71,6 +71,7 @@ hidden_imports = [
     "alembic.runtime.environment",
     "alembic.script",
     "alembic.ddl",
+    "app.jobs.bootstrap_admin",
     *collect_submodules("alembic"),
 ]
 

@@ -2,8 +2,7 @@
 
 功能：
   - 用户自助注册（无需邀请码，无需登录即可访问）
-  - 若系统尚无用户，第一个注册者自动成为 sys_admin（立即可登录）
-  - 后续注册者创建 is_active=False 的待审核账号，需管理员审核
+  - 创建 is_active=False 的待审核账号，需管理员审核
 """
 from nicegui import ui
 
@@ -18,9 +17,7 @@ logger = get_logger(__name__)
 async def register_page() -> None:
     with ui.column().classes("w-full max-w-md mx-auto mt-16 p-8 gap-4"):
         ui.label("注册账号").classes("text-2xl font-bold text-blue-700 text-center")
-        ui.label(
-            "首个注册账号将自动成为系统管理员；后续账号需管理员审核激活。"
-        ).classes("text-sm text-gray-500 text-center")
+        ui.label("注册后需等待系统管理员审核激活。").classes("text-sm text-gray-500 text-center")
 
         error_label = ui.label("").classes("text-red-600 text-sm hidden")
         success_label = ui.label("").classes("text-green-600 text-sm hidden")
@@ -72,14 +69,9 @@ async def register_page() -> None:
                         password=pwd,
                         display_name=display_name,
                     )
-                if user.is_active:
-                    success_label.set_text(
-                        "✓ 注册成功！您是系统的第一个用户，已自动获得管理员权限，可直接登录。"
-                    )
-                else:
-                    success_label.set_text(
-                        "✓ 注册成功！您的账号已创建，请等待管理员审核激活后再登录。"
-                    )
+                success_label.set_text(
+                    "✓ 注册成功！您的账号已创建，请等待管理员审核激活后再登录。"
+                )
                 success_label.classes(remove="hidden")
                 register_btn.props("disabled=true")
             except ValueError as e:

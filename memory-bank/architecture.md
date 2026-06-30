@@ -2,21 +2,23 @@
 
 ## 1. 当前阶段
 
-- 项目阶段：M2/M3 已完成；二期 REST API 已落地；v3.0.1 单用户模式重构完成。
+- 项目阶段：M2/M3 已完成；二期 REST API 已落地；dev3.4 正在恢复登录系统。
 - 架构方向：Docker Compose AIO 编排，Monorepo，渐进式微服务化。
 - 开发策略：先架构后编码；每完成一个步骤同步更新本文件与 progress.md
 
-## 2. 当前模式（v3.0.1+）
+## 2. 当前模式（dev3.4）
 
-### 单用户模式
-- 登录功能已移除（后续恢复），根路径 `/` 重定向到 `/home`
-- 系统启动自动创建默认管理员（`app/core/bootstrap.py`）
-- 用户上下文通过 `app/core/user_context.py` 提供固定身份（tenant_id=1, user_id=1）
-- `app/auth/` 模块完整保留，供后续恢复登录功能
+### 登录模式
+- 根路径 `/` 为登录页，登录成功后进入 `/home`。
+- `/setup-admin` 用于首次系统管理员初始化；应用启动不再自动创建默认 `admin`。
+- 页面通过 `app/ui/auth_context.py` 从 `app.storage.user["token"]` 解析 JWT，并查询数据库确认账号仍存在、启用、角色有效。
+- 业务数据继续使用 `tenant_id` 与当前登录 `user_id` 隔离。
+- `/register` 创建待审核教师账号，需系统管理员在 `/user-admin` 审核启用。
 
 ### 数据库
-- 默认 SQLite（无需配置），可在 /settings 页面切换到 MySQL
+- 默认 SQLite（无需配置），系统管理员可在 /settings 页面切换到 MySQL
 - MySQL 配置通过独立字段（服务器、端口、用户名、密码、数据库名）保存到 .env
+- 普通用户可在 /setup 配置自己的 text/vision AI Key。
 
 ### 部署架构
 - **生产**：Docker Compose AIO（Caddy + 主系统 + MySQL + 子系统）
@@ -25,12 +27,15 @@
 
 ## 3. 业务与权限边界
 
-- 当前：单用户模式，默认管理员拥有所有权限
-- 后续恢复：教师、教研管理员、系统管理员三角色 RBAC
+- 当前：教师、教研管理员、系统管理员三角色页面级 RBAC
+- 教师：教学业务页面、个人 AI 配置、个人资料与改密
+- 教研管理员：教师能力 + 提示词管理
+- 系统管理员：教研管理员能力 + 系统设置 + 用户管理
 - 多设备登录：token 独立；设备管理和强制下线功能为低优先级需求
 
 > 一日活动计划子系统（教案拆分 / 年龄适配 / 提示词管理 / Word 导出 / 一日活动生成）的核心流程约束、日历规则与导出规则详见 [daily-plan/design.md](daily-plan/design.md)。
 > 课程审议记录子系统（教案拆分 / 审议调整 / 二次修改稿 / Word 导出）的设计详见 [coursereviewactivity/design.md](coursereviewactivity/design.md)。
+> 登录系统恢复设计详见 [login/design.md](login/design.md)。
 
 ## 3. 目录结构与模块职责（Step 0.1 完成后）
 

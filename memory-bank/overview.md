@@ -8,9 +8,9 @@
 
 | 维度 | 说明 |
 |------|------|
-| 用户 | 幼儿园教师（当前为单用户模式，登录功能后续开发） |
+| 用户 | 幼儿园教师、教研管理员、系统管理员（dev3.4 恢复登录） |
 | 核心价值 | AI 辅助生成日活动计划 → 一键导出标准 Word 模板 |
-| 数据范围 | 单用户（默认 tenant_id=1, user_id=1）；后续恢复多用户 |
+| 数据范围 | 单租户部署（默认 tenant_id=1），业务数据按登录 user_id 隔离 |
 | 部署方式 | Docker Compose（AIO 编排：主系统 + 子系统 + Caddy + 可选 MySQL） |
 
 ---
@@ -98,13 +98,13 @@
 
 ---
 
-## 4. 角色与权限（当前为单用户模式）
+## 4. 角色与权限（dev3.4 登录模式）
 
 | 角色 | 标识 | 权限 | 状态 |
 |------|------|------|------|
-| 默认管理员 | `sys_admin` | 所有功能 | ✅ 当前使用 |
-| 教师 | `teacher` | 创建/编辑/导出/查看同班计划 | 🔜 登录恢复后启用 |
-| 教研管理员 | `teaching_admin` | 管理教学计划与提示词 | 🔜 登录恢复后启用 |
+| 教师 | `teacher` | 教学业务页面、个人 AI 配置、个人资料与改密 | ✅ dev3.4 |
+| 教研管理员 | `teaching_admin` | 教学业务页面、个人 AI 配置、提示词管理 | ✅ dev3.4 |
+| 系统管理员 | `sys_admin` | 系统设置、用户管理、提示词管理、全部教学业务页面 | ✅ dev3.4 |
 
 ---
 
@@ -116,7 +116,7 @@
 | 子系统 | Python FastAPI（独立容器） |
 | 数据库 | SQLite（默认/开发）、MySQL 8（生产可选）、外部 RDS |
 | ORM / 迁移 | SQLAlchemy 2（AsyncSession）+ Alembic |
-| 鉴权 | 单用户模式（默认管理员）；JWT/RBAC 模块保留待恢复 |
+| 鉴权 | JWT + Argon2 密码哈希 + 页面级 RBAC |
 | AI 调用 | OpenAI 兼容接口（httpx + tenacity 重试） |
 | 文档导出 | python-docx（主方案）+ 模板填充 |
 | 定时任务 | APScheduler |
@@ -138,7 +138,7 @@
 | AI Key 安全 | Fernet 对称加密入库，明文禁止入库/写日志；展示时脱敏 |
 | 密码安全 | Argon2（argon2-cffi），禁止 MD5/SHA1/bcrypt |
 | 审计日志 | ai_split / ai_generate / export_word 等关键操作 |
-| 单用户模式 | 当前无登录，根路径 `/` 重定向 `/home`；`app/auth/` 保留待恢复 |
+| 登录模式 | `/` 登录；`/setup-admin` 首次管理员初始化；页面 helper 校验 JWT 与用户状态 |
 | 子系统通信 | 主系统通过 Docker 内网 HTTP REST 调用子系统，子系统不暴露外部端口 |
 
 ---

@@ -103,6 +103,23 @@ async def has_any_user(
     return (result.scalar_one() or 0) > 0
 
 
+async def has_active_sys_admin(
+    session: AsyncSession,
+    tenant_id: int,
+) -> bool:
+    """检查指定租户是否已有启用的系统管理员。"""
+    result = await session.execute(
+        select(func.count())
+        .select_from(User)
+        .where(
+            User.tenant_id == tenant_id,
+            User.role == UserRole.sys_admin,
+            User.is_active.is_(True),
+        )
+    )
+    return (result.scalar_one() or 0) > 0
+
+
 async def update_user_active(
     session: AsyncSession,
     tenant_id: int,
@@ -120,6 +137,22 @@ async def update_user_active(
     )
     await session.commit()
     return bool(result.rowcount)
+
+
+async def list_pending_users(
+    session: AsyncSession,
+    tenant_id: int,
+) -> list[User]:
+    """返回指定租户下待审核/停用的账号列表（按创建时间倒序）。"""
+    result = await session.execute(
+        select(User)
+        .where(
+            User.tenant_id == tenant_id,
+            User.is_active.is_(False),
+        )
+        .order_by(User.created_at.desc())
+    )
+    return list(result.scalars().all())
 
 
 async def query_users_by_tenant(

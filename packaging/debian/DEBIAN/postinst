@@ -38,6 +38,40 @@ EOF
     echo "配置文件已生成：$CONFIG_DIR/env"
 fi
 
+# ── 可选：交互式初始化管理员（失败时由首次启动页兜底）────────────────────────
+if [ -t 0 ] && [ -x /opt/kindergarten-manager/KindergartenManager ]; then
+    echo ""
+    echo "是否现在初始化系统管理员？跳过后可访问 http://localhost:8080/setup-admin 初始化。"
+    read -r -p "初始化管理员 [y/N]: " INIT_ADMIN || INIT_ADMIN=""
+    if [ "$INIT_ADMIN" = "y" ] || [ "$INIT_ADMIN" = "Y" ]; then
+        read -r -p "管理员用户名 [sysadmin]: " ADMIN_USER || ADMIN_USER=""
+        ADMIN_USER=${ADMIN_USER:-sysadmin}
+        while true; do
+            stty -echo
+            printf "管理员密码（至少8位）: "
+            read -r ADMIN_PASS
+            printf "\n确认密码: "
+            read -r ADMIN_PASS_CONFIRM
+            stty echo
+            printf "\n"
+            if [ "$ADMIN_PASS" = "$ADMIN_PASS_CONFIRM" ]; then
+                break
+            fi
+            echo "两次密码不一致，请重试。"
+        done
+        PASS_FILE=$(mktemp)
+        chmod 600 "$PASS_FILE"
+        printf "%s" "$ADMIN_PASS" > "$PASS_FILE"
+        /opt/kindergarten-manager/KindergartenManager bootstrap-admin \
+            --init \
+            --username "$ADMIN_USER" \
+            --password-file "$PASS_FILE" \
+            --allow-remote || true
+        rm -f "$PASS_FILE"
+        unset ADMIN_PASS ADMIN_PASS_CONFIRM
+    fi
+fi
+
 # ── 设置数据目录权限 ─────────────────────────────────────────────────────────
 chmod 755 "$DATA_DIR"
 chmod 755 "$DATA_DIR/exports"
@@ -55,7 +89,8 @@ echo "=========================================="
 echo "  幼儿园教学管理系统安装完成"
 echo "=========================================="
 echo "  访问地址：http://localhost:8080"
-echo "  初始化：  http://localhost:8080/setup"
+echo "  管理员初始化：http://localhost:8080/setup-admin"
+echo "  AI 配置：  http://localhost:8080/setup"
 echo "  配置文件：$CONFIG_DIR/env"
 echo "  数据目录：$DATA_DIR"
 echo ""

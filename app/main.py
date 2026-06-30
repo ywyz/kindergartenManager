@@ -4,9 +4,9 @@
     python -m app.main
 
 页面路由：
-    /       — 重定向到 /home
+    /       — 登录页
     /home   — 主页
-    /setup  — AI 配置
+    /setup  — 个人 AI 配置
 """
 import multiprocessing
 import sys
@@ -16,6 +16,10 @@ from nicegui import app, ui
 # 导入页面模块以注册 @ui.page 路由（必须在 ui.run 前执行）
 from app.ui.pages import home  # noqa: F401
 from app.ui.pages import login  # noqa: F401
+from app.ui.pages import register  # noqa: F401
+from app.ui.pages import setup_admin  # noqa: F401
+from app.ui.pages import profile  # noqa: F401
+from app.ui.pages import user_admin  # noqa: F401
 from app.ui.pages import settings  # noqa: F401
 from app.ui.pages import daily_plan  # noqa: F401
 from app.ui.pages import prompt_mgmt  # noqa: F401
@@ -52,12 +56,12 @@ def main() -> None:
     # 启动前同步执行数据库迁移（失败记录日志但不阻断启动）
     run_startup_migrations()
 
-    # 启动后引导默认用户（单用户模式）
+    # 登录模式下不自动创建用户；保留启动钩子用于记录与未来扩展
     app.on_startup(run_bootstrap)
 
     # 全局异常日志
     app.on_exception(_on_global_exception)
-    # 路由守卫：单用户模式仅做根路径重定向
+    # 页面层通过 app.ui.auth_context 校验登录态；中间件保持直通
     app.add_middleware(AuthMiddleware)
     # 对外只读 REST API（二期）：/api/v1，API Key + 可选 HMAC 签名鉴权
     app.include_router(create_api_router())

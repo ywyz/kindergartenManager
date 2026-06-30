@@ -24,7 +24,6 @@ from app.core.audit import log_audit
 from app.core.database import AsyncSessionLocal
 from app.core.exceptions import AiCallError, AiParseError, AppError, ConfigError
 from app.core.logging import get_logger
-from app.core.user_context import get_current_user
 from app.integration.image_storage.blob_backend import BlobImageStorage
 from app.integration.word_export.observation_exporter import export_observation
 from app.repository.ai_key_repository import get_active_ai_key, get_decrypted_key
@@ -43,7 +42,9 @@ from app.service.observation_service import (
     generate_observation_content,
     save_observation_with_images,
 )
+from app.ui.auth_context import get_current_user_or_redirect
 from app.ui.components.app_shell import get_display_name, render_shell
+from app.ui.error_messages import format_user_error
 
 logger = get_logger(__name__)
 
@@ -82,7 +83,9 @@ def validate_image_count(count: int) -> bool:
 
 @ui.page("/game-observation")
 async def game_observation_page() -> None:
-    user = get_current_user()
+    user = await get_current_user_or_redirect()
+    if not user:
+        return
 
     tenant_id: int = user["tenant_id"]
     user_id: int = int(user["sub"])
@@ -258,9 +261,9 @@ async def game_observation_page() -> None:
                 state["compressed_images"] = result.get("compressed_images", [])
                 show_success("生成成功，请检查并编辑后保存")
             except ConfigError as e:
-                show_error(f"配置错误：{e.message}")
+                show_error(format_user_error(e))
             except (AiCallError, AiParseError) as e:
-                show_error(f"AI 调用失败：{e.message}")
+                show_error(format_user_error(e))
             except Exception as e:
                 logger.error("生成观察记录失败", exc_info=e)
                 show_error(f"生成失败：{e}")

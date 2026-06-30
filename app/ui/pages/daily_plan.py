@@ -17,7 +17,6 @@ from nicegui import app, ui
 from app.core.database import AsyncSessionLocal
 from app.core.audit import log_audit
 from app.core.exceptions import AiCallError, AiParseError, ConfigError
-from app.core.user_context import get_current_user
 from app.integration.holiday_client.client import is_near_holiday
 from app.integration.word_export.exporter import export_batch_daily_plans, export_daily_plan
 from app.repository.class_repository import get_class_config
@@ -35,11 +34,15 @@ from app.service.generate_service import generate_activity_content
 from app.service.lesson_plan_service import process_lesson_plan
 from app.ui.components.date_panel import DatePanel
 from app.ui.components.app_shell import render_shell
+from app.ui.auth_context import get_current_user_or_redirect
+from app.ui.error_messages import format_user_error
 
 
 @ui.page("/daily-plan")
 async def daily_plan_page() -> None:
-    user = get_current_user()
+    user = await get_current_user_or_redirect()
+    if not user:
+        return
 
     tenant_id: int = user["tenant_id"]
     user_id: int = int(user["sub"])
@@ -153,13 +156,13 @@ async def daily_plan_page() -> None:
 
                 except ConfigError as e:
                     split_msg.classes(add="text-red-500")
-                    split_msg.text = f"⚠ {e.message}，请前往【设置】配置 AI Key"
+                    split_msg.text = format_user_error(e)
                 except AiCallError as e:
                     split_msg.classes(add="text-red-500")
-                    split_msg.text = f"❌ AI 接口调用失败：{e.message}"
+                    split_msg.text = format_user_error(e)
                 except AiParseError as e:
                     split_msg.classes(add="text-red-500")
-                    split_msg.text = f"❌ AI 返回内容解析失败：{e.message}"
+                    split_msg.text = format_user_error(e)
                 except Exception as e:
                     split_msg.classes(add="text-red-500")
                     split_msg.text = f"❌ 拆分过程发生未知错误：{type(e).__name__}: {e}"
@@ -299,12 +302,12 @@ async def daily_plan_page() -> None:
                     msg.classes(remove="text-green-600 text-red-500 text-orange-500")
                     if isinstance(res, ConfigError):
                         msg.classes(add="text-orange-500")
-                        msg.text = f"⚠ {res.message}"
-                        failures.append(f"{name}：{res.message}")
+                        msg.text = format_user_error(res)
+                        failures.append(f"{name}：{format_user_error(res)}")
                     elif isinstance(res, (AiCallError, AiParseError)):
                         msg.classes(add="text-red-500")
-                        msg.text = f"❌ {res.message}"
-                        failures.append(f"{name}：{res.message}")
+                        msg.text = format_user_error(res)
+                        failures.append(f"{name}：{format_user_error(res)}")
                     elif isinstance(res, Exception):
                         msg.classes(add="text-red-500")
                         msg.text = f"❌ {type(res).__name__}: {res}"
@@ -417,10 +420,10 @@ async def daily_plan_page() -> None:
                     daily_reflection_msg.text = "✅ 生成完成"
                 except ConfigError as e:
                     daily_reflection_msg.classes(add="text-orange-500")
-                    daily_reflection_msg.text = f"⚠ {e.message}"
+                    daily_reflection_msg.text = format_user_error(e)
                 except (AiCallError, AiParseError) as e:
                     daily_reflection_msg.classes(add="text-red-500")
-                    daily_reflection_msg.text = f"❌ {e.message}"
+                    daily_reflection_msg.text = format_user_error(e)
                 except Exception as e:
                     daily_reflection_msg.classes(add="text-red-500")
                     daily_reflection_msg.text = f"❌ {type(e).__name__}: {e}"

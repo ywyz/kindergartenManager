@@ -4,6 +4,7 @@
 不能用 `python -m app.main` 方式启动，仅供 PyInstaller 构建使用。
 """
 import multiprocessing
+import sys
 
 from app.main import main
 
@@ -13,4 +14,10 @@ if __name__ == "__main__":
     # 执行本入口 → 反复启动服务器 → 进程指数爆炸（fork bomb），导致整机
     # CPU/内存耗尽卡死。非打包模式下该调用为无害的空操作。
     multiprocessing.freeze_support()
-    main()
+    if len(sys.argv) > 1 and sys.argv[1] == "bootstrap-admin":
+        from app.jobs.bootstrap_admin import main_cli
+
+        sys.argv = [sys.argv[0], *sys.argv[2:]]
+        main_cli()
+    else:
+        main()

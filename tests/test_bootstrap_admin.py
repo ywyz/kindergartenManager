@@ -119,3 +119,31 @@ async def test_bootstrap_admin_remote_blocked(async_session, monkeypatch):
         database_url="mysql+aiomysql://user:pwd@47.116.40.89:3306/kindergarten_db",
     )
     assert message.startswith("error:")
+
+
+def test_resolve_password_from_file(tmp_path):
+    """CLI 可从临时文件读取密码，便于安装器安全传入。"""
+    from app.jobs.bootstrap_admin import resolve_password_source
+
+    pwd_file = tmp_path / "pwd.txt"
+    pwd_file.write_text("StrongPass!\n", encoding="utf-8")
+
+    assert resolve_password_source(
+        password=None,
+        password_file=str(pwd_file),
+        password_stdin=False,
+    ) == "StrongPass!"
+
+
+def test_resolve_password_prefers_explicit_password(tmp_path):
+    """显式 password 优先于文件。"""
+    from app.jobs.bootstrap_admin import resolve_password_source
+
+    pwd_file = tmp_path / "pwd.txt"
+    pwd_file.write_text("FilePass!", encoding="utf-8")
+
+    assert resolve_password_source(
+        password="ExplicitPass!",
+        password_file=str(pwd_file),
+        password_stdin=False,
+    ) == "ExplicitPass!"

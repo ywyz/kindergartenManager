@@ -8,9 +8,7 @@
 """
 from math import ceil
 
-from nicegui import app, ui
-
-from app.auth.jwt import decode_access_token
+from nicegui import ui
 from app.core.database import AsyncSessionLocal
 from app.core.exceptions import AuthError
 from app.service.auth_service import (
@@ -21,26 +19,16 @@ from app.service.auth_service import (
     set_user_active_by_admin,
 )
 from app.ui.components.app_shell import render_shell
+from app.ui.auth_context import get_current_user_or_redirect
 
 
 _ROLES = ["teacher", "teaching_admin", "sys_admin"]
 
 
-def _get_current_user() -> dict | None:
-    token = app.storage.user.get("token")
-    if not token:
-        return None
-    try:
-        return decode_access_token(token)
-    except Exception:
-        return None
-
-
 @ui.page("/user-admin")
 async def user_admin_page() -> None:
-    user = _get_current_user()
+    user = await get_current_user_or_redirect(allowed_roles={"sys_admin"})
     if not user:
-        ui.navigate.to("/")
         return
 
     tenant_id: int = user["tenant_id"]
@@ -60,6 +48,7 @@ async def user_admin_page() -> None:
         ui.label("创建账号").classes("text-xl font-bold text-blue-700")
 
         username_input = ui.input(label="用户名", placeholder="请输入用户名").classes("w-full")
+        display_name_input = ui.input(label="显示名", placeholder="如：李老师").classes("w-full")
         password_input = ui.input(
             label="初始密码",
             placeholder="至少 8 位",
@@ -189,9 +178,11 @@ async def user_admin_page() -> None:
                         username=username_input.value,
                         password=password_input.value,
                         role=role_select.value,
+                        display_name=display_name_input.value.strip() or None,
                     )
                 _set_msg(create_message, "账号创建成功", is_error=False)
                 username_input.value = ""
+                display_name_input.value = ""
                 password_input.value = ""
                 role_select.value = "teacher"
                 await reload_table(reset_page=True)
@@ -286,7 +277,13 @@ async def user_admin_page() -> None:
                                 async def _approve(user_obj=u) -> None:
                                     try:
                                         async with AsyncSessionLocal() as s:
-                                            await approve_user(s, tenant_id=tenant_id, user_id=user_obj.id)
+                                            await approve_user(
+                                                s,
+                                                tenant_id=tenant_id,
+                                                admin_user_id=admin_user_id,
+                                                admin_role=admin_role,
+                                                target_user_id=user_obj.id,
+                                            )
                                         _set_msg(pending_msg, f"已审核通过：{user_obj.username}", is_error=False)
                                         await load_pending()
                                         await reload_table(reset_page=False)

@@ -5,14 +5,16 @@
 from nicegui import ui
 
 from app.core.database import AsyncSessionLocal
-from app.core.user_context import get_current_user
 from app.repository.class_repository import get_class_config
+from app.ui.auth_context import get_current_user_or_redirect
 from app.ui.components.app_shell import app_shell, get_display_name
 
 
 @ui.page("/home")
 async def home_page() -> None:
-    user = get_current_user()
+    user = await get_current_user_or_redirect()
+    if not user:
+        return
 
     tenant_id: int = user["tenant_id"]
     user_id: int = int(user["sub"])

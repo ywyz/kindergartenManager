@@ -5,6 +5,8 @@ from app.repository.user_repository import (
     create_user,
     get_user_by_id,
     get_user_by_username,
+    has_active_sys_admin,
+    list_pending_users,
     list_users_by_tenant,
     query_users_by_tenant,
     update_password,
@@ -190,3 +192,33 @@ async def test_query_users_by_tenant_with_filter_and_pagination(async_session):
     )
     assert paged_total == 2
     assert len(paged_users) == 1
+
+
+async def test_has_active_sys_admin(async_session):
+    """仅 active sys_admin 会被视为已完成管理员初始化。"""
+    assert await has_active_sys_admin(async_session, tenant_id=1) is False
+    admin = await create_user(
+        async_session,
+        tenant_id=1,
+        username="root",
+        hashed_password="h",
+        role="sys_admin",
+    )
+    assert await has_active_sys_admin(async_session, tenant_id=1) is True
+
+    admin.is_active = False
+    await async_session.commit()
+    assert await has_active_sys_admin(async_session, tenant_id=1) is False
+
+
+async def test_list_pending_users(async_session):
+    """待审核列表只返回当前租户 inactive 用户。"""
+    await create_user(async_session, tenant_id=1, username="active_u", hashed_password="h", role="teacher")
+    inactive = await create_user(async_session, tenant_id=1, username="pending_u", hashed_password="h", role="teacher")
+    inactive.is_active = False
+    await create_user(async_session, tenant_id=2, username="pending_other", hashed_password="h", role="teacher")
+    await async_session.commit()
+
+    users = await list_pending_users(async_session, tenant_id=1)
+
+    assert [user.username for user in users] == ["pending_u"]

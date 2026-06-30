@@ -1,8 +1,8 @@
-"""tests/test_middleware.py — 单用户模式路由中间件测试。
+"""tests/test_middleware.py — 登录恢复后的路由中间件测试。
 
 验证：
-- 根路径 (/) 重定向到 /home
-- 其他路由直接放行，无认证检查
+- 登录页面根路径 (/) 直接放行
+- 其他路由直接放行，页面层 helper 负责登录态检查
 """
 
 from unittest.mock import AsyncMock, MagicMock
@@ -13,13 +13,13 @@ from app.auth.middleware import UNRESTRICTED_PAGE_ROUTES, AuthMiddleware
 
 
 def test_unrestricted_routes_includes_home():
-    """白名单包含 /home。"""
-    assert "/home" in UNRESTRICTED_PAGE_ROUTES
+    """白名单包含登录页。"""
+    assert "/" in UNRESTRICTED_PAGE_ROUTES
 
 
 def test_unrestricted_routes_includes_setup():
-    """/setup 在白名单中。"""
-    assert "/setup" in UNRESTRICTED_PAGE_ROUTES
+    """/setup-admin 在白名单中。"""
+    assert "/setup-admin" in UNRESTRICTED_PAGE_ROUTES
 
 
 def test_middleware_instantiable():
@@ -29,18 +29,18 @@ def test_middleware_instantiable():
 
 
 @pytest.mark.asyncio
-async def test_root_redirects_to_home():
-    """根路径 / 应重定向到 /home。"""
+async def test_root_passes_through():
+    """根路径 / 是登录页，应直接放行。"""
     mw = AuthMiddleware(app=MagicMock())
     request = MagicMock()
     request.url.path = "/"
-    call_next = AsyncMock()
+    expected = MagicMock()
+    call_next = AsyncMock(return_value=expected)
 
     response = await mw.dispatch(request, call_next)
 
-    assert response.status_code == 307
-    assert response.headers["location"] == "/home"
-    call_next.assert_not_called()
+    assert response is expected
+    call_next.assert_called_once_with(request)
 
 
 @pytest.mark.asyncio
@@ -54,4 +54,3 @@ async def test_non_root_passes_through():
     response = await mw.dispatch(request, call_next)
 
     call_next.assert_called_once_with(request)
-

@@ -16,6 +16,8 @@
 import argparse
 import asyncio
 import getpass
+import sys
+from pathlib import Path
 
 from sqlalchemy.engine import make_url
 
@@ -25,7 +27,27 @@ from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.core.models.user import UserRole
 from app.core.startup import run_startup_migrations
-from app.repository.user_repository import create_user, get_user_by_username, update_password
+from app.repository.user_repository import get_user_by_username, update_password
+from app.service.auth_service import create_initial_admin
+
+
+def resolve_password_source(
+    *,
+    password: str | None,
+    password_file: str | None,
+    password_stdin: bool,
+) -> str:
+    """解析 CLI 密码来源。
+
+    显式 password 优先，其次 password_file，最后从 stdin 读取。返回值不会被日志输出。
+    """
+    if password:
+        return password
+    if password_file:
+        return Path(password_file).read_text(encoding="utf-8").strip()
+    if password_stdin:
+        return sys.stdin.read().strip()
+    return ""
 
 
 async def bootstrap_admin(
@@ -54,21 +76,17 @@ async def bootstrap_admin(
         return "error: BOOTSTRAP_ADMIN_PASSWORD 至少 8 位"
 
     async with AsyncSessionLocal() as session:
-        existing = await get_user_by_username(
-            session,
-            tenant_id=tenant_id,
-            username=normalized_username,
-        )
-        if existing is not None:
-            return f"skip: sys_admin already exists ({normalized_username})"
-
-        user = await create_user(
-            session,
-            tenant_id=tenant_id,
-            username=normalized_username,
-            hashed_password=hash_password(password),
-            role=UserRole.sys_admin,
-        )
+        try:
+            user = await create_initial_admin(
+                session,
+                tenant_id=tenant_id,
+                username=normalized_username,
+                password=password,
+            )
+        except ValueError as exc:
+            if "已完成管理员初始化" in str(exc) or "用户名已存在" in str(exc):
+                return f"skip: sys_admin already exists ({normalized_username})"
+            return f"error: {exc}"
 
     log_audit(
         "bootstrap_admin",
@@ -134,7 +152,7 @@ def _prompt_password(prompt_text: str) -> str:
     return getpass.getpass(f"{prompt_text}: ")
 
 
-async def _run_init() -> None:
+async def _run_init(args: argparse.Namespace) -> None:
     """--init 模式：创建 sys_admin 账号。"""
     print("\n[Step 1/3] 执行数据库迁移...")
     try:
@@ -145,7 +163,8 @@ async def _run_init() -> None:
 
     print("\n[Step 2/3] 配置管理员账号...")
 
-    enabled = settings.BOOTSTRAP_ADMIN_ENABLED
+    has_cli_init_values = bool(args.username or args.password or args.password_file or args.password_stdin)
+    enabled = settings.BOOTSTRAP_ADMIN_ENABLED or has_cli_init_values
     if not enabled:
         resp = input("BOOTSTRAP_ADMIN_ENABLED 未设置为 true，是否继续？[y/N] ").strip().lower()
         if resp != "y":
@@ -154,9 +173,15 @@ async def _run_init() -> None:
         enabled = True
 
     tenant_id = settings.BOOTSTRAP_ADMIN_TENANT_ID
-    username = settings.BOOTSTRAP_ADMIN_USERNAME or _prompt_str("管理员用户名", "sysadmin")
-    password = settings.BOOTSTRAP_ADMIN_PASSWORD or _prompt_password("管理员密码（至少8位）")
-    allow_remote = settings.BOOTSTRAP_ADMIN_ALLOW_REMOTE
+    username = args.username or settings.BOOTSTRAP_ADMIN_USERNAME or _prompt_str("管理员用户名", "sysadmin")
+    password = resolve_password_source(
+        password=args.password or settings.BOOTSTRAP_ADMIN_PASSWORD or None,
+        password_file=args.password_file,
+        password_stdin=args.password_stdin,
+    )
+    if not password:
+        password = _prompt_password("管理员密码（至少8位）")
+    allow_remote = args.allow_remote or settings.BOOTSTRAP_ADMIN_ALLOW_REMOTE
 
     print("\n[Step 3/3] 创建管理员账号...")
     message = await bootstrap_admin(
@@ -218,13 +243,23 @@ async def _main() -> None:
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--init", action="store_true", help="创建系统管理员账号（默认）")
     group.add_argument("--reset-password", action="store_true", help="重置系统管理员密码")
+    parser.add_argument("--username", help="管理员用户名（--init 模式）")
+    parser.add_argument("--password", help="管理员密码（不推荐，可能进入 shell 历史）")
+    parser.add_argument("--password-file", help="从文件读取管理员密码（安装器推荐）")
+    parser.add_argument("--password-stdin", action="store_true", help="从标准输入读取管理员密码")
+    parser.add_argument("--allow-remote", action="store_true", help="允许初始化远程数据库")
     args = parser.parse_args()
 
     if args.reset_password:
         await _run_reset()
     else:
-        await _run_init()
+        await _run_init(args)
+
+
+def main_cli() -> None:
+    """同步 CLI 入口，供 PyInstaller run.py 调用。"""
+    asyncio.run(_main())
 
 
 if __name__ == "__main__":
-    asyncio.run(_main())
+    main_cli()
