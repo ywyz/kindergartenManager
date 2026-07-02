@@ -20,7 +20,7 @@ P0 测试用于证明 dev4.0 的工程底座可继续安全推进。测试重点
 ## E2E / Integration
 
 - P0 不做浏览器业务 E2E。
-- CI smoke 必须执行安装、lint、unit tests、依赖扫描。
+- CI smoke 必须执行安装、lint、typecheck、gate tests、periodic evals、Python planning contract、依赖扫描、SBOM。
 
 ## 安全测试
 
@@ -40,8 +40,11 @@ P0 工具链建立后追加：
 ```bash
 pnpm install --frozen-lockfile
 pnpm lint
-pnpm test
-pnpm audit
+pnpm typecheck
+pnpm test:gate
+pnpm eval:periodic
+pnpm audit:deps
+pnpm run sbom:generate
 ```
 
 ## 通过标准

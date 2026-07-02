@@ -1,0 +1,6 @@
+{
+  "name": "@kindergarten/database",
+  "version": "4.0.0-alpha.0",
+  "private": true,
+  "type": "module"
+}

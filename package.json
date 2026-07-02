@@ -1,0 +1,33 @@
+{
+  "name": "kindergarten-manager-dev4",
+  "version": "4.0.0-alpha.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=24 <26",
+    "pnpm": ">=11 <12"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm test:gate",
+    "test:gate": "vitest run --config vitest.config.ts",
+    "eval:periodic": "vitest run --config vitest.eval.config.ts",
+    "check": "pnpm lint && pnpm typecheck && pnpm test:gate && pnpm eval:periodic",
+    "audit:deps": "pnpm audit --prod",
+    "sbom:generate": "pnpm sbom --sbom-format cyclonedx --out sbom.cdx.json"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.1.0",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.3",
+    "eslint": "10.6.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.62.1",
+    "vite": "8.1.3",
+    "vitest": "4.1.9"
+  }
+}

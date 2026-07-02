@@ -10,6 +10,13 @@
 venv/
 env/
 
+# Node / TypeScript
+node_modules/
+.turbo/
+.vite/
+*.tsbuildinfo
+sbom.cdx.json
+
 # Python 缓存
 __pycache__/
 *.py[cod]
