@@ -24,6 +24,7 @@ describe("dev4.0 P0 architecture eval", () => {
       join(root, "memory-bank/dev4.0/p0-backup-target-spike.md"),
       "utf8"
     );
+    const jobPlan = readFileSync(join(root, "memory-bank/dev4.0/p0-job-spike.md"), "utf8");
 
     expect(packageJson.scripts["test:gate"]).toContain("vitest.config.ts");
     expect(packageJson.scripts["eval:periodic"]).toContain("vitest.eval.config.ts");
@@ -36,6 +37,9 @@ describe("dev4.0 P0 architecture eval", () => {
     expect(devPlan).toContain("p0-backup-target-spike.md");
     expect(backupPlan).toContain("writeVerifiedBackupObject");
     expect(backupPlan).toContain("WebDAV");
+    expect(devPlan).toContain("p0-job-spike.md");
+    expect(jobPlan).toContain("FOR UPDATE SKIP LOCKED");
+    expect(jobPlan).toContain("失败重试");
   });
 
   it("preserves the required online role model in the shared contract", () => {

@@ -34,6 +34,13 @@
 - 新增认证失败和完整性失败错误类型。
 - S3 暂保留同一目标合同，P0 不接真实 S3 账号。
 
+### MySQL job spike 已完成本地验证
+
+- 新增 `memory-bank/dev4.0/p0-job-spike.md`。
+- 新增 `packages/database` 的 workflow job 合同和 MySQL 8 SQL 合同。
+- 领取 SQL 明确使用 `FOR UPDATE SKIP LOCKED`。
+- 新增内存 job queue gate tests，验证并发领取互斥、失败重试、达到最大次数后失败、非锁持有者不能回写。
+
 ### 自动验证记录
 
 - P0 scaffold 提交 `dae8ced`：
@@ -52,6 +59,11 @@
   - `.venv/bin/pytest tests/ -q`：`547 passed`。
   - `pnpm audit:deps`：No known vulnerabilities found。
   - `pnpm run sbom:generate` 通过。
+- MySQL job spike：
+  - `pnpm check` 通过。
+  - `.venv/bin/pytest tests/ -q`：`547 passed`。
+  - `pnpm audit:deps`：No known vulnerabilities found。
+  - `pnpm run sbom:generate` 通过。
 
 ### 需要 Julien 后续手工测试
 
@@ -60,5 +72,5 @@
 
 ### 下一步
 
-- 推送 Backup target spike。
-- 继续 P0 MySQL job spike：任务领取互斥、失败重试、状态回写。
+- 推送 MySQL job spike。
+- 继续 P0 文件存储与上传安全 spike。

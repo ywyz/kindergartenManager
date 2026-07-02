@@ -627,7 +627,8 @@ dev4.0 是重构，但旧系统不能在计划阶段直接清空。dev3.4 的代
 - 当前旧系统自动化测试基线：`.venv/bin/pytest tests/ -q` 为 `547 passed`。
 - P0 scaffold 已推送：`dae8ced chore: scaffold dev4 monorepo`。
 - Word export spike 已推送：`73e1955 feat: add dev4 word export spike`。
-- Backup target spike 已完成本地验证：WebDAV 目标、上传后读回 SHA-256 校验、认证失败和完整性失败分类。
+- Backup target spike 已推送：`b7f25d5 feat: add dev4 backup target spike`。
+- MySQL job spike 已完成本地验证：MySQL 8 领取 SQL 合同、`FOR UPDATE SKIP LOCKED`、并发领取互斥、失败重试、状态回写。
 - 当前 `services/` 只有 README，没有已拆出的微服务。
 - 当前运行依赖实际解析包含 `nicegui==3.12.0`。
 - 当前 OSV 命中漏洞的包包括 `starlette==1.0.0`、`aiohttp==3.13.5`、`python-multipart==0.0.28`、`cryptography==48.0.0`。
