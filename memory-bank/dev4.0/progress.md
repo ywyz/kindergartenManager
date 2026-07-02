@@ -102,6 +102,15 @@
 - `App` 使用共享合同 view model。
 - 前端类型检查、gate tests 和 Vite build 均通过。
 
+### Worker contract smoke 已完成完整验证
+
+- 新增 `memory-bank/dev4.0/p0-worker-contract-smoke.md`。
+- 新增 `createWorkerDispatcher`。
+- worker 使用 `packages/database` 的 `WorkflowJob` 合同。
+- 支持按 `jobType` 分发 handler。
+- 未注册 jobType 返回 failed 且 `retryable=false`。
+- handler 抛错返回 failed 且 `retryable=true`。
+
 ### 自动验证记录
 
 - P0 scaffold 提交 `dae8ced`：
@@ -161,6 +170,11 @@
   - `.venv/bin/pytest tests/ -q`：`547 passed`。
   - `pnpm audit:deps`：No known vulnerabilities found。
   - `pnpm run sbom:generate` 通过。
+- Worker contract smoke：
+  - `pnpm check` 通过。
+  - `.venv/bin/pytest tests/ -q`：`547 passed`。
+  - `pnpm audit:deps`：No known vulnerabilities found。
+  - `pnpm run sbom:generate` 通过。
 
 ### 需要 Julien 后续手工测试
 
@@ -169,5 +183,5 @@
 
 ### 下一步
 
-- 推送 Web contract smoke。
-- 继续 P0 worker contract smoke spike。
+- 推送 Worker contract smoke。
+- 继续 P0 P1 前置切分文档：确认 P0 已完成项、剩余项、进入 P1 的门槛。

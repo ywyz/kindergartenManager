@@ -635,7 +635,8 @@ dev4.0 是重构，但旧系统不能在计划阶段直接清空。dev3.4 的代
 - Observability/audit spike 已推送：`9872b46 feat: add dev4 audit event spike`。
 - Prompt eval spike 已推送：`31e7697 feat: add dev4 prompt eval contract spike`。
 - API contract smoke 已推送：`4007f2f feat: add dev4 api contract smoke`。
-- Web contract smoke 已完成完整验证：前端合同 view model、角色列表、高权限 action 分类、Vite build。
+- Web contract smoke 已推送：`d61ea86 feat: add dev4 web contract smoke`。
+- Worker contract smoke 已完成完整验证：jobType 分发、未知任务结构化失败、handler 失败结构化。
 - 当前 `services/` 只有 README，没有已拆出的微服务。
 - 当前运行依赖实际解析包含 `nicegui==3.12.0`。
 - 当前 OSV 命中漏洞的包包括 `starlette==1.0.0`、`aiohttp==3.13.5`、`python-multipart==0.0.28`、`cryptography==48.0.0`。

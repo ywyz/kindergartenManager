@@ -50,6 +50,10 @@ describe("dev4.0 P0 architecture eval", () => {
       join(root, "memory-bank/dev4.0/p0-web-contract-smoke.md"),
       "utf8"
     );
+    const workerContractPlan = readFileSync(
+      join(root, "memory-bank/dev4.0/p0-worker-contract-smoke.md"),
+      "utf8"
+    );
 
     expect(packageJson.scripts["test:gate"]).toContain("vitest.config.ts");
     expect(packageJson.scripts["eval:periodic"]).toContain("vitest.eval.config.ts");
@@ -86,6 +90,9 @@ describe("dev4.0 P0 architecture eval", () => {
     expect(devPlan).toContain("p0-web-contract-smoke.md");
     expect(webContractPlan).toContain("view model");
     expect(webContractPlan).toContain("前端构建");
+    expect(devPlan).toContain("p0-worker-contract-smoke.md");
+    expect(workerContractPlan).toContain("jobType");
+    expect(workerContractPlan).toContain("retryable");
   });
 
   it("preserves the required online role model in the shared contract", () => {

@@ -17,6 +17,7 @@
 - 完成 Prompt eval spike 完整验证：eval 汇总、五类发布阈值、阻断原因、业务园长风险放行。
 - 完成 API contract smoke 完整验证：health、roles、workflow actions、no-store 合同响应。
 - 完成 Web contract smoke 完整验证：前端合同 view model、角色列表、高权限 action 分类、Vite build。
+- 完成 Worker contract smoke 完整验证：jobType 分发、未知任务结构化失败、handler 失败结构化。
 
 ### 验证
 
@@ -31,11 +32,12 @@
 - Prompt eval spike：`pnpm check` 通过，`.venv/bin/pytest tests/ -q` 为 `547 passed`，`pnpm audit:deps` 无已知漏洞，SBOM 生成通过。
 - API contract smoke：`pnpm check` 通过，`.venv/bin/pytest tests/ -q` 为 `547 passed`，`pnpm audit:deps` 无已知漏洞，SBOM 生成通过。
 - Web contract smoke：`pnpm check` 通过，`pnpm --filter @kindergarten/web build` 通过，`.venv/bin/pytest tests/ -q` 为 `547 passed`，`pnpm audit:deps` 无已知漏洞，SBOM 生成通过。
+- Worker contract smoke：`pnpm check` 通过，`.venv/bin/pytest tests/ -q` 为 `547 passed`，`pnpm audit:deps` 无已知漏洞，SBOM 生成通过。
 
 ### 下一步
 
-- 推送 Web contract smoke。
-- 继续 P0 worker contract smoke spike。
+- 推送 Worker contract smoke。
+- 继续 P0 P1 前置切分文档。
 
 ## 2026-06-30（dev3.4 登录系统恢复）
 

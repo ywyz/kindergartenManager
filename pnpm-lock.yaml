@@ -72,6 +72,9 @@ importers:
       '@kindergarten/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@kindergarten/database':
+        specifier: workspace:*
+        version: link:../../packages/database
 
   packages/ai: {}
 
