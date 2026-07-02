@@ -43,6 +43,7 @@ P0 不交付业务功能。P0 的目标是为 dev4.0 后续实现建立可运行
 - `memory-bank/dev4.0/p0-observability-audit-spike.md`。
 - `memory-bank/dev4.0/p0-prompt-eval-spike.md`。
 - `memory-bank/dev4.0/p0-api-contract-smoke.md`。
+- `memory-bank/dev4.0/p0-web-contract-smoke.md`。
 - P0 spike 代码和测试。
 - P0 scaffold periodic eval。
 - CI 配置。

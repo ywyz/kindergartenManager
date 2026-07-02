@@ -94,6 +94,14 @@
 - 合同端点返回共享角色、中文名称、workflow action、scope 和 auditAction。
 - 合同端点设置 `Cache-Control: no-store`，避免权限合同被浏览器缓存。
 
+### Web contract smoke 已完成完整验证
+
+- 新增 `memory-bank/dev4.0/p0-web-contract-smoke.md`。
+- 新增 `buildContractViewModel`。
+- 前端从共享合同生成角色列表、业务高权限 action、系统高权限 action。
+- `App` 使用共享合同 view model。
+- 前端类型检查、gate tests 和 Vite build 均通过。
+
 ### 自动验证记录
 
 - P0 scaffold 提交 `dae8ced`：
@@ -147,6 +155,12 @@
   - `.venv/bin/pytest tests/ -q`：`547 passed`。
   - `pnpm audit:deps`：No known vulnerabilities found。
   - `pnpm run sbom:generate` 通过。
+- Web contract smoke：
+  - `pnpm check` 通过。
+  - `pnpm --filter @kindergarten/web build` 通过。
+  - `.venv/bin/pytest tests/ -q`：`547 passed`。
+  - `pnpm audit:deps`：No known vulnerabilities found。
+  - `pnpm run sbom:generate` 通过。
 
 ### 需要 Julien 后续手工测试
 
@@ -155,5 +169,5 @@
 
 ### 下一步
 
-- 推送 API contract smoke。
-- 继续 P0 web contract smoke spike。
+- 推送 Web contract smoke。
+- 继续 P0 worker contract smoke spike。

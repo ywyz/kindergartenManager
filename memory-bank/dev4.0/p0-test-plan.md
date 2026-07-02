@@ -22,6 +22,7 @@ P0 测试用于证明 dev4.0 的工程底座可继续安全推进。测试重点
   - Observability/audit spike：审计事件结构、失败原因要求、metadata 敏感信息脱敏。
   - Prompt eval spike：eval 结果汇总、发布阻断原因、业务园长风险放行。
   - API contract smoke：health、roles、workflow actions、no-store 合同响应。
+  - Web contract smoke：角色 view model、高权限 action 分类、前端构建。
 
 ## E2E / Integration
 
