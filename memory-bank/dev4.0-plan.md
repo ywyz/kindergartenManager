@@ -428,6 +428,16 @@ Docker Compose 服务：
 
 ### P0：基线与技术验证
 
+阶段文档：
+
+- [P0 开发计划](dev4.0/p0-dev-plan.md)
+- [P0 测试计划](dev4.0/p0-test-plan.md)
+
+执行规则：
+
+- 每个 P 阶段开始前必须先补齐对应开发计划、测试计划和 gate tests。
+- 阶段实现提交必须引用对应计划条目和测试命令。
+
 - 创建 dev4.0 monorepo 结构。
 - 建立 TypeScript、lint、format、test、lockfile、CI。
 - 建立安全扫描和 SBOM。
