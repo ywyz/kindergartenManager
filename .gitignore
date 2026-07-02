@@ -31,6 +31,9 @@ exports/
 *.swp
 *.swo
 
+# Office / WPS 临时锁文件
+.~lock.*#
+
 # 测试覆盖率
 .coverage
 htmlcov/
