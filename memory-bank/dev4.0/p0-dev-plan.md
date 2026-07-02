@@ -35,6 +35,7 @@ P0 不交付业务功能。P0 的目标是为 dev4.0 后续实现建立可运行
 - dev4.0 monorepo 初始目录与 package 配置。
 - `memory-bank/dev4.0/p0-monorepo-scaffold.md`。
 - `memory-bank/dev4.0/p0-word-spike.md`。
+- `memory-bank/dev4.0/p0-backup-target-spike.md`。
 - P0 spike 代码和测试。
 - P0 scaffold periodic eval。
 - CI 配置。

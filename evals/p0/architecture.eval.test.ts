@@ -20,6 +20,10 @@ describe("dev4.0 P0 architecture eval", () => {
     const devPlan = readFileSync(join(root, "memory-bank/dev4.0/p0-dev-plan.md"), "utf8");
     const testPlan = readFileSync(join(root, "memory-bank/dev4.0/p0-test-plan.md"), "utf8");
     const wordPlan = readFileSync(join(root, "memory-bank/dev4.0/p0-word-spike.md"), "utf8");
+    const backupPlan = readFileSync(
+      join(root, "memory-bank/dev4.0/p0-backup-target-spike.md"),
+      "utf8"
+    );
 
     expect(packageJson.scripts["test:gate"]).toContain("vitest.config.ts");
     expect(packageJson.scripts["eval:periodic"]).toContain("vitest.eval.config.ts");
@@ -29,6 +33,9 @@ describe("dev4.0 P0 architecture eval", () => {
     expect(devPlan).toContain("p0-word-spike.md");
     expect(wordPlan).toContain("generateStyledWordDocument");
     expect(wordPlan).toContain("w:eastAsia");
+    expect(devPlan).toContain("p0-backup-target-spike.md");
+    expect(backupPlan).toContain("writeVerifiedBackupObject");
+    expect(backupPlan).toContain("WebDAV");
   });
 
   it("preserves the required online role model in the shared contract", () => {

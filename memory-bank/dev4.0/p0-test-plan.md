@@ -15,7 +15,7 @@ P0 测试用于证明 dev4.0 的工程底座可继续安全推进。测试重点
 - TypeScript unit tests（P0 工具链建立后新增）
   - Word spike：中文字体、表格、图片、标题/表头/正文样式配置写入。
   - Job spike：任务领取互斥、失败重试、状态流转。
-  - Backup spike：S3/WebDAV 客户端上传、下载、hash 校验和失败错误分类。
+  - Backup spike：WebDAV 客户端上传、下载、hash 校验和失败错误分类；S3 保留同一目标合同。
 
 ## E2E / Integration
 

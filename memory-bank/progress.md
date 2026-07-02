@@ -1,5 +1,26 @@
 # 进度记录
 
+## 2026-07-02（dev4.0 P0 线上重构）
+
+### 已完成
+
+- 新建并推送 `dev4.0` 分支。
+- 完成 dev4.0 总计划、P0 开发计划、P0 测试计划。
+- 完成 P0 monorepo scaffold 并推送：`dae8ced chore: scaffold dev4 monorepo`。
+- 完成 Word export spike 并推送：`73e1955 feat: add dev4 word export spike`。
+- 完成 Backup target spike 本地验证：WebDAV 目标、统一备份目标合同、上传后读回 SHA-256 校验、认证失败与完整性失败错误分类。
+
+### 验证
+
+- P0 scaffold：`pnpm check` 通过，`.venv/bin/pytest tests/ -q` 为 `547 passed`，`pnpm audit:deps` 无已知漏洞，SBOM 生成通过。
+- Word export spike：`pnpm check` 通过，`pnpm audit:deps` 无已知漏洞，SBOM 生成通过。
+- Backup target spike 本地：`pnpm check` 通过，`.venv/bin/pytest tests/ -q` 为 `547 passed`，`pnpm audit:deps` 无已知漏洞，SBOM 生成通过。
+
+### 下一步
+
+- 推送 Backup target spike。
+- 继续 P0 MySQL job spike。
+
 ## 2026-06-30（dev3.4 登录系统恢复）
 
 ### 已完成
