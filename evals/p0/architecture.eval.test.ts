@@ -25,6 +25,10 @@ describe("dev4.0 P0 architecture eval", () => {
       "utf8"
     );
     const jobPlan = readFileSync(join(root, "memory-bank/dev4.0/p0-job-spike.md"), "utf8");
+    const storagePlan = readFileSync(
+      join(root, "memory-bank/dev4.0/p0-storage-upload-spike.md"),
+      "utf8"
+    );
 
     expect(packageJson.scripts["test:gate"]).toContain("vitest.config.ts");
     expect(packageJson.scripts["eval:periodic"]).toContain("vitest.eval.config.ts");
@@ -40,6 +44,9 @@ describe("dev4.0 P0 architecture eval", () => {
     expect(devPlan).toContain("p0-job-spike.md");
     expect(jobPlan).toContain("FOR UPDATE SKIP LOCKED");
     expect(jobPlan).toContain("失败重试");
+    expect(devPlan).toContain("p0-storage-upload-spike.md");
+    expect(storagePlan).toContain("SHA-256");
+    expect(storagePlan).toContain("用户文件名");
   });
 
   it("preserves the required online role model in the shared contract", () => {

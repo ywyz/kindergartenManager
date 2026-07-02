@@ -10,6 +10,7 @@
 - 完成 Word export spike 并推送：`73e1955 feat: add dev4 word export spike`。
 - 完成 Backup target spike 本地验证：WebDAV 目标、统一备份目标合同、上传后读回 SHA-256 校验、认证失败与完整性失败错误分类。
 - 完成 MySQL job spike 本地验证：MySQL 8 领取 SQL 合同、`FOR UPDATE SKIP LOCKED`、并发领取互斥、失败重试、状态回写。
+- 完成 Storage upload spike 完整验证：PNG/JPEG/DOCX/XLSX 上传校验、hash 元数据、tenant-scoped 对象 key、禁止用户文件名拼路径。
 
 ### 验证
 
@@ -17,11 +18,12 @@
 - Word export spike：`pnpm check` 通过，`pnpm audit:deps` 无已知漏洞，SBOM 生成通过。
 - Backup target spike 本地：`pnpm check` 通过，`.venv/bin/pytest tests/ -q` 为 `547 passed`，`pnpm audit:deps` 无已知漏洞，SBOM 生成通过。
 - MySQL job spike 本地：`pnpm check` 通过，`.venv/bin/pytest tests/ -q` 为 `547 passed`，`pnpm audit:deps` 无已知漏洞，SBOM 生成通过。
+- Storage upload spike：`pnpm check` 通过，`.venv/bin/pytest tests/ -q` 为 `547 passed`，`pnpm audit:deps` 无已知漏洞，SBOM 生成通过。
 
 ### 下一步
 
-- 推送 MySQL job spike。
-- 继续 P0 文件存储与上传安全 spike。
+- 推送 Storage upload spike。
+- 继续 P0 Auth/RBAC 合同 spike。
 
 ## 2026-06-30（dev3.4 登录系统恢复）
 

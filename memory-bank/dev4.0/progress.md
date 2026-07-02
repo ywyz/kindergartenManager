@@ -41,6 +41,15 @@
 - 领取 SQL 明确使用 `FOR UPDATE SKIP LOCKED`。
 - 新增内存 job queue gate tests，验证并发领取互斥、失败重试、达到最大次数后失败、非锁持有者不能回写。
 
+### Storage upload spike 已完成完整验证
+
+- 新增 `memory-bank/dev4.0/p0-storage-upload-spike.md`。
+- 新增 `createStoredObjectMetadata` 上传入口合同。
+- 支持 PNG、JPEG、DOCX、XLSX 的扩展名、MIME、文件头和大小校验。
+- 生成不含用户上传文件名的 tenant-scoped 对象 key。
+- 返回 `key`、`bytes`、`sha256`、`mimeType`、`extension`、`assetKind` 元数据。
+- 收紧 object id，禁止路径分隔符和 `..` 进入对象 key。
+
 ### 自动验证记录
 
 - P0 scaffold 提交 `dae8ced`：
@@ -64,6 +73,11 @@
   - `.venv/bin/pytest tests/ -q`：`547 passed`。
   - `pnpm audit:deps`：No known vulnerabilities found。
   - `pnpm run sbom:generate` 通过。
+- Storage upload spike：
+  - `pnpm check` 通过。
+  - `.venv/bin/pytest tests/ -q`：`547 passed`。
+  - `pnpm audit:deps`：No known vulnerabilities found。
+  - `pnpm run sbom:generate` 通过。
 
 ### 需要 Julien 后续手工测试
 
@@ -72,5 +86,5 @@
 
 ### 下一步
 
-- 推送 MySQL job spike。
-- 继续 P0 文件存储与上传安全 spike。
+- 推送 Storage upload spike。
+- 继续 P0 Auth/RBAC 合同 spike。

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 const CATEGORY_PATTERN = /^[a-z][a-z0-9-]*$/;
 const EXTENSION_PATTERN = /^[a-z0-9]{1,12}$/;
+const OBJECT_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/;
 
 export type StorageCategory = "uploads" | "exports" | "templates" | "backups";
 
@@ -34,6 +35,10 @@ export function createObjectKey(input: CreateObjectKeyInput): string {
   const month = String(now.getUTCMonth() + 1).padStart(2, "0");
   const objectId = input.objectId ?? randomUUID();
   const extension = normalizeExtension(input.extension);
+
+  if (!OBJECT_ID_PATTERN.test(objectId)) {
+    throw new Error(`Invalid object id: ${objectId}`);
+  }
 
   return `tenant-${input.tenantId}/${input.category}/${year}/${month}/${objectId}.${extension}`;
 }
