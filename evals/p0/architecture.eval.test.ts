@@ -38,6 +38,10 @@ describe("dev4.0 P0 architecture eval", () => {
       join(root, "memory-bank/dev4.0/p0-observability-audit-spike.md"),
       "utf8"
     );
+    const promptEvalPlan = readFileSync(
+      join(root, "memory-bank/dev4.0/p0-prompt-eval-spike.md"),
+      "utf8"
+    );
 
     expect(packageJson.scripts["test:gate"]).toContain("vitest.config.ts");
     expect(packageJson.scripts["eval:periodic"]).toContain("vitest.eval.config.ts");
@@ -65,6 +69,9 @@ describe("dev4.0 P0 architecture eval", () => {
     expect(devPlan).toContain("p0-observability-audit-spike.md");
     expect(auditPlan).toContain("审计事件");
     expect(auditPlan).toContain("脱敏");
+    expect(devPlan).toContain("p0-prompt-eval-spike.md");
+    expect(promptEvalPlan).toContain("业务园长");
+    expect(promptEvalPlan).toContain("100%");
   });
 
   it("preserves the required online role model in the shared contract", () => {

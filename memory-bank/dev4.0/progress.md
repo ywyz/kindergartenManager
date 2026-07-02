@@ -77,6 +77,15 @@
 - metadata 递归脱敏 apiKey、password、secret、token、authorization、cookie 和 `sk-*` 明文。
 - 测试确认生成后的审计 JSON 不含原始秘密。
 
+### Prompt eval spike 已完成完整验证
+
+- 新增 `memory-bank/dev4.0/p0-prompt-eval-spike.md`。
+- 新增 `summarizePromptEvalResults` 和 `decidePromptRelease`。
+- 计算 JSON 结构、必填字段、可导出性、禁 Markdown、字数范围五类通过率。
+- 默认发布阈值均为 100%。
+- 未达标默认阻断，并返回阻断原因。
+- 仅业务园长可填写风险说明进行风险放行；系统管理员默认不能放行业务提示词。
+
 ### 自动验证记录
 
 - P0 scaffold 提交 `dae8ced`：
@@ -120,6 +129,11 @@
   - `.venv/bin/pytest tests/ -q`：`547 passed`。
   - `pnpm audit:deps`：No known vulnerabilities found。
   - `pnpm run sbom:generate` 通过。
+- Prompt eval spike：
+  - `pnpm check` 通过。
+  - `.venv/bin/pytest tests/ -q`：`547 passed`。
+  - `pnpm audit:deps`：No known vulnerabilities found。
+  - `pnpm run sbom:generate` 通过。
 
 ### 需要 Julien 后续手工测试
 
@@ -128,5 +142,5 @@
 
 ### 下一步
 
-- 推送 Observability/audit spike。
-- 继续 P0 prompt eval contract spike。
+- 推送 Prompt eval spike。
+- 继续 P0 API contract smoke spike。

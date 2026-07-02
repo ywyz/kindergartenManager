@@ -7,7 +7,9 @@ describe("prompt release thresholds", () => {
     expect(DEFAULT_PROMPT_RELEASE_THRESHOLDS).toEqual({
       jsonStructurePassRate: 1,
       requiredFieldPassRate: 1,
-      exportabilityPassRate: 1
+      exportabilityPassRate: 1,
+      markdownFreePassRate: 1,
+      wordCountPassRate: 1
     });
   });
 
@@ -16,7 +18,9 @@ describe("prompt release thresholds", () => {
       isPromptReleasePassing({
         jsonStructurePassRate: 1,
         requiredFieldPassRate: 0.99,
-        exportabilityPassRate: 1
+        exportabilityPassRate: 1,
+        markdownFreePassRate: 1,
+        wordCountPassRate: 1
       })
     ).toBe(false);
   });

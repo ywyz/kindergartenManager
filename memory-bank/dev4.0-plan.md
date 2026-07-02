@@ -632,7 +632,8 @@ dev4.0 是重构，但旧系统不能在计划阶段直接清空。dev3.4 的代
 - Storage upload spike 已推送：`504edb4 feat: add dev4 storage upload safety spike`。
 - Auth/RBAC spike 已推送：`ad9ceaa feat: add dev4 rbac contract spike`。
 - AI Key crypto spike 已推送：`6af590d feat: add dev4 ai key crypto spike`。
-- Observability/audit spike 已完成完整验证：审计事件结构、失败原因要求、metadata 递归脱敏。
+- Observability/audit spike 已推送：`9872b46 feat: add dev4 audit event spike`。
+- Prompt eval spike 已完成完整验证：eval 汇总、五类发布阈值、阻断原因、业务园长风险放行。
 - 当前 `services/` 只有 README，没有已拆出的微服务。
 - 当前运行依赖实际解析包含 `nicegui==3.12.0`。
 - 当前 OSV 命中漏洞的包包括 `starlette==1.0.0`、`aiohttp==3.13.5`、`python-multipart==0.0.28`、`cryptography==48.0.0`。

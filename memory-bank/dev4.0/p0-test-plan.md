@@ -20,6 +20,7 @@ P0 测试用于证明 dev4.0 的工程底座可继续安全推进。测试重点
   - Auth/RBAC spike：角色、workflow action、scope、审计动作授权判断。
   - AI Key crypto spike：AES-256-GCM 加密、AAD 绑定、脱敏和日志脱敏。
   - Observability/audit spike：审计事件结构、失败原因要求、metadata 敏感信息脱敏。
+  - Prompt eval spike：eval 结果汇总、发布阻断原因、业务园长风险放行。
 
 ## E2E / Integration
 
