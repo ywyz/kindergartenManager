@@ -17,6 +17,7 @@ P0 测试用于证明 dev4.0 的工程底座可继续安全推进。测试重点
   - Job spike：MySQL 领取 SQL、任务领取互斥、失败重试、状态流转。
   - Backup spike：WebDAV 客户端上传、下载、hash 校验和失败错误分类；S3 保留同一目标合同。
   - Storage spike：图片、Word、Excel 上传类型、大小、hash、对象 key 安全。
+  - Auth/RBAC spike：角色、workflow action、scope、审计动作授权判断。
 
 ## E2E / Integration
 

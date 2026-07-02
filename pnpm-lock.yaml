@@ -75,7 +75,11 @@ importers:
 
   packages/ai: {}
 
-  packages/auth: {}
+  packages/auth:
+    dependencies:
+      '@kindergarten/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   packages/backup: {}
 

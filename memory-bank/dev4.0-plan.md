@@ -629,7 +629,8 @@ dev4.0 是重构，但旧系统不能在计划阶段直接清空。dev3.4 的代
 - Word export spike 已推送：`73e1955 feat: add dev4 word export spike`。
 - Backup target spike 已推送：`b7f25d5 feat: add dev4 backup target spike`。
 - MySQL job spike 已推送：`6f1eb7f feat: add dev4 workflow job spike`。
-- Storage upload spike 已完成完整验证：PNG/JPEG/DOCX/XLSX 上传校验、hash 元数据、tenant-scoped 对象 key、禁止用户文件名拼路径。
+- Storage upload spike 已推送：`504edb4 feat: add dev4 storage upload safety spike`。
+- Auth/RBAC spike 已完成完整验证：角色、workflow action、self/grade/tenant/system scope、审计动作授权判断。
 - 当前 `services/` 只有 README，没有已拆出的微服务。
 - 当前运行依赖实际解析包含 `nicegui==3.12.0`。
 - 当前 OSV 命中漏洞的包包括 `starlette==1.0.0`、`aiohttp==3.13.5`、`python-multipart==0.0.28`、`cryptography==48.0.0`。

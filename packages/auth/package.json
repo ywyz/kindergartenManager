@@ -2,5 +2,14 @@
   "name": "@kindergarten/auth",
   "version": "4.0.0-alpha.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@kindergarten/contracts": "workspace:*"
+  }
 }

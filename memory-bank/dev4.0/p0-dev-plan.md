@@ -38,6 +38,7 @@ P0 不交付业务功能。P0 的目标是为 dev4.0 后续实现建立可运行
 - `memory-bank/dev4.0/p0-backup-target-spike.md`。
 - `memory-bank/dev4.0/p0-job-spike.md`。
 - `memory-bank/dev4.0/p0-storage-upload-spike.md`。
+- `memory-bank/dev4.0/p0-auth-rbac-spike.md`。
 - P0 spike 代码和测试。
 - P0 scaffold periodic eval。
 - CI 配置。

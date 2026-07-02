@@ -50,6 +50,15 @@
 - 返回 `key`、`bytes`、`sha256`、`mimeType`、`extension`、`assetKind` 元数据。
 - 收紧 object id，禁止路径分隔符和 `..` 进入对象 key。
 
+### Auth/RBAC spike 已完成完整验证
+
+- 新增 `memory-bank/dev4.0/p0-auth-rbac-spike.md`。
+- 新增 `authorizeWorkflowAction` 授权合同。
+- 使用 `packages/contracts` 的角色和 workflow action。
+- 支持 `self`、`grade`、`tenant`、`system` scope。
+- 授权结果返回 `allowed`、`reason`、`auditAction`，供后续 API middleware 和审计复用。
+- 测试覆盖教师本人记录、年级组长绑定年级、业务园长提示词发布、系统管理员备份恢复、跨 tenant 拒绝。
+
 ### 自动验证记录
 
 - P0 scaffold 提交 `dae8ced`：
@@ -78,6 +87,11 @@
   - `.venv/bin/pytest tests/ -q`：`547 passed`。
   - `pnpm audit:deps`：No known vulnerabilities found。
   - `pnpm run sbom:generate` 通过。
+- Auth/RBAC spike：
+  - `pnpm check` 通过。
+  - `.venv/bin/pytest tests/ -q`：`547 passed`。
+  - `pnpm audit:deps`：No known vulnerabilities found。
+  - `pnpm run sbom:generate` 通过。
 
 ### 需要 Julien 后续手工测试
 
@@ -86,5 +100,5 @@
 
 ### 下一步
 
-- 推送 Storage upload spike。
-- 继续 P0 Auth/RBAC 合同 spike。
+- 推送 Auth/RBAC spike。
+- 继续 P0 AI Key 加密合同 spike。

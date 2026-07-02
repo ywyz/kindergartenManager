@@ -1,15 +1,27 @@
 # @kindergarten/auth
 
-认证与授权边界占位包。
+认证与授权边界包。
+
+## 当前职责
+
+- RBAC 合同。
+- workflow action 授权判断。
+- `self`、`grade`、`tenant`、`system` scope 判断。
+- 高风险动作返回 `auditAction`。
 
 ## 后续职责
 
 - 登录、会话、密码策略。
-- 教师、年级组长、业务园长、园长、系统管理员权限映射。
-- 高风险动作审计。
+- Session Cookie、CSRF、密码哈希。
+- API middleware。
 
-## 当前状态
+## 验证
 
-P0 只建立目录和 package 边界，不实现登录和 RBAC。
+```bash
+pnpm --filter @kindergarten/auth typecheck
+pnpm test:gate
+```
 
-P0 placeholder for session, CSRF, RBAC, password hashing, and key encryption.
+## P0 文档
+
+见 `memory-bank/dev4.0/p0-auth-rbac-spike.md`。
