@@ -59,6 +59,15 @@
 - 授权结果返回 `allowed`、`reason`、`auditAction`，供后续 API middleware 和审计复用。
 - 测试覆盖教师本人记录、年级组长绑定年级、业务园长提示词发布、系统管理员备份恢复、跨 tenant 拒绝。
 
+### AI Key crypto spike 已完成完整验证
+
+- 新增 `memory-bank/dev4.0/p0-ai-key-crypto-spike.md`。
+- 新增 `encryptSecret` / `decryptSecret` 合同。
+- 使用 AES-256-GCM，密文记录包含 algorithm、keyVersion、iv、ciphertext、authTag。
+- AAD 绑定 tenantId、userId、keyKind，防止跨用户或跨 text/vision 类型误用。
+- 新增 `maskSecret` 和 `redactSecretsFromText`。
+- 测试覆盖密文不含明文、随机 IV、AAD 错误拒绝、masterKey 错误拒绝、脱敏和日志文本脱敏。
+
 ### 自动验证记录
 
 - P0 scaffold 提交 `dae8ced`：
@@ -92,6 +101,11 @@
   - `.venv/bin/pytest tests/ -q`：`547 passed`。
   - `pnpm audit:deps`：No known vulnerabilities found。
   - `pnpm run sbom:generate` 通过。
+- AI Key crypto spike：
+  - `pnpm check` 通过。
+  - `.venv/bin/pytest tests/ -q`：`547 passed`。
+  - `pnpm audit:deps`：No known vulnerabilities found。
+  - `pnpm run sbom:generate` 通过。
 
 ### 需要 Julien 后续手工测试
 
@@ -100,5 +114,5 @@
 
 ### 下一步
 
-- 推送 Auth/RBAC spike。
-- 继续 P0 AI Key 加密合同 spike。
+- 推送 AI Key crypto spike。
+- 继续 P0 observability/audit 合同 spike。

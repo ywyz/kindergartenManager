@@ -8,6 +8,7 @@
 - workflow action 授权判断。
 - `self`、`grade`、`tenant`、`system` scope 判断。
 - 高风险动作返回 `auditAction`。
+- AI Key AES-256-GCM 加密、AAD 绑定、脱敏展示和日志脱敏。
 
 ## 后续职责
 
