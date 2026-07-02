@@ -19,12 +19,16 @@ describe("dev4.0 P0 architecture eval", () => {
     const packageJson = readJson<{ scripts: Record<string, string> }>("package.json");
     const devPlan = readFileSync(join(root, "memory-bank/dev4.0/p0-dev-plan.md"), "utf8");
     const testPlan = readFileSync(join(root, "memory-bank/dev4.0/p0-test-plan.md"), "utf8");
+    const wordPlan = readFileSync(join(root, "memory-bank/dev4.0/p0-word-spike.md"), "utf8");
 
     expect(packageJson.scripts["test:gate"]).toContain("vitest.config.ts");
     expect(packageJson.scripts["eval:periodic"]).toContain("vitest.eval.config.ts");
     expect(packageJson.scripts.check).toContain("pnpm eval:periodic");
     expect(devPlan).toContain("dev4.0 monorepo");
     expect(testPlan).toContain("pnpm eval:periodic");
+    expect(devPlan).toContain("p0-word-spike.md");
+    expect(wordPlan).toContain("generateStyledWordDocument");
+    expect(wordPlan).toContain("w:eastAsia");
   });
 
   it("preserves the required online role model in the shared contract", () => {
