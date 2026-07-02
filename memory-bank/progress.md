@@ -15,6 +15,7 @@
 - 完成 AI Key crypto spike 完整验证：AES-256-GCM、AAD 绑定租户/用户/key 类型、明文脱敏和日志文本脱敏。
 - 完成 Observability/audit spike 完整验证：审计事件结构、失败原因要求、metadata 递归脱敏。
 - 完成 Prompt eval spike 完整验证：eval 汇总、五类发布阈值、阻断原因、业务园长风险放行。
+- 完成 API contract smoke 完整验证：health、roles、workflow actions、no-store 合同响应。
 
 ### 验证
 
@@ -27,11 +28,12 @@
 - AI Key crypto spike：`pnpm check` 通过，`.venv/bin/pytest tests/ -q` 为 `547 passed`，`pnpm audit:deps` 无已知漏洞，SBOM 生成通过。
 - Observability/audit spike：`pnpm check` 通过，`.venv/bin/pytest tests/ -q` 为 `547 passed`，`pnpm audit:deps` 无已知漏洞，SBOM 生成通过。
 - Prompt eval spike：`pnpm check` 通过，`.venv/bin/pytest tests/ -q` 为 `547 passed`，`pnpm audit:deps` 无已知漏洞，SBOM 生成通过。
+- API contract smoke：`pnpm check` 通过，`.venv/bin/pytest tests/ -q` 为 `547 passed`，`pnpm audit:deps` 无已知漏洞，SBOM 生成通过。
 
 ### 下一步
 
-- 推送 Prompt eval spike。
-- 继续 P0 API contract smoke spike。
+- 推送 API contract smoke。
+- 继续 P0 web contract smoke spike。
 
 ## 2026-06-30（dev3.4 登录系统恢复）
 

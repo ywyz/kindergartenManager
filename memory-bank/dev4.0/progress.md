@@ -86,6 +86,14 @@
 - 未达标默认阻断，并返回阻断原因。
 - 仅业务园长可填写风险说明进行风险放行；系统管理员默认不能放行业务提示词。
 
+### API contract smoke 已完成完整验证
+
+- 新增 `memory-bank/dev4.0/p0-api-contract-smoke.md`。
+- `apps/api` 增加 `GET /api/v1/contracts/roles`。
+- `apps/api` 增加 `GET /api/v1/contracts/workflow-actions`。
+- 合同端点返回共享角色、中文名称、workflow action、scope 和 auditAction。
+- 合同端点设置 `Cache-Control: no-store`，避免权限合同被浏览器缓存。
+
 ### 自动验证记录
 
 - P0 scaffold 提交 `dae8ced`：
@@ -134,6 +142,11 @@
   - `.venv/bin/pytest tests/ -q`：`547 passed`。
   - `pnpm audit:deps`：No known vulnerabilities found。
   - `pnpm run sbom:generate` 通过。
+- API contract smoke：
+  - `pnpm check` 通过。
+  - `.venv/bin/pytest tests/ -q`：`547 passed`。
+  - `pnpm audit:deps`：No known vulnerabilities found。
+  - `pnpm run sbom:generate` 通过。
 
 ### 需要 Julien 后续手工测试
 
@@ -142,5 +155,5 @@
 
 ### 下一步
 
-- 推送 Prompt eval spike。
-- 继续 P0 API contract smoke spike。
+- 推送 API contract smoke。
+- 继续 P0 web contract smoke spike。

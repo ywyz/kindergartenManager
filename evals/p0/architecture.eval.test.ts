@@ -42,6 +42,10 @@ describe("dev4.0 P0 architecture eval", () => {
       join(root, "memory-bank/dev4.0/p0-prompt-eval-spike.md"),
       "utf8"
     );
+    const apiContractPlan = readFileSync(
+      join(root, "memory-bank/dev4.0/p0-api-contract-smoke.md"),
+      "utf8"
+    );
 
     expect(packageJson.scripts["test:gate"]).toContain("vitest.config.ts");
     expect(packageJson.scripts["eval:periodic"]).toContain("vitest.eval.config.ts");
@@ -72,6 +76,9 @@ describe("dev4.0 P0 architecture eval", () => {
     expect(devPlan).toContain("p0-prompt-eval-spike.md");
     expect(promptEvalPlan).toContain("业务园长");
     expect(promptEvalPlan).toContain("100%");
+    expect(devPlan).toContain("p0-api-contract-smoke.md");
+    expect(apiContractPlan).toContain("/api/v1/contracts/roles");
+    expect(apiContractPlan).toContain("no-store");
   });
 
   it("preserves the required online role model in the shared contract", () => {
