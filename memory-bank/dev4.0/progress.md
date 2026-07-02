@@ -68,6 +68,15 @@
 - 新增 `maskSecret` 和 `redactSecretsFromText`。
 - 测试覆盖密文不含明文、随机 IV、AAD 错误拒绝、masterKey 错误拒绝、脱敏和日志文本脱敏。
 
+### Observability/audit spike 已完成完整验证
+
+- 新增 `memory-bank/dev4.0/p0-observability-audit-spike.md`。
+- 新增 `createAuditEvent` 审计事件合同。
+- 审计事件包含 eventId、tenantId、actorUserId、action、target、outcome、riskLevel、reason、metadata、occurredAt。
+- `denied` 和 `failed` 审计事件必须带 reason。
+- metadata 递归脱敏 apiKey、password、secret、token、authorization、cookie 和 `sk-*` 明文。
+- 测试确认生成后的审计 JSON 不含原始秘密。
+
 ### 自动验证记录
 
 - P0 scaffold 提交 `dae8ced`：
@@ -106,6 +115,11 @@
   - `.venv/bin/pytest tests/ -q`：`547 passed`。
   - `pnpm audit:deps`：No known vulnerabilities found。
   - `pnpm run sbom:generate` 通过。
+- Observability/audit spike：
+  - `pnpm check` 通过。
+  - `.venv/bin/pytest tests/ -q`：`547 passed`。
+  - `pnpm audit:deps`：No known vulnerabilities found。
+  - `pnpm run sbom:generate` 通过。
 
 ### 需要 Julien 后续手工测试
 
@@ -114,5 +128,5 @@
 
 ### 下一步
 
-- 推送 AI Key crypto spike。
-- 继续 P0 observability/audit 合同 spike。
+- 推送 Observability/audit spike。
+- 继续 P0 prompt eval contract spike。

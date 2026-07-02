@@ -13,6 +13,7 @@
 - 完成 Storage upload spike 完整验证：PNG/JPEG/DOCX/XLSX 上传校验、hash 元数据、tenant-scoped 对象 key、禁止用户文件名拼路径。
 - 完成 Auth/RBAC spike 完整验证：角色、workflow action、self/grade/tenant/system scope、审计动作授权判断。
 - 完成 AI Key crypto spike 完整验证：AES-256-GCM、AAD 绑定租户/用户/key 类型、明文脱敏和日志文本脱敏。
+- 完成 Observability/audit spike 完整验证：审计事件结构、失败原因要求、metadata 递归脱敏。
 
 ### 验证
 
@@ -23,11 +24,12 @@
 - Storage upload spike：`pnpm check` 通过，`.venv/bin/pytest tests/ -q` 为 `547 passed`，`pnpm audit:deps` 无已知漏洞，SBOM 生成通过。
 - Auth/RBAC spike：`pnpm check` 通过，`.venv/bin/pytest tests/ -q` 为 `547 passed`，`pnpm audit:deps` 无已知漏洞，SBOM 生成通过。
 - AI Key crypto spike：`pnpm check` 通过，`.venv/bin/pytest tests/ -q` 为 `547 passed`，`pnpm audit:deps` 无已知漏洞，SBOM 生成通过。
+- Observability/audit spike：`pnpm check` 通过，`.venv/bin/pytest tests/ -q` 为 `547 passed`，`pnpm audit:deps` 无已知漏洞，SBOM 生成通过。
 
 ### 下一步
 
-- 推送 AI Key crypto spike。
-- 继续 P0 observability/audit 合同 spike。
+- 推送 Observability/audit spike。
+- 继续 P0 prompt eval contract spike。
 
 ## 2026-06-30（dev3.4 登录系统恢复）
 
