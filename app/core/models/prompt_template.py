@@ -9,6 +9,7 @@
 - outdoor_game：户外游戏
 - daily_reflection：一日活动反思
 - homemade_teaching：自制教玩具
+- personal_development：个体发展档案
 """
 
 from datetime import datetime, timezone
@@ -47,6 +48,7 @@ class PromptTemplate(Base):
             "one_on_one_listening",
             "homemade_teaching",
             "course_review_activity",
+            "personal_development",
             name="prompt_task_type",
         ),
         nullable=False,

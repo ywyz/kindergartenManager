@@ -18,11 +18,8 @@ services:
   # ── 主系统（NiceGUI 前后端一体化）──────────────────────────────────────
   app:
     build: .
-    depends_on:
-      db:
-        condition: service_healthy
     environment:
-      DATABASE_URL: mysql+aiomysql://${MYSQL_USER:-kindergarten}:${MYSQL_PASSWORD:-kg_pass_2024}@db:3306/${MYSQL_DATABASE:-kindergarten_db}
+      DATABASE_URL: ${DATABASE_URL}
     env_file:
       - .env
     volumes:
@@ -31,32 +28,11 @@ services:
     networks:
       - kindergarten_net
 
-  # ── 数据库（MySQL，生产模式）──────────────────────────────────────────────
-  db:
-    image: mysql:8
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-kg_root_2024}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-kindergarten_db}
-      MYSQL_USER: ${MYSQL_USER:-kindergarten}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-kg_pass_2024}
-    volumes:
-      - db_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root",
-             "-pkg_root_2024"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    networks:
-      - kindergarten_net
-
 networks:
   kindergarten_net:
     driver: bridge
 
 volumes:
-  db_data:
   exports:
   caddy_data:
   caddy_config:

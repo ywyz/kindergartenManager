@@ -94,3 +94,14 @@ async def home_page() -> None:
                             ui.label("教案拆分 · 审议调整 · 导出").classes(
                                 "text-xs text-gray-400"
                             )
+
+                with ui.card().classes(
+                    "flex-1 min-w-48 cursor-pointer hover:shadow-md transition-shadow"
+                ).on("click", lambda: ui.navigate.to("/personal-development")):
+                    with ui.row().classes("items-center gap-3"):
+                        ui.icon("file_person").classes("text-3xl text-indigo-600")
+                        with ui.column().classes("gap-0"):
+                            ui.label("个体发展档案").classes("font-semibold text-gray-800")
+                            ui.label("体检数据 · AI分析 · 导出档案").classes(
+                                "text-xs text-gray-400"
+                            )

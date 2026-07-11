@@ -62,6 +62,14 @@ _ALL_MENU_ITEMS: list[dict] = [
         "route": "/course-review-activity",
         "roles": None,
     },
+    {
+        "group": "教学管理",
+        "key": "personal-development",
+        "label": "个体发展档案",
+        "icon": "file_person",
+        "route": "/personal-development",
+        "roles": None,
+    },
     # 配置中心
     {
         "group": "配置中心",

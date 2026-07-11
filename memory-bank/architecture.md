@@ -2,7 +2,7 @@
 
 ## 1. 当前阶段
 
-- 项目阶段：M2/M3 已完成；二期 REST API 已落地；dev3.1（一对一倾听）、dev3.2（自制教玩具）、dev3.3（课程审议活动）已完成；dev3.4（登录系统恢复）已完成。
+- 项目阶段：M2/M3 已完成；二期 REST API 已落地；dev3.1（一对一倾听）、dev3.2（自制教玩具）、dev3.3（课程审议活动）、dev3.4（登录系统恢复）、dev3.5（幼儿个体发展档案）已完成。
 - 架构方向：Docker Compose AIO 编排，Monorepo，渐进式微服务化。
 - 开发策略：先架构后编码；每完成一个步骤同步更新本文件与 progress.md
 
@@ -85,7 +85,7 @@
 
 ## 5. 阶段 1 & 2 已实现文件清单
 
-### 数据库表（Alembic 当前 head：最新迁移版本，含 ai_api_key 表）
+### 数据库表（Alembic 当前 head：`2ea4743f8fa7`，已清理旧版本遗留表）
 
 | 表名 | 迁移版本 | 主要字段 |
 |------|---------|----------|
@@ -93,10 +93,19 @@
 | `semester_config` | `fd6d29f921b4` | id, tenant_id, user_id, semester_name, start_date, end_date, is_active |
 | `class_config` | `67b4aef28796` | id, tenant_id, user_id, grade, class_name, indoor_areas, outdoor_content |
 | `ai_api_key` | 阶段3迁移 | id, tenant_id, user_id, api_base_url, model_name, api_key_encrypted, is_active |
+| `daily_plan` | 阶段3迁移 | id, tenant_id, user_id, plan_date, content_json, status |
+| `prompt_template` | 阶段3迁移 | id, tenant_id, user_id, template_name, task_type, content |
+| `export_record` | 阶段3迁移 | id, tenant_id, user_id, export_type, file_path, record_ref |
+| `game_observation` | 阶段3迁移 | id, tenant_id, user_id, content_json, images_json |
+| `listening_record` | dev3.1 | id, tenant_id, user_id, child_info, observation_json |
+| `homemade_teaching_toy` | dev3.2 | id, tenant_id, user_id, name, description, images_json |
+| `course_review_activity` | dev3.3 | id, tenant_id, user_id, title, content_json, status |
 
 所有表均含 `created_at`、`updated_at`，并建立 `(tenant_id, user_id)` 联合索引。
 
 **安全约束**：`ai_api_key.api_key_encrypted` 仅存 Fernet 密文，明文禁止入库、禁止写日志。
+
+**已清理旧表**（迁移 `2ea4743f8fa7`）：`daily_plans`、`weekly_plans`、`semester_settings`、`prompts`、`ai_call_logs`、`ai_config`、`app_settings`
 
 ### 核心模块
 

@@ -75,7 +75,7 @@ auth / core 为横切支撑
 .venv/bin/alembic upgrade head
 ```
 
-- 当前 head：`a6c4d8e2f9b1`。表清单：`user` / `semester_config` / `class_config` / `ai_api_key` / `daily_plan` / `prompt_template` / `export_record` / `game_observation` / `game_observation_image` / `listening_record` / `listening_domain` / `listening_image` / `listening_indicator_result` / `indicator_catalog` / `homemade_teaching_toy` / `course_review_activity`。
+- 当前 head：`4b7c2d1e8f0a`。表清单：`user` / `semester_config` / `class_config` / `ai_api_key` / `daily_plan` / `prompt_template` / `export_record` / `game_observation` / `game_observation_image` / `listening_record` / `listening_domain` / `listening_image` / `listening_indicator_result` / `indicator_catalog` / `homemade_teaching_toy` / `course_review_activity` / `personal_development_record`。
 - 连接串含 `@`、`%` 等特殊字符需 URL 编码；`alembic/env.py` 已对 `%` 做 `%%` 转义。
 
 ## 4. AI 集成约定
