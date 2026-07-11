@@ -61,7 +61,7 @@ auth / core 为横切支撑
 
 ### 审计日志
 
-`app/core/audit.py` 的 `log_audit(action, *, tenant_id, user_id, **detail)`，结构化记录。已接入审计点：`login_success` / `change_password` / `ai_split` / `ai_generate` / `export_word`。审计调用内部包裹 try/except，**绝不影响主流程**。
+`app/core/audit.py` 的 `log_audit(action, *, tenant_id, user_id, **detail)`，结构化记录。已接入审计点：`login_success` / `change_password` / `ai_split` / `ai_generate` / `export_word` / `ai_listening` / `export_listening` / `ai_homemade_teaching` / `export_homemade_teaching` / `ai_course_review_activity` / `export_course_review_activity`。审计调用内部包裹 try/except，**绝不影响主流程**。
 
 ## 3. 数据库与迁移
 
@@ -75,7 +75,7 @@ auth / core 为横切支撑
 .venv/bin/alembic upgrade head
 ```
 
-- 当前 head：`d60766786069`。表清单：`users` / `semester_config` / `class_config` / `ai_api_key` / `daily_plan` / `prompt_template` / `export_records`。
+- 当前 head：`a6c4d8e2f9b1`。表清单：`user` / `semester_config` / `class_config` / `ai_api_key` / `daily_plan` / `prompt_template` / `export_record` / `game_observation` / `game_observation_image` / `listening_record` / `listening_domain` / `listening_image` / `listening_indicator_result` / `indicator_catalog` / `homemade_teaching_toy` / `course_review_activity`。
 - 连接串含 `@`、`%` 等特殊字符需 URL 编码；`alembic/env.py` 已对 `%` 做 `%%` 转义。
 
 ## 4. AI 集成约定
@@ -83,14 +83,112 @@ auth / core 为横切支撑
 - 统一入口 `app/integration/ai_client/base.py::call_ai`（httpx 超时 60s + tenacity 指数退避重试 3 次）。
 - 返回值强约束 JSON schema，解析失败抛 `AiParseError` 并记录日志。
 - 拆分 / 适配 / 一日活动生成分别封装在 `lesson_plan_client.py` / `adapt_client.py` / `generate_client.py`，各自内置默认 system prompt；数据库激活的提示词优先覆盖默认。
+- 一对一倾听视觉生成：`listening_client.py`（每领域 1 次视觉调用）。
+- 自制教玩具文本生成：`homemade_teaching_client.py`。
+- 课程审议活动文本生成：`course_review_activity_client.py`。
 
 ## 5. Word 导出约定
 
-- 主方案 `python-docx`，打开 `templates/teacherplan.docx`（19 行 2 列单表）按单元格填充，禁止自行重排结构。
-- 差异段落字体设为红色 `RGBColor(255, 0, 0)`；中文需显式指定字体（宋体），否则乱码。
+- 主方案 `python-docx`，按模板单元格填充，禁止自行重排结构。
+- 中文需显式指定字体（宋体），否则乱码；复用 `_set_font` 辅助函数。
 - 模板缺失时降级 `_export_from_scratch` 从零建表。
 
-## 6. 测试规范
+**模板与导出器对应：**
+
+| 模板                                            | 导出器                                 | 用途                                                                    |
+| ----------------------------------------------- | -------------------------------------- | ----------------------------------------------------------------------- |
+| `templates/teacherplan.docx`                  | `observation_exporter.py`            | 每日活动计划导出（19 行 2 列单表），差异段落标红`RGBColor(255, 0, 0)` |
+| `templates/OneOnOneListeningSmallSecond.docx` | `listening_exporter.py`              | 一对一倾听导出（5 个领域表格），支持合并/按领域拆分/批量按领域三种模式  |
+| `templates/homemadeteaching.docx`             | `homemade_teaching_exporter.py`      | 自制教玩具导出（5 行 2 列表格）                                         |
+| `templates/coursereviewactivity.docx`         | `course_review_activity_exporter.py` | 课程审议活动导出（第一张空白表），填充后删除后方示例内容                |
+
+## 6. 子系统说明
+
+### 6.1 一对一倾听观察（dev3.1）
+
+教师对单个幼儿按健康/语言/社会/艺术/科学五大领域做一对一倾听观察，每领域独立观察年月 + 3 个工作日 + 3 张绘画 → 每领域 1 次视觉 AI 调用，返回目标/3 图描述/各二级指标星级/综合评价/支持策略。
+
+**数据库表：**
+
+| 表名                           | 说明                                                                                                                          |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `listening_record`           | 主表：一个幼儿一次记录（obs_year/month、child_name、adult_count、child_age、grade、term、class_name、observer）               |
+| `listening_domain`           | 每记录 5 条：领域级 obs_year/month、date_1/2/3、goals、evaluation、support_strategy                                           |
+| `listening_image`            | 每领域 ≤3 张：domain、image_index、blob_content、mime/尺寸、image_description                                                |
+| `listening_indicator_result` | 每记录每领域每二级指标一条：catalog_id、stars(1~3)                                                                            |
+| `indicator_catalog`          | 参考数据（迁移预置小班下学期 5 领域共 30 个二级指标）：grade/term/domain/level1/level2/sort_order/standard_star1..3/max_stars |
+
+**核心模块：**
+
+| 文件                                                  | 职责                                     |
+| ----------------------------------------------------- | ---------------------------------------- |
+| `app/core/models/listening_record.py`               | ORM 模型                                 |
+| `app/repository/listening_repository.py`            | record/domain/indicator_result 读写      |
+| `app/repository/listening_image_repository.py`      | 图片 CRUD                                |
+| `app/integration/ai_client/listening_client.py`     | 视觉 AI 调用，每领域 1 次                |
+| `app/service/listening_service.py`                  | 业务编排：生成、保存、导出               |
+| `app/integration/word_export/listening_exporter.py` | 三种导出模式：合并/按领域拆分/批量按领域 |
+| `app/ui/pages/one_on_one_listening.py`              | 路由`/one-on-one-listening`            |
+
+**关键行为：**
+
+- 领域时间独立：每领域各自 obs_year/month + 3 工作日；自动选取前三周各一工作日（排除节假日）。
+- 图片统一横版：上传即 `normalize_to_landscape`；一键导入 15 张，按文件名排序每 3 张分配五领域。
+- 星级默认值：AI 生成 1~3 星；未涉及指标默认 3 星；用户可改。
+- 提示词管理：`task_type=one_on_one_listening` 接入多版本管理。
+- 审计：`ai_listening`、`export_listening`。
+
+### 6.2 自制教玩具（dev3.2）
+
+教师在设置页维护年级、班级名称与教师姓名；系统读取配置后调用文本 AI，生成「教玩具名称 / 所用材料 / 玩法」结构化 JSON，保存到数据库，并按 `templates/homemadeteaching.docx` 导出 Word。
+
+**数据库变更：**
+
+| 表名                      | 变更                                                                                  |
+| ------------------------- | ------------------------------------------------------------------------------------- |
+| `class_config`          | 增列`teacher_name VARCHAR(64) NULL`                                                 |
+| `homemade_teaching_toy` | 新表：grade、class_name、teacher_name、toy_name、materials、play_methods、ai_raw_json |
+| `prompt_template`       | task_type 增`homemade_teaching`                                                     |
+
+**核心模块：**
+
+| 文件                                                          | 职责                                   |
+| ------------------------------------------------------------- | -------------------------------------- |
+| `app/core/models/homemade_teaching.py`                      | ORM 模型                               |
+| `app/repository/homemade_teaching_repository.py`            | CRUD，强制 tenant/user 隔离            |
+| `app/integration/ai_client/homemade_teaching_client.py`     | 文本 AI JSON 生成                      |
+| `app/service/homemade_teaching_service.py`                  | 取文本 AI Key、读取提示词、生成并审计  |
+| `app/integration/word_export/homemade_teaching_exporter.py` | 填充`homemadeteaching.docx` 5 行表格 |
+| `app/ui/pages/homemade_teaching.py`                         | 路由`/homemade-teaching`             |
+
+**审计：** `ai_homemade_teaching`、`export_homemade_teaching`。
+
+### 6.3 课程审议活动（dev3.3）
+
+教师填写活动名称、幼儿人数、活动时间并粘贴原始教案；系统读取年龄段、班级名称和教师姓名，调用文本 AI 拆分教案并生成课程审议调整内容，保存到数据库，并按 `templates/coursereviewactivity.docx` 导出 Word。
+
+**数据库变更：**
+
+| 表名                       | 变更                                                                        |
+| -------------------------- | --------------------------------------------------------------------------- |
+| `course_review_activity` | 新表：设置快照、活动信息、原稿、拆分字段、审议调整、二次修改稿、ai_raw_json |
+| `prompt_template`        | task_type 增`course_review_activity`                                      |
+| `export_records`         | 增列`course_review_activity_id BIGINT NULL`                               |
+
+**核心模块：**
+
+| 文件                                                               | 职责                                           |
+| ------------------------------------------------------------------ | ---------------------------------------------- |
+| `app/core/models/course_review_activity.py`                      | ORM 模型                                       |
+| `app/repository/course_review_activity_repository.py`            | CRUD，强制 tenant/user 隔离                    |
+| `app/integration/ai_client/course_review_activity_client.py`     | 文本 AI JSON 生成，校验审议字段与布尔字段      |
+| `app/service/course_review_activity_service.py`                  | 取文本 AI Key、读取提示词、生成并审计          |
+| `app/integration/word_export/course_review_activity_exporter.py` | 填充`coursereviewactivity.docx` 第一张空白表 |
+| `app/ui/pages/course_review_activity.py`                         | 路由`/course-review-activity`                |
+
+**审计：** `ai_course_review_activity`、`export_course_review_activity`。
+
+## 7. 测试规范
 
 ```bash
 .venv/bin/pytest tests/ -q            # 全量
@@ -101,21 +199,21 @@ auth / core 为横切支撑
 - `tests/conftest.py` 提供 `async_session` fixture（SQLite 内存库，每测试函数建表/拆表）。
 - AI / Word / DB 调用使用 mock / fixture 隔离；每个 service 函数必须有单元测试。
 - API 路由测试用 `httpx.ASGITransport` 构建独立 FastAPI app，`dependency_overrides[get_db]` 注入内存库会话，`monkeypatch` 覆盖 `settings.API_KEYS`。
-- 当前基线：**242 passed, 0 warnings**。
+- 当前基线：**543 passed, 0 warnings**。
 
-## 7. 对外 REST API 开发
+## 8. 对外 REST API 开发
 
 - 路由集中在 `app/api/routes.py`，鉴权依赖 `app/api/auth.py::get_api_principal`，响应模型在 `app/api/schemas.py`（不暴露密钥/密码）。
 - 鉴权返回 `ApiPrincipal(tenant_id=...)`，端点以该 `tenant_id` 作为查询隔离条件。新增端点务必沿用此模式，禁止从查询参数直接取 `tenant_id`。
 - 详见 [API.md](API.md)。
 
-## 8. 部署（生产）
+## 9. 部署（生产）
 
 - 云服务器直装 + systemd 托管 `python -m app.main`，前置 Nginx 反向代理（TLS、限流、来源限制）。
 - 启用对外 API：在 `.env` 配置 `API_KEYS`（建议同时配置 `API_SIGNING_SECRET`），并在反向代理层限制 `/api/` 来源 IP。
 - 备份：定期备份 MySQL 与 `exports/` 导出文件。
 
-## 9. 常见陷阱
+## 10. 常见陷阱
 
 1. NiceGUI 底层 async，UI 状态更新需正确传递；`DatePanel` 回调若为 async 须 `await`。
 2. SQLite 测试与 MySQL 类型差异：主键用 `with_variant`。
@@ -123,26 +221,26 @@ auth / core 为横切支撑
 4. Alembic autogenerate 不识别全部约束，迁移后人工核对 SQL。
 5. 远程 MySQL 域名若有 AAAA 记录可能导致 IPv6 连接超时；必要时连接串直接用 IPv4。
 
-## 10. 手动验证步骤（账号管理第二阶段）
+## 11. 手动验证步骤（账号管理第二阶段）
 
 完整测试清单见 [MANUAL_TESTING.md](MANUAL_TESTING.md)。
 
 1. 初始化系统管理员
-    - 设置环境变量：`BOOTSTRAP_ADMIN_ENABLED=true`、`BOOTSTRAP_ADMIN_PASSWORD=<强密码>`，可选设置 tenant 和用户名。
-    - 执行：`.venv/bin/python -m app.jobs.bootstrap_admin`
-    - 预期：首次创建成功；重复执行提示已存在并跳过。
+   - 设置环境变量：`BOOTSTRAP_ADMIN_ENABLED=true`、`BOOTSTRAP_ADMIN_PASSWORD=<强密码>`，可选设置 tenant 和用户名。
+   - 执行：`.venv/bin/python -m app.jobs.bootstrap_admin`
+   - 预期：首次创建成功；重复执行提示已存在并跳过。
 2. 登录与入口可见性
-    - 使用系统管理员登录，主页可见“账号管理”。
-    - 使用教师账号登录，主页不可见“账号管理”；直接访问 `/user-admin` 显示无权限。
+   - 使用系统管理员登录，主页可见“账号管理”。
+   - 使用教师账号登录，主页不可见“账号管理”；直接访问 `/user-admin` 显示无权限。
 3. 创建账号
-    - 在 `/user-admin` 创建 teacher / teaching_admin 账号。
-    - 预期：创建成功后列表刷新可见；重复用户名提示失败。
+   - 在 `/user-admin` 创建 teacher / teaching_admin 账号。
+   - 预期：创建成功后列表刷新可见；重复用户名提示失败。
 4. 启停账号
-    - 在账号列表对某教师执行停用。
-    - 预期：该账号登录失败；重新启用后可再次登录。
+   - 在账号列表对某教师执行停用。
+   - 预期：该账号登录失败；重新启用后可再次登录。
 5. 重置密码
-    - 在账号列表对某账号执行重置密码。
-    - 预期：旧密码登录失败，新密码登录成功。
+   - 在账号列表对某账号执行重置密码。
+   - 预期：旧密码登录失败，新密码登录成功。
 6. 筛选与分页
-    - 输入用户名关键字筛选，并切换页码。
-    - 预期：结果总数、当前页数据与分页按钮状态正确。
+   - 输入用户名关键字筛选，并切换页码。
+   - 预期：结果总数、当前页数据与分页按钮状态正确。
