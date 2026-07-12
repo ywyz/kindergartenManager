@@ -1,7 +1,6 @@
 services:
-  # ── 反向代理（Caddy：自动 HTTPS + 反向代理）──────────────────────────────
   caddy:
-    image: caddy:2-alpine
+    image: github.ywyz.tech/caddy:2-alpine
     restart: unless-stopped
     ports:
       - "80:80"
@@ -15,7 +14,6 @@ services:
     networks:
       - kindergarten_net
 
-  # ── 主系统（NiceGUI 前后端一体化）──────────────────────────────────────
   app:
     build: .
     environment:
