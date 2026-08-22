@@ -1,5 +1,7 @@
 # 幼儿园信息管理系统 — 顶层总览
 
+> **历史文档说明（2026-08-22）**：本文保留旧阶段的产品与微服务规划，不能作为当前部署事实。当前权威状态见 [`../CONTEXT.md`](../CONTEXT.md)、[`../docs/ROADMAP.md`](../docs/ROADMAP.md) 与 [`../docs/design/system-architecture.md`](../docs/design/system-architecture.md)。当前 `main` 是单用户 NiceGUI 模块化单体，`services/` 尚无独立服务实现。
+
 本系统是面向幼儿园教研场景的 **教学管理平台**，提供日常教学计划生成、游戏观察记录等功能。
 
 ---

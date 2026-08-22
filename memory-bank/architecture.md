@@ -1,5 +1,7 @@
 # 幼儿园教学管理系统架构文档（初始化）
 
+> **历史文档说明（2026-08-22）**：本文按开发阶段累积，包含已被后续单用户模式取代的登录描述和旧迁移/测试数字。当前架构事实见 [`../CONTEXT.md`](../CONTEXT.md)、[`../docs/design/system-architecture.md`](../docs/design/system-architecture.md)、[`../docs/design/data-model.md`](../docs/design/data-model.md) 和 [`../docs/ADR/README.md`](../docs/ADR/README.md)。受控 Agent 只处于已确认设计状态，边界见 [`../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md`](../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md) 与 [`../docs/design/agent-runtime.md`](../docs/design/agent-runtime.md)；下文历史内容不授权 Agent 实现或 WRITE。当前 Alembic head 为 `a6c4d8e2f9b1`。
+
 ## 1. 当前阶段
 
 - 项目阶段：M2/M3 已完成；二期 REST API 已落地；v3.0.1 单用户模式重构完成。

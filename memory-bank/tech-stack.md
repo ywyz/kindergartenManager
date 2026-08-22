@@ -1,5 +1,7 @@
 # 幼儿园教学管理系统推荐技术栈（简单且健壮）
 
+> **历史选型说明（2026-08-22）**：本文包含渐进式微服务规划。当前实际架构是 NiceGUI 模块化单体，默认 SQLite、可选 MySQL；以 [`../docs/design/system-architecture.md`](../docs/design/system-architecture.md) 和 ADR 为准。
+
 ## 结论（首推）
 采用 **Python 单体应用**：
 - 前后端：NiceGUI（基于 FastAPI）
