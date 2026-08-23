@@ -1,6 +1,6 @@
 # KindergartenManager 受控 AI Agent Runtime 设计
 
-> 状态：已确认设计；F003 contracts/关闭 registry 与 F004 Context/READ 投影已实现，F005 及以后未授权。本文落实
+> 状态：已确认设计；F003 contracts/关闭 registry、F004 Context/READ 投影已实现，F005 PlanPatch 为 GREEN 候选；F006 已获条件授权。本文落实
 > [ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md)，不代表完整 Agent 已进入当前产品，也不授权
 > 提交、推送、合并或发布。
 
@@ -44,6 +44,7 @@ app/service/agent/
   context.py         # 已实现：按 intent 最小构建和数据裁剪
   read_service.py    # 已实现：tenant+user 四类 READ 投影
   registry.py        # 已实现：关闭 Tool registry
+  patch.py           # GREEN 候选：关闭路径、完整绑定、规范 PlanPatch
   runtime.py         # 未实现：单 operation loop、上限、取消、迟到丢弃
   tools.py           # 未实现：READ/DRAFT 应用工具
 
@@ -54,7 +55,7 @@ app/ui/components/
   agent_draft.py     # 状态、回答、字段差异、取消/丢弃
 ```
 
-标为“已实现”的文件已进入 F003-F004；其余目录仍只是设计目标。后续实现时若现有层次出现更小而清晰的
+标为“已实现”或“GREEN 候选”的文件已进入 F003-F005；其余目录仍只是设计目标。后续实现时若现有层次出现更小而清晰的
 seam，可在不放宽本契约的前提下调整文件拆分。
 
 ## 4. 核心类型

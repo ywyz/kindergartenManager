@@ -7,6 +7,22 @@ from typing import TypeAlias
 from uuid import UUID
 
 
+DAILY_PLAN_SECTION_PATHS = (
+    "activity_goal",
+    "activity_prep",
+    "activity_key",
+    "activity_difficult",
+    "activity_process_original",
+    "activity_process_adapted",
+    "morning_activity",
+    "indoor_area",
+    "outdoor_activity",
+    "morning_talk_topic",
+    "morning_talk_questions",
+    "daily_reflection",
+)
+
+
 class Permission(str, Enum):
     """Permissions reserved by the Agent contract."""
 

@@ -18,6 +18,7 @@ from app.repository.daily_plan_repository import (
 )
 from app.repository.semester_repository import get_active_semester
 from app.service.agent.contracts import (
+    DAILY_PLAN_SECTION_PATHS,
     CalendarDayType,
     CalendarEvaluationProjection,
     ClassAreasProjection,
@@ -32,20 +33,7 @@ from app.service.agent.canonical import canonical_sha256
 from app.service.date_service import is_within_semester
 
 MAX_PROJECTION_TEXT_LENGTH = 4096
-PLAN_SECTION_PATHS = (
-    "activity_goal",
-    "activity_prep",
-    "activity_key",
-    "activity_difficult",
-    "activity_process_original",
-    "activity_process_adapted",
-    "morning_activity",
-    "indoor_area",
-    "outdoor_activity",
-    "morning_talk_topic",
-    "morning_talk_questions",
-    "daily_reflection",
-)
+PLAN_SECTION_PATHS = DAILY_PLAN_SECTION_PATHS
 
 
 @dataclass(frozen=True, slots=True)

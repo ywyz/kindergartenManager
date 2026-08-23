@@ -301,6 +301,7 @@ async def test_successful_patch_construction_changes_neither_database_nor_ui_bod
 ):
     patch = _patch_module()
     plan = await _seed_plan(async_session)
+    await async_session.refresh(plan)
     ui_body = _ui_body()
     before_ui = dict(ui_body)
     before_database = (plan.activity_goal, plan.activity_prep, plan.updated_at)
@@ -324,6 +325,7 @@ async def test_rejected_patch_changes_neither_database_nor_ui_body(
     async_session: AsyncSession,
 ):
     plan = await _seed_plan(async_session)
+    await async_session.refresh(plan)
     ui_body = _ui_body()
     before_ui = dict(ui_body)
     before_database = (plan.activity_goal, plan.activity_prep, plan.updated_at)

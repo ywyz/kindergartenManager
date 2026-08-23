@@ -1,7 +1,7 @@
 # KindergartenManager 项目上下文
 
 > 状态快照：2026-08-23；Agent 安全同步 RED 基线：`5de2e49bee19749f611b50747a31be9464b92d7b`；
-> 当前检出分支：`feat/agent-foundation`（F003 已固定 GREEN；F004 为 GREEN 候选，交付精确 SHA 以 Git HEAD、远端 ref 和 CI `headSha` 回读为准）；
+> 当前检出分支：`feat/agent-foundation`（F004 已固定 GREEN；F005 为 GREEN 候选，交付精确 SHA 以 Git HEAD、远端 ref 和 CI `headSha` 回读为准）；
 > 最近远端产品主线：`origin/main@cfeadefd7dfa056c1b3757876658493110d8cf84`。
 >
 > 本文件用于回答“当前仓库实际上是什么、哪些事实已经确认、下一步可以做什么”。
@@ -35,7 +35,7 @@
 ## 3. 当前产品定位
 
 KindergartenManager 是一个 Python 3.14.7、NiceGUI 前后端一体化的幼儿园教学管理应用。
-当前检出 `feat/agent-foundation` 推进 F004，其安全 RED 起点为 `5de2e49bee19749f611b50747a31be9464b92d7b`；
+当前检出 `feat/agent-foundation` 推进 F005，其安全 RED 起点为 `5de2e49bee19749f611b50747a31be9464b92d7b`；
 最近远端产品主线为 `origin/main@cfeadefd7dfa056c1b3757876658493110d8cf84`。两者都保持可打包、可本地运行、
 也可用 Docker 部署的模块化单体定位，主要能力包括：
 
@@ -99,19 +99,20 @@ UI 的固定单用户身份与 API 的租户主体是两个不同边界，不得
 - 最近远端产品主线为 `origin/main@cfeadefd7dfa056c1b3757876658493110d8cf84`；
   本地 `main` 引用仍落后，不作为当前远端证据。
 - 当前远端仍有 `origin/dev3.4` 和 `origin/dev4.0`；没有发现 `origin/dev5.0`、`origin/dev6.0` 或 `origin/trae-dev-v6.0`。本轮未获授权删除任何分支。
-- `feat/agent-foundation` 的 F003 已固定为 `e96d79e6a86aea5218f71dbb0c61202983581f55` 并通过远端 Quality；当前已获授权实施且仅实施 F004，F005、合入 `main` 或其他后续行为仍需独立授权。
+- `feat/agent-foundation` 的 F004 已固定为 `729f446e4e462250156be84037c72e9efdf2c1e3`，远端 Quality `headSha` 完全匹配且成功。F005 稳定 RED 为 `6c8e2c261632be889cfc9f2278942bff51417ee1`，当前为 GREEN 候选；F006 已获条件授权，但只能在 F005 固定 SHA Review/CI 通过后进入。合入 `main` 或其他后续行为仍需独立授权。
 
 ## 8. 已确认的下一能力：受控 AI Agent
 
 项目已接受 [ADR-0005](docs/ADR/ADR-0005-controlled-ai-agent-runtime.md) 并完成
-[Agent Runtime 设计](docs/design/agent-runtime.md)。当前代码已实现 F003 的 contracts 与关闭 registry；
-F004 已最小实现冻结 Context 与 tenant+user READ 投影，尚无 Tool 实现、Provider、Runtime、UI 或持久化，
-不得宣称整个 Agent Foundation 已实现。
+[Agent Runtime 设计](docs/design/agent-runtime.md)。当前代码已实现 F003 的 contracts 与关闭 registry、F004 的
+冻结 Context 与 tenant+user READ 投影；F005 已最小实现纯内存、关闭字段路径且规范哈希的 `PlanPatch`，
+尚无 Tool 实现、Provider、Runtime、UI 或持久化，不得宣称整个 Agent Foundation 已实现。
 
 当前已冻结 [Foundation spec](specs/agent-foundation/spec.md)、[任务顺序](specs/agent-foundation/tasks.md) 和
 [Issue #48](https://github.com/ywyz/kindergartenManager/issues/48)。F002 在安全同步基线上仍稳定为同样的 4 RED；
 F003 只通过新增 contracts 与关闭 registry 使原 4 项 GREEN；F004 初始 RED 固定为 `8297fce…`，
-Review RED 为 `f1797e6…`；当前 Foundation 共 `9 passed`，没有 skip、xfail 或放宽原测试。
+Review RED 为 `f1797e6…`，固定 GREEN 为 `729f446…`；F005 RED 固定为 `6c8e2c2…`，当前 GREEN
+候选共 `24 passed`，没有 skip、xfail 或放宽原测试。
 
 首期范围只是每日活动计划页的单 Agent Foundation：
 
@@ -135,7 +136,7 @@ F003 固定 SHA 的双轴 Review 和远端 CI `headSha` 已通过。
 3. **投影边界需持续守卫**：API 列表显式使用 tenant 投影，UI 详情和子表使用 tenant + user 投影并已有跨 tenant/user 负向测试；新增查询仍必须选择并测试正确投影。
 4. **类型债务**：Ruff 已清零，但当前 Pyright 仍报告既有第三方类型与结构问题，尚未建立可执行的类型门禁。
 5. **发布证据漂移**：Linux 本地结果不能代替 Windows 安装、浏览器打开、模板 Word 保真和真实 AI/MySQL 验收。
-6. **远端质量证据需按 SHA 回读**：安全 RED 基线 `5de2e49…` 与 F003 固定 SHA `e96d79e6…` 的 push Quality 已通过；F004 仍必须以自身固定 `headSha` 回读，不能沿用旧 CI。
+6. **远端质量证据需按 SHA 回读**：F004 固定 SHA `729f446…` 的 push Quality 已通过；F005 必须以自身固定 `headSha` 回读，不能沿用旧 CI。
 7. **Agent 作用域风险**：当前 UI 是网络可达的固定管理员身份；首期 Agent 必须保持零写入，
    并拒绝 prompt injection、跨 tenant/user、动态工具和过期结果。
 
@@ -143,8 +144,8 @@ F003 固定 SHA 的双轴 Review 和远端 CI `headSha` 已通过。
 
 R1 基础修复的本地门禁已经通过，当前共同下一步是：
 
-1. 对 F004 GREEN 候选运行完整 Quality、无忽略依赖审计和 Foundation 9 项验证。
-2. 对 F004 固定 SHA 完成双轴 Review 和远端 Quality `headSha` 回读，然后停止；F005 不得自动开始。
+1. 对 F005 GREEN 候选运行完整 Quality、无忽略依赖审计和 Foundation 24 项验证。
+2. 对 F005 固定 SHA 完成双轴 Review 和远端 Quality `headSha` 回读；仅在该门禁通过后进入已授权的 F006 Provider port 与有界 Runtime。
 3. NiceGUI 多用户预备功能保持低优先级，不与 Agent Foundation 隐式捆绑。
 4. 本轮 Linux 本地证据为 Python 3.14.7、Ruff 0 错误、全新 SQLite 到 `a6c4d8e2f9b1`、全量 `551 passed`；Windows、Word、MySQL 和真实 AI 仍是独立人工门禁。
 

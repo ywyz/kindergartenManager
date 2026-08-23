@@ -1,6 +1,6 @@
 # Agent Foundation 冻结规格
 
-- 状态：F003 GREEN；F004 GREEN 候选，待固定 SHA Review/CI；F005 及以后未授权
+- 状态：F004 固定 GREEN；F005 GREEN 候选，待固定 SHA Review/CI；F006 已获条件授权
 - 分支：`feat/agent-foundation`
 - 安全同步 RED 基线：`5de2e49bee19749f611b50747a31be9464b92d7b`
 - Issue：[#48](https://github.com/ywyz/kindergartenManager/issues/48)
@@ -54,9 +54,9 @@
 6. 每日计划页只读/草案展示：运行、取消、失败、草案、丢弃；无采用/保存/确认。
 7. 全边界零持久化证明与目标平台人工验收。
 
-## 6. F002 RED、F003 GREEN 与 F004 RED/GREEN 检查点
+## 6. F002-F005 RED/GREEN 检查点
 
-切片 1 的公共行为测试放在 `specs/agent-foundation/tests/`，不进入常规 `pytest tests/` 质量套件。
+切片公共行为测试放在 `specs/agent-foundation/tests/`；从 F005 GREEN 起由 Quality 独立步骤执行，仍不混入常规 `pytest tests/` 套件。
 F002 原始 SHA `ad13a6aa3e44ff98b2604d4a008649cd66185d80` 和安全同步基线
 `5de2e49bee19749f611b50747a31be9464b92d7b` 均保留同样的 4 个预期 RED，原因为
 `app.service.agent` 公共模块不存在。
@@ -72,10 +72,15 @@ F003 不修改、skip、xfail 或放宽这 4 个测试；只新增 contracts 与
 F004 在同一目录新增公共行为测试，固定 tenant+user READ 投影、裁剪/冻结、日历降级、敏感正文
 `repr` 关闭、按 intent 最小 facts 和 `AgentContext` fingerprint。初始 4 项在 `8297fce…` 因
 `app.service.agent.read_service` / `context` 尚不存在而失败；Review RED `f1797e6…` 将 F004
-扩为 5 项并修正契约。GREEN 后预期总计 `9 passed`，不得 skip、xfail 或放宽测试。
+扩为 5 项并修正契约。固定 GREEN 为 `729f446…`，总计 `9 passed`。
+
+F005 在 `6c8e2c261632be889cfc9f2278942bff51417ee1` 固定 15 项公共行为 RED；24 项可完整收集，
+原 F003/F004 的 9 项继续 GREEN，新 15 项连续运行均只因 `app.service.agent.patch` 尚不存在而失败。
+GREEN 候选必须保持 `24 passed`，覆盖关闭且前缀无重叠的字段路径、operation/turn/target/fingerprint
+绑定、独立 before/after 校验、稳定排序与 canonical SHA-256，以及成功/拒绝路径对数据库和 UI 正文零变化。
 
 ## 7. 停止边界
 
-本分支当前授权到 F004 的 Context/READ 投影 GREEN 为止。固定 SHA 双轴 Review
-和远端 CI 回读后停止；F005 PlanPatch 及任何 Provider adapter、Tool 实现、
-UI 控件、schema/migration 或多用户工作都需要下一道明确授权。
+本分支当前授权到 F005 PlanPatch GREEN，并条件授权 F006 Provider port 与有界 Runtime。
+必须先完成 F005 固定 SHA 双轴 Review 和远端 CI 回读，才可进入 F006；F007 取消/超时/迟到丢弃、
+Tool 实现、UI 控件、schema/migration 或多用户工作仍需要下一道明确授权。
