@@ -41,6 +41,12 @@ class PlanPatchTarget:
     daily_plan_id: int
     plan_date: date
 
+    def __post_init__(self) -> None:
+        if type(self.daily_plan_id) is not int or self.daily_plan_id <= 0:
+            _reject("target_invalid")
+        if type(self.plan_date) is not date:
+            _reject("target_invalid")
+
 
 @dataclass(frozen=True, slots=True)
 class DraftPatchOperation:
@@ -105,6 +111,8 @@ def _validate_binding(
     if proposal.turn_id != context.turn_id:
         _reject("turn_mismatch")
 
+    if not isinstance(proposal.target, PlanPatchTarget):
+        _reject("target_invalid")
     target = PlanPatchTarget(
         daily_plan_id=projection.plan_id,
         plan_date=projection.plan_date,

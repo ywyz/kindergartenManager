@@ -113,7 +113,7 @@ R0 事实基线与图谱
 - 功能分支固定为 `feat/agent-foundation`；F002 原始 RED SHA 为 `ad13a6aa3e44ff98b2604d4a008649cd66185d80`。
 - `main@cfeadefd7dfa056c1b3757876658493110d8cf84` 通过双亲 merge commit 同步到 `5de2e49bee19749f611b50747a31be9464b92d7b`；该远端 SHA 的 Quality 已通过。
 - [冻结规格与停止边界](../specs/agent-foundation/spec.md)、[任务顺序](../specs/agent-foundation/tasks.md) 和 [Issue #48](https://github.com/ywyz/kindergartenManager/issues/48) 已建立。
-- `specs/agent-foundation/tests/` 的 F003/F004 9 项继续 GREEN；F004 固定 GREEN 为 `729f446…`；F005 稳定 RED 为 `6c8e2c2…`，当前 GREEN 候选总计 `24 passed`。
+- `specs/agent-foundation/tests/` 的 F003/F004 9 项继续 GREEN；F004 固定 GREEN 为 `729f446…`；F005 稳定 RED 为 `6c8e2c2…`，Review RED 为 `6097b1d…`，当前 GREEN 候选总计 `29 passed`。
 - 当前继续单用户；NiceGUI 多用户/RBAC 代码仅作为低优先级预备资产，不进入 Foundation 范围。
 - 是否仍保持模块化单体？服务拆分必须有独立 ADR 和运营理由。
 - 聚合事务和 tenant/user 投影修复后，每日计划、班级设置和日历的窄 Service 投影如何建立，使 Agent Tool 不直接调用 Repository？

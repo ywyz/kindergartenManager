@@ -112,7 +112,8 @@ UI 的固定单用户身份与 API 的租户主体是两个不同边界，不得
 [Issue #48](https://github.com/ywyz/kindergartenManager/issues/48)。F002 在安全同步基线上仍稳定为同样的 4 RED；
 F003 只通过新增 contracts 与关闭 registry 使原 4 项 GREEN；F004 初始 RED 固定为 `8297fce…`，
 Review RED 为 `f1797e6…`，固定 GREEN 为 `729f446…`；F005 RED 固定为 `6c8e2c2…`，当前 GREEN
-候选共 `24 passed`，没有 skip、xfail 或放宽原测试。
+候选在 Review RED `6097b1d…` 修正 SQLite 快照归一化并补严格 target/UI 依赖边界后，共
+`29 passed`，没有 skip、xfail 或放宽原测试。
 
 首期范围只是每日活动计划页的单 Agent Foundation：
 
@@ -144,7 +145,7 @@ F003 固定 SHA 的双轴 Review 和远端 CI `headSha` 已通过。
 
 R1 基础修复的本地门禁已经通过，当前共同下一步是：
 
-1. 对 F005 GREEN 候选运行完整 Quality、无忽略依赖审计和 Foundation 24 项验证。
+1. 对 F005 GREEN 候选运行完整 Quality、无忽略依赖审计和 Foundation 29 项验证。
 2. 对 F005 固定 SHA 完成双轴 Review 和远端 Quality `headSha` 回读；仅在该门禁通过后进入已授权的 F006 Provider port 与有界 Runtime。
 3. NiceGUI 多用户预备功能保持低优先级，不与 Agent Foundation 隐式捆绑。
 4. 本轮 Linux 本地证据为 Python 3.14.7、Ruff 0 错误、全新 SQLite 到 `a6c4d8e2f9b1`、全量 `551 passed`；Windows、Word、MySQL 和真实 AI 仍是独立人工门禁。

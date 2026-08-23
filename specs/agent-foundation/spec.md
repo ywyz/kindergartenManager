@@ -76,7 +76,10 @@ F004 在同一目录新增公共行为测试，固定 tenant+user READ 投影、
 
 F005 在 `6c8e2c261632be889cfc9f2278942bff51417ee1` 固定 15 项公共行为 RED；24 项可完整收集，
 原 F003/F004 的 9 项继续 GREEN，新 15 项连续运行均只因 `app.service.agent.patch` 尚不存在而失败。
-GREEN 候选必须保持 `24 passed`，覆盖关闭且前缀无重叠的字段路径、operation/turn/target/fingerprint
+Review 发现原 RED 的 SQLite `updated_at` 快照需先按数据库读回值归一化，并补充严格 target 类型与
+UI/DB 依赖 seam；修正后的 Review RED 为 `6097b1d194adff4528911821d34e0fdf393ca810`，稳定结果为
+`29 collected / 25 passed / 4 failed`，四项只因 `PlanPatchTarget` 尚未严格拒绝 bool/float/非正 ID/非 date。
+GREEN 候选必须保持 `29 passed`，覆盖关闭且前缀无重叠的字段路径、operation/turn/target/fingerprint
 绑定、独立 before/after 校验、稳定排序与 canonical SHA-256，以及成功/拒绝路径对数据库和 UI 正文零变化。
 
 ## 7. 停止边界

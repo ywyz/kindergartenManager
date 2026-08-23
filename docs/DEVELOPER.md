@@ -112,13 +112,15 @@ API 身份独立：`X-Api-Key` 映射到 tenant；配置 `API_SIGNING_SECRET` �
 
 测试使用 `httpx.MockTransport` 或 mock 边界，不调用真实 AI。
 
-### 6.1 受控 Agent Foundation（F003-F004 已实现）
+### 6.1 受控 Agent Foundation（F004 已固定，F005 GREEN 候选）
 
 实现前必须阅读 [ADR-0005](ADR/ADR-0005-controlled-ai-agent-runtime.md) 和
 [Agent Runtime 设计](design/agent-runtime.md)。规划依赖方向为：
 
-当前只存在 contracts/关闭 registry、tenant+user READ 投影和按 intent 白名单构建的冻结 Context；
-PlanPatch、Tool 执行、Provider、Runtime、UI 与持久化仍未实现且未授权。
+当前存在 contracts/关闭 registry、tenant+user READ 投影、按 intent 白名单构建的冻结 Context，
+以及纯内存、关闭字段路径和规范 SHA-256 的 PlanPatch GREEN 候选；Tool 执行、Provider、Runtime、
+UI 与持久化仍未实现。F006 Provider/Runtime 只在 F005 固定 SHA Review/CI 通过后获得执行授权，
+F007 及以后仍未授权。
 
 ```text
 ui/components/agent_draft
