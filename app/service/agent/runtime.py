@@ -79,20 +79,7 @@ class AgentContextStamp:
     base_fingerprint: str
 
     def __post_init__(self) -> None:
-        if (
-            type(self.context_id) is not UUID
-            or type(self.operation_id) is not UUID
-            or type(self.turn_id) is not UUID
-            or type(self.actor) is not TrustedActor
-            or type(self.actor.tenant_id) is not int
-            or not 0 < self.actor.tenant_id <= MAX_TOOL_ID
-            or type(self.actor.user_id) is not int
-            or not 0 < self.actor.user_id <= MAX_TOOL_ID
-            or type(self.active_scope) is not DailyPlanScope
-            or not _valid_stamp_scope(self.active_scope)
-            or type(self.base_fingerprint) is not str
-            or SHA256_HEX_PATTERN.fullmatch(self.base_fingerprint) is None
-        ):
+        if not _valid_context_stamp_fields(self):
             raise ValueError("agent_context_stamp_invalid")
 
     @classmethod
@@ -127,11 +114,11 @@ def _valid_stamp_scope(scope: DailyPlanScope) -> bool:
     return type(scope.plan_date) is date
 
 
-def _valid_context_stamp(value: object) -> bool:
+def _valid_context_stamp_fields(value: object) -> bool:
+    """Validate the complete closed stamp shape from one shared predicate."""
     try:
         return (
-            type(value) is AgentContextStamp
-            and type(value.context_id) is UUID
+            type(value.context_id) is UUID
             and type(value.operation_id) is UUID
             and type(value.turn_id) is UUID
             and type(value.actor) is TrustedActor
@@ -146,6 +133,10 @@ def _valid_context_stamp(value: object) -> bool:
         )
     except (AttributeError, TypeError):
         return False
+
+
+def _valid_context_stamp(value: object) -> bool:
+    return type(value) is AgentContextStamp and _valid_context_stamp_fields(value)
 
 
 def _freeze_json(value: object) -> object:
@@ -431,11 +422,15 @@ class AgentCurrentContextPort(Protocol):
 
 
 class _OperationStopped(Exception):
-    """Private control flow carrying only a stable public error code."""
+    """Runtime stop signal; port-raised instances are normalized at the boundary."""
 
     def __init__(self, code: str) -> None:
         super().__init__(code)
         self.code = code
+
+
+class _PortFailure(Exception):
+    """Sanitized marker for every exception originating inside a port call."""
 
 
 def _failure(code: str) -> AgentTurnOutcome:
@@ -449,6 +444,11 @@ def _stopped_outcome(code: str) -> AgentTurnOutcome:
             error_code="agent.cancelled",
         )
     return _failure(code)
+
+
+def _host_task_is_cancelling() -> bool:
+    task = asyncio.current_task()
+    return task is not None and bool(task.cancelling())
 
 
 class AgentRuntime:
@@ -474,6 +474,10 @@ class AgentRuntime:
         self._active_operation_id: UUID | None = None
         self._active_stamp: AgentContextStamp | None = None
         self._active_io_task: asyncio.Task[object] | None = None
+        self._active_io_cancel_sent = False
+        self._active_stop_event: asyncio.Event | None = None
+        self._active_drain_task: asyncio.Task[None] | None = None
+        self._active_run_released = True
         self._active_stop_code: str | None = None
 
     async def run_turn(self, *, context: AgentContext, intent: str) -> AgentTurnOutcome:
@@ -495,6 +499,9 @@ class AgentRuntime:
                 return _failure("agent.busy")
             self._active_operation_id = context.operation_id
             self._active_stamp = stamp
+            self._active_stop_event = asyncio.Event()
+            self._active_drain_task = None
+            self._active_run_released = False
             self._active_stop_code = None
 
         deadline = (
@@ -524,10 +531,9 @@ class AgentRuntime:
             async with self._state_lock:
                 if self._active_stamp == stamp:
                     final_stop_code = self._active_stop_code
-                    self._active_operation_id = None
-                    self._active_stamp = None
-                    self._active_io_task = None
-                    self._active_stop_code = None
+                    self._active_run_released = True
+                    if self._active_drain_task is None:
+                        self._clear_active_locked()
         if final_stop_code is not None:
             return _stopped_outcome(final_stop_code)
         return outcome
@@ -540,9 +546,11 @@ class AgentRuntime:
             if self._active_stamp != stamp or self._active_stop_code is not None:
                 return False
             self._active_stop_code = "agent.cancelled"
+            if self._active_stop_event is not None:
+                self._active_stop_event.set()
             active_task = self._active_io_task
             if active_task is not None and not active_task.done():
-                active_task.cancel()
+                self._request_port_cancel(active_task)
             return True
 
     async def _run_active(
@@ -576,15 +584,21 @@ class AgentRuntime:
             )
             try:
                 result = await self._await_port(
-                    self._provider.complete(request),
-                    operation_id=context.operation_id,
+                    lambda: self._provider.complete(request),
+                    expected_stamp=expected_stamp,
                     deadline=deadline,
                     max_duration_ms=self._limits.max_provider_duration_ms,
-                    cancelled_code="agent.provider_failed",
                 )
             except _OperationStopped:
                 raise
-            except Exception:
+            except _PortFailure:
+                gate_error = self._gate_error(
+                    context=context,
+                    expected_stamp=expected_stamp,
+                    deadline=deadline,
+                )
+                if gate_error is not None:
+                    return _stopped_outcome(gate_error)
                 return _failure("agent.provider_failed")
             gate_error = self._gate_error(
                 context=context,
@@ -650,18 +664,24 @@ class AgentRuntime:
             for call, descriptor, expected_patch in resolved_calls:
                 try:
                     execution = await self._await_port(
-                        self._executor.execute(call, context),
-                        operation_id=context.operation_id,
+                        lambda: self._executor.execute(call, context),
+                        expected_stamp=expected_stamp,
                         deadline=deadline,
                         max_duration_ms=min(
                             self._limits.max_tool_duration_ms,
                             descriptor.timeout_ms,
                         ),
-                        cancelled_code="agent.tool_failed",
                     )
                 except _OperationStopped:
                     raise
-                except Exception:
+                except _PortFailure:
+                    gate_error = self._gate_error(
+                        context=context,
+                        expected_stamp=expected_stamp,
+                        deadline=deadline,
+                    )
+                    if gate_error is not None:
+                        return _stopped_outcome(gate_error)
                     return _failure("agent.tool_failed")
                 gate_error = self._gate_error(
                     context=context,
@@ -697,51 +717,152 @@ class AgentRuntime:
 
     async def _await_port(
         self,
-        awaitable: object,
+        invoke: Callable[[], object],
         *,
-        operation_id: UUID,
+        expected_stamp: AgentContextStamp,
         deadline: float,
         max_duration_ms: int,
-        cancelled_code: str,
     ) -> object:
-        """Await one port call while retaining busy until cancellation is drained."""
-        if not hasattr(awaitable, "__await__"):
-            raise TypeError("agent_port_result_invalid")
-        task = asyncio.create_task(awaitable)
-        self._active_io_task = task
-        loop = asyncio.get_running_loop()
-        timeout_seconds = min(max_duration_ms / 1000, max(0.0, deadline - loop.time()))
-
-        def expire() -> None:
-            if (
-                self._active_operation_id == operation_id
-                and self._active_io_task is task
-                and self._active_stop_code is None
-            ):
-                self._active_stop_code = "agent.timeout"
-                task.cancel()
-
-        timeout_handle = loop.call_later(timeout_seconds, expire)
-        if self._active_stop_code is not None:
-            task.cancel()
-        try:
-            result = await task
-        except asyncio.CancelledError:
-            current_task = asyncio.current_task()
-            if current_task is not None and current_task.cancelling():
-                raise
-            raise _OperationStopped(self._active_stop_code or cancelled_code) from None
-        finally:
-            timeout_handle.cancel()
-            if self._active_io_task is task:
-                self._active_io_task = None
-
-        current_task = asyncio.current_task()
-        if current_task is not None and current_task.cancelling():
-            raise asyncio.CancelledError
+        """Return at the hard boundary while draining a defiant port in background."""
         if self._active_stop_code is not None:
             raise _OperationStopped(self._active_stop_code)
-        return result
+        try:
+            awaitable = invoke()
+        except BaseException:
+            raise _PortFailure from None
+        if not hasattr(awaitable, "__await__"):
+            raise _PortFailure
+        try:
+            task = asyncio.create_task(awaitable)
+        except BaseException:
+            raise _PortFailure from None
+        self._active_io_task = task
+        self._active_io_cancel_sent = False
+        loop = asyncio.get_running_loop()
+        timeout_seconds = min(max_duration_ms / 1000, max(0.0, deadline - loop.time()))
+        stop_event = self._active_stop_event
+        if stop_event is None:
+            self._request_port_cancel(task)
+            self._detach_port_task(task=task, expected_stamp=expected_stamp)
+            raise _OperationStopped("agent.cancelled")
+        stop_waiter = asyncio.create_task(stop_event.wait())
+        try:
+            done, _ = await asyncio.wait(
+                (task, stop_waiter),
+                timeout=timeout_seconds,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+        except asyncio.CancelledError:
+            stop_waiter.cancel()
+            stop_waiter.add_done_callback(self._discard_task_result)
+            self._request_port_cancel(task)
+            self._detach_port_task(task=task, expected_stamp=expected_stamp)
+            raise
+
+        stop_waiter.cancel()
+        stop_waiter.add_done_callback(self._discard_task_result)
+        if self._active_stop_code is not None or stop_waiter in done:
+            code = self._active_stop_code or "agent.cancelled"
+            await self._cancel_or_drain_port(
+                task=task,
+                expected_stamp=expected_stamp,
+            )
+            raise _OperationStopped(code)
+        if task not in done:
+            self._active_stop_code = "agent.timeout"
+            stop_event.set()
+            await self._cancel_or_drain_port(
+                task=task,
+                expected_stamp=expected_stamp,
+            )
+            raise _OperationStopped("agent.timeout")
+
+        if self._active_io_task is task:
+            self._active_io_task = None
+            self._active_io_cancel_sent = False
+        try:
+            return task.result()
+        except BaseException:
+            raise _PortFailure from None
+
+    async def _cancel_or_drain_port(
+        self,
+        *,
+        task: asyncio.Task[object],
+        expected_stamp: AgentContextStamp,
+    ) -> None:
+        """Deliver cancellation once, then detach if the port suppresses it."""
+        self._request_port_cancel(task)
+        await asyncio.sleep(0)
+        self._detach_port_task(task=task, expected_stamp=expected_stamp)
+
+    def _request_port_cancel(self, task: asyncio.Task[object]) -> None:
+        if (
+            self._active_io_task is task
+            and not self._active_io_cancel_sent
+            and not task.done()
+        ):
+            self._active_io_cancel_sent = True
+            task.cancel()
+
+    def _detach_port_task(
+        self,
+        *,
+        task: asyncio.Task[object],
+        expected_stamp: AgentContextStamp,
+    ) -> None:
+        if task.done():
+            self._discard_task_result(task)
+            if self._active_io_task is task:
+                self._active_io_task = None
+                self._active_io_cancel_sent = False
+            return
+        if self._active_drain_task is None:
+            self._active_drain_task = asyncio.create_task(
+                self._drain_port_task(task=task, expected_stamp=expected_stamp)
+            )
+
+    async def _drain_port_task(
+        self,
+        *,
+        task: asyncio.Task[object],
+        expected_stamp: AgentContextStamp,
+    ) -> None:
+        """Consume every late value/exception and release busy only after drain."""
+        try:
+            await task
+        except BaseException:
+            pass
+        current_drain = asyncio.current_task()
+        async with self._state_lock:
+            if self._active_stamp != expected_stamp:
+                return
+            if self._active_io_task is task:
+                self._active_io_task = None
+                self._active_io_cancel_sent = False
+            if self._active_drain_task is current_drain:
+                self._active_drain_task = None
+            if self._active_run_released:
+                self._clear_active_locked()
+
+    @staticmethod
+    def _discard_task_result(task: asyncio.Future[object]) -> None:
+        if not task.done():
+            return
+        try:
+            task.result()
+        except BaseException:
+            pass
+
+    def _clear_active_locked(self) -> None:
+        self._active_operation_id = None
+        self._active_stamp = None
+        self._active_io_task = None
+        self._active_io_cancel_sent = False
+        self._active_stop_event = None
+        self._active_drain_task = None
+        self._active_run_released = True
+        self._active_stop_code = None
 
     def _gate_error(
         self,
@@ -760,6 +881,10 @@ class AgentRuntime:
         try:
             context_stamp = AgentContextStamp.from_context(context)
             now = self._clock()
+        except asyncio.CancelledError:
+            if _host_task_is_cancelling():
+                raise
+            return "agent.context_stale"
         except Exception:
             return "agent.context_stale"
         if (
@@ -771,6 +896,10 @@ class AgentRuntime:
             return "agent.context_stale"
         try:
             current_stamp = self._context_state.current_stamp()
+        except asyncio.CancelledError:
+            if _host_task_is_cancelling():
+                raise
+            return "agent.context_stale"
         except Exception:
             return "agent.context_stale"
         if not _valid_context_stamp(current_stamp) or current_stamp != expected_stamp:
