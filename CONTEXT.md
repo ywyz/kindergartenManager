@@ -88,16 +88,20 @@ UI 的固定单用户身份与 API 的租户主体是两个不同边界，不得
 
 ## 7. 分支与仓库状态
 
-- 当前本地分支：`dev4.0`，跟踪 `origin/dev4.0`，审查起点为 `0657c3a`。
+- R1 基线已固定为 `dev4.0@1a72c2d4b439743e358e71a7bf4c5321e1d889f8`；Agent 规格工作位于独立分支 `feat/agent-foundation`。
 - 最近产品主线：`main` 与 `origin/main` 均为 `225fe139`；本文不会把尚未提交的审查改动写成主线已交付。
 - 当前远端仍有 `origin/dev3.4` 和 `origin/dev4.0`；没有发现 `origin/dev5.0`、`origin/dev6.0` 或 `origin/trae-dev-v6.0`。本轮未获授权删除任何分支。
-- 新功能从哪个分支开始、是否吸收其他历史分支，必须在相应任务开始前单独确认，不能由文档整理自动决定。
+- Agent Foundation 已按本轮授权从上述 R1 基线创建分支；这不授权 GREEN、合并或吸收其他历史分支。
 
 ## 8. 已确认的下一能力：受控 AI Agent
 
 项目已接受 [ADR-0005](docs/ADR/ADR-0005-controlled-ai-agent-runtime.md) 并完成
 [Agent Runtime 设计](docs/design/agent-runtime.md)，但当前代码、路由、数据表和用户界面中都没有 Agent，
 不得宣称已实现。
+
+当前已冻结 [Foundation spec](specs/agent-foundation/spec.md)、[任务顺序](specs/agent-foundation/tasks.md) 和
+[Issue #48](https://github.com/ywyz/kindergartenManager/issues/48)。首组契约/关闭 registry 测试处于稳定 RED；
+缺少 `app.service.agent` 是预期失败，不得用空壳、skip 或 xfail 消除，也不得据此开始 GREEN。
 
 首期范围只是每日活动计划页的单 Agent Foundation：
 

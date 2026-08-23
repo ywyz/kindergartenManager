@@ -102,21 +102,22 @@ R0 事实基线与图谱
 
 ## 7. R3：Agent Foundation 规格与分支决策
 
-状态：`设计中`（R1 本地基础已具备；等待本轮固定分支/spec/Issue/稳定 RED）。
+状态：`RED`（`feat/agent-foundation` 基于 `dev4.0@1a72c2d4`；规格与 [Issue #48](https://github.com/ywyz/kindergartenManager/issues/48) 已冻结；首组契约测试稳定 4 failed，尚未授权 GREEN）。
 
 已确认：[ADR-0005](ADR/ADR-0005-controlled-ai-agent-runtime.md) 和
 [Agent Runtime 设计](design/agent-runtime.md) 已经固定首期上限，即每日活动计划的单 Agent、
 4 个 READ、2 个 DRAFT、零持久化和零长期记忆。设计接受不代表 spec/Issue、RED 或实现已完成。
 
-开始前必须回答：
+冻结结果：
 
-- Agent 功能工作使用哪个经审查且固定的分支/SHA？当前维护审查分支不自动成为功能实现授权。
-- Agent Foundation 的 spec/Issue、任务顺序、稳定 RED 和停止边界是什么？
+- 功能分支固定为 `feat/agent-foundation`，R1 基线固定为 `dev4.0@1a72c2d4b439743e358e71a7bf4c5321e1d889f8`。
+- [冻结规格与停止边界](../specs/agent-foundation/spec.md)、[任务顺序](../specs/agent-foundation/tasks.md) 和 [Issue #48](https://github.com/ywyz/kindergartenManager/issues/48) 已建立。
+- `specs/agent-foundation/tests/` 首组 RED 可干净收集 4 项，并连续三次以缺少 `app.service.agent` 公共模块稳定失败；它与常规 R1 GREEN 套件分离。
 - 当前继续单用户；NiceGUI 多用户/RBAC 代码仅作为低优先级预备资产，不进入 Foundation 范围。
 - 是否仍保持模块化单体？服务拆分必须有独立 ADR 和运营理由。
 - 聚合事务和 tenant/user 投影修复后，每日计划、班级设置和日历的窄 Service 投影如何建立，使 Agent Tool 不直接调用 Repository？
 
-出口门禁：固定 spec、任务顺序、分支、Issue 和第一组稳定 RED。
+当前停止边界：不得实现 contracts/registry GREEN、Provider、Tool、UI 或 migration；下一步需新的明确授权。
 
 ## 8. R4A：受控 Agent Foundation READ/DRAFT
 
