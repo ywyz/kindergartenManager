@@ -13,7 +13,7 @@
 | F005 | 实现规范 PlanPatch | F004 | GREEN（`53dd2e8…`，双轴 Review/CI 通过） |
 | F006 | 实现 Provider port 与有界 Runtime | F005 | GREEN（RED `f0ab660…`；Review RED `6b083fa…`、`8831b3f…`、`79e005a…`、`51f5e5f…`；实现/重构 `99167ef…`；证据 `049b520…`；Review 0/0；本地 `73 + 551 passed`；CI `32644290676`） |
 | F007 | 实现取消/超时/context current-state/迟到丢弃 | F006 | GREEN（RED `55b8702…`；Review RED `08ada78…`、`ddca78d…`；候选 `51443a3…`；证据 `2fb4e6f…`；Review 0/0；本地 `110 + 551 passed`；CI `32648599591`） |
-| F008 | OpenAI-compatible Provider adapter、六个关闭 Tool executor、组合装配与每日计划 Agent UI | F007 固定 GREEN + Review/CI/Issue | 已授权；seam 已冻结，稳定 RED 待固定 |
+| F008 | OpenAI-compatible Provider adapter、六个关闭 Tool executor、组合装配与每日计划 Agent UI | F007 固定 GREEN + Review/CI/Issue | RED `79f1f93…`（`175 / 110 / 65`）；最小 GREEN 实施中 |
 | F009 | 零持久化全矩阵、Linux 浏览器 mock 与安全配置真实模型验收 | F008 固定 GREEN + Review/CI/Issue | 已授权，等待 F008 |
 
 F008 内部依赖顺序冻结为：
@@ -30,5 +30,5 @@ F008 内部依赖顺序冻结为：
 5. RED 后才依次执行最小 GREEN、双轴 Review、findings RED/修正、固定 SHA 本地验证、push、精确 Quality
    `headSha` 回读与 Issue #48 证据回写。只有这些门禁全闭合才把 F008 标为 GREEN 并进入 F009。
 
-当前只激活 F008 稳定 RED；F009 继续等待。全程禁止 migration、WRITE、长期记忆、产品多 Agent、合并 main、
+当前只激活 F008 最小 GREEN；F009 继续等待。全程禁止 migration、WRITE、长期记忆、产品多 Agent、合并 main、
 关闭 Issue 或发布。

@@ -1,6 +1,6 @@
 # KindergartenManager 受控 AI Agent Runtime 设计
 
-> 状态：已确认设计；F003-F007 已固定 GREEN；F008 seam 已冻结、稳定 RED 待固定，F009 仅在其前置门禁闭合后进入。本文落实
+> 状态：已确认设计；F003-F007 已固定 GREEN；F008 稳定 RED 已固定、正在实施最小 GREEN，F009 仅在其前置门禁闭合后进入。本文落实
 > [ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md)，不代表完整 Agent 已进入当前产品。本轮只授权在功能分支
 > 依序提交并推送 F007-F009；合并、关闭 Issue 或发布仍未授权。
 
@@ -389,6 +389,9 @@ F008 只在以下三个公共行为文件稳定 RED 后实施 GREEN：
 测试继续 GREEN，新增失败只指向尚不存在或尚未满足的 F008 public seam。不得用 skip/xfail、固定 sleep、
 真实网络/真实凭据、私有实现字段或 F009 验收来制造 RED。固定 RED commit 之后才允许最小 GREEN；GREEN 后
 仍须双轴 Review、Review findings 的新 RED/修正、固定 SHA Quality 和 Issue #48 证据闭合，才可进入 F009。
+
+固定 RED 为 `79f1f9346d748b67d74db0f75e5f36836353c852`；两次结果均为
+`175 collected / 110 passed / 65 failed`，旧 110 项保持 GREEN。当前只实施 F008 最小 GREEN。
 
 ## 12. 实现前置门禁
 

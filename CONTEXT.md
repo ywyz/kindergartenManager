@@ -1,7 +1,7 @@
 # KindergartenManager 项目上下文
 
 > 状态快照：2026-08-23；Agent 安全同步 RED 基线：`5de2e49bee19749f611b50747a31be9464b92d7b`；
-> 当前检出分支：`feat/agent-foundation`（F005-F007 已固定 GREEN；F008 seam 已冻结，稳定 RED 待固定）；
+> 当前检出分支：`feat/agent-foundation`（F005-F007 已固定 GREEN；F008 稳定 RED 已固定，正在实施最小 GREEN）；
 > 最近远端产品主线：`origin/main@cfeadefd7dfa056c1b3757876658493110d8cf84`。
 >
 > 本文件用于回答“当前仓库实际上是什么、哪些事实已经确认、下一步可以做什么”。
@@ -183,9 +183,9 @@ F003 固定 SHA 的双轴 Review 和远端 CI `headSha` 已通过。
 
 R1 基础修复的本地门禁已经通过，当前共同下一步是：
 
-1. F007 固定 GREEN、精确 Quality 与 Issue #48 证据均已闭合；F008 文档/spec/tasks seam 已冻结，下一步只固定
-   三个 F008 RED 文件及其可重复失败矩阵。
-2. F008 稳定 RED 固定前不得实施 GREEN；之后仍须独立完成 `最小 GREEN → 双轴 Review → 固定 SHA Quality → Issue`。
+1. F007 固定 GREEN、精确 Quality 与 Issue #48 证据均已闭合；F008 文档/spec/tasks seam 与稳定 RED
+   `79f1f9346d748b67d74db0f75e5f36836353c852` 已固定，结果为 `175 collected / 110 passed / 65 failed`。
+2. 当前只实施 F008 最小 GREEN；之后仍须独立完成 `双轴 Review → 固定 SHA Quality → Issue`。
    F009 的零持久化全矩阵、Linux 浏览器 mock 与安全配置真实模型验收继续等待 F008 全部门禁闭合。
 3. NiceGUI 多用户预备功能保持低优先级，不与 Agent Foundation 隐式捆绑。
 4. F006 最终实现/重构候选 `99167ef…` 的 Linux 本地证据为 Python 3.14.7、`pip check`/严格依赖审计通过、变更文件 Ruff 0 错误、全新 SQLite Alembic head `a6c4d8e2f9b1`、Foundation `73 passed` 与全量 `551 passed`；证据 SHA `049b520…` 的远端 Quality `32644290676` 全部成功。Windows、Word、MySQL 和真实 AI 仍是独立人工门禁。

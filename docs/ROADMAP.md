@@ -102,7 +102,7 @@ R0 事实基线与图谱
 
 ## 7. R3：Agent Foundation 规格与分支决策
 
-状态：`设计中`（F005-F007 固定 GREEN；F008 seam 已冻结，稳定 RED 待固定）。
+状态：`实现中`（F005-F007 固定 GREEN；F008 稳定 RED 已固定，正在实施最小 GREEN）。
 
 已确认：[ADR-0005](ADR/ADR-0005-controlled-ai-agent-runtime.md) 和
 [Agent Runtime 设计](design/agent-runtime.md) 已经固定首期上限，即每日活动计划的单 Agent、
@@ -129,7 +129,7 @@ ADR/design/spec/tasks 冻结，但稳定 RED 固定前不得实施 GREEN，也�
 
 ## 8. R4A：受控 Agent Foundation READ/DRAFT
 
-状态：`设计中`（F005-F007 固定 GREEN；F008 seam 已冻结，正在建立稳定 RED）。
+状态：`实现中`（F005-F007 固定 GREEN；F008 稳定 RED 已固定，正在实施最小 GREEN）。
 
 实现范围严格限定为：
 
@@ -164,6 +164,9 @@ F008 稳定 RED 固定在以下三个文件，且旧 Foundation 测试必须继�
 
 三个文件必须 collection clean、连续两次得到同一 collected/passed/failed 分布，且新增失败只指向尚未实现的
 F008 公共 seam；不得通过 skip/xfail、固定 sleep、真实网络/凭据或实现 F009 来制造 RED。之后才可进入最小 GREEN。
+
+F008 RED 已固定为 `79f1f9346d748b67d74db0f75e5f36836353c852`：`175 collected / 110 passed / 65 failed`
+连续两次一致，旧 110 项全部 GREEN；当前已进入最小 GREEN，F009 仍等待。
 
 完成证据必须包含：未知/WRITE Tool、额外参数、prompt injection、跨 tenant/user、取消、超时和
 过期结果的负向测试，以及所有路径对业务数据、页面正文、版本、preview、audit 和导出“零变化”的证明。

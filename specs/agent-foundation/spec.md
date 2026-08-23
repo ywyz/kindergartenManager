@@ -1,6 +1,6 @@
 # Agent Foundation 冻结规格
 
-- 状态：F005-F007 固定 GREEN；F008 seam 已冻结、稳定 RED 待固定；F009 仅在 F008 门禁闭合后进入
+- 状态：F005-F007 固定 GREEN；F008 稳定 RED 已固定、正在实施最小 GREEN；F009 仅在 F008 门禁闭合后进入
 - 分支：`feat/agent-foundation`
 - 安全同步 RED 基线：`5de2e49bee19749f611b50747a31be9464b92d7b`
 - Issue：[#48](https://github.com/ywyz/kindergartenManager/issues/48)
@@ -229,9 +229,12 @@ collected/passed/failed 分布；新增失败只因 F008 public seam 尚不存�
 建立 Review RED 并修正，直到 Standards `0`、Spec `0`，再提交/push 固定 SHA、核对 Quality 精确 `headSha`
 并回写 Issue #48。完成前不得进入 F009。
 
+F008 稳定 RED 已固定为 `79f1f9346d748b67d74db0f75e5f36836353c852`；连续两次均为
+`175 collected / 110 passed / 65 failed`，旧 110 项全部 GREEN。当前只允许实施 F008 最小 GREEN。
+
 ## 7. 当前授权与停止边界
 
 本分支从 `0880f64c419e4fc27c45f4a7207e547077736056` 获得 F007 → F008 → F009 连续授权，但必须逐切片闭合
 `RED → 最小 GREEN → 双轴 Review → 固定 SHA Quality → Issue 证据`，不得横向并行实现。F007 已闭合，
-当前只激活 F008 的稳定 RED；上述文档与 public seam 已冻结，但 RED 固定前不得实施具体 Provider adapter、六 Tool executor、组合装配或 UI GREEN。全程禁止合并 `main`、关闭 Issue、
+当前只激活 F008 最小 GREEN；上述文档、public seam 与稳定 RED 已冻结。全程禁止合并 `main`、关闭 Issue、
 发布、Agent WRITE、长期记忆、migration 或产品多 Agent。
