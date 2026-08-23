@@ -12,6 +12,9 @@ import os
 import secrets
 import stat
 import tempfile
+import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from pydantic import model_validator
@@ -20,6 +23,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from app.core.paths import app_data_dir
 
 logger = logging.getLogger("app.config")
+_SECRETS_THREAD_LOCK = threading.Lock()
 
 
 class _SecretsFileError(RuntimeError):
@@ -43,21 +47,122 @@ def _parse_kv_text(text: str) -> dict[str, str]:
 
 def _posix_open_flags(base_flags: int) -> int:
     no_follow = getattr(os, "O_NOFOLLOW", 0)
-    if not no_follow:
+    non_block = getattr(os, "O_NONBLOCK", 0)
+    close_on_exec = getattr(os, "O_CLOEXEC", 0)
+    if not no_follow or not non_block or not close_on_exec:
         raise _SecretsFileError("当前 POSIX 平台不支持安全打开密钥文件")
-    return base_flags | no_follow | getattr(os, "O_CLOEXEC", 0)
+    return base_flags | no_follow | non_block | close_on_exec
 
 
-def _harden_regular_fd(fd: int, path: Path) -> None:
+def _regular_fd_identity(fd: int, path: Path) -> os.stat_result:
     try:
         metadata = os.fstat(fd)
         if not stat.S_ISREG(metadata.st_mode):
             raise _SecretsFileError(f"密钥文件不是普通文件：{path}")
-        os.fchmod(fd, 0o600)
+        return metadata
     except _SecretsFileError:
         raise
     except OSError:
+        raise _SecretsFileError(f"无法安全检查密钥文件：{path}") from None
+
+
+def _harden_regular_fd(
+    fd: int,
+    path: Path,
+    identity: os.stat_result | None = None,
+) -> os.stat_result:
+    identity = identity or _regular_fd_identity(fd, path)
+    try:
+        os.fchmod(fd, 0o600)
+    except OSError:
         raise _SecretsFileError(f"无法安全设置密钥文件权限：{path}") from None
+    return identity
+
+
+def _path_matches_identity(path: Path, identity: os.stat_result) -> bool:
+    try:
+        current = path.lstat()
+    except FileNotFoundError:
+        return False
+    except OSError:
+        raise _SecretsFileError(f"无法检查密钥文件：{path}") from None
+    return (
+        stat.S_ISREG(current.st_mode)
+        and current.st_dev == identity.st_dev
+        and current.st_ino == identity.st_ino
+    )
+
+
+@contextmanager
+def _posix_lifecycle_file_lock(secrets_path: Path) -> Iterator[None]:
+    """用安全 sibling regular file 串行化跨进程密钥生命周期。"""
+    try:
+        import fcntl
+    except ImportError:
+        raise _SecretsFileError("当前 POSIX 平台不支持密钥文件进程锁") from None
+
+    lock_path = secrets_path.with_name(f"{secrets_path.name}.lock")
+    fd: int | None = None
+    locked = False
+
+    def cleanup_lock() -> bool:
+        nonlocal fd, locked
+        if fd is None:
+            return False
+        cleanup_failed = False
+        if locked:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            except OSError:
+                cleanup_failed = True
+        try:
+            os.close(fd)
+        except OSError:
+            cleanup_failed = True
+        fd = None
+        locked = False
+        return cleanup_failed
+
+    try:
+        fd = os.open(
+            lock_path,
+            _posix_open_flags(os.O_RDWR | os.O_CREAT),
+            0o600,
+        )
+        identity = _harden_regular_fd(fd, lock_path)
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        locked = True
+        if not _path_matches_identity(lock_path, identity):
+            raise _SecretsFileError(f"密钥锁文件在获取期间已被替换：{lock_path}")
+    except BaseException as exc:
+        if cleanup_lock():
+            raise _SecretsFileError(
+                f"无法安全清理密钥文件进程锁：{lock_path}"
+            ) from None
+        if isinstance(exc, OSError):
+            raise _SecretsFileError(
+                f"无法安全获取密钥文件进程锁：{lock_path}"
+            ) from None
+        raise
+
+    try:
+        yield
+    finally:
+        if cleanup_lock():
+            raise _SecretsFileError(
+                f"无法安全释放密钥文件进程锁：{lock_path}"
+            ) from None
+
+
+@contextmanager
+def _secrets_lifecycle_lock(secrets_path: Path) -> Iterator[None]:
+    """串行化完整 read→generate→persist；非 POSIX 仅承诺进程内互斥。"""
+    with _SECRETS_THREAD_LOCK:
+        if os.name == "posix":
+            with _posix_lifecycle_file_lock(secrets_path):
+                yield
+        else:
+            yield
 
 
 def _read_posix_text(path: Path) -> str | None:
@@ -122,7 +227,9 @@ def _path_entry_exists(path: Path) -> bool:
     return True
 
 
-def _remove_failed_artifact(path: Path) -> None:
+def _remove_failed_artifact(path: Path, identity: os.stat_result) -> None:
+    if not _path_matches_identity(path, identity):
+        return
     try:
         path.unlink(missing_ok=True)
     except OSError:
@@ -150,24 +257,42 @@ def _cleanup_temp_artifact(
 
 
 def _create_posix_file(path: Path, payload: bytes) -> None:
-    created = False
+    fd: int | None = None
+    identity: os.stat_result | None = None
+    completed = False
+    failure: BaseException | None = None
+    cleanup_failure = False
     try:
         fd = os.open(
             path,
             _posix_open_flags(os.O_WRONLY | os.O_CREAT | os.O_EXCL),
             0o600,
         )
-        created = True
-        try:
-            _harden_regular_fd(fd, path)
-            _write_all(fd, payload)
-            os.fsync(fd)
-        finally:
-            os.close(fd)
-    except (OSError, _SecretsFileError):
-        if created:
-            _remove_failed_artifact(path)
-        raise _SecretsFileError(f"无法安全持久化密钥文件：{path}") from None
+        identity = _regular_fd_identity(fd, path)
+        _harden_regular_fd(fd, path, identity)
+        _write_all(fd, payload)
+        os.fsync(fd)
+        completed = True
+    except BaseException as exc:
+        failure = exc
+    finally:
+        if fd is not None:
+            try:
+                os.close(fd)
+            except OSError:
+                cleanup_failure = True
+        if not completed and identity is not None:
+            try:
+                _remove_failed_artifact(path, identity)
+            except _SecretsFileError:
+                cleanup_failure = True
+
+    if cleanup_failure:
+        raise _SecretsFileError(f"无法安全清理密钥文件：{path}") from None
+    if failure is not None:
+        if isinstance(failure, (OSError, _SecretsFileError)):
+            raise _SecretsFileError(f"无法安全持久化密钥文件：{path}") from None
+        raise failure
 
 
 def _replace_posix_file(path: Path, payload: bytes) -> None:
@@ -282,36 +407,37 @@ class Settings(BaseSettings):
     def _ensure_secrets(self) -> "Settings":
         """自动生成缺失的密钥并持久化，保证重启后可还原。"""
         secrets_path = _secrets_file_path()
-        generated: dict[str, str] = {}
+        with _secrets_lifecycle_lock(secrets_path):
+            generated: dict[str, str] = {}
 
-        # 即使环境变量已覆盖两个 Key，也先验证既有文件的类型与权限。
-        saved = _read_kv_file(secrets_path)
-        if not self.ENCRYPTION_KEY and "ENCRYPTION_KEY" in saved:
-            object.__setattr__(self, "ENCRYPTION_KEY", saved["ENCRYPTION_KEY"])
-        if not self.JWT_SECRET and "JWT_SECRET" in saved:
-            object.__setattr__(self, "JWT_SECRET", saved["JWT_SECRET"])
+            # 即使环境变量已覆盖两个 Key，也先验证既有文件的类型与权限。
+            saved = _read_kv_file(secrets_path)
+            if not self.ENCRYPTION_KEY and "ENCRYPTION_KEY" in saved:
+                object.__setattr__(self, "ENCRYPTION_KEY", saved["ENCRYPTION_KEY"])
+            if not self.JWT_SECRET and "JWT_SECRET" in saved:
+                object.__setattr__(self, "JWT_SECRET", saved["JWT_SECRET"])
 
-        if not self.ENCRYPTION_KEY:
-            key = secrets.token_urlsafe(32)
-            object.__setattr__(self, "ENCRYPTION_KEY", key)
-            generated["ENCRYPTION_KEY"] = key
-            logger.warning(
-                "ENCRYPTION_KEY 未配置，已自动生成随机密钥。"
-                "密钥改变后已加密的 AI Key 将无法解密；生产环境请在 .env 中显式配置。"
-            )
+            if not self.ENCRYPTION_KEY:
+                key = secrets.token_urlsafe(32)
+                object.__setattr__(self, "ENCRYPTION_KEY", key)
+                generated["ENCRYPTION_KEY"] = key
+                logger.warning(
+                    "ENCRYPTION_KEY 未配置，已自动生成随机密钥。"
+                    "密钥改变后已加密的 AI Key 将无法解密；生产环境请在 .env 中显式配置。"
+                )
 
-        if not self.JWT_SECRET:
-            key = secrets.token_urlsafe(64)
-            object.__setattr__(self, "JWT_SECRET", key)
-            generated["JWT_SECRET"] = key
-            logger.warning(
-                "JWT_SECRET 未配置，已自动生成随机密钥。"
-                "重启应用后已登录用户的 token 将失效；生产环境请在 .env 中显式配置。"
-            )
+            if not self.JWT_SECRET:
+                key = secrets.token_urlsafe(64)
+                object.__setattr__(self, "JWT_SECRET", key)
+                generated["JWT_SECRET"] = key
+                logger.warning(
+                    "JWT_SECRET 未配置，已自动生成随机密钥。"
+                    "重启应用后已登录用户的 token 将失效；生产环境请在 .env 中显式配置。"
+                )
 
-        if generated:
-            _write_kv_file(secrets_path, generated)
-            logger.info("自动生成的密钥已持久化到 %s", secrets_path)
+            if generated:
+                _write_kv_file(secrets_path, generated)
+                logger.info("自动生成的密钥已持久化到 %s", secrets_path)
 
         return self
 
