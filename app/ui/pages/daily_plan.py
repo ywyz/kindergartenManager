@@ -19,7 +19,10 @@ from app.core.audit import log_audit
 from app.core.exceptions import AiCallError, AiParseError, ConfigError
 from app.core.user_context import get_current_user
 from app.integration.holiday_client.client import is_near_holiday
-from app.integration.word_export.exporter import export_batch_daily_plans, export_daily_plan
+from app.integration.word_export.exporter import (
+    export_batch_daily_plans,
+    export_daily_plan,
+)
 from app.repository.class_repository import get_class_config
 from app.repository.daily_plan_repository import (
     delete_daily_plan,
@@ -33,8 +36,11 @@ from app.service.date_service import get_week_number, get_weekday_cn
 from app.service.diff_service import compute_diff
 from app.service.generate_service import generate_activity_content
 from app.service.lesson_plan_service import process_lesson_plan
-from app.ui.components.date_panel import DatePanel
+from app.service.agent.composition import create_daily_plan_agent_controller
+from app.service.agent.contracts import TrustedActor
+from app.ui.components.agent_draft import render_daily_plan_agent_panel
 from app.ui.components.app_shell import render_shell
+from app.ui.components.date_panel import DatePanel, DateSelection
 
 
 @ui.page("/daily-plan")
@@ -43,24 +49,26 @@ async def daily_plan_page() -> None:
 
     tenant_id: int = user["tenant_id"]
     user_id: int = int(user["sub"])
+    agent_controller = create_daily_plan_agent_controller(
+        TrustedActor(tenant_id=tenant_id, user_id=user_id)
+    )
 
     # 状态变量（Python 层，NiceGUI reactive 通过 label/input binding 刷新）
     state = {
-        "selected_date": None,        # date | None
-        "week_number": None,           # int | None
+        "selected_date": None,  # date | None
+        "week_number": None,  # int | None
         "weekday_cn": "",
         "grade": "",
         "class_name": "",
-        "diff_result": [],             # list[dict]
-        "original_process": "",        # 拆分原文（折叠展示用）
-        "indoor_areas": "",            # 室内区域（来自 class_cfg）
-        "outdoor_content": "",         # 户外内容（来自 class_cfg）
+        "diff_result": [],  # list[dict]
+        "original_process": "",  # 拆分原文（折叠展示用）
+        "indoor_areas": "",  # 室内区域（来自 class_cfg）
+        "outdoor_content": "",  # 户外内容（来自 class_cfg）
     }
 
     await render_shell(user, active="daily-plan")
 
     with ui.column().classes("w-full max-w-3xl mx-auto p-4 gap-4"):
-
         # ══════════════════════════════════════════════════════════════════════
         # 区块一：日期选择面板
         # ══════════════════════════════════════════════════════════════════════
@@ -78,7 +86,12 @@ async def daily_plan_page() -> None:
             state["indoor_areas"] = class_cfg.indoor_areas or ""
             state["outdoor_content"] = class_cfg.outdoor_content or ""
 
-        async def _on_date_change(selected: date | None) -> None:
+        selection_state: dict[str, DateSelection | None] = {"current": None}
+
+        def _on_date_selected(selection: DateSelection) -> None:
+            """Invalidate old page/Agent state before holiday or DB awaits begin."""
+            selection_state["current"] = selection
+            selected = selection.selected_date
             state["selected_date"] = selected
             if selected and sem_start:
                 state["week_number"] = get_week_number(sem_start, selected)
@@ -86,25 +99,37 @@ async def daily_plan_page() -> None:
             else:
                 state["week_number"] = None
                 state["weekday_cn"] = ""
-            # 尝试加载当天已保存草稿
-            await _load_draft(selected)
+            _clear_plan_body()
+            agent_panel.scope_changed(selected)
+
+        async def _on_date_change(selected: date | None) -> None:
+            selection = selection_state["current"]
+            if selection is None or selection.selected_date != selected:
+                return
+            await _load_draft(selected, selection)
 
         panel = DatePanel(
             semester_start=sem_start,
             semester_end=sem_end,
             on_date_change=_on_date_change,
+            on_date_selected=_on_date_selected,
         )
         panel.render()
+        agent_panel = render_daily_plan_agent_panel(agent_controller)
 
         # ══════════════════════════════════════════════════════════════════════
         # 区块二：教案输入
         # ══════════════════════════════════════════════════════════════════════
         with ui.card().classes("w-full"):
             ui.label("教案输入").classes("text-base font-bold text-blue-700 mb-2")
-            raw_text_area = ui.textarea(
-                label="粘贴完整教案文本",
-                placeholder="请将完整教案文本粘贴到此处，包含活动目标、准备、过程等所有内容……",
-            ).classes("w-full").props("rows=8 autogrow")
+            raw_text_area = (
+                ui.textarea(
+                    label="粘贴完整教案文本",
+                    placeholder="请将完整教案文本粘贴到此处，包含活动目标、准备、过程等所有内容……",
+                )
+                .classes("w-full")
+                .props("rows=8 autogrow")
+            )
 
             split_msg = ui.label("").classes("text-sm mt-1")
 
@@ -177,32 +202,38 @@ async def daily_plan_page() -> None:
         with ui.card().classes("w-full"):
             ui.label("拆分结果").classes("text-base font-bold text-blue-700 mb-2")
 
-            goal_area = ui.textarea(label="活动目标").classes("w-full").props(
-                "rows=3 autogrow"
+            goal_area = (
+                ui.textarea(label="活动目标").classes("w-full").props("rows=3 autogrow")
             )
-            prep_area = ui.textarea(label="活动准备").classes("w-full").props(
-                "rows=3 autogrow"
+            prep_area = (
+                ui.textarea(label="活动准备").classes("w-full").props("rows=3 autogrow")
             )
-            key_area = ui.textarea(label="活动重点").classes("w-full").props(
-                "rows=2 autogrow"
+            key_area = (
+                ui.textarea(label="活动重点").classes("w-full").props("rows=2 autogrow")
             )
-            difficult_area = ui.textarea(label="活动难点").classes("w-full").props(
-                "rows=2 autogrow"
+            difficult_area = (
+                ui.textarea(label="活动难点").classes("w-full").props("rows=2 autogrow")
             )
 
             ui.separator().classes("my-2")
-            ui.label("活动过程（年龄适配改写版）").classes("text-sm font-medium text-gray-700")
-            adapted_area = ui.textarea(label="活动过程（改写后）").classes("w-full").props(
-                "rows=6 autogrow"
+            ui.label("活动过程（年龄适配改写版）").classes(
+                "text-sm font-medium text-gray-700"
+            )
+            adapted_area = (
+                ui.textarea(label="活动过程（改写后）")
+                .classes("w-full")
+                .props("rows=6 autogrow")
             )
 
             # 折叠：查看拆分原文
             with ui.expansion("查看 AI 拆分原文（改写前）", icon="history").classes(
                 "w-full mt-2 text-gray-500"
             ):
-                original_area = ui.textarea(label="活动过程（原文）").classes(
-                    "w-full"
-                ).props("rows=5 autogrow readonly")
+                original_area = (
+                    ui.textarea(label="活动过程（原文）")
+                    .classes("w-full")
+                    .props("rows=5 autogrow readonly")
+                )
 
         # ══════════════════════════════════════════════════════════════════════
         # 区块三-A：一键生成一日活动（晨间活动 / 晨间谈话 / 区域游戏 / 户外游戏）
@@ -340,9 +371,13 @@ async def daily_plan_page() -> None:
                 ui.label("晨间活动").classes("text-base font-bold text-blue-700 flex-1")
                 morning_activity_msg = ui.label("").classes("text-sm")
 
-            morning_activity_area = ui.textarea(
-                placeholder="晨间活动方案（点击上方「一键生成一日活动」后可手动修改）……"
-            ).classes("w-full").props("rows=5 autogrow")
+            morning_activity_area = (
+                ui.textarea(
+                    placeholder="晨间活动方案（点击上方「一键生成一日活动」后可手动修改）……"
+                )
+                .classes("w-full")
+                .props("rows=5 autogrow")
+            )
 
         # ══════════════════════════════════════════════════════════════════════
         # 区块三-C：晨间谈话
@@ -352,21 +387,31 @@ async def daily_plan_page() -> None:
                 ui.label("晨间谈话").classes("text-base font-bold text-blue-700 flex-1")
                 morning_talk_msg = ui.label("").classes("text-sm")
 
-            morning_talk_area = ui.textarea(
-                placeholder="晨间谈话方案（谈话主题 + 问题设计，点击上方「一键生成一日活动」后可手动修改）……"
-            ).classes("w-full").props("rows=5 autogrow")
+            morning_talk_area = (
+                ui.textarea(
+                    placeholder="晨间谈话方案（谈话主题 + 问题设计，点击上方「一键生成一日活动」后可手动修改）……"
+                )
+                .classes("w-full")
+                .props("rows=5 autogrow")
+            )
 
         # ══════════════════════════════════════════════════════════════════════
         # 区块三-D：室内区域游戏
         # ══════════════════════════════════════════════════════════════════════
         with ui.card().classes("w-full"):
             with ui.row().classes("w-full items-center mb-2"):
-                ui.label("室内区域游戏").classes("text-base font-bold text-blue-700 flex-1")
+                ui.label("室内区域游戏").classes(
+                    "text-base font-bold text-blue-700 flex-1"
+                )
                 area_game_msg = ui.label("").classes("text-sm")
 
-            area_game_area = ui.textarea(
-                placeholder="区域游戏方案（点击上方「一键生成一日活动」后可手动修改）……"
-            ).classes("w-full").props("rows=5 autogrow")
+            area_game_area = (
+                ui.textarea(
+                    placeholder="区域游戏方案（点击上方「一键生成一日活动」后可手动修改）……"
+                )
+                .classes("w-full")
+                .props("rows=5 autogrow")
+            )
 
         # ══════════════════════════════════════════════════════════════════════
         # 区块三-E：户外游戏
@@ -376,21 +421,31 @@ async def daily_plan_page() -> None:
                 ui.label("户外游戏").classes("text-base font-bold text-blue-700 flex-1")
                 outdoor_activity_msg = ui.label("").classes("text-sm")
 
-            outdoor_activity_area = ui.textarea(
-                placeholder="户外游戏方案（点击上方「一键生成一日活动」后可手动修改）……"
-            ).classes("w-full").props("rows=5 autogrow")
+            outdoor_activity_area = (
+                ui.textarea(
+                    placeholder="户外游戏方案（点击上方「一键生成一日活动」后可手动修改）……"
+                )
+                .classes("w-full")
+                .props("rows=5 autogrow")
+            )
 
         # ══════════════════════════════════════════════════════════════════════
         # 区块三-F：一日活动反思
         # ══════════════════════════════════════════════════════════════════════
         with ui.card().classes("w-full"):
             with ui.row().classes("w-full items-center mb-2"):
-                ui.label("一日活动反思").classes("text-base font-bold text-blue-700 flex-1")
+                ui.label("一日活动反思").classes(
+                    "text-base font-bold text-blue-700 flex-1"
+                )
                 daily_reflection_msg = ui.label("").classes("text-sm")
 
-            daily_reflection_area = ui.textarea(
-                placeholder="一日活动反思（AI 生成后可手动修改，也可直接手填）……"
-            ).classes("w-full").props("rows=4 autogrow")
+            daily_reflection_area = (
+                ui.textarea(
+                    placeholder="一日活动反思（AI 生成后可手动修改，也可直接手填）……"
+                )
+                .classes("w-full")
+                .props("rows=4 autogrow")
+            )
 
             async def _gen_daily_reflection() -> None:
                 daily_reflection_btn.props("loading")
@@ -445,9 +500,7 @@ async def daily_plan_page() -> None:
                     return
 
                 save_btn.props("loading")
-                save_msg.classes(
-                    remove="text-green-600 text-red-500 text-orange-500"
-                )
+                save_msg.classes(remove="text-green-600 text-red-500 text-orange-500")
                 save_msg.text = "保存中……"
 
                 d = state["selected_date"]
@@ -493,11 +546,15 @@ async def daily_plan_page() -> None:
 
             async def _delete_draft() -> None:
                 if not state["selected_date"]:
-                    save_msg.classes(remove="text-green-600 text-red-500", add="text-orange-500")
+                    save_msg.classes(
+                        remove="text-green-600 text-red-500", add="text-orange-500"
+                    )
                     save_msg.text = "⚠ 请先选择日期"
                     return
                 with ui.dialog() as dlg, ui.card():
-                    ui.label("确定要删除当天的草稿吗？删除后无法恢复。").classes("text-base")
+                    ui.label("确定要删除当天的草稿吗？删除后无法恢复。").classes(
+                        "text-base"
+                    )
                     with ui.row().classes("gap-3 mt-3"):
                         ui.button(
                             "确认删除",
@@ -515,14 +572,24 @@ async def daily_plan_page() -> None:
                                 plan_date=state["selected_date"],
                             )
                         if deleted:
-                            save_msg.classes(remove="text-green-600 text-orange-500", add="text-gray-500")
+                            save_msg.classes(
+                                remove="text-green-600 text-orange-500",
+                                add="text-gray-500",
+                            )
                             save_msg.text = "✅ 草稿已删除"
                             # 清空表单
                             for area in (
-                                goal_area, prep_area, key_area, difficult_area,
-                                adapted_area, original_area, morning_activity_area,
-                                morning_talk_area, area_game_area,
-                                outdoor_activity_area, daily_reflection_area,
+                                goal_area,
+                                prep_area,
+                                key_area,
+                                difficult_area,
+                                adapted_area,
+                                original_area,
+                                morning_activity_area,
+                                morning_talk_area,
+                                area_game_area,
+                                outdoor_activity_area,
+                                daily_reflection_area,
                             ):
                                 area.value = ""
                             raw_text_area.value = ""
@@ -552,9 +619,7 @@ async def daily_plan_page() -> None:
                     return
 
                 export_btn.props("loading")
-                export_msg.classes(
-                    remove="text-green-600 text-red-500 text-orange-500"
-                )
+                export_msg.classes(remove="text-green-600 text-red-500 text-orange-500")
                 export_msg.text = "导出中……"
 
                 try:
@@ -630,9 +695,9 @@ async def daily_plan_page() -> None:
     # ------------------------------------------------------------------
     with ui.card().classes("w-full"):
         ui.label("批量导出").classes("text-lg font-bold mb-2")
-        ui.label("选择日期范围，将区间内所有已保存的计划合并导出为一个 Word 文件。").classes(
-            "text-sm text-gray-500 mb-3"
-        )
+        ui.label(
+            "选择日期范围，将区间内所有已保存的计划合并导出为一个 Word 文件。"
+        ).classes("text-sm text-gray-500 mb-3")
         with ui.row().classes("items-center gap-4 flex-wrap"):
             with ui.input("开始日期").classes("w-44") as batch_start_input:
                 with batch_start_input.add_slot("append"):
@@ -798,7 +863,9 @@ async def daily_plan_page() -> None:
                 else:
                     for plan in plans:
                         with ui.card().classes("w-full"):
-                            with ui.row().classes("w-full justify-between items-center"):
+                            with ui.row().classes(
+                                "w-full justify-between items-center"
+                            ):
                                 ui.label(
                                     f"{plan.plan_date}  第{plan.week_number}周 {plan.weekday_cn}  "
                                     f"{plan.grade or ''} {plan.class_name or ''}"
@@ -814,7 +881,10 @@ async def daily_plan_page() -> None:
                                                 "确认删除",
                                                 on_click=lambda: dlg.submit("yes"),
                                             ).classes("bg-red-600 text-white")
-                                            ui.button("取消", on_click=lambda: dlg.submit("no"))
+                                            ui.button(
+                                                "取消",
+                                                on_click=lambda: dlg.submit("no"),
+                                            )
                                     result = await dlg
                                     if result == "yes":
                                         try:
@@ -827,27 +897,55 @@ async def daily_plan_page() -> None:
                                                 )
                                             await refresh_history()
                                         except Exception as ex:
-                                            ui.notify(f"删除失败：{ex}", type="negative")
+                                            ui.notify(
+                                                f"删除失败：{ex}", type="negative"
+                                            )
 
-                                ui.button("删除", icon="delete", on_click=_delete_plan).props(
-                                    "size=sm flat"
-                                ).classes("text-red-500")
+                                ui.button(
+                                    "删除", icon="delete", on_click=_delete_plan
+                                ).props("size=sm flat").classes("text-red-500")
         except Exception:
             with history_container:
                 ui.label("加载历史失败").classes("text-red-500 text-sm")
 
     await refresh_history()
-    async def _load_draft(selected: date | None) -> None:
+
+    def _clear_plan_body() -> None:
+        """Clear caller-owned fields immediately when the selected scope changes."""
+        goal_area.value = ""
+        prep_area.value = ""
+        key_area.value = ""
+        difficult_area.value = ""
+        adapted_area.value = ""
+        original_area.value = ""
+        morning_activity_area.value = ""
+        morning_talk_area.value = ""
+        area_game_area.value = ""
+        outdoor_activity_area.value = ""
+        daily_reflection_area.value = ""
+        state["original_process"] = ""
+        state["diff_result"] = []
+
+    async def _load_draft(
+        selected: date | None,
+        selection: DateSelection,
+    ) -> None:
         """根据选定日期加载已有草稿，回填各字段。"""
-        if not selected:
+        if (
+            not selected
+            or selection_state["current"] is not selection
+            or selection.selected_date != selected
+        ):
             return
         try:
             async with AsyncSessionLocal() as session:
-                plan = await get_daily_plan_by_date(session, tenant_id, user_id, selected)
+                plan = await get_daily_plan_by_date(
+                    session, tenant_id, user_id, selected
+                )
         except Exception:
             return
 
-        if plan is None:
+        if plan is None or selection_state["current"] is not selection:
             return
 
         goal_area.value = plan.activity_goal or ""
