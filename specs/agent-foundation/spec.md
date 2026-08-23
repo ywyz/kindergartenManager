@@ -229,7 +229,8 @@ collected/passed/failed 分布；新增失败只因 F008 public seam 尚不存�
 建立 Review RED 并修正，直到 Standards `0`、Spec `0`，再提交/push 固定 SHA、核对 Quality 精确 `headSha`
 并回写 Issue #48。完成前不得进入 F009。
 
-F008 稳定 RED 已固定为 `79f1f9346d748b67d74db0f75e5f36836353c852`；连续两次均为
+初始 RED `79f1f934…` 在 GREEN 前复核发现 wire alias 与本 spec 不一致；只把测试 alias 收敛为上述双下划线
+静态双射后，最终稳定 RED 固定为 `0cd4b3ee476b3e6e0233b886212e560ae5f363d9`。连续两次均为
 `175 collected / 110 passed / 65 failed`，旧 110 项全部 GREEN。当前只允许实施 F008 最小 GREEN。
 
 ## 7. 当前授权与停止边界

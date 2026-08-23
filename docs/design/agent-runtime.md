@@ -390,7 +390,8 @@ F008 只在以下三个公共行为文件稳定 RED 后实施 GREEN：
 真实网络/真实凭据、私有实现字段或 F009 验收来制造 RED。固定 RED commit 之后才允许最小 GREEN；GREEN 后
 仍须双轴 Review、Review findings 的新 RED/修正、固定 SHA Quality 和 Issue #48 证据闭合，才可进入 F009。
 
-固定 RED 为 `79f1f9346d748b67d74db0f75e5f36836353c852`；两次结果均为
+初始 RED `79f1f934…` 在实现前复核发现 wire alias 与已冻结 spec 不一致；只调整测试为双下划线显式别名后，
+最终稳定 RED 固定为 `0cd4b3ee476b3e6e0233b886212e560ae5f363d9`。两次结果均为
 `175 collected / 110 passed / 65 failed`，旧 110 项保持 GREEN。当前只实施 F008 最小 GREEN。
 
 ## 12. 实现前置门禁
