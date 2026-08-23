@@ -103,7 +103,7 @@
 | `app/core/models/semester.py` | SemesterConfig ORM 模型 |
 | `app/core/models/class_config.py` | ClassConfig ORM 模型 |
 | `app/auth/password.py` | Argon2 密码哈希与验证（`argon2-cffi`） |
-| `app/auth/jwt.py` | JWT 生成/验证（python-jose HS256），payload 含 sub/tenant_id/role/exp |
+| `app/auth/jwt.py` | JWT 生成/验证（PyJWT HS256），payload 含 sub/tenant_id/role/exp |
 | `app/service/auth_service.py` | 登录逻辑（查用户→验密码→签 JWT）；修改密码 |
 | `app/service/date_service.py` | 纯函数：`get_week_number`、`get_weekday_cn`、`is_workday`、`is_within_semester` |
 | `app/repository/user_repository.py` | 按用户名/ID 查询用户；更新密码 |

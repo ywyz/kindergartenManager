@@ -2,11 +2,20 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from jose import jwt
+import jwt
 
 from app.auth.jwt import _ALGORITHM, create_access_token, decode_access_token
 from app.core.config import settings
 from app.core.exceptions import AuthError
+
+
+LEGACY_PYTHON_JOSE_SECRET = "compatibility-test-secret-at-least-32-bytes"
+LEGACY_PYTHON_JOSE_TOKEN = (
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+    "eyJzdWIiOiI0MiIsInRlbmFudF9pZCI6MSwicm9sZSI6InRlYWNoZXIiLCJ1c2VybmFtZSI6"
+    "ImxlZ2FjeSIsImRpc3BsYXlfbmFtZSI6bnVsbCwiZXhwIjo0MTAyNDQ0ODAwfQ."
+    "lqEFVPZ6V8XUVI135aAUQ0t-5hRORmqof2cacThLuTs"
+)
 
 
 def test_create_and_decode_returns_correct_fields():
@@ -17,6 +26,22 @@ def test_create_and_decode_returns_correct_fields():
     assert payload["sub"] == "42"
     assert payload["tenant_id"] == 1
     assert payload["role"] == "teacher"
+
+
+def test_legacy_python_jose_hs256_token_remains_valid(monkeypatch):
+    """切换 JWT 库后，升级前签发且未过期的 token 仍可继续使用。"""
+    monkeypatch.setattr(settings, "JWT_SECRET", LEGACY_PYTHON_JOSE_SECRET)
+
+    payload = decode_access_token(LEGACY_PYTHON_JOSE_TOKEN)
+
+    assert payload == {
+        "sub": "42",
+        "tenant_id": 1,
+        "role": "teacher",
+        "username": "legacy",
+        "display_name": None,
+        "exp": 4102444800,
+    }
 
 
 def test_tampered_signature_raises_auth_error():
@@ -36,7 +61,11 @@ def test_wrong_secret_raises_auth_error():
         "role": "teacher",
         "exp": datetime.now(tz=timezone.utc) + timedelta(minutes=60),
     }
-    bad_token = jwt.encode(payload, "wrong-secret", algorithm=_ALGORITHM)
+    bad_token = jwt.encode(
+        payload,
+        "wrong-secret-that-is-at-least-32-bytes-long",
+        algorithm=_ALGORITHM,
+    )
     with pytest.raises(AuthError):
         decode_access_token(bad_token)
 

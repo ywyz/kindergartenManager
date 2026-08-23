@@ -1,7 +1,8 @@
 """JWT access token 生成与解码工具。"""
 from datetime import datetime, timedelta, timezone
 
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError
 
 from app.core.config import settings
 from app.core.exceptions import AuthError
@@ -48,5 +49,5 @@ def decode_access_token(token: str) -> dict:
     try:
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[_ALGORITHM])
         return payload
-    except JWTError as exc:
+    except PyJWTError as exc:
         raise AuthError("token 无效或已过期") from exc

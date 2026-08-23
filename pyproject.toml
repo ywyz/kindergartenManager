@@ -1,0 +1,42 @@
+[project]
+name = "kindergarten-manager"
+version = "0.1.0"
+description = "幼儿园教学管理系统"
+requires-python = ">=3.12"
+dependencies = [
+    "nicegui",
+    "fastapi",
+    "uvicorn",
+    "sqlalchemy[asyncio]",
+    "aiomysql",
+    "pymysql",
+    "alembic",
+    "pydantic-settings",
+    "argon2-cffi",
+    "PyJWT",
+    "cryptography",
+    "httpx",
+    "tenacity",
+    "python-docx",
+    "Pillow",
+    "apscheduler",
+    "python-json-logger",
+    "aiohttp",
+    "python-socketio",
+    "python-engineio",
+    "python-multipart",
+    "starlette",
+    "lxml",
+    "urllib3",
+    "idna",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "aiosqlite",
+]
+
+[tool.uv]
+package = false

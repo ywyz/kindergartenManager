@@ -18,6 +18,19 @@ KindergartenManager 是一个 Python 3.14.7 / NiceGUI 教学管理应用。当�
 
 当前并未完成微服务拆分；`services/` 只是未来规划。实际运行单元为一个 NiceGUI 应用进程，外加可选 Caddy/MySQL。
 
+## 技术栈
+
+| 层 | 选型 |
+|----|------|
+| 语言 | Python 3.12+（开发环境 3.14） |
+| 前后端 | NiceGUI（底层 FastAPI / Starlette） |
+| 数据库 | MySQL 8（async：SQLAlchemy 2 + aiomysql）；迁移：Alembic |
+| 鉴权 | JWT（PyJWT）+ Argon2（argon2-cffi）+ RBAC |
+| 加密 | Fernet（cryptography）—— AI Key 入库加密 |
+| AI | OpenAI 兼容 Chat Completions（httpx + tenacity 重试） |
+| 文档导出 | python-docx |
+| 测试 | pytest + pytest-asyncio（SQLite 内存库隔离） |
+
 ## 已确认的下一能力：受控 AI Agent（尚未实现）
 
 项目已接受 [ADR-0005](docs/ADR/ADR-0005-controlled-ai-agent-runtime.md)，下一功能方向是在每日活动
