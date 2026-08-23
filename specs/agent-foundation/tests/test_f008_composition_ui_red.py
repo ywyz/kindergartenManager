@@ -2,6 +2,7 @@
 
 import ast
 import asyncio
+from contextlib import asynccontextmanager
 from dataclasses import FrozenInstanceError, dataclass, field
 from datetime import date
 from importlib import import_module
@@ -10,6 +11,7 @@ from typing import Any
 
 import pytest
 import pytest_asyncio
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 import app.core.models  # noqa: F401 - register all ORM models
@@ -354,6 +356,140 @@ async def test_cancel_and_close_never_publish_blocked_provider_content(
 
 
 @pytest.mark.asyncio
+async def test_cancel_during_context_assembly_never_starts_provider(
+    agent_session_factory,
+):
+    module = _composition()
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    @asynccontextmanager
+    async def gated_session_factory():
+        entered.set()
+        await release.wait()
+        async with agent_session_factory() as session:
+            yield session
+
+    provider = ImmediateProvider()
+    captured_configs: list[object] = []
+    coordinator = module.DailyPlanAgentCoordinator(
+        session_factory=gated_session_factory,
+        provider_factory=lambda config: captured_configs.append(config) or provider,
+    )
+    controller = coordinator.create_controller(TrustedActor(tenant_id=1, user_id=10))
+    controller.scope_changed(PLAN_DATE)
+
+    run_task = asyncio.create_task(controller.run("装配期间取消"))
+    await entered.wait()
+    cancel_accepted = await controller.cancel()
+    release.set()
+    snapshot = await run_task
+
+    assert cancel_accepted is True
+    assert provider.requests == []
+    assert captured_configs == []
+    assert snapshot.status is module.AgentPanelStatus.CANCELLED
+    assert snapshot.error_code == "agent.cancelled"
+    assert snapshot.assistant_content is None
+    assert snapshot.patches == ()
+
+
+@pytest.mark.asyncio
+async def test_plan_change_invalidates_same_scope_fingerprint_before_publish(
+    agent_session_factory,
+):
+    module = _composition()
+    assert hasattr(module.DailyPlanAgentController, "plan_changed")
+
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    provider = BlockingProvider(entered, release, content="旧 fingerprint 的迟到回答")
+    coordinator = module.DailyPlanAgentCoordinator(
+        session_factory=agent_session_factory,
+        provider_factory=lambda _config: provider,
+    )
+    running = coordinator.create_controller(TrustedActor(tenant_id=1, user_id=10))
+    notifier = coordinator.create_controller(TrustedActor(tenant_id=1, user_id=10))
+    running.scope_changed(PLAN_DATE)
+
+    run_task = asyncio.create_task(running.run("等待同日期计划变化"))
+    await entered.wait()
+    async with agent_session_factory() as session:
+        plan = (
+            await session.execute(
+                select(DailyPlan).where(
+                    DailyPlan.tenant_id == 1,
+                    DailyPlan.user_id == 10,
+                    DailyPlan.plan_date == PLAN_DATE,
+                )
+            )
+        ).scalar_one()
+        plan.activity_goal = "已经改变 fingerprint 的新目标"
+        await session.commit()
+
+    notifier.plan_changed(PLAN_DATE)
+    release.set()
+    snapshot = await run_task
+
+    assert snapshot.status is module.AgentPanelStatus.FAILED
+    assert snapshot.error_code == "agent.context_stale"
+    assert snapshot.assistant_content is None
+    assert snapshot.patches == ()
+
+
+@pytest.mark.asyncio
+async def test_same_controller_reentry_does_not_replace_running_attempt(
+    agent_session_factory,
+):
+    module = _composition()
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    provider = BlockingProvider(entered, release, content="唯一运行的结果")
+    _, controller, _ = _controller(module, agent_session_factory, provider)
+    controller.scope_changed(PLAN_DATE)
+
+    first_task = asyncio.create_task(controller.run("第一次运行"))
+    await entered.wait()
+    second_snapshot = await controller.run("同一页面重复点击")
+    published_while_blocked = controller.snapshot
+    release.set()
+    first_snapshot = await first_task
+
+    assert second_snapshot.status is module.AgentPanelStatus.RUNNING
+    assert published_while_blocked.status is module.AgentPanelStatus.RUNNING
+    assert first_snapshot.status is module.AgentPanelStatus.SUCCEEDED
+    assert first_snapshot.assistant_content == "唯一运行的结果"
+    assert len(provider.requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_disconnect_cancels_attempt_but_controller_can_run_after_reconnect(
+    agent_session_factory,
+):
+    module = _composition()
+    assert hasattr(module.DailyPlanAgentController, "disconnect")
+
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    provider = BlockingProvider(entered, release, content="重连后的回答")
+    _, controller, _ = _controller(module, agent_session_factory, provider)
+    controller.scope_changed(PLAN_DATE)
+
+    old_task = asyncio.create_task(controller.run("断线前运行"))
+    await entered.wait()
+    await controller.disconnect()
+    release.set()
+    old_snapshot = await old_task
+
+    assert old_snapshot.status is module.AgentPanelStatus.IDLE
+    assert old_snapshot.assistant_content is None
+    fresh_snapshot = await controller.run("重连后重新运行")
+    assert fresh_snapshot.status is module.AgentPanelStatus.SUCCEEDED
+    assert fresh_snapshot.assistant_content == "重连后的回答"
+    assert len(provider.requests) == 2
+
+
+@pytest.mark.asyncio
 async def test_discard_only_clears_agent_memory_not_caller_owned_body(
     agent_session_factory,
 ):
@@ -378,6 +514,7 @@ async def test_discard_only_clears_agent_memory_not_caller_owned_body(
 
 def test_agent_ui_surface_is_closed_and_patch_rows_are_detached_primitives():
     component = import_module("app.ui.components.agent_draft")
+    panel_source = inspect.getsource(component.DailyPlanAgentPanel)
 
     assert component.AGENT_ACTION_LABELS == ("运行", "取消", "丢弃建议")
     assert component.AGENT_FIXED_NOTICE == "仅生成建议，不会保存或修改当前计划。"
@@ -385,6 +522,9 @@ def test_agent_ui_surface_is_closed_and_patch_rows_are_detached_primitives():
     assert not hasattr(component, "apply_patch")
     assert not hasattr(component, "confirm_write")
     assert callable(component.render_daily_plan_agent_panel)
+    assert "on_disconnect(self.disconnect)" in panel_source
+    assert "on_disconnect(self.close)" not in panel_source
+    assert "on_delete(self.close)" in panel_source
 
 
 def test_date_selection_guard_invalidates_out_of_order_callbacks():
@@ -407,6 +547,7 @@ def test_daily_plan_page_wires_immediate_selection_and_agent_panel_without_write
     assert "on_date_selected=" in source
     assert "render_daily_plan_agent_panel" in source
     assert "scope_changed" in source
+    assert source.count("plan_changed(") >= 3
     assert "agent_controller" in source
     assert "adopt_patch" not in source
     assert "confirm_write" not in source
