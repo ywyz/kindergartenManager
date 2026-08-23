@@ -50,6 +50,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           BASE_REF: ${{ github.base_ref }}
           BEFORE_SHA: ${{ github.event.before }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
             lint_base="origin/$BASE_REF"
@@ -57,7 +58,7 @@ jobs:
             && git cat-file -e "$BEFORE_SHA^{commit}"; then
             lint_base="$BEFORE_SHA"
           else
-            lint_base="$(git rev-list --max-parents=0 HEAD)"
+            lint_base="origin/$DEFAULT_BRANCH"
           fi
 
           mapfile -d '' python_files < <(
