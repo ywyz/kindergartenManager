@@ -237,6 +237,18 @@ class ReleasableProvider:
 
 
 @dataclass
+class ReleasableFailingProvider:
+    entered: asyncio.Event
+    release: asyncio.Event
+    secret: str
+
+    async def complete(self, request: object) -> object:
+        self.entered.set()
+        await self.release.wait()
+        raise RuntimeError(self.secret)
+
+
+@dataclass
 class ToolCallingProvider:
     call: object
     requests: list[object] = field(default_factory=list)
@@ -330,6 +342,71 @@ class ReleasableExecutor:
         )
 
 
+@dataclass
+class CancellationDefyingExecutor:
+    entered: asyncio.Event
+    cancellation_seen: asyncio.Event
+    release: asyncio.Event
+
+    async def execute(self, call: object, context: AgentContext) -> object:
+        runtime = _runtime_module()
+        self.entered.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            self.cancellation_seen.set()
+            await self.release.wait()
+        return runtime.ToolExecutionResult(
+            call_id=call.call_id,
+            operation_id=context.operation_id,
+            turn_id=context.turn_id,
+            tool_name=call.tool_name,
+            permission=call.permission,
+            status=runtime.ToolExecutionStatus.OK,
+            value=ClassAreasProjection(
+                grade="大班",
+                class_name="星星班",
+                indoor_areas="迟到区域",
+                outdoor_content="迟到内容",
+            ),
+            error_code=None,
+        )
+
+
+@dataclass
+class ReleasableFailingExecutor:
+    entered: asyncio.Event
+    release: asyncio.Event
+    secret: str
+
+    async def execute(self, call: object, context: AgentContext) -> object:
+        self.entered.set()
+        await self.release.wait()
+        raise RuntimeError(self.secret)
+
+
+@dataclass
+class InternalStopMimickingProvider:
+    secret: str
+
+    async def complete(self, request: object) -> object:
+        raise _runtime_module()._OperationStopped(self.secret)
+
+
+@dataclass
+class InternalStopMimickingExecutor:
+    secret: str
+
+    async def execute(self, call: object, context: AgentContext) -> object:
+        raise _runtime_module()._OperationStopped(self.secret)
+
+
+@dataclass
+class CancelledClock:
+    def __call__(self) -> datetime:
+        raise asyncio.CancelledError
+
+
 def _agent(
     runtime: Any,
     provider: object,
@@ -354,6 +431,21 @@ def _agent(
         clock=active_clock,
         limits=limits or runtime.RuntimeLimits(),
     )
+
+
+async def _run_after_drain(
+    runtime: Any,
+    agent: object,
+    state: MutableContextState,
+):
+    next_context = _next_context()
+    state.stamp = runtime.AgentContextStamp.from_context(next_context)
+    async with asyncio.timeout(1):
+        while True:
+            outcome = await agent.run_turn(context=next_context, intent="排空后重试")
+            if outcome.error_code != "agent.busy":
+                return outcome
+            await asyncio.sleep(0)
 
 
 @pytest.mark.asyncio
@@ -765,3 +857,236 @@ async def test_runtime_rechecks_context_ttl_before_publishing_terminal_output():
     assert outcome.error_code == "agent.context_stale"
     assert outcome.assistant_content is None
     assert outcome.patches == ()
+
+
+@pytest.mark.asyncio
+async def test_provider_cannot_forge_runtime_stop_control_flow_or_public_error_codes():
+    runtime = _runtime_module()
+    secret = "secret-provider-payload"
+    agent = _agent(runtime, InternalStopMimickingProvider(secret))
+
+    outcome = await agent.run_turn(context=_context(), intent="检查 Provider 异常")
+
+    assert outcome.status is runtime.AgentTurnStatus.FAILED
+    assert outcome.error_code == "agent.provider_failed"
+    assert outcome.assistant_content is None
+    assert outcome.patches == ()
+    assert secret not in repr(outcome)
+
+
+@pytest.mark.asyncio
+async def test_executor_cannot_forge_runtime_stop_control_flow_or_public_error_codes():
+    runtime = _runtime_module()
+    secret = "secret-executor-payload"
+    call = _tool_call(runtime)
+    provider = ToolCallingProvider(call)
+    agent = _agent(
+        runtime,
+        provider,
+        executor=InternalStopMimickingExecutor(secret),
+    )
+
+    outcome = await agent.run_turn(context=_context(), intent="检查 Executor 异常")
+
+    assert outcome.status is runtime.AgentTurnStatus.FAILED
+    assert outcome.error_code == "agent.tool_failed"
+    assert outcome.assistant_content is None
+    assert outcome.patches == ()
+    assert secret not in repr(outcome)
+
+
+@pytest.mark.parametrize("failing_port", ("clock", "context_state"))
+@pytest.mark.asyncio
+async def test_port_originated_cancelled_error_fails_closed_without_host_cancellation(
+    failing_port: str,
+):
+    runtime = _runtime_module()
+    context = _context()
+    provider = ImmediateProvider()
+    state = MutableContextState(runtime.AgentContextStamp.from_context(context))
+    clock: object = MutableClock(context.created_at_utc)
+    if failing_port == "clock":
+        clock = CancelledClock()
+    else:
+        state.failure = asyncio.CancelledError()
+    agent = _agent(runtime, provider, state=state, clock=clock)
+
+    outcome = await agent.run_turn(context=context, intent="检查伪取消")
+
+    assert outcome.status is runtime.AgentTurnStatus.FAILED
+    assert outcome.error_code == "agent.context_stale"
+    assert outcome.assistant_content is None
+    assert outcome.patches == ()
+    assert provider.requests == []
+
+
+@pytest.mark.parametrize("limit_kind", ("provider", "total"))
+@pytest.mark.asyncio
+async def test_provider_and_total_limits_return_before_a_cancel_defying_port_drains(
+    limit_kind: str,
+):
+    runtime = _runtime_module()
+    provider = CancellationDefyingProvider(
+        asyncio.Event(),
+        asyncio.Event(),
+        asyncio.Event(),
+    )
+    state = MutableContextState(runtime.AgentContextStamp.from_context(_context()))
+    limits = (
+        runtime.RuntimeLimits(
+            max_provider_duration_ms=20,
+            max_total_duration_ms=500,
+        )
+        if limit_kind == "provider"
+        else runtime.RuntimeLimits(
+            max_provider_duration_ms=500,
+            max_total_duration_ms=20,
+        )
+    )
+    agent = _agent(runtime, provider, state=state, limits=limits)
+
+    outcome = await asyncio.wait_for(
+        agent.run_turn(context=_context(), intent="硬时限"),
+        1,
+    )
+
+    assert outcome.status is runtime.AgentTurnStatus.FAILED
+    assert outcome.error_code == "agent.timeout"
+    assert outcome.assistant_content is None
+    assert outcome.patches == ()
+    await asyncio.wait_for(provider.cancellation_seen.wait(), 1)
+    busy = await agent.run_turn(context=_context(), intent="排空前")
+    assert busy.error_code == "agent.busy"
+
+    provider.release.set()
+    recovered = await _run_after_drain(runtime, agent, state)
+    assert recovered.status is runtime.AgentTurnStatus.SUCCEEDED
+
+
+@pytest.mark.asyncio
+async def test_tool_limit_returns_before_a_cancel_defying_executor_drains():
+    runtime = _runtime_module()
+    provider = ToolCallingProvider(_tool_call(runtime))
+    executor = CancellationDefyingExecutor(
+        asyncio.Event(),
+        asyncio.Event(),
+        asyncio.Event(),
+    )
+    state = MutableContextState(runtime.AgentContextStamp.from_context(_context()))
+    agent = _agent(
+        runtime,
+        provider,
+        executor=executor,
+        state=state,
+        limits=runtime.RuntimeLimits(
+            max_tool_duration_ms=20,
+            max_total_duration_ms=500,
+        ),
+    )
+
+    outcome = await asyncio.wait_for(
+        agent.run_turn(context=_context(), intent="Tool 硬时限"),
+        1,
+    )
+
+    assert outcome.status is runtime.AgentTurnStatus.FAILED
+    assert outcome.error_code == "agent.timeout"
+    assert outcome.assistant_content is None
+    assert outcome.patches == ()
+    await asyncio.wait_for(executor.cancellation_seen.wait(), 1)
+    busy = await agent.run_turn(context=_context(), intent="排空前")
+    assert busy.error_code == "agent.busy"
+
+    executor.release.set()
+    recovered = await _run_after_drain(runtime, agent, state)
+    assert recovered.status is runtime.AgentTurnStatus.SUCCEEDED
+
+
+@pytest.mark.asyncio
+async def test_host_cancellation_propagates_before_a_cancel_defying_port_drains():
+    runtime = _runtime_module()
+    provider = CancellationDefyingProvider(
+        asyncio.Event(),
+        asyncio.Event(),
+        asyncio.Event(),
+    )
+    state = MutableContextState(runtime.AgentContextStamp.from_context(_context()))
+    agent = _agent(runtime, provider, state=state)
+    pending = asyncio.create_task(
+        agent.run_turn(context=_context(), intent="宿主取消硬边界")
+    )
+    await asyncio.wait_for(provider.entered.wait(), 1)
+
+    pending.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(pending, 1)
+
+    await asyncio.wait_for(provider.cancellation_seen.wait(), 1)
+    busy = await agent.run_turn(context=_context(), intent="排空前")
+    assert busy.error_code == "agent.busy"
+    provider.release.set()
+    recovered = await _run_after_drain(runtime, agent, state)
+    assert recovered.status is runtime.AgentTurnStatus.SUCCEEDED
+
+
+@pytest.mark.asyncio
+async def test_provider_failure_rechecks_current_context_before_terminal_output():
+    runtime = _runtime_module()
+    context = _context()
+    provider = ReleasableFailingProvider(
+        asyncio.Event(),
+        asyncio.Event(),
+        "provider-failure-secret",
+    )
+    state = MutableContextState(runtime.AgentContextStamp.from_context(context))
+    agent = _agent(runtime, provider, context=context, state=state)
+    pending = asyncio.create_task(
+        agent.run_turn(context=context, intent="异常终态复核")
+    )
+    await asyncio.wait_for(provider.entered.wait(), 1)
+    state.stamp = runtime.AgentContextStamp.from_context(
+        replace(context, base_fingerprint="f" * 64)
+    )
+    provider.release.set()
+
+    outcome = await asyncio.wait_for(pending, 1)
+
+    assert outcome.error_code == "agent.context_stale"
+    assert outcome.assistant_content is None
+    assert outcome.patches == ()
+    assert provider.secret not in repr(outcome)
+
+
+@pytest.mark.asyncio
+async def test_tool_failure_rechecks_current_context_before_terminal_output():
+    runtime = _runtime_module()
+    context = _context()
+    provider = ToolCallingProvider(_tool_call(runtime))
+    executor = ReleasableFailingExecutor(
+        asyncio.Event(),
+        asyncio.Event(),
+        "tool-failure-secret",
+    )
+    state = MutableContextState(runtime.AgentContextStamp.from_context(context))
+    agent = _agent(
+        runtime,
+        provider,
+        executor=executor,
+        context=context,
+        state=state,
+    )
+    pending = asyncio.create_task(
+        agent.run_turn(context=context, intent="Tool 异常终态复核")
+    )
+    await asyncio.wait_for(executor.entered.wait(), 1)
+    state.stamp = runtime.AgentContextStamp.from_context(
+        replace(context, base_fingerprint="f" * 64)
+    )
+    executor.release.set()
+
+    outcome = await asyncio.wait_for(pending, 1)
+
+    assert outcome.error_code == "agent.context_stale"
+    assert outcome.assistant_content is None
+    assert outcome.patches == ()
+    assert executor.secret not in repr(outcome)
