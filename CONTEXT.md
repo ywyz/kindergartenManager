@@ -1,7 +1,7 @@
 # KindergartenManager 项目上下文
 
 > 状态快照：2026-08-24；Agent 安全同步 RED 基线：`5de2e49bee19749f611b50747a31be9464b92d7b`；
-> 当前检出分支：`feat/agent-foundation`（F005-F008 已固定 GREEN；当前只进入 F009 文档与稳定 RED 门禁）；
+> 当前检出分支：`feat/agent-foundation`（F005-F008 已固定 GREEN；F009 公共验收 seam 已冻结，下一门禁为稳定 RED）；
 > 最近远端产品主线：`origin/main@cfeadefd7dfa056c1b3757876658493110d8cf84`。
 >
 > 本文件用于回答“当前仓库实际上是什么、哪些事实已经确认、下一步可以做什么”。
@@ -35,7 +35,7 @@
 ## 3. 当前产品定位
 
 KindergartenManager 是一个 Python 3.14.7、NiceGUI 前后端一体化的幼儿园教学管理应用。
-当前检出 `feat/agent-foundation` 已完成 F007，其安全 RED 起点为 `5de2e49bee19749f611b50747a31be9464b92d7b`；
+当前检出 `feat/agent-foundation` 已完成 F008，其安全 RED 起点为 `5de2e49bee19749f611b50747a31be9464b92d7b`；
 最近远端产品主线为 `origin/main@cfeadefd7dfa056c1b3757876658493110d8cf84`。两者都保持可打包、可本地运行、
 也可用 Docker 部署的模块化单体定位，主要能力包括：
 
@@ -112,6 +112,12 @@ F006 已固定 GREEN，新增应用拥有的 Provider DTO/port、Tool executor p
 六个关闭 Tool executor、应用级单 coordinator、selection/current-stamp 失效与每日计划只读建议面板；没有
 Agent 持久化、WRITE、长期记忆或产品多 Agent。F009 验收尚未闭合，仍不得宣称整个 Agent Foundation 已完成验收。
 
+F009 不新增 Agent 能力。自动化矩阵在初始化/seed 后动态反射实际数据库全部表并比较逻辑快照，同时比较受保护配置/exports、调用方页面正文、独立 audit logger
+和 seed 后 DML/DDL attempts，覆盖所有成功/失败/取消/timeout/stale/越权/busy/restart 终态；Linux 浏览器
+mock 使用临时 SQLite 与应用加密保存的虚构 Key；真实模型只允许通过 controller→coordinator→repository
+读取应用 active `text` 配置并短命解密。POSIX `.kindergarten_secrets` 必须由应用在新建和读取既有文件时
+收敛为 `0600`。缺少安全配置或权限不安全时必须零请求，F009 保持未完成，不能用 mock 或环境变量注入替代。
+
 当前已冻结 [Foundation spec](specs/agent-foundation/spec.md)、[任务顺序](specs/agent-foundation/tasks.md) 和
 [Issue #48](https://github.com/ywyz/kindergartenManager/issues/48)。F002 在安全同步基线上仍稳定为同样的 4 RED；
 F003 只通过新增 contracts 与关闭 registry 使原 4 项 GREEN；F004 初始 RED 固定为 `8297fce…`，
@@ -163,8 +169,8 @@ F008 的固定集成上限为：
 - 面板只展示运行/取消、失败、assistant、字段级 `PlanPatch` 与丢弃；不回填每日计划正文，也不提供
   adopt/save/confirm 或任何隐藏 WRITE 路径。
 
-F003 固定 SHA 的双轴 Review 和远端 CI `headSha` 已通过。
-每日计划/班级/日历的 Agent 专用窄 Service 投影属于当前获授权的 F004。
+F003-F008 各切片的双轴 Review 与远端精确 `headSha` Quality 均已闭合；F004 的每日计划/班级/日历
+Agent 专用窄 Service 投影和 F008 的具体 adapter/executor/composition/UI 已进入当前代码。
 未来 WRITE 属于独立里程碑，至少需恢复可信用户身份、引入显式
 `daily_plan` revision、逐次确认、操作前版本和不可变审计，不由当前设计自动授权。
 
@@ -186,8 +192,9 @@ R1 基础修复的本地门禁已经通过，当前共同下一步是：
 1. F008 已固定 GREEN：最终 RED `b3cad08…`，最小 GREEN `80a20de…`，Review RED `b3c45d2…`、
    `b0647a9…`，最终候选 `f1f5e63…`；Foundation `180 passed`、常规全量 `551 passed`、双轴 Review 0/0，
    Quality `32651221452` 的 `headSha` 精确匹配成功。
-2. 当前只进入 F009 文档/spec/tasks 与稳定 RED；之后才执行零持久化全矩阵、Linux 浏览器 mock 和仅使用
-   应用安全配置凭据的真实模型验收。F009 仍须独立闭合 Review、精确 SHA Quality 与 Issue 证据。
+2. F009 公共验收 seam 已冻结，下一步只建立稳定 RED；之后才执行零持久化全矩阵、Linux 浏览器 mock 和
+   仅使用应用安全配置凭据的真实模型验收。两份人工证据必须绑定同一 `tested_code_sha`，真实模型须 PASS；
+   证据提交形成独立 `evidence_closure_sha`，F009 仍须在 closure SHA 闭合 Review 0/0、精确 Quality 与 Issue 证据。
 3. NiceGUI 多用户预备功能保持低优先级，不与 Agent Foundation 隐式捆绑。
 4. F006 最终实现/重构候选 `99167ef…` 的 Linux 本地证据为 Python 3.14.7、`pip check`/严格依赖审计通过、变更文件 Ruff 0 错误、全新 SQLite Alembic head `a6c4d8e2f9b1`、Foundation `73 passed` 与全量 `551 passed`；证据 SHA `049b520…` 的远端 Quality `32644290676` 全部成功。Windows、Word、MySQL 和真实 AI 仍是独立人工门禁。
 5. F007 最终候选 `51443a3…` 的本地证据为 Foundation `110 passed`、全量 `551 passed`、双轴 Review 0/0；证据 SHA `2fb4e6f…` 的远端 Quality `32648599591` 全部成功。

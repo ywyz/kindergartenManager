@@ -1,6 +1,6 @@
 # Agent Foundation 冻结规格
 
-- 状态：F005-F008 固定 GREEN；当前只进入 F009 文档与稳定 RED 门禁
+- 状态：F005-F008 固定 GREEN；F009 公共验收契约冻结，下一门禁为稳定 RED
 - 分支：`feat/agent-foundation`
 - 安全同步 RED 基线：`5de2e49bee19749f611b50747a31be9464b92d7b`
 - Issue：[#48](https://github.com/ywyz/kindergartenManager/issues/48)
@@ -140,7 +140,64 @@ F008 只接入具体 adapter/executor/composition/UI；不修改 F003-F007 的�
 - UI 只显示固定零写入说明、意图输入、运行、取消、失败、assistant、字段级 PlanPatch 与丢弃。丢弃只清除
   内存结果；不得回填每日计划正文，也不得存在 adopt/save/confirm、“总是允许”或隐藏 WRITE handler。
 
-## 6. F002-F008 RED/GREEN 检查点
+### 5.3 F009 固定公共验收 seam
+
+F009 不增加 Agent 能力，只为 F003-F008 的既有 READ/DRAFT 边界建立三类彼此独立的验收证据。
+
+#### 5.3.1 自动化零持久化全矩阵
+
+- 每个场景都从公开 coordinator/controller seam 发起，并共享同一 `EffectSnapshot` 不变量：初始化与 seed
+  完成后动态反射并规范化实际数据库全部表（不限于 `Base.metadata`）、受保护配置文件与 exports 的目录/内容摘要、调用方拥有的每日计划正文、独立捕获的
+  `audit` logger 记录，以及 seed 后 SQLAlchemy `INSERT`/`UPDATE`/`DELETE`/`REPLACE`/DDL 尝试必须前后完全相等。
+  SQLite 数据库/WAL/journal、pytest cache 等运行时物理文件不进入文件摘要；数据库只比较全表逻辑快照。
+- 矩阵至少覆盖 assistant 文本成功、一个真实 READ executor 链、两个 DRAFT builder、配置缺失/解密失败、
+  Context 构建失败/plan not found、Provider HTTP/结构失败、executor 失败、装配期/Provider/Tool 取消、host task
+  cancellation、Provider/Tool/总时限、TTL/current-context/scope/fingerprint stale、未知 Tool、WRITE Tool、
+  prompt injection、跨 tenant、跨 user、busy、same-controller reentry、mutation 发布窗口、discard、临时
+  disconnect→reconnect、永久 close 与 restart。取消、stale、busy 与 timeout 用 `asyncio.Event` 协调，不用
+  固定 sleep、真实网络或真实凭据。
+- 额外断言实际数据库表集合没有 Agent/conversation/thread/message/run/embedding/vector/summary/profile/memory/
+  preview/audit/version 表；新 controller/coordinator 不得恢复上次 assistant、ToolResult、Patch、operation、turn
+  或 Provider thread。
+- 为确定性覆盖 composition 层 timeout，`DailyPlanAgentCoordinator` 只允许新增可选
+  `runtime_limits: RuntimeLimits | None = None` 测试 seam，并原样传给 `AgentRuntime`；默认生产上限不得改变。
+
+#### 5.3.2 Linux 浏览器 mock 人工验收
+
+- 只在固定候选 SHA 上，从仓库根启动应用；`DATABASE_URL` 指向 `/tmp/km-f009.*` 下的临时 SQLite，
+  `ENCRYPTION_KEY`/`JWT_SECRET` 使用明确的虚构临时值。mock text Key 必须经应用现有 `save_ai_key()` 加密写入
+  临时库，不得通过设置页改写仓库 `.env`，也不得读取应用或宿主的真实 AI 配置。
+- 测试辅助只能位于 `specs/agent-foundation/manual/`，mock server 仅提供固定 holiday 与 Chat Completions
+  响应，并 fail-closed 校验恰好六个 wire Tool、无 `store`/`parallel_tool_calls`。它不得记录 Authorization、
+  system Context、业务正文或 Key。
+- 可见步骤至少覆盖固定零写入说明和无 Agent WRITE 控件、文本建议与丢弃、DRAFT 字段差异且页面正文不变、
+  cancel 后迟到标记不出现、A→B→A 后旧结果不回填、断开/重连后不恢复会话且 coordinator 可再次运行。
+- 迁移、seed、虚构 Key 保存和 Settings/secrets 权限收敛完成后、第一次 Agent operation 前取得 baseline；
+  浏览器步骤前后比较 SQLite 实际全部表逻辑摘要、exports 摘要和 Git 状态；物理 SQLite 文件 hash 不作为逻辑零写入
+  证据。记录 Linux、浏览器版本、完整 40 位 SHA、可见断言和脱敏摘要；原始 app/mock 日志不进入 Issue。
+
+#### 5.3.3 应用安全配置真实模型验收
+
+- 在 `tested_code_sha` 的隔离临时 worktree/SQLite 中 seed 合成计划，再由用户亲自在该临时应用 `/settings`
+  正常保存真实 active `text` 配置；脚本和浏览器自动化不得读取、复制或键入 Key、endpoint 或密文。配置、
+  Settings/secrets 权限收敛完成后、第一次 Agent operation 前取得 baseline。只允许调用
+  `DailyPlanAgentController.run()`，由 coordinator 经现有 `get_active_ai_key()` / 解密 repository
+  边界短命装配 Provider；禁止脚本导出 Key、直接构造真实 Provider、临时环境变量注入真实 Key、探测 `/models`、
+  自动切换凭据或失败重试。
+- POSIX 上 `.kindergarten_secrets` 必须从创建瞬间为 `0600`；已有普通文件在读取任何正文前纠权，即使两个
+  Key 都由环境变量覆盖。符号链接/非普通文件、无法纠权或安全写入失败必须 fail-closed，不得记录“已持久化”；
+  权限不安全、没有 active `text` 配置或无法解密时必须在发请求前 fail-closed。测试只使用无真实幼儿/教师信息的合成计划与最短文本请求；
+  如需 Tool loop，只增加一次短 DRAFT 请求。
+- 证据只记录固定 SHA、时间、`key_type=text`、模型名、终态、Patch 数量/字段路径，以及 DB/文件/UI 正文的
+  前后逻辑摘要。禁止记录 endpoint、Key、密文、assistant/Patch 正文、request ID、原始 HTTP/HAR、system
+  Context 或 Tool 参数。缺少安全配置时记录 `BLOCKED` 与 `network_requests=0`，F009 仍不得宣称通过。
+- Linux mock 与真实模型验收必须分别写入
+  `specs/agent-foundation/evidence/f009-linux-browser-mock.md` 和
+  `specs/agent-foundation/evidence/f009-real-model.md`；二者都必须绑定同一个无后续产品代码变更的
+  `tested_code_sha`，且真实模型记录必须为 `PASS`。提交证据后形成独立 `evidence_closure_sha`，最终 Review、
+  Quality 与 Issue 绑定 closure SHA；否则证据 commit 会形成自引用。
+
+## 6. F002-F009 RED/GREEN 检查点
 
 切片公共行为测试放在 `specs/agent-foundation/tests/`；从 F005 GREEN 起由 Quality 独立步骤执行，仍不混入常规 `pytest tests/` 套件。
 F002 原始 SHA `ad13a6aa3e44ff98b2604d4a008649cd66185d80` 和安全同步基线
@@ -238,9 +295,39 @@ current fingerprint、selection、重入、连接生命周期、mutation 发布�
 最终候选 `f1f5e63…` 为 Foundation `180 passed`、全量 `551 passed`、Standards `0`、Spec `0`、
 scope creep `0`；Quality `32651221452` 的 `headSha` 精确匹配并成功。F008 已固定 GREEN。
 
+### 6.2 F009 稳定 RED 文件、矩阵与门禁
+
+F009 初始 RED 只允许新增或修改以下公共行为测试：
+
+1. `specs/agent-foundation/tests/test_f009_zero_persistence_matrix_red.py`
+   - 初始化/seed 后动态反射实际数据库全部表，并与受保护文件、UI 正文、audit logger、DML/DDL attempt
+     形成统一前后快照；
+   - 成功、READ、两个 DRAFT、配置/Context/plan/Provider/Tool 失败、装配期/Provider/Tool/host 取消、三类
+     timeout、TTL/current-context/scope/fingerprint stale、未知/WRITE、prompt injection、跨 tenant/user、busy、
+     same-controller reentry、mutation 发布窗口、discard、disconnect/reconnect、close/restart 全矩阵；
+   - 无 Agent 持久化 schema，重启无可恢复的 Context/消息/ToolResult/Patch/thread；
+   - 预期 RED 只指向 coordinator 尚无公开 `runtime_limits` 注入 seam，不得篡改 `_runtime` 或等待生产时限。
+2. `tests/test_config_secrets.py`
+   - POSIX permissive umask 下新生成 `.kindergarten_secrets` 从创建时即为 `0600`；
+   - 已存在的宽权限普通文件在首次读取前收敛为 `0600`，内容摘要/复用语义不变，环境变量覆盖两个 Key 时
+     也必须纠权；符号链接/非普通文件或纠权/写入失败必须 fail-closed；Windows 只验证现有功能，不伪造
+     POSIX mode 或 DACL 结论。
+
+RED commit 必须 collection clean、无 skip/xfail、无固定 sleep/真实网络/真实凭据，既有 Foundation 180 项与
+既有常规配置测试保持 GREEN；连续两次必须得到完全相同的 collected/passed/failed 与失败 node ID。新增预期失败仅为
+`runtime_limits` seam 和 secrets 文件权限行为。固定 RED 后才允许最小 GREEN：只透传可选 RuntimeLimits，并
+以文件描述符、普通文件/无 symlink 校验和安全写入 helper 在首次读取前纠权或以 `0600` 创建 secrets 文件；
+失败向上传播且日志不含正文。不得增加表、migration、WRITE、记忆或新 Tool。
+
+GREEN 后先执行双轴 Review；findings 必须先建立 Review RED 再修正。固定 `tested_code_sha` 后须完成 Foundation、
+常规全量、`pip check`、Ruff/diff、Linux 浏览器 mock 与安全配置真实模型验收，两份脱敏证据都引用该 SHA。
+提交证据得到 `evidence_closure_sha` 后，再做最终 Standards `0` / Spec `0` Review、推送、等待精确 closure
+`headSha` Quality 成功并回写 Issue #48。
+任一真实模型安全前置缺失都保持 F009 未完成，不得以 mock、环境变量注入或旧 SHA 证据替代。
+
 ## 7. 当前授权与停止边界
 
 本分支从 `0880f64c419e4fc27c45f4a7207e547077736056` 获得 F007 → F008 → F009 连续授权，但必须逐切片闭合
 `RED → 最小 GREEN → 双轴 Review → 固定 SHA Quality → Issue 证据`，不得横向并行实现。F008 已闭合，
-当前只激活 F009 文档/spec/tasks 与稳定 RED；其验收实现必须等待 RED 固定。全程禁止合并 `main`、关闭 Issue、
-发布、Agent WRITE、长期记忆、migration 或产品多 Agent。
+当前冻结 F009 公共验收 seam，下一门禁只建立并固定稳定 RED；其 GREEN 与人工验收必须等待 RED commit。
+全程禁止合并 `main`、关闭 Issue、发布、Agent WRITE、长期记忆、migration 或产品多 Agent。

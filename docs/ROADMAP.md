@@ -1,6 +1,6 @@
 # KindergartenManager 产品与工程路线图
 
-> 当前快照：2026-08-23；Agent 安全同步 RED 基线 `5de2e49bee19749f611b50747a31be9464b92d7b`；最近远端产品主线 `main@cfeadefd7dfa056c1b3757876658493110d8cf84`。
+> 当前快照：2026-08-24；Agent 安全同步 RED 基线 `5de2e49bee19749f611b50747a31be9464b92d7b`；最近远端产品主线 `main@cfeadefd7dfa056c1b3757876658493110d8cf84`。
 
 ## 1. 状态语义
 
@@ -102,12 +102,12 @@ R0 事实基线与图谱
 
 ## 7. R3：Agent Foundation 规格与分支决策
 
-状态：`验收中`（F005-F008 固定 GREEN；当前只进入 F009 文档与稳定 RED 门禁）。
+状态：`验收中`（F005-F008 固定 GREEN；F009 公共验收 seam 已冻结，下一门禁为稳定 RED）。
 
 已确认：[ADR-0005](ADR/ADR-0005-controlled-ai-agent-runtime.md) 和
 [Agent Runtime 设计](design/agent-runtime.md) 已经固定首期上限，即每日活动计划的单 Agent、
-4 个 READ、2 个 DRAFT、零持久化和零长期记忆。F003-F007 的完成证据见下；F008 设计/seam 冻结不代表
-其稳定 RED 或实现已完成。
+4 个 READ、2 个 DRAFT、零持久化和零长期记忆。F003-F008 的实现、Review 与精确 SHA Quality 已闭合；
+整个 Foundation 仍须通过 F009 自动化与两类人工验收。
 
 当前结果：
 
@@ -120,15 +120,16 @@ R0 事实基线与图谱
   最终本地候选 `51443a3…` 为 Foundation `110 passed`、全量 `551 passed`、Standards `0`、Spec `0`、
   scope creep `0`；证据 SHA `2fb4e6f…` 的远端 Quality `32648599591` 精确匹配成功。
 - 当前继续单用户；NiceGUI 多用户/RBAC 代码仅作为低优先级预备资产，不进入 Foundation 范围。
-- 是否仍保持模块化单体？服务拆分必须有独立 ADR 和运营理由。
-- 聚合事务和 tenant/user 投影修复后，每日计划、班级设置和日历的窄 Service 投影如何建立，使 Agent Tool 不直接调用 Repository？
+- 当前继续保持模块化单体；服务拆分仍须独立 ADR 与运营理由，F009 不改变部署形态。
+- F004 已建立每日计划、班级设置和日历的 tenant+user 窄 Service 投影；F008 executor 只调用这些投影，
+  Provider 不接触 Repository。
 
-当前执行边界：F008 固定 SHA Review/CI 已闭合；当前只激活 F009 文档/spec/tasks 与稳定 RED。零持久化全矩阵、
-Linux 浏览器 mock 和仅使用应用安全配置凭据的真实模型验收必须在 F009 RED 固定后执行。
+当前执行边界：F008 固定 SHA Review/CI 已闭合；F009 文档/spec/tasks 公共 seam 已冻结，下一步只建立稳定
+RED。零持久化全矩阵、Linux 浏览器 mock 和仅使用应用安全配置凭据的真实模型验收必须在 F009 RED 固定后执行。
 
 ## 8. R4A：受控 Agent Foundation READ/DRAFT
 
-状态：`验收中`（F005-F008 固定 GREEN；F009 文档与稳定 RED 待固定）。
+状态：`验收中`（F005-F008 固定 GREEN；F009 公共 seam 已冻结、稳定 RED 待固定）。
 
 实现范围严格限定为：
 
@@ -168,7 +169,32 @@ F008 RED 最终固定为 `b3cad08…`：`175 collected / 110 passed / 65 failed`
 全部 GREEN。最小 GREEN 为 `80a20de…`；Review RED `b3c45d2…` 与 `b0647a9…` 依次固定装配期取消、
 fingerprint/selection 失效、同 controller 重入、连接生命周期、mutation 发布窗口和 host cancellation。
 最终候选 `f1f5e63…` 为 Foundation `180 passed`、全量 `551 passed`、Standards `0`、Spec `0`、scope creep `0`；
-Quality `32651221452` 的 `headSha` 精确匹配并成功。F008 已固定 GREEN，当前只进入 F009 文档与稳定 RED。
+Quality `32651221452` 的 `headSha` 精确匹配并成功。F008 已固定 GREEN；F009 公共验收 seam 已冻结，
+下一门禁为稳定 RED。
+
+F009 验收分为三个不能互相替代的门禁：
+
+1. 自动化零持久化全矩阵：初始化/seed 后动态反射实际数据库全部表并建立 baseline；每个公开终态统一比较
+   全表逻辑快照、受保护配置/exports（排除
+   SQLite/WAL/journal/cache 物理文件）、调用方 UI 正文、独立 audit logger 与 seed 后 DML/DDL attempts；
+   覆盖成功、READ、两个 DRAFT、配置/Context/plan/Provider/Tool 失败、装配期/Provider/Tool/host 取消、
+   三类 timeout、TTL/current-context/scope/fingerprint stale、未知/WRITE、prompt injection、跨 tenant/user、
+   busy、same-controller reentry、mutation 发布窗口与 discard/disconnect/reconnect/close/restart；无新增 Agent schema
+   或可恢复会话/Context/Patch/thread。
+2. Linux 浏览器 mock：临时 SQLite、虚构且经应用加密保存的 Key、关闭 mock server；迁移、seed、Key 保存与
+   Settings 权限收敛完成后、第一次 Agent operation 前取得 baseline；可见验证零写入说明、
+   无 Agent WRITE 控件、文本/DRAFT/丢弃、cancel、A→B→A、断开重连与再次运行，前后全表逻辑摘要、exports、
+   Git 状态和页面正文一致。
+3. 真实模型：在 `tested_code_sha` 的隔离临时 worktree/SQLite 中 seed 合成计划，由用户在该临时应用
+   `/settings` 正常保存真实 active `text` 配置；脚本和浏览器自动化不得读取、复制或键入 Key/endpoint/密文。
+   配置与权限收敛后、第一次 Agent operation 前取得 baseline，调用只走 controller→coordinator→repository
+   配置/解密链。POSIX secrets 文件必须
+   为 `0600`；禁止读取/导出 Key、临时环境变量注入真实 Key、直接构造 Provider、`/models` 探测、切换凭据
+   或重试。无安全配置时零请求且 F009 保持未完成；只允许合成数据与脱敏证据。
+
+两份人工验收证据必须绑定同一 `tested_code_sha`，真实模型明确 PASS；提交证据得到独立
+`evidence_closure_sha` 后，仍需最终双轴 Review 0/0、完整本地门禁与 closure `headSha` Quality 精确成功并
+回写 Issue #48，才可把 R4A 标为完成。
 
 完成证据必须包含：未知/WRITE Tool、额外参数、prompt injection、跨 tenant/user、取消、超时和
 过期结果的负向测试，以及所有路径对业务数据、页面正文、版本、preview、audit 和导出“零变化”的证明。

@@ -111,9 +111,9 @@ API 身份独立：`X-Api-Key` 映射到 tenant；配置 `API_SIGNING_SECRET` �
 - 失败不覆盖教师原输入；教师可编辑 AI 结果。
 - 视觉任务发送最少必要的幼儿数据。
 
-测试使用 `httpx.MockTransport` 或 mock 边界，不调用真实 AI。
+自动测试使用 `httpx.MockTransport` 或 mock 边界，不调用真实 AI；F009 人工真实模型验收遵守下述独立门禁。
 
-### 6.1 受控 Agent Foundation（F005-F008 已固定）
+### 6.1 受控 Agent Foundation（F005-F008 已固定，F009 验收中）
 
 实现前必须阅读 [ADR-0005](ADR/ADR-0005-controlled-ai-agent-runtime.md) 和
 [Agent Runtime 设计](design/agent-runtime.md)。规划依赖方向为：
@@ -150,6 +150,21 @@ ui/components/agent_draft
 变化、迟到丢弃、host cancellation、drain 竞态及 BaseException 净化；F008 已覆盖具体 wire adapter、六路
 executor、跨页面 busy、selection/fingerprint、连接生命周期和 mutation 发布窗口。F009 才以完整矩阵和
 Linux 浏览器/真实模型验收最终证明业务数据与 UI 正文零变化。
+
+F009 开发与验收硬约束：
+
+- 自动矩阵使用动态全表逻辑快照、受保护文件/exports 摘要、调用方 UI 正文、独立 `audit` logger 捕获和
+  seed 后 DML/DDL 记录；不以事务 rollback、SQLite 物理文件 hash 或少数业务表替代。
+- composition timeout 只通过可选 `runtime_limits` 公开注入做确定性测试，默认生产上限保持不变；并发用
+  `asyncio.Event` 协调，不读取 Runtime 私有状态或固定 sleep。
+- Linux mock 只用临时 SQLite 和虚构 Key，Key 仍经应用 repository 加密保存；不得读取真实配置或修改仓库
+  `.env`。真实模型则只走 controller→coordinator→repository active `text` 配置/解密链，不得导出 Key、
+  直接构造 Provider、环境变量注入真实 Key、探测 `/models`、切换凭据或重试。
+- POSIX `.kindergarten_secrets` 从创建瞬间为 `0600`；已有普通文件在首次读取前纠权，即使环境变量覆盖 Key；
+  symlink/非普通文件或纠权/安全写入失败须 fail-closed。没有安全配置时真实验收零请求，F009 保持未完成。
+- 先固定 `tested_code_sha` 并在该 SHA 执行 Linux mock 与真实模型；证据文件共同引用该 SHA。提交证据得到
+  `evidence_closure_sha` 后，最终双轴 Review、Quality 和 Issue 绑定 closure SHA。验收后若产品代码变化，
+  两类人工验收全部重做。
 
 ## 7. Word 与图片
 
@@ -205,12 +220,12 @@ Linux 浏览器/真实模型验收最终证明业务数据与 UI 正文零变化
 
 1. 把保留的 auth 代码误写为当前登录已启用。
 2. 把 `services/README.md` 的目录示例误写为已部署微服务。
-3. 把启动成功误写为迁移成功；当前迁移失败会继续启动。
+3. 把进程存在误写为迁移成功；当前启动迁移失败会 fail-closed，仍须核对迁移日志与 head。
 4. 用历史测试数字代替当前执行。
 5. 只按资源 ID 更新/删除，不带 tenant/user。
 6. 在大型 NiceGUI 页面继续堆业务规则。
 7. 把 Linux CI 或 DOCX XML 测试当作 Windows/Word 人工通过。
-8. 把已接受的 Agent 设计误写为已实现，或为了快速接入让 Provider 直连 Repository/动态 Tool。
+8. 把 F008 已实现误写成 F009 整体验收已完成，或为了快速接入让 Provider 直连 Repository/动态 Tool。
 9. 在 Agent Foundation 中预留 WRITE、“始终允许”、持久化对话或 MCP/插件入口。
 
 ## 13. 提交前检查

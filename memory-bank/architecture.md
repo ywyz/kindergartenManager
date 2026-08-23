@@ -1,6 +1,6 @@
 # 幼儿园教学管理系统架构文档（初始化）
 
-> **历史文档说明（2026-08-23）**：本文按开发阶段累积，包含已被后续单用户模式取代的登录描述和旧迁移/测试数字。当前架构事实见 [`../CONTEXT.md`](../CONTEXT.md)、[`../docs/design/system-architecture.md`](../docs/design/system-architecture.md)、[`../docs/design/data-model.md`](../docs/design/data-model.md) 和 [`../docs/ADR/README.md`](../docs/ADR/README.md)。受控 Agent 的 F003-F007 应用层基础已固定 GREEN，具体 Provider/Tool/UI 与验收仍未完成；边界见 [`../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md`](../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md) 与 [`../docs/design/agent-runtime.md`](../docs/design/agent-runtime.md)。下文历史内容不授权 Agent WRITE。当前 Alembic head 为 `a6c4d8e2f9b1`。
+> **历史文档说明（2026-08-24）**：本文按开发阶段累积，包含已被后续单用户模式取代的登录描述和旧迁移/测试数字。当前架构事实见 [`../CONTEXT.md`](../CONTEXT.md)、[`../docs/design/system-architecture.md`](../docs/design/system-architecture.md)、[`../docs/design/data-model.md`](../docs/design/data-model.md) 和 [`../docs/ADR/README.md`](../docs/ADR/README.md)。受控 Agent 的 F003-F008 已固定 GREEN，具体 Provider、六 Tool executor、组合装配与每日计划 UI 已实现；F009 零持久化、Linux 浏览器 mock 与安全配置真实模型验收尚未闭合。边界见 [`../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md`](../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md) 与 [`../docs/design/agent-runtime.md`](../docs/design/agent-runtime.md)。下文历史内容不授权 Agent WRITE。当前 Alembic head 为 `a6c4d8e2f9b1`。
 
 ## 1. 历史阶段记录
 
@@ -416,6 +416,11 @@ F008 在该边界内新增具体 OpenAI-compatible Chat Completions adapter、�
 coordinator/controller、日期 generation/current fingerprint 失效和每日计划只读建议面板；仍无 Agent 持久化、
 WRITE、长期记忆或产品多 Agent。
 
+F009 只增加验收证据：自动化矩阵统一覆盖全部表、受保护文件/exports、UI 正文、audit 与 DML/DDL attempt；
+Linux 浏览器 mock 使用临时数据库和虚构加密 Key；真实模型只能使用应用 active `text` 配置，且 POSIX secrets
+文件在读取前/新建时必须为 `0600`。人工验收绑定 `tested_code_sha`，证据提交后的 Review/CI 绑定独立
+`evidence_closure_sha`；任一产品代码变化都使前一组人工证据失效。
+
 ### 核心模块
 
 | 文件 | 职责 |
@@ -435,4 +440,4 @@ SHA `049b520…` 的远端 Quality `32644290676` 精确匹配成功。F007 初�
 Standards `0`、Spec `0`；证据 SHA `2fb4e6f…` 的远端 Quality `32648599591` 精确匹配成功。F008 最终
 RED `b3cad08…`、Review RED `b3c45d2…` 与 `b0647a9…` 收敛到候选 `f1f5e63…`，Foundation **180 passed**、
 全量 **551 passed**、Standards `0`、Spec `0`；远端 Quality `32651221452` 的 `headSha` 精确匹配成功。
-当前只进入 F009 文档与稳定 RED。
+F009 公共验收 seam 已冻结，下一门禁为稳定 RED；尚不得宣称整个 Agent Foundation 验收完成。

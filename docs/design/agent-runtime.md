@@ -1,6 +1,6 @@
 # KindergartenManager 受控 AI Agent Runtime 设计
 
-> 状态：已确认设计；F003-F008 已固定 GREEN；当前只进入 F009 文档与稳定 RED 门禁。本文落实
+> 状态：已确认设计；F003-F008 已固定 GREEN；F009 公共验收 seam 已冻结，下一门禁为稳定 RED。本文落实
 > [ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md)，不代表完整 Agent 已进入当前产品。本轮只授权在功能分支
 > 依序提交并推送 F007-F009；合并、关闭 Issue 或发布仍未授权。
 
@@ -46,18 +46,18 @@ app/service/agent/
   registry.py        # 已实现：关闭 Tool registry
   patch.py           # 已实现：关闭路径、完整绑定、规范 PlanPatch
   runtime.py         # 已实现：Provider port、单 operation loop、精确取消、硬时限与安全排空
-  tools.py           # F008 目标：六路静态 FoundationToolExecutor
+  tools.py           # 已实现：六路静态 FoundationToolExecutor
+  composition.py     # 已实现：应用级单 Runtime、controller/snapshot 与短命 Provider 装配
 
 app/integration/ai_client/
-  agent_provider.py  # F008 目标：OpenAI-compatible Chat Completions Adapter
+  agent_provider.py  # 已实现：OpenAI-compatible Chat Completions Adapter
 
 app/ui/components/
-  agent_draft.py     # F008 目标：controller/snapshot、状态、回答、字段差异、取消/丢弃
+  agent_draft.py     # 已实现：状态、回答、字段差异、取消/丢弃面板
 ```
 
-标为“已实现”的文件已进入 F003-F007；其余目录仍只是设计目标。F007 不包含具体
-Provider adapter、Tool executor、组合装配或 UI。后续实现时若现有层次出现更小而清晰的
-seam，可在不放宽本契约的前提下调整文件拆分。
+以上文件已在 F003-F008 依序固定 GREEN。F009 不增加 Agent 能力，只增加 composition timeout 的公开测试
+注入 seam、凭据文件权限收敛、全矩阵与人工验收证据。
 
 ## 4. 核心类型
 
@@ -397,7 +397,47 @@ worktree 连续两次均为 `175 collected / 110 passed / 65 failed`，旧 110 �
 `80a20de…` 经双轴 Review 后，以 Review RED `b3c45d2…`、`b0647a9…` 固定取消、current fingerprint、
 selection、重入、连接生命周期与 mutation 发布窗口；最终候选 `f1f5e63…` 为 Foundation `180 passed`、
 全量 `551 passed`、Standards `0`、Spec `0`，Quality `32651221452` 精确匹配成功。F008 已固定 GREEN，
-当前只进入 F009 文档与稳定 RED。
+F009 公共验收 seam 已冻结，下一门禁为稳定 RED。
+
+### F009 零持久化与目标平台验收
+
+F009 自动化测试对每个公开终态复用同一个效果快照，而不是分别挑选少数表或只检查最终 rollback：
+
+```text
+EffectSnapshot
+  database: 初始化/seed 后动态反射实际数据库全部表，按表/主键/列规范排序；BLOB 只记录长度与 sha256
+  files: 受保护配置/exports 的 relative path/length/sha256；排除 DB/WAL/journal/cache 物理文件
+  ui_body: 调用方拥有的完整页面正文深冻结副本
+  audit: 独立安装到 propagate=False 的 audit logger 的捕获记录
+  dml_ddl_attempts: seed 后捕获全部写 SQL/DDL，即使事务最终 rollback
+```
+
+assistant、真实 READ executor、两个 DRAFT、配置/Context/plan/Provider/Tool 失败、装配期/Provider/Tool/host
+取消、三类 timeout、TTL/current-context/scope/fingerprint stale、未知/WRITE、prompt injection、跨 tenant/user、
+busy、same-controller reentry、mutation 发布窗口以及 discard/disconnect/reconnect/close/restart 都必须满足
+`after == before`、无 audit、无
+写 SQL/DDL。timeout 通过 `DailyPlanAgentCoordinator(..., runtime_limits=...)` 的可选注入在公开 composition seam
+确定性测试；`None` 保留现有生产默认。事件型测试使用 entered/release/exited 协调，不读取 `_active` 等私有状态。
+
+Linux 浏览器 mock 使用临时 SQLite 和虚构 Key，mock Key 仍经应用 repository 加密保存；迁移、seed、Key
+保存和 Settings 权限收敛后、第一次 Agent operation 前取 baseline。mock server 只返回
+固定 holiday/Chat Completions，并校验六个关闭 Tool 与禁止参数。浏览器可见验证覆盖零写入提示、无 Agent
+采用/保存/确认控件、文本/DRAFT 后丢弃、取消迟到丢弃、A→B→A、断开重连和再次运行。步骤前后比较全表
+逻辑摘要、exports 摘要、Git 状态与正文；截图和 Issue 只记录脱敏事实，不上传原始日志。
+
+真实模型验收在 `tested_code_sha` 的隔离临时 worktree/SQLite 中 seed 合成计划，由用户亲自在临时应用
+`/settings` 正常保存真实 active `text` 配置；脚本和浏览器自动化不得读取、复制或键入 Key/endpoint/密文。
+配置与权限收敛后、第一次 Agent operation 前取 baseline。调用只走产品链：
+`DailyPlanAgentController.run()` → coordinator → repository active `text` 配置与
+解密 → 短命 Provider。POSIX `.kindergarten_secrets` 必须从创建瞬间为 `0600`；已有普通文件在任何读取前
+纠权（包括环境变量覆盖 Key），拒绝 symlink/非普通文件，纠权或安全写入失败须 fail-closed。
+禁止脚本导出 Key、临时环境变量注入真实 Key、直接构造 Provider、额外 `/models` 请求、凭据切换或自动重试。
+输入必须是合成计划；证据不含 endpoint、Key/密文、模型正文、request ID、HTTP/HAR、system Context 或 Tool
+参数。配置不存在、权限不安全或解密失败时必须零请求并保持 F009 未完成。
+
+Linux mock 与真实模型证据文件分别为 `specs/agent-foundation/evidence/f009-linux-browser-mock.md` 和
+`f009-real-model.md`；两者绑定同一 `tested_code_sha`，真实模型必须明确 `PASS`。提交证据后形成独立
+`evidence_closure_sha`，最终 Review/Quality/Issue 绑定 closure SHA。自动矩阵、人工验收与远端 Quality 互不替代。
 
 ## 12. 实现前置门禁
 
@@ -405,8 +445,8 @@ selection、重入、连接生命周期与 mutation 发布窗口；最终候选 
 2. 先修复聚合事务的部分提交风险与 tenant/user 投影边界；当前 SHA 的依赖、迁移和全量测试可重复，常规质量 CI 已建立或明确豁免。
 3. 对 Agent 页面采用回环/可信网络限制；Agent 不被当作恢复 UI 认证的替代品。
 4. 为每日计划、班级和日历补只读 Service 投影，Agent Tool 不直接调用 Repository；投影明确区分 API tenant 与 UI tenant + user 语义。
-5. 冻结 spec、Issue、任务顺序、上述三个 F008 RED 文件和停止边界；设计完成不自动授权 GREEN，只有稳定
-   RED commit 才开放 F008 最小 GREEN。
+5. F008 已固定 GREEN；冻结 F009 自动矩阵、secrets 权限与两类人工验收 seam。设计完成不自动授权 GREEN，
+   只有 F009 稳定 RED commit 才开放最小 GREEN。
 6. Graphify/codebase-memory 更新只证明覆盖，不替代测试、Review 和人工验收。
 
 ## 13. 未来 WRITE 的额外前置条件

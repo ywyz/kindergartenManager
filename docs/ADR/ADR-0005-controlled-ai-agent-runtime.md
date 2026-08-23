@@ -113,6 +113,31 @@ operation”。页面交互由 `DailyPlanAgentController` 转成冻结 `AgentPan
 全部精确匹配时才可发布。即使 A→B→A 回到同一日期，第一次 A 的 assistant/Patch 也必须因 generation 不匹配丢弃。
 面板只显示运行/取消、失败、assistant、字段级 `PlanPatch` 和丢弃；不回填正文，不提供 adopt/save/confirm。
 
+F009 不改变上述产品能力，只以三个独立门禁证明边界：
+
+1. 自动化零持久化全矩阵在初始化/seed 后动态反射实际数据库全部表，并同时快照受保护配置/exports（排除
+   SQLite/WAL/journal/cache 物理文件）、调用方页面正文、独立 `audit` logger 与 seed 后 DML/DDL 尝试；
+   成功、READ、两个 DRAFT、配置/Context/plan/Provider/Tool 失败、装配期/Provider/Tool/host 取消、三类
+   timeout、TTL/current-context/scope/fingerprint stale、未知/WRITE、prompt injection、跨 tenant/user、busy、
+   same-controller reentry、mutation 发布窗口和 discard/disconnect/reconnect/close/restart 都必须零差异。不得新增
+   Agent schema 或恢复上次 Context、消息、ToolResult、Patch、operation/thread。
+2. Linux 浏览器 mock 只用临时 SQLite 和经应用 repository 加密保存的虚构 Key；迁移、seed、Key 保存与
+   Settings 权限收敛后、第一次 Agent operation 前取 baseline，再验证可见零写入说明、无
+   Agent WRITE 控件、文本/DRAFT/丢弃、cancel、A→B→A、断开重连和再次运行，并比较全表逻辑摘要、exports、
+   Git 状态及正文。mock 不读取真实配置，也不记录 Authorization、system Context 或业务正文。
+3. 真实模型在 `tested_code_sha` 的隔离临时 worktree/SQLite 中 seed 合成计划，由用户亲自在临时应用
+   `/settings` 保存 active `text` 配置；脚本和浏览器自动化不得读取、复制或键入 Key/endpoint/密文。配置与
+   权限收敛后、第一次 Agent operation 前取 baseline，只允许通过 controller→coordinator→repository 解密链调用。POSIX
+   `.kindergarten_secrets` 必须从创建瞬间为 `0600`；已有普通文件在首次读取前纠权（即使环境变量覆盖 Key），
+   symlink/非普通文件或纠权/安全写入失败须 fail-closed。禁止导出 Key、环境变量临时注入真实 Key、
+   直接构造真实 Provider、探测 `/models`、凭据切换或自动重试；配置/权限不满足时必须零请求且 F009 保持
+   未完成。只用合成业务数据，证据不得包含 endpoint、Key/密文、模型正文、request ID、HTTP/HAR、system
+   Context 或 Tool 参数。
+
+自动矩阵、Linux mock、真实模型、双轴 Review 和精确 SHA Quality 互不替代。两份人工证据必须绑定同一
+`tested_code_sha`；提交证据形成独立 `evidence_closure_sha`，最终 Review/Quality/Issue 绑定 closure SHA。
+真实模型结果必须为 PASS 才能宣称 Agent Foundation 验收闭合。
+
 ### 6. 未来 WRITE 是独立里程碑
 
 未来 WRITE 至少需要：可信 UI actor、显式业务 revision、字段级 before hash、规范 Patch hash、绑定
@@ -134,7 +159,7 @@ operation”。页面交互由 `DailyPlanAgentController` 转成冻结 `AgentPan
 
 F008 已按本顺序固定 GREEN：最终 RED `b3cad08…`，Review RED `b3c45d2…`、`b0647a9…`，最终候选
 `f1f5e63…`；Foundation `180 passed`、全量 `551 passed`、双轴 Review 0/0，Quality `32651221452`
-精确匹配成功。当前只进入 F009 文档与稳定 RED，不扩张本 ADR 的 WRITE、记忆或多 Agent 边界。
+精确匹配成功。F009 公共验收 seam 已冻结，下一门禁是稳定 RED；不扩张本 ADR 的 WRITE、记忆或多 Agent 边界。
 
 ## 后果
 

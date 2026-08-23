@@ -95,22 +95,66 @@ Word：Microsoft Word / LibreOffice / 未执行
 - [ ] Compose 已覆盖所有示例默认密码。
 - [ ] 上传、AI、导出异常不在 UI/日志显示密钥或 traceback。
 
-## 11. 受控 AI Agent Foundation（实现后执行）
+## 11. 受控 AI Agent Foundation（F009）
 
-> 当前 Agent 只有 ADR 和设计，以下是未来验收契约，不得在尚未实现时填写“通过”。
+> F003-F008 已实现并固定 GREEN；以下 F009 验收尚未闭合。自动矩阵、Linux 浏览器 mock 与真实模型必须
+> 分开记录，任何一项未执行都不得把 MT-011A/B/C 全部填为通过。
 
-- [ ] 每日活动计划显示“只生成建议，不会保存”，可提交问题、观察运行状态、取消并丢弃草案。
-- [ ] Agent 只能使用 `daily_plan.read_current`、`daily_plan.read_context`、`calendar.read_evaluation`、
-  `settings.read_class_areas`、`daily_plan.draft_section_patch`、`daily_plan.draft_reflection_patch`。
-- [ ] 草案完整显示目标、Tool、字段级 before/after、警告和已过期状态，不提供采用、保存、
-  “本次会话允许”或后台自动执行。
-- [ ] 操作成功、失败、取消、超时和丢弃后，重新载入页面和数据库，确认正文、版本、preview、audit、
-  导出和业务表均无变化。
-- [ ] 输入“忽略规则/直接保存/执行 SQL/打开 URL/调用未知 Tool/始终允许”不会产生新权限或副作用。
-- [ ] 切换日期、计划、页面或 actor 后，迟到结果被丢弃，不回填到新作用域。
-- [ ] 同时发起第二个 operation 得到可理解的 busy 错误，Tool loop 超过次数/长度/时间上限后终止。
-- [ ] 另一 tenant/user、AI Key、数据库/导出绝对路径、图片和完整无关历史不出现在 Agent 回答、错误或日志。
-- [ ] 关闭/重启应用后无会话、Context、Patch 或 Provider thread 可恢复。
+### 11.1 通用记录与零写入边界
+
+- [ ] 先固定 `tested_code_sha`（完整 40 位）；其后不得再修改产品代码、自动测试或 manual helper。
+- [ ] 每日活动计划显示“仅生成建议，不会保存或修改当前计划。”，可提交问题、观察运行、取消和丢弃。
+- [ ] Agent 卡内只有运行、取消、丢弃；没有采用、保存建议、确认写入、“总是允许”或隐藏 WRITE handler。
+  页面其他合法业务按钮不属于 Agent 卡，验收时不得点击。
+- [ ] 草案显示 Tool、字段路径和 before/after；文本建议/草案/丢弃/失败/取消后页面正文均不变。
+- [ ] 自动矩阵在初始化/seed 后动态反射实际数据库全部表，覆盖受保护文件/exports、独立 audit logger、
+  seed 后 DML/DDL attempts、配置/Context/plan/Provider/Tool 失败、四类取消、跨 tenant/user、prompt injection、
+  未知/WRITE、busy/reentry、三类 timeout、stale、mutation 发布窗口、断开/关闭与 restart 无恢复。
+- [ ] 人工步骤前后比较 SQLite 全表逻辑摘要、exports 摘要和 Git 状态；不得把 SQLite 物理文件 hash 当作
+  零写入证据，也不得把原始日志、业务正文或凭据粘贴到 Issue。
+
+### 11.2 Linux 浏览器 mock
+
+- [ ] 从仓库根启动；数据库位于 `/tmp/km-f009.*`，应用端口 `127.0.0.1:18080`，mock 端口
+  `127.0.0.1:18081`；启动前确认端口未被占用。
+- [ ] 只使用虚构 `ENCRYPTION_KEY`、`JWT_SECRET` 和 text Key；mock Key 经现有 `save_ai_key()` 加密保存到
+  临时数据库。不得读取真实应用 AI 配置，不得通过设置页改写仓库 `.env`。
+- [ ] mock fail-closed 校验 Authorization 存在且匹配虚构值、请求路径正确、恰好六个双下划线 wire Tool，
+  且没有 `store`、`parallel_tool_calls`；mock 不记录 Authorization、system Context 或业务正文。
+- [ ] 文本场景先显示运行态，随后显示建议；丢弃后建议消失，正文不变。
+- [ ] DRAFT 场景显示 `daily_plan.draft_section_patch`、`activity_goal` 与字段差异；丢弃后正文不变。
+- [ ] cancel 场景先显示“正在取消”，终态显示已取消；超过 mock 延迟后迟到标记仍不出现。
+- [ ] A→B→A 切日后 scope/正文始终对应当前日期，旧 assistant/Patch 和迟到标记不回填。
+- [ ] 运行中刷新或离开页面，超过延迟后返回；不恢复旧消息/草案，再次文本运行成功，证明 busy 已释放。
+- [ ] 迁移、seed、虚构 Key 保存和 Settings 权限收敛后、首次 Agent operation 前取得 baseline；停止应用后，
+  实际数据库全部表逻辑摘要、exports 摘要、Git 状态和正文证据均与 baseline 相等；只终止本次捕获 PID，
+  回写证据后再删除已验证前缀的临时目录。
+
+### 11.3 应用安全配置真实模型
+
+- [ ] 在 `tested_code_sha` 的隔离临时 worktree/SQLite 中 seed 合成计划；由用户亲自在该临时应用
+  `/settings` 保存真实 active `text` 配置。脚本和浏览器自动化不得读取、复制或键入 Key/endpoint/密文。
+- [ ] POSIX `.kindergarten_secrets` 为 `0600`，配置可由 repository 解密；设置保存与权限收敛完成后、首次
+  Agent operation 前取得 baseline。任一条件不满足时记录 `BLOCKED` 与 `network_requests=0`，停止且不得
+  改用环境变量临时注入真实 Key。
+- [ ] 只从 `DailyPlanAgentController.run()` 发起，由 coordinator 短命取得配置；不导出/显示 Key，不直接
+  构造 Provider，不调用 `/models`，不切换凭据或自动重试。
+- [ ] 使用不含真实幼儿/教师信息的合成计划，先请求一次最短文本响应；如需证明 Tool loop，仅再请求一次
+  不超过 20 字的一日反思 DRAFT。
+- [ ] 只记录时间、`tested_code_sha`、`key_type=text`、模型名、终态、Patch 数量/字段路径，以及 DB/exports/UI
+  正文前后逻辑摘要。不得记录 endpoint、Key、密文、assistant/Patch 正文、request ID、HTTP/HAR、system
+  Context 或 Tool 参数。
+- [ ] 文本为 `SUCCEEDED`，可选 DRAFT 为 `DRAFT_READY`；页面正文、全部业务表、version/preview/audit、
+  exports 均不变。
+
+### 11.4 证据闭合
+
+- [ ] Linux mock 写入 `specs/agent-foundation/evidence/f009-linux-browser-mock.md`；真实模型写入
+  `specs/agent-foundation/evidence/f009-real-model.md`。两份文件必须引用同一个 `tested_code_sha`，真实模型
+  必须为 `PASS`。
+- [ ] 提交两份证据后记录新的 `evidence_closure_sha`；最终 Standards/Spec Review 0/0、Quality success 与
+  Issue #48 回写均绑定该 closure SHA。验收后不得再修改产品代码；如修改，必须生成新的 tested code SHA 并
+  重做两类人工验收。
 
 ## 12. 打包与升级
 
@@ -137,4 +181,6 @@ Word：Microsoft Word / LibreOffice / 未执行
 | MT-008 | API |  |  |  |
 | MT-009 | 安全与网络 |  |  |  |
 | MT-010 | 平台打包/升级 |  |  |  |
-| MT-011 | 受控 AI Agent Foundation |  |  | 尚未实现时必须记为未执行 |
+| MT-011A | Agent 自动零持久化矩阵 |  |  | 必须绑定 tested code SHA |
+| MT-011B | Agent Linux 浏览器 mock |  |  | 必须绑定 tested code SHA |
+| MT-011C | Agent 安全配置真实模型 |  |  | BLOCKED/未执行均不等于通过 |
