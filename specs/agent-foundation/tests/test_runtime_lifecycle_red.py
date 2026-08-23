@@ -4,6 +4,9 @@ import asyncio
 from dataclasses import FrozenInstanceError, dataclass, field, fields, replace
 from datetime import date, datetime, timedelta, timezone
 from importlib import import_module
+from pathlib import Path
+import subprocess
+import sys
 from typing import Any
 from uuid import UUID
 
@@ -38,6 +41,7 @@ PLAN_SECTION_PATHS = (
     "morning_talk_questions",
     "daily_reflection",
 )
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _runtime_module():
@@ -1090,3 +1094,99 @@ async def test_tool_failure_rechecks_current_context_before_terminal_output():
     assert outcome.assistant_content is None
     assert outcome.patches == ()
     assert executor.secret not in repr(outcome)
+
+
+@pytest.mark.asyncio
+async def test_drain_registration_survives_host_cancellation_interleaving():
+    runtime = _runtime_module()
+    provider = CancellationDefyingProvider(
+        asyncio.Event(),
+        asyncio.Event(),
+        asyncio.Event(),
+    )
+    state = MutableContextState(runtime.AgentContextStamp.from_context(_context()))
+    agent = _agent(runtime, provider, state=state)
+    pending = asyncio.create_task(agent.run_turn(context=_context(), intent="取消交错"))
+    await asyncio.wait_for(provider.entered.wait(), 1)
+
+    assert (
+        await agent.cancel(runtime.AgentContextStamp.from_context(_context())) is True
+    )
+    await asyncio.wait_for(provider.cancellation_seen.wait(), 1)
+    await asyncio.sleep(0)
+    pending.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await pending
+
+    next_context = _next_context()
+    state.stamp = runtime.AgentContextStamp.from_context(next_context)
+    blocked = await agent.run_turn(context=next_context, intent="旧端口仍在排空")
+    try:
+        assert blocked.error_code == "agent.busy"
+        assert provider.calls == 1
+    finally:
+        provider.release.set()
+    recovered = await _run_after_drain(runtime, agent, state)
+    assert recovered.status is runtime.AgentTurnStatus.SUCCEEDED
+
+
+@pytest.mark.parametrize(
+    ("port_kind", "exception_name", "expected_code"),
+    (
+        ("provider", "SystemExit", "agent.provider_failed"),
+        ("executor", "KeyboardInterrupt", "agent.tool_failed"),
+    ),
+)
+def test_port_base_exceptions_are_sanitized_inside_the_child_task_boundary(
+    port_kind: str,
+    exception_name: str,
+    expected_code: str,
+):
+    secret = f"{port_kind}-base-exception-secret"
+    probe = f"""
+import asyncio
+import runpy
+
+namespace = runpy.run_path({str(Path(__file__))!r})
+runtime = namespace["_runtime_module"]()
+
+class ExplodingPort:
+    async def complete(self, request):
+        raise {exception_name}({secret!r})
+
+    async def execute(self, call, context):
+        raise {exception_name}({secret!r})
+
+async def main():
+    if {port_kind!r} == "provider":
+        agent = namespace["_agent"](runtime, ExplodingPort())
+    else:
+        call = namespace["_tool_call"](runtime)
+        provider = namespace["ToolCallingProvider"](call)
+        agent = namespace["_agent"](
+            runtime,
+            provider,
+            executor=ExplodingPort(),
+        )
+    outcome = await agent.run_turn(
+        context=namespace["_context"](),
+        intent="BaseException boundary",
+    )
+    print(outcome.error_code)
+
+asyncio.run(main())
+"""
+
+    completed = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=REPOSITORY_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=False,
+    )
+
+    assert completed.returncode == 0
+    assert completed.stdout.strip() == expected_code
+    assert secret not in completed.stdout
+    assert secret not in completed.stderr
