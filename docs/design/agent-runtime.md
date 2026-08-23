@@ -1,6 +1,6 @@
 # KindergartenManager 受控 AI Agent Runtime 设计
 
-> 状态：已确认设计；F003 contracts/关闭 registry、F004 Context/READ 投影已实现，F005 PlanPatch 为 GREEN 候选；F006 已获条件授权。本文落实
+> 状态：已确认设计；F003-F005 已固定 GREEN，F006 Provider port/有界串行 Runtime 为本地 GREEN 候选；F007 及以后未授权。本文落实
 > [ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md)，不代表完整 Agent 已进入当前产品，也不授权
 > 提交、推送、合并或发布。
 
@@ -44,8 +44,8 @@ app/service/agent/
   context.py         # 已实现：按 intent 最小构建和数据裁剪
   read_service.py    # 已实现：tenant+user 四类 READ 投影
   registry.py        # 已实现：关闭 Tool registry
-  patch.py           # GREEN 候选：关闭路径、完整绑定、规范 PlanPatch
-  runtime.py         # 未实现：单 operation loop、上限、取消、迟到丢弃
+  patch.py           # 已实现：关闭路径、完整绑定、规范 PlanPatch
+  runtime.py         # GREEN 候选：Provider port、单 operation 串行 loop 与本地上限
   tools.py           # 未实现：READ/DRAFT 应用工具
 
 app/integration/ai_client/
@@ -55,7 +55,8 @@ app/ui/components/
   agent_draft.py     # 状态、回答、字段差异、取消/丢弃
 ```
 
-标为“已实现”或“GREEN 候选”的文件已进入 F003-F005；其余目录仍只是设计目标。后续实现时若现有层次出现更小而清晰的
+标为“已实现”或“GREEN 候选”的文件已进入 F003-F006；其余目录仍只是设计目标。F006 不包含具体
+Provider adapter、Tool executor，也不包含 F007 的取消、超时、scope/fingerprint 变化和迟到丢弃。后续实现时若现有层次出现更小而清晰的
 seam，可在不放宽本契约的前提下调整文件拆分。
 
 ## 4. 核心类型
@@ -186,7 +187,7 @@ ProviderTurnRequest
 ProviderTurnResult
   assistant_content: bounded text | null
   tool_calls: tuple[ProviderToolCall, ...]
-  finish_reason: completed | tool_calls | length | refused | cancelled
+  finish_reason: completed | tool_calls | length | refused
   provider_request_id: bounded redacted string | null
 ```
 
@@ -202,10 +203,10 @@ idle -> running -> draft_ready | succeeded | failed | cancelled -> idle
 ```
 
 - 全应用同时最多一个 operation；第二个请求返回稳定 busy 错误。
-- Tool loop 串行运行，设置 Tool call 次数、消息窗口、Context、响应大小、单 Tool 超时和总时限。
+- F006 Tool loop 串行运行，并设置 Tool call 次数、消息窗口、intent 与响应大小上限。
 - Provider 等待期间不得保持数据库事务。
 - 每个 READ Tool 在执行时创建并关闭自己的短会话；DRAFT 只消费冻结 DTO。
-- 取消、页面切换、actor/scope/fingerprint 变化或 operation ID 不匹配时，迟到结果全部丢弃。
+- F007 才增加单 Tool/总时限，以及取消、页面切换、actor/scope/fingerprint 变化或 operation ID 不匹配时的迟到结果丢弃。
 - Runtime 重启回到 idle；不恢复 Context、消息、Patch、operation 或 Provider thread。
 
 建议稳定错误码：
@@ -263,7 +264,7 @@ revision；当前不得预留空表或猜测迁移编号。
 
 ### 应用测试
 
-- Scripted Provider 覆盖纯文本、一次/多次 Tool call、拒绝、超长、结构错误、超时和取消。
+- F006 Scripted Provider 覆盖纯文本、一次/多次 Tool call、拒绝、超长和结构错误；F007 再覆盖超时和取消。
 - READ 只含白名单字段；另一 tenant/user、Key、路径、图片和完整历史不进入 Context/log/repr。
 - DRAFT 产生确定 PlanPatch；任何成功/失败/取消后数据库、正文、版本、preview、audit 和导出均零变化。
 - 第二个 operation 被拒绝，旧 scope/operation 的迟到结果被丢弃。

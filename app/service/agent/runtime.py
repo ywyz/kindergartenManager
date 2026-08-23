@@ -1,0 +1,466 @@
+"""Application-owned provider port and bounded serial Agent runtime."""
+
+import asyncio
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from enum import Enum
+from types import MappingProxyType
+from typing import Protocol, runtime_checkable
+from uuid import UUID
+
+from app.service.agent.contracts import (
+    AgentContext,
+    DailyPlanProjection,
+    Permission,
+    ToolDescriptor,
+)
+from app.service.agent.patch import PlanPatch
+from app.service.agent.registry import AgentToolRegistry, AgentToolRejected
+
+LOCAL_POLICY_VERSION = "agent-foundation-v1"
+
+
+class ProviderRole(str, Enum):
+    """Closed application message roles understood by provider adapters."""
+
+    USER = "user"
+    ASSISTANT = "assistant"
+    TOOL = "tool"
+
+
+class ProviderFinishReason(str, Enum):
+    """Closed provider completion reasons used by the Foundation runtime."""
+
+    COMPLETED = "completed"
+    TOOL_CALLS = "tool_calls"
+    LENGTH = "length"
+    REFUSED = "refused"
+
+
+class ToolExecutionStatus(str, Enum):
+    """Closed local tool-execution outcomes."""
+
+    OK = "ok"
+    REJECTED = "rejected"
+    FAILED = "failed"
+
+
+class AgentTurnStatus(str, Enum):
+    """Public terminal states for one bounded runtime operation."""
+
+    SUCCEEDED = "succeeded"
+    DRAFT_READY = "draft_ready"
+    FAILED = "failed"
+
+
+def _freeze_json(value: object) -> object:
+    """Copy provider-owned JSON-like values into immutable local structures."""
+    if value is None or type(value) in {str, int, float, bool}:
+        return value
+    if isinstance(value, Mapping):
+        if not all(isinstance(key, str) for key in value):
+            raise ValueError("provider_arguments_invalid")
+        return MappingProxyType(
+            {key: _freeze_json(item) for key, item in value.items()}
+        )
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_json(item) for item in value)
+    raise ValueError("provider_arguments_invalid")
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderToolCall:
+    """One provider-requested call, fully bound to the operation and turn."""
+
+    call_id: UUID
+    operation_id: UUID
+    turn_id: UUID
+    tool_name: str
+    permission: Permission
+    arguments: Mapping[str, object] = field(repr=False)
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.call_id) is not UUID
+            or type(self.operation_id) is not UUID
+            or type(self.turn_id) is not UUID
+            or not isinstance(self.tool_name, str)
+            or not self.tool_name
+            or not isinstance(self.permission, Permission)
+            or not isinstance(self.arguments, Mapping)
+        ):
+            raise ValueError("provider_tool_call_invalid")
+        frozen_arguments = _freeze_json(self.arguments)
+        if not isinstance(frozen_arguments, Mapping):
+            raise ValueError("provider_tool_call_invalid")
+        object.__setattr__(self, "arguments", frozen_arguments)
+
+
+@dataclass(frozen=True, slots=True)
+class ToolExecutionResult:
+    """One immutable local result returned to the runtime."""
+
+    call_id: UUID
+    operation_id: UUID
+    turn_id: UUID
+    tool_name: str
+    permission: Permission
+    status: ToolExecutionStatus
+    value: object = field(repr=False)
+    error_code: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderMessage:
+    """Application-owned provider message with sensitive payloads hidden in repr."""
+
+    role: ProviderRole
+    content: str | None = field(default=None, repr=False)
+    tool_calls: tuple[ProviderToolCall, ...] = field(default=(), repr=False)
+    tool_results: tuple[ToolExecutionResult, ...] = field(default=(), repr=False)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.role, ProviderRole):
+            raise ValueError("provider_message_invalid")
+        if self.content is not None and not isinstance(self.content, str):
+            raise ValueError("provider_message_invalid")
+        if not isinstance(self.tool_calls, tuple) or not all(
+            isinstance(call, ProviderToolCall) for call in self.tool_calls
+        ):
+            raise ValueError("provider_message_invalid")
+        if not isinstance(self.tool_results, tuple) or not all(
+            isinstance(result, ToolExecutionResult) for result in self.tool_results
+        ):
+            raise ValueError("provider_message_invalid")
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderTurnRequest:
+    """Frozen application request passed to a provider adapter."""
+
+    operation_id: UUID
+    local_policy_version: str
+    context: AgentContext
+    messages: tuple[ProviderMessage, ...]
+    tools: tuple[ToolDescriptor, ...]
+    response_limit: int
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.operation_id) is not UUID
+            or not isinstance(self.context, AgentContext)
+            or self.operation_id != self.context.operation_id
+            or not isinstance(self.local_policy_version, str)
+            or not self.local_policy_version
+            or not isinstance(self.messages, tuple)
+            or not self.messages
+            or not all(
+                isinstance(message, ProviderMessage) for message in self.messages
+            )
+            or not isinstance(self.tools, tuple)
+            or not all(isinstance(tool, ToolDescriptor) for tool in self.tools)
+            or type(self.response_limit) is not int
+            or self.response_limit <= 0
+        ):
+            raise ValueError("provider_request_invalid")
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderTurnResult:
+    """Normalized result returned by a provider adapter."""
+
+    assistant_content: str | None = field(default=None, repr=False)
+    tool_calls: tuple[ProviderToolCall, ...] = field(default=(), repr=False)
+    finish_reason: ProviderFinishReason = ProviderFinishReason.COMPLETED
+    provider_request_id: str | None = field(default=None, repr=False)
+
+    def __post_init__(self) -> None:
+        if self.assistant_content is not None and not isinstance(
+            self.assistant_content, str
+        ):
+            raise ValueError("provider_result_invalid")
+        if not isinstance(self.tool_calls, tuple) or not all(
+            isinstance(call, ProviderToolCall) for call in self.tool_calls
+        ):
+            raise ValueError("provider_result_invalid")
+        if not isinstance(self.finish_reason, ProviderFinishReason):
+            raise ValueError("provider_result_invalid")
+        if self.provider_request_id is not None and not isinstance(
+            self.provider_request_id, str
+        ):
+            raise ValueError("provider_result_invalid")
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeLimits:
+    """Local ceilings that bound a serial provider/tool loop."""
+
+    max_intent_chars: int = 2_000
+    max_response_chars: int = 4_096
+    max_tool_calls: int = 6
+    max_messages: int = 12
+
+    def __post_init__(self) -> None:
+        if any(
+            type(value) is not int or value <= 0
+            for value in (
+                self.max_intent_chars,
+                self.max_response_chars,
+                self.max_tool_calls,
+                self.max_messages,
+            )
+        ):
+            raise ValueError("runtime_limits_invalid")
+
+
+@dataclass(frozen=True, slots=True)
+class AgentTurnOutcome:
+    """Sanitized terminal output from one runtime operation."""
+
+    status: AgentTurnStatus
+    assistant_content: str | None = field(default=None, repr=False)
+    patches: tuple[PlanPatch, ...] = field(default=(), repr=False)
+    error_code: str | None = None
+
+
+@runtime_checkable
+class AgentProviderPort(Protocol):
+    """Provider-neutral async completion port owned by the application layer."""
+
+    async def complete(self, request: ProviderTurnRequest) -> ProviderTurnResult:
+        """Return one normalized provider turn."""
+        ...
+
+
+@runtime_checkable
+class AgentToolExecutorPort(Protocol):
+    """Narrow executor port; concrete tool wiring remains outside the runtime."""
+
+    async def execute(
+        self, call: ProviderToolCall, context: AgentContext
+    ) -> ToolExecutionResult:
+        """Execute one already-resolved READ or DRAFT call."""
+        ...
+
+
+def _failure(code: str) -> AgentTurnOutcome:
+    return AgentTurnOutcome(status=AgentTurnStatus.FAILED, error_code=code)
+
+
+class AgentRuntime:
+    """Run one local provider operation at a time within fixed ceilings."""
+
+    def __init__(
+        self,
+        *,
+        provider: AgentProviderPort,
+        executor: AgentToolExecutorPort,
+        registry: AgentToolRegistry,
+        limits: RuntimeLimits | None = None,
+    ) -> None:
+        self._provider = provider
+        self._executor = executor
+        self._registry = registry
+        self._limits = limits or RuntimeLimits()
+        self._state_lock = asyncio.Lock()
+        self._active_operation_id: UUID | None = None
+
+    async def run_turn(self, *, context: AgentContext, intent: str) -> AgentTurnOutcome:
+        """Run a bounded serial turn; never expose provider exception details."""
+        if not isinstance(context, AgentContext) or not isinstance(intent, str):
+            return _failure("agent.tool_schema_invalid")
+        normalized_intent = intent.strip()
+        if not normalized_intent:
+            return _failure("agent.tool_schema_invalid")
+        if len(normalized_intent) > self._limits.max_intent_chars:
+            return _failure("agent.limit_exceeded")
+
+        async with self._state_lock:
+            if self._active_operation_id is not None:
+                return _failure("agent.busy")
+            self._active_operation_id = context.operation_id
+
+        try:
+            return await self._run_active(context=context, intent=normalized_intent)
+        finally:
+            async with self._state_lock:
+                if self._active_operation_id == context.operation_id:
+                    self._active_operation_id = None
+
+    async def _run_active(
+        self, *, context: AgentContext, intent: str
+    ) -> AgentTurnOutcome:
+        messages = (ProviderMessage(role=ProviderRole.USER, content=intent),)
+        total_tool_calls = 0
+        call_ids: set[UUID] = set()
+        patches: list[PlanPatch] = []
+
+        while True:
+            request = ProviderTurnRequest(
+                operation_id=context.operation_id,
+                local_policy_version=LOCAL_POLICY_VERSION,
+                context=context,
+                messages=messages,
+                tools=self._registry.descriptors(),
+                response_limit=self._limits.max_response_chars,
+            )
+            try:
+                result = await self._provider.complete(request)
+            except Exception:
+                return _failure("agent.provider_failed")
+            if not isinstance(result, ProviderTurnResult):
+                return _failure("agent.provider_failed")
+            if (
+                result.assistant_content is not None
+                and len(result.assistant_content) > self._limits.max_response_chars
+            ):
+                return _failure("agent.response_too_large")
+
+            if not result.tool_calls:
+                if result.finish_reason is not ProviderFinishReason.COMPLETED:
+                    return _failure("agent.provider_failed")
+                status = (
+                    AgentTurnStatus.DRAFT_READY
+                    if patches
+                    else AgentTurnStatus.SUCCEEDED
+                )
+                return AgentTurnOutcome(
+                    status=status,
+                    assistant_content=result.assistant_content,
+                    patches=tuple(patches),
+                )
+
+            if result.finish_reason is not ProviderFinishReason.TOOL_CALLS:
+                return _failure("agent.provider_failed")
+            total_tool_calls += len(result.tool_calls)
+            if total_tool_calls > self._limits.max_tool_calls:
+                return _failure("agent.limit_exceeded")
+            if len(messages) + 2 > self._limits.max_messages:
+                return _failure("agent.limit_exceeded")
+
+            resolved_calls: list[ProviderToolCall] = []
+            for call in result.tool_calls:
+                error = self._validate_call(
+                    call=call,
+                    context=context,
+                    seen_call_ids=call_ids,
+                )
+                if error is not None:
+                    return _failure(error)
+                call_ids.add(call.call_id)
+                resolved_calls.append(call)
+
+            results: list[ToolExecutionResult] = []
+            for call in resolved_calls:
+                try:
+                    execution = await self._executor.execute(call, context)
+                except Exception:
+                    return _failure("agent.tool_failed")
+                error = self._validate_execution(
+                    call=call,
+                    context=context,
+                    execution=execution,
+                )
+                if error is not None:
+                    return _failure(error)
+                results.append(execution)
+                if call.permission is Permission.DRAFT:
+                    patches.append(execution.value)
+
+            messages += (
+                ProviderMessage(
+                    role=ProviderRole.ASSISTANT,
+                    content=result.assistant_content,
+                    tool_calls=tuple(resolved_calls),
+                ),
+                ProviderMessage(
+                    role=ProviderRole.TOOL,
+                    tool_results=tuple(results),
+                ),
+            )
+
+    def _validate_call(
+        self,
+        *,
+        call: ProviderToolCall,
+        context: AgentContext,
+        seen_call_ids: set[UUID],
+    ) -> str | None:
+        if call.operation_id != context.operation_id or call.turn_id != context.turn_id:
+            return "agent.tool_schema_invalid"
+        if call.call_id in seen_call_ids:
+            return "agent.tool_schema_invalid"
+        if call.permission not in context.allowed_permissions:
+            return "agent.tool_not_allowed"
+        try:
+            descriptor = self._registry.resolve(call.tool_name, call.permission)
+        except AgentToolRejected:
+            return "agent.tool_not_allowed"
+        if not descriptor.input_schema.accepts(call.arguments):
+            return "agent.tool_schema_invalid"
+        if call.permission is Permission.DRAFT and not self._draft_binding_matches(
+            call=call, context=context
+        ):
+            return "agent.tool_schema_invalid"
+        return None
+
+    @staticmethod
+    def _draft_binding_matches(
+        *, call: ProviderToolCall, context: AgentContext
+    ) -> bool:
+        arguments = call.arguments
+        if (
+            arguments.get("operation_id") != str(context.operation_id)
+            or arguments.get("turn_id") != str(context.turn_id)
+            or arguments.get("base_fingerprint") != context.base_fingerprint
+        ):
+            return False
+        target = arguments.get("target")
+        if not isinstance(target, Mapping) or frozenset(target) != {
+            "daily_plan_id",
+            "plan_date",
+        }:
+            return False
+        projections = tuple(
+            fact for fact in context.facts if isinstance(fact, DailyPlanProjection)
+        )
+        if len(projections) != 1:
+            return False
+        projection = projections[0]
+        return (
+            type(target.get("daily_plan_id")) is int
+            and target.get("daily_plan_id") == projection.plan_id
+            and target.get("plan_date") == projection.plan_date.isoformat()
+        )
+
+    @staticmethod
+    def _validate_execution(
+        *,
+        call: ProviderToolCall,
+        context: AgentContext,
+        execution: object,
+    ) -> str | None:
+        if not isinstance(execution, ToolExecutionResult):
+            return "agent.tool_schema_invalid"
+        if (
+            execution.call_id != call.call_id
+            or execution.operation_id != context.operation_id
+            or execution.turn_id != context.turn_id
+            or execution.tool_name != call.tool_name
+            or execution.permission is not call.permission
+        ):
+            return "agent.tool_schema_invalid"
+        if execution.status is not ToolExecutionStatus.OK:
+            return "agent.tool_failed"
+        if call.permission is Permission.DRAFT:
+            patch = execution.value
+            if not isinstance(patch, PlanPatch):
+                return "agent.tool_schema_invalid"
+            if (
+                patch.operation_id != context.operation_id
+                or patch.turn_id != context.turn_id
+                or patch.tool_name != call.tool_name
+                or patch.base_fingerprint != context.base_fingerprint
+            ):
+                return "agent.tool_schema_invalid"
+        return None

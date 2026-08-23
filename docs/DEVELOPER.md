@@ -112,15 +112,15 @@ API 身份独立：`X-Api-Key` 映射到 tenant；配置 `API_SIGNING_SECRET` �
 
 测试使用 `httpx.MockTransport` 或 mock 边界，不调用真实 AI。
 
-### 6.1 受控 Agent Foundation（F004 已固定，F005 GREEN 候选）
+### 6.1 受控 Agent Foundation（F005 已固定，F006 GREEN 候选）
 
 实现前必须阅读 [ADR-0005](ADR/ADR-0005-controlled-ai-agent-runtime.md) 和
 [Agent Runtime 设计](design/agent-runtime.md)。规划依赖方向为：
 
 当前存在 contracts/关闭 registry、tenant+user READ 投影、按 intent 白名单构建的冻结 Context，
-以及纯内存、关闭字段路径和规范 SHA-256 的 PlanPatch GREEN 候选；Tool 执行、Provider、Runtime、
-UI 与持久化仍未实现。F006 Provider/Runtime 只在 F005 固定 SHA Review/CI 通过后获得执行授权，
-F007 及以后仍未授权。
+以及已固定的纯内存、关闭字段路径和规范 SHA-256 PlanPatch。F006 GREEN 候选新增应用拥有的冻结
+Provider DTO/port、Tool executor port 与有界串行 Runtime；具体 Provider adapter、Tool executor、
+UI 与持久化仍未实现。取消、超时、scope/fingerprint 变化和迟到丢弃属于 F007，仍未授权。
 
 ```text
 ui/components/agent_draft
@@ -138,8 +138,9 @@ ui/components/agent_draft
 - `AgentContext`、消息窗口、`ToolResult` 和 `PlanPatch` 只存在内存，不进入数据库、备份或日志正文。
 - 首期不引入 Agent 迁移。不使用 `updated_at` 或内容哈希代替将来 WRITE 所需的显式 revision。
 
-测试先用确定性 Scripted Provider 建立 RED，覆盖纯文本、Tool loop、未知/WRITE Tool、Schema 违反、
-跨 tenant/user、超长、超时、取消、busy、迟到丢弃和 prompt injection。每条路径都需断言业务数据和 UI 正文零变化。
+测试先用确定性 Scripted Provider 建立 RED。F006 覆盖纯文本、串行 Tool loop、未知/WRITE Tool、
+额外参数、绑定错误、超长、busy、Tool/消息上限和异常净化；F007 才覆盖超时、取消、scope/fingerprint
+变化与迟到丢弃。每条路径最终都需断言业务数据和 UI 正文零变化。
 
 ## 7. Word 与图片
 

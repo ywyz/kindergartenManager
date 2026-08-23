@@ -397,3 +397,24 @@ F004 在既有 F003 contracts/关闭 registry 之后，只建立应用层 READ s
 覆盖白名单、tenant/user 负向读取、裁剪/冻结、日历降级、正文 `repr` 关闭、intent 最小 facts 和
 稳定 fingerprint。F004 初始 RED 为 `8297fce…`，Review RED 为 `f1797e6…`；GREEN 候选下
 Foundation 总计 **9 passed**。
+
+## 14. 受控 Agent Foundation F005-F006 内存边界
+
+F005 在 F004 冻结 Context 之上增加纯应用层 `PlanPatch`：字段路径为关闭集合，proposal 必须完整绑定
+operation、turn、daily-plan target 与 base fingerprint；before/after 独立校验后按字段稳定排序，并以唯一
+canonical JSON 计算 SHA-256。成功与拒绝路径都不依赖 UI、数据库或 repository。
+
+F006 只增加供应商中立的 Provider DTO/port、Tool executor port 和有界串行 Runtime。Runtime 重新校验
+六个关闭工具的名称、Permission、参数与 operation/turn 绑定，拒绝 WRITE/未知/额外参数，限制 Tool 次数、
+消息窗口、intent 和响应大小，并把 Provider 异常压缩为稳定本地错误码。具体 Provider adapter、Tool executor、
+取消/超时/迟到丢弃、UI 和持久化均未实现。
+
+### 核心模块
+
+| 文件 | 职责 |
+|------|------|
+| `app/service/agent/patch.py` | 构造关闭字段、稳定排序和 canonical SHA-256 的只读 `PlanPatch` |
+| `app/service/agent/runtime.py` | 应用拥有的 Provider/Executor ports、冻结消息 DTO、busy 与有界串行 loop |
+
+F005 固定 GREEN 为 `53dd2e8…`，双轴 Review 与精确远端 CI 已通过；F006 稳定 RED 为 `f0ab660…`，
+当前本地 GREEN 候选下 Foundation 总计 **44 passed**。F007 及以后仍需独立授权。

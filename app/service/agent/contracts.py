@@ -1,5 +1,6 @@
 """Closed contracts for the authorized Agent Foundation slices."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
@@ -32,11 +33,47 @@ class Permission(str, Enum):
 
 
 @dataclass(frozen=True, slots=True)
+class ClosedToolInputSchema:
+    """Closed top-level input names accepted from a provider tool call."""
+
+    required_fields: frozenset[str] = frozenset()
+    optional_fields: frozenset[str] = frozenset()
+    additional_properties: bool = False
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.required_fields, frozenset)
+            or not isinstance(self.optional_fields, frozenset)
+            or not all(
+                isinstance(name, str) and name
+                for name in self.required_fields | self.optional_fields
+            )
+            or self.required_fields & self.optional_fields
+            or self.additional_properties is not False
+        ):
+            raise ValueError("tool_input_schema_invalid")
+
+    def accepts(self, arguments: Mapping[str, object]) -> bool:
+        """Return whether provider arguments have exactly the closed key shape."""
+        if not isinstance(arguments, Mapping) or not all(
+            isinstance(name, str) for name in arguments
+        ):
+            return False
+        names = frozenset(arguments)
+        return (
+            self.required_fields
+            <= names
+            <= (self.required_fields | self.optional_fields)
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class ToolDescriptor:
-    """Name and permission exposed by the closed Foundation registry."""
+    """Name, permission, and closed input shape exposed by the registry."""
 
     name: str
     permission: Permission
+    input_schema: ClosedToolInputSchema
 
 
 @dataclass(frozen=True, slots=True)
@@ -178,13 +215,25 @@ class AgentContext:
 
 FOUNDATION_ALLOWED_PERMISSIONS = frozenset({Permission.READ, Permission.DRAFT})
 
+_READ_TOOL_INPUT = ClosedToolInputSchema()
+_DRAFT_TOOL_INPUT = ClosedToolInputSchema(
+    required_fields=frozenset(
+        {"operation_id", "turn_id", "target", "base_fingerprint", "operations"}
+    ),
+    optional_fields=frozenset({"warnings"}),
+)
+
 FOUNDATION_TOOL_DESCRIPTORS = (
-    ToolDescriptor("daily_plan.read_current", Permission.READ),
-    ToolDescriptor("daily_plan.read_context", Permission.READ),
-    ToolDescriptor("calendar.read_evaluation", Permission.READ),
-    ToolDescriptor("settings.read_class_areas", Permission.READ),
-    ToolDescriptor("daily_plan.draft_section_patch", Permission.DRAFT),
-    ToolDescriptor("daily_plan.draft_reflection_patch", Permission.DRAFT),
+    ToolDescriptor("daily_plan.read_current", Permission.READ, _READ_TOOL_INPUT),
+    ToolDescriptor("daily_plan.read_context", Permission.READ, _READ_TOOL_INPUT),
+    ToolDescriptor("calendar.read_evaluation", Permission.READ, _READ_TOOL_INPUT),
+    ToolDescriptor("settings.read_class_areas", Permission.READ, _READ_TOOL_INPUT),
+    ToolDescriptor(
+        "daily_plan.draft_section_patch", Permission.DRAFT, _DRAFT_TOOL_INPUT
+    ),
+    ToolDescriptor(
+        "daily_plan.draft_reflection_patch", Permission.DRAFT, _DRAFT_TOOL_INPUT
+    ),
 )
 
 FOUNDATION_TOOL_NAMES = tuple(

@@ -1,6 +1,6 @@
 # Agent Foundation 冻结规格
 
-- 状态：F004 固定 GREEN；F005 GREEN 候选，待固定 SHA Review/CI；F006 已获条件授权
+- 状态：F005 固定 GREEN；F006 Provider port/有界 Runtime 为本地 GREEN 候选，待固定 SHA Review/CI
 - 分支：`feat/agent-foundation`
 - 安全同步 RED 基线：`5de2e49bee19749f611b50747a31be9464b92d7b`
 - Issue：[#48](https://github.com/ywyz/kindergartenManager/issues/48)
@@ -54,7 +54,7 @@
 6. 每日计划页只读/草案展示：运行、取消、失败、草案、丢弃；无采用/保存/确认。
 7. 全边界零持久化证明与目标平台人工验收。
 
-## 6. F002-F005 RED/GREEN 检查点
+## 6. F002-F006 RED/GREEN 检查点
 
 切片公共行为测试放在 `specs/agent-foundation/tests/`；从 F005 GREEN 起由 Quality 独立步骤执行，仍不混入常规 `pytest tests/` 套件。
 F002 原始 SHA `ad13a6aa3e44ff98b2604d4a008649cd66185d80` 和安全同步基线
@@ -79,11 +79,16 @@ F005 在 `6c8e2c261632be889cfc9f2278942bff51417ee1` 固定 15 项公共行为 RE
 Review 发现原 RED 的 SQLite `updated_at` 快照需先按数据库读回值归一化，并补充严格 target 类型与
 UI/DB 依赖 seam；修正后的 Review RED 为 `6097b1d194adff4528911821d34e0fdf393ca810`，稳定结果为
 `29 collected / 25 passed / 4 failed`，四项只因 `PlanPatchTarget` 尚未严格拒绝 bool/float/非正 ID/非 date。
-GREEN 候选必须保持 `29 passed`，覆盖关闭且前缀无重叠的字段路径、operation/turn/target/fingerprint
+固定 GREEN `53dd2e8d1af3f6633a114e4892dcfe1216ce091a` 保持 `29 passed`，覆盖关闭且前缀无重叠的字段路径、operation/turn/target/fingerprint
 绑定、独立 before/after 校验、稳定排序与 canonical SHA-256，以及成功/拒绝路径对数据库和 UI 正文零变化。
+
+F006 在 `f0ab660f46d9293df53c13f5698c7dffd99892bc` 固定 15 项公共行为 RED；44 项可完整收集，
+原 29 项继续 GREEN，新 15 项连续运行均只因 `app.service.agent.runtime` 尚不存在而失败。GREEN 候选
+必须保持 `44 passed`，覆盖应用拥有且冻结的 Provider DTO/port、关闭参数、六工具精确注册、串行执行、
+busy、Tool/消息/响应上限、Provider 异常净化和 F005 `PlanPatch` 绑定复核。具体 Provider adapter、
+Tool executor、取消、超时、过期/迟到丢弃、UI 和持久化均不属于 F006。
 
 ## 7. 停止边界
 
-本分支当前授权到 F005 PlanPatch GREEN，并条件授权 F006 Provider port 与有界 Runtime。
-必须先完成 F005 固定 SHA 双轴 Review 和远端 CI 回读，才可进入 F006；F007 取消/超时/迟到丢弃、
+本分支当前授权到 F006 Provider port 与有界 Runtime，并停在其固定 SHA Review/CI 门禁。F007 取消/超时/迟到丢弃、
 Tool 实现、UI 控件、schema/migration 或多用户工作仍需要下一道明确授权。
