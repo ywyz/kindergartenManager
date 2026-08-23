@@ -1,6 +1,8 @@
 # KindergartenManager 项目上下文
 
-> 状态快照：2026-08-23；本次审查基线：`dev4.0@0657c3ab9f0ffb3e2dbe6249b1fa2e1e6887df76`；最近产品主线基线：`main@225fe139d5541539f2be4d0d41ef00061989533d`。
+> 状态快照：2026-08-23；Agent 安全同步 RED 基线：`5de2e49bee19749f611b50747a31be9464b92d7b`；
+> 当前检出分支：`feat/agent-foundation`（F003 GREEN 候选，交付精确 SHA 以 Git HEAD、远端 ref 和 CI `headSha` 回读为准）；
+> 最近远端产品主线：`origin/main@cfeadefd7dfa056c1b3757876658493110d8cf84`。
 >
 > 本文件用于回答“当前仓库实际上是什么、哪些事实已经确认、下一步可以做什么”。
 > 历史进度文档可以解释来路，但不能覆盖当前代码、迁移和本文件记录的现状。
@@ -32,7 +34,10 @@
 
 ## 3. 当前产品定位
 
-KindergartenManager 是一个 Python 3.14.7、NiceGUI 前后端一体化的幼儿园教学管理应用。当前检出的 `dev4.0` 是维护与审查分支；最近产品主线为 `main@225fe139`。两者都保持可打包、可本地运行、也可用 Docker 部署的模块化单体定位，主要能力包括：
+KindergartenManager 是一个 Python 3.14.7、NiceGUI 前后端一体化的幼儿园教学管理应用。
+当前检出 `feat/agent-foundation` 作为 F003 GREEN 候选，其安全 RED 起点为 `5de2e49bee19749f611b50747a31be9464b92d7b`；
+最近远端产品主线为 `origin/main@cfeadefd7dfa056c1b3757876658493110d8cf84`。两者都保持可打包、可本地运行、
+也可用 Docker 部署的模块化单体定位，主要能力包括：
 
 - 每日活动计划：日期/学期、教案拆分、年龄适配、活动生成、差异比对、Word 导出。
 - 游戏观察：图片、视觉 AI、观察记录、历史与 Word 导出。
