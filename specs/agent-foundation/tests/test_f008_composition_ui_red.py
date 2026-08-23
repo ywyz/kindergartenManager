@@ -490,6 +490,38 @@ async def test_disconnect_cancels_attempt_but_controller_can_run_after_reconnect
 
 
 @pytest.mark.asyncio
+async def test_host_cancel_propagates_without_leaving_controller_running(
+    agent_session_factory,
+):
+    module = _composition()
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    blocked = BlockingProvider(entered, release, content="不得发布")
+    fresh = ImmediateProvider(content="宿主取消后的新回答")
+    providers = [blocked, fresh]
+    coordinator = module.DailyPlanAgentCoordinator(
+        session_factory=agent_session_factory,
+        provider_factory=lambda _config: providers.pop(0),
+    )
+    controller = coordinator.create_controller(TrustedActor(tenant_id=1, user_id=10))
+    controller.scope_changed(PLAN_DATE)
+
+    cancelled_task = asyncio.create_task(controller.run("等待宿主取消"))
+    await entered.wait()
+    cancelled_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await cancelled_task
+
+    assert controller.snapshot.status is module.AgentPanelStatus.IDLE
+    assert controller.snapshot.assistant_content is None
+    retry = await controller.run("取消后重试")
+    assert retry.status is module.AgentPanelStatus.SUCCEEDED
+    assert retry.assistant_content == "宿主取消后的新回答"
+    assert len(blocked.requests) == 1
+    assert len(fresh.requests) == 1
+
+
+@pytest.mark.asyncio
 async def test_discard_only_clears_agent_memory_not_caller_owned_body(
     agent_session_factory,
 ):
@@ -548,6 +580,20 @@ def test_daily_plan_page_wires_immediate_selection_and_agent_panel_without_write
     assert "render_daily_plan_agent_panel" in source
     assert "scope_changed" in source
     assert source.count("plan_changed(") >= 3
+    save_call = source.index("await save_daily_plan(")
+    assert source.index("agent_panel.plan_changed(d)") < save_call
+
+    direct_delete = source.index("deleted = await delete_daily_plan(")
+    captured_date = source.index('deleting_date = state["selected_date"]')
+    direct_invalidation = source.index("agent_panel.plan_changed(deleting_date)")
+    assert captured_date < direct_invalidation < direct_delete
+    assert source.index("plan_date=deleting_date", direct_delete) > direct_delete
+
+    history_delete = source.index(
+        "deleted = await delete_daily_plan(", direct_delete + 1
+    )
+    history_invalidation = source.index("agent_panel.plan_changed(p.plan_date)")
+    assert history_invalidation < history_delete
     assert "agent_controller" in source
     assert "adopt_patch" not in source
     assert "confirm_write" not in source
