@@ -507,6 +507,7 @@ async def daily_plan_page() -> None:
                 wn = state["week_number"] or 1
                 wday = state["weekday_cn"] or get_weekday_cn(d)
 
+                agent_panel.plan_changed(d)
                 try:
                     async with AsyncSessionLocal() as session:
                         async with session.begin():
@@ -532,7 +533,6 @@ async def daily_plan_page() -> None:
                                 daily_reflection=daily_reflection_area.value,
                             )
 
-                    agent_panel.plan_changed(d)
                     save_msg.classes(add="text-green-600")
                     save_msg.text = f"✅ 草稿已保存（{d}）"
                 except Exception:
@@ -546,7 +546,8 @@ async def daily_plan_page() -> None:
             )
 
             async def _delete_draft() -> None:
-                if not state["selected_date"]:
+                deleting_date = state["selected_date"]
+                if not deleting_date:
                     save_msg.classes(
                         remove="text-green-600 text-red-500", add="text-orange-500"
                     )
@@ -564,16 +565,16 @@ async def daily_plan_page() -> None:
                         ui.button("取消", on_click=lambda: dlg.submit("no"))
                 result = await dlg
                 if result == "yes":
+                    agent_panel.plan_changed(deleting_date)
                     try:
                         async with AsyncSessionLocal() as session:
                             deleted = await delete_daily_plan(
                                 session,
                                 tenant_id=tenant_id,
                                 user_id=user_id,
-                                plan_date=state["selected_date"],
+                                plan_date=deleting_date,
                             )
                         if deleted:
-                            agent_panel.plan_changed(state["selected_date"])
                             save_msg.classes(
                                 remove="text-green-600 text-orange-500",
                                 add="text-gray-500",
@@ -889,16 +890,15 @@ async def daily_plan_page() -> None:
                                             )
                                     result = await dlg
                                     if result == "yes":
+                                        agent_panel.plan_changed(p.plan_date)
                                         try:
                                             async with AsyncSessionLocal() as s:
-                                                deleted = await delete_daily_plan(
+                                                await delete_daily_plan(
                                                     s,
                                                     tenant_id=tenant_id,
                                                     user_id=user_id,
                                                     plan_date=p.plan_date,
                                                 )
-                                            if deleted:
-                                                agent_panel.plan_changed(p.plan_date)
                                             await refresh_history()
                                         except Exception as ex:
                                             ui.notify(

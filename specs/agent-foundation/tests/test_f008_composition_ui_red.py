@@ -583,15 +583,13 @@ def test_daily_plan_page_wires_immediate_selection_and_agent_panel_without_write
     save_call = source.index("await save_daily_plan(")
     assert source.index("agent_panel.plan_changed(d)") < save_call
 
-    direct_delete = source.index("deleted = await delete_daily_plan(")
+    direct_delete = source.index("await delete_daily_plan(")
     captured_date = source.index('deleting_date = state["selected_date"]')
     direct_invalidation = source.index("agent_panel.plan_changed(deleting_date)")
     assert captured_date < direct_invalidation < direct_delete
     assert source.index("plan_date=deleting_date", direct_delete) > direct_delete
 
-    history_delete = source.index(
-        "deleted = await delete_daily_plan(", direct_delete + 1
-    )
+    history_delete = source.index("await delete_daily_plan(", direct_delete + 1)
     history_invalidation = source.index("agent_panel.plan_changed(p.plan_date)")
     assert history_invalidation < history_delete
     assert "agent_controller" in source

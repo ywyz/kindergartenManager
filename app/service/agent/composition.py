@@ -440,13 +440,25 @@ class DailyPlanAgentController:
                 return None
             return DailyPlanScope(plan_date=selected_date)
 
-        outcome = await self._coordinator.execute(
-            owner_id=self._owner_id,
-            actor=self._actor,
-            scope=DailyPlanScope(plan_date=selected_date),
-            intent=intent,
-            scope_reader=current_scope,
-        )
+        try:
+            outcome = await self._coordinator.execute(
+                owner_id=self._owner_id,
+                actor=self._actor,
+                scope=DailyPlanScope(plan_date=selected_date),
+                intent=intent,
+                scope_reader=current_scope,
+            )
+        except asyncio.CancelledError:
+            if (
+                not self._closed
+                and self._generation == generation
+                and self._selected_date == selected_date
+            ):
+                self._snapshot = AgentPanelSnapshot(
+                    status=AgentPanelStatus.IDLE,
+                    selected_date=selected_date,
+                )
+            raise
         if (
             self._closed
             or self._generation != generation
