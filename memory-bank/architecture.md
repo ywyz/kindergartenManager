@@ -417,5 +417,5 @@ F006 只增加供应商中立的 Provider DTO/port、Tool executor port 和有�
 | `app/service/agent/runtime.py` | 应用拥有的 Provider/Executor ports、冻结消息 DTO、busy 与有界串行 loop |
 
 F005 固定 GREEN 为 `53dd2e8…`，双轴 Review 与精确远端 CI 已通过；F006 稳定 RED 为 `f0ab660…`，
-Review RED 为 `6b083fa…`、`8831b3f…`、`79e005a…`、`51f5e5f…`，当前本地 GREEN 候选下
-Foundation 总计 **73 passed**。F007 及以后仍需独立授权。
+Review RED 为 `6b083fa…`、`8831b3f…`、`79e005a…`、`51f5e5f…`；最终本地实现/重构候选
+`99167ef…` 的双轴 Review 为 Standards `0`、Spec `0`，Foundation **73 passed**、全量 **551 passed**，待远端 CI。F007 及以后仍需独立授权。

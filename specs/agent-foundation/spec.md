@@ -1,6 +1,6 @@
 # Agent Foundation 冻结规格
 
-- 状态：F005 固定 GREEN；F006 Provider port/有界 Runtime 为本地 GREEN 候选，待固定 SHA Review/CI
+- 状态：F005 固定 GREEN；F006 Provider port/有界 Runtime 已完成本地实现与双轴 Review，待远端 CI 回读
 - 分支：`feat/agent-foundation`
 - 安全同步 RED 基线：`5de2e49bee19749f611b50747a31be9464b92d7b`
 - Issue：[#48](https://github.com/ywyz/kindergartenManager/issues/48)
@@ -94,7 +94,8 @@ READ DTO 的逐字段关闭与深不可变要求。后续复审补充内建类�
 第三个 Review RED `79e005a929e5a1a4979cad6e28d71ef5f9ab1e17` 稳定为
 `67 collected / 58 passed / 9 failed`。第四个 Review RED `51f5e5f3227a2d6f8861331995545fddf79650c7`
 固定任意可变 dataclass 保留、AgentContext actor/scope/locale/facts 内层越界和 ToolResult error metadata 扩张，
-稳定为 `73 collected / 67 passed / 6 failed`；当前修正后的 GREEN 候选必须保持 `73 passed`。具体 Provider adapter、Tool executor、取消、超时、
+稳定为 `73 collected / 67 passed / 6 failed`；最终本地实现/重构候选 `99167ef4abba447ed5369642e9ed3c855263a4d3`
+保持 `73 passed`，双轴 Review 为 Standards `0`、Spec `0`，全量回归为 `551 passed`。具体 Provider adapter、Tool executor、取消、超时、
 过期/迟到丢弃、UI 和持久化均不属于 F006。
 
 ## 7. 停止边界
