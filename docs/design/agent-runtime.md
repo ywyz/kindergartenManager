@@ -222,6 +222,7 @@ idle -> running -> draft_ready | succeeded | failed | cancelled -> idle
 ```text
 agent.busy
 agent.cancelled
+agent.timeout
 agent.context_stale
 agent.tool_not_allowed
 agent.tool_schema_invalid
