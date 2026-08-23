@@ -230,8 +230,10 @@ collected/passed/failed 分布；新增失败只因 F008 public seam 尚不存�
 并回写 Issue #48。完成前不得进入 F009。
 
 初始 RED `79f1f934…` 在 GREEN 前复核发现 wire alias 与本 spec 不一致；只把测试 alias 收敛为上述双下划线
-静态双射后，最终稳定 RED 固定为 `0cd4b3ee476b3e6e0233b886212e560ae5f363d9`。连续两次均为
-`175 collected / 110 passed / 65 failed`，旧 110 项全部 GREEN。当前只允许实施 F008 最小 GREEN。
+静态双射后形成 `0cd4b3e…`。GREEN 验证继而发现一个测试断言把 F006 已深冻结的嵌套参数直接与可变 JSON
+容器比较；未放宽 F006 契约，只把断言改为 canonical JSON 等价比较。最终稳定 RED 固定为 `b3cad08…`，
+在不含任何 F008 生产实现的干净 worktree 连续两次均为 `175 collected / 110 passed / 65 failed`，旧 110 项
+全部 GREEN。当前只允许实施 F008 最小 GREEN。
 
 ## 7. 当前授权与停止边界
 

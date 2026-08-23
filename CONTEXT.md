@@ -184,7 +184,8 @@ F003 固定 SHA 的双轴 Review 和远端 CI `headSha` 已通过。
 R1 基础修复的本地门禁已经通过，当前共同下一步是：
 
 1. F007 固定 GREEN、精确 Quality 与 Issue #48 证据均已闭合；F008 文档/spec/tasks seam 与稳定 RED
-   最终稳定 RED `0cd4b3ee476b3e6e0233b886212e560ae5f363d9` 已固定，结果为 `175 collected / 110 passed / 65 failed`。
+   最终稳定 RED `b3cad08…` 已固定，结果为 `175 collected / 110 passed / 65 failed`。该固定点保留
+   F006 对 Provider 参数的深不可变契约，并以 canonical JSON 等价比较嵌套参数。
 2. 当前只实施 F008 最小 GREEN；之后仍须独立完成 `双轴 Review → 固定 SHA Quality → Issue`。
    F009 的零持久化全矩阵、Linux 浏览器 mock 与安全配置真实模型验收继续等待 F008 全部门禁闭合。
 3. NiceGUI 多用户预备功能保持低优先级，不与 Agent Foundation 隐式捆绑。

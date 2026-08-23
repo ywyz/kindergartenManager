@@ -165,8 +165,9 @@ F008 稳定 RED 固定在以下三个文件，且旧 Foundation 测试必须继�
 三个文件必须 collection clean、连续两次得到同一 collected/passed/failed 分布，且新增失败只指向尚未实现的
 F008 公共 seam；不得通过 skip/xfail、固定 sleep、真实网络/凭据或实现 F009 来制造 RED。之后才可进入最小 GREEN。
 
-F008 RED 已固定为 `0cd4b3ee476b3e6e0233b886212e560ae5f363d9`：`175 collected / 110 passed / 65 failed`
-连续两次一致，旧 110 项全部 GREEN；当前已进入最小 GREEN，F009 仍等待。
+F008 RED 最终固定为 `b3cad08…`：`175 collected / 110 passed / 65 failed` 连续两次一致，旧 110 项
+全部 GREEN。该固定点在 `0cd4b3e…` 的 wire alias 修正后，进一步以 canonical JSON 等价比较嵌套 Provider
+参数，保留 F006 深不可变契约；当前已进入最小 GREEN，F009 仍等待。
 
 完成证据必须包含：未知/WRITE Tool、额外参数、prompt injection、跨 tenant/user、取消、超时和
 过期结果的负向测试，以及所有路径对业务数据、页面正文、版本、preview、audit 和导出“零变化”的证明。

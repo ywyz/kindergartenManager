@@ -13,7 +13,7 @@
 | F005 | 实现规范 PlanPatch | F004 | GREEN（`53dd2e8…`，双轴 Review/CI 通过） |
 | F006 | 实现 Provider port 与有界 Runtime | F005 | GREEN（RED `f0ab660…`；Review RED `6b083fa…`、`8831b3f…`、`79e005a…`、`51f5e5f…`；实现/重构 `99167ef…`；证据 `049b520…`；Review 0/0；本地 `73 + 551 passed`；CI `32644290676`） |
 | F007 | 实现取消/超时/context current-state/迟到丢弃 | F006 | GREEN（RED `55b8702…`；Review RED `08ada78…`、`ddca78d…`；候选 `51443a3…`；证据 `2fb4e6f…`；Review 0/0；本地 `110 + 551 passed`；CI `32648599591`） |
-| F008 | OpenAI-compatible Provider adapter、六个关闭 Tool executor、组合装配与每日计划 Agent UI | F007 固定 GREEN + Review/CI/Issue | 最终 RED `0cd4b3e…`（`175 / 110 / 65`）；最小 GREEN 实施中 |
+| F008 | OpenAI-compatible Provider adapter、六个关闭 Tool executor、组合装配与每日计划 Agent UI | F007 固定 GREEN + Review/CI/Issue | 最终 RED `b3cad08…`（`175 / 110 / 65`）；最小 GREEN 实施中 |
 | F009 | 零持久化全矩阵、Linux 浏览器 mock 与安全配置真实模型验收 | F008 固定 GREEN + Review/CI/Issue | 已授权，等待 F008 |
 
 F008 内部依赖顺序冻结为：
