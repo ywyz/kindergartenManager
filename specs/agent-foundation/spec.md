@@ -1,6 +1,6 @@
 # Agent Foundation 冻结规格
 
-- 状态：F005-F007 固定 GREEN；F008 稳定 RED 已固定、正在实施最小 GREEN；F009 仅在 F008 门禁闭合后进入
+- 状态：F005-F008 固定 GREEN；当前只进入 F009 文档与稳定 RED 门禁
 - 分支：`feat/agent-foundation`
 - 安全同步 RED 基线：`5de2e49bee19749f611b50747a31be9464b92d7b`
 - Issue：[#48](https://github.com/ywyz/kindergartenManager/issues/48)
@@ -233,11 +233,14 @@ collected/passed/failed 分布；新增失败只因 F008 public seam 尚不存�
 静态双射后形成 `0cd4b3e…`。GREEN 验证继而发现一个测试断言把 F006 已深冻结的嵌套参数直接与可变 JSON
 容器比较；未放宽 F006 契约，只把断言改为 canonical JSON 等价比较。最终稳定 RED 固定为 `b3cad08…`，
 在不含任何 F008 生产实现的干净 worktree 连续两次均为 `175 collected / 110 passed / 65 failed`，旧 110 项
-全部 GREEN。当前只允许实施 F008 最小 GREEN。
+全部 GREEN。最小 GREEN `80a20de…` 后，Review RED `b3c45d2…` 与 `b0647a9…` 固定并关闭取消、
+current fingerprint、selection、重入、连接生命周期、mutation 发布窗口与 host cancellation findings。
+最终候选 `f1f5e63…` 为 Foundation `180 passed`、全量 `551 passed`、Standards `0`、Spec `0`、
+scope creep `0`；Quality `32651221452` 的 `headSha` 精确匹配并成功。F008 已固定 GREEN。
 
 ## 7. 当前授权与停止边界
 
 本分支从 `0880f64c419e4fc27c45f4a7207e547077736056` 获得 F007 → F008 → F009 连续授权，但必须逐切片闭合
-`RED → 最小 GREEN → 双轴 Review → 固定 SHA Quality → Issue 证据`，不得横向并行实现。F007 已闭合，
-当前只激活 F008 最小 GREEN；上述文档、public seam 与稳定 RED 已冻结。全程禁止合并 `main`、关闭 Issue、
+`RED → 最小 GREEN → 双轴 Review → 固定 SHA Quality → Issue 证据`，不得横向并行实现。F008 已闭合，
+当前只激活 F009 文档/spec/tasks 与稳定 RED；其验收实现必须等待 RED 固定。全程禁止合并 `main`、关闭 Issue、
 发布、Agent WRITE、长期记忆、migration 或产品多 Agent。

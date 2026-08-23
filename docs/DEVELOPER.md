@@ -113,7 +113,7 @@ API 身份独立：`X-Api-Key` 映射到 tenant；配置 `API_SIGNING_SECRET` �
 
 测试使用 `httpx.MockTransport` 或 mock 边界，不调用真实 AI。
 
-### 6.1 受控 Agent Foundation（F005-F007 已固定）
+### 6.1 受控 Agent Foundation（F005-F008 已固定）
 
 实现前必须阅读 [ADR-0005](ADR/ADR-0005-controlled-ai-agent-runtime.md) 和
 [Agent Runtime 设计](design/agent-runtime.md)。规划依赖方向为：
@@ -125,7 +125,9 @@ Runtime 对 ID、周次、metadata、ToolResult 与 provider request-id 设置�
 逐字段复核 Provider-visible `AgentContext`，复制冻结的 Tool DTO 而不保留 executor 对象，并完整复核返回的
 F005 Patch。F007 已固定 GREEN，Runtime 还使用完整冻结 stamp 做精确取消，以本地硬时限约束单次
 Provider、单 Tool 和总 operation，在每个终态重新检查 UTC TTL/current-context，并在吞取消 port 真正排空前
-保持 busy、丢弃迟到正文/Patch/异常。具体 Provider adapter、Tool executor、UI 与持久化仍未实现。
+保持 busy、丢弃迟到正文/Patch/异常。F008 已固定具体 OpenAI-compatible adapter、六路静态 executor、
+应用级单 coordinator/controller、日期/current-fingerprint 失效和每日计划只读建议面板；持久化、WRITE、
+长期记忆与产品多 Agent 仍未实现，F009 验收尚未闭合。
 
 ```text
 ui/components/agent_draft
@@ -145,7 +147,9 @@ ui/components/agent_draft
 
 测试先用确定性 Scripted Provider 建立 RED。F006 覆盖纯文本、串行 Tool loop、未知/WRITE Tool、
 额外参数、绑定错误、超长、busy、Tool/消息上限和异常净化；F007 已覆盖超时、取消、scope/fingerprint
-变化、迟到丢弃、host cancellation、drain 竞态及 BaseException 净化。每条路径最终都需断言业务数据和 UI 正文零变化。
+变化、迟到丢弃、host cancellation、drain 竞态及 BaseException 净化；F008 已覆盖具体 wire adapter、六路
+executor、跨页面 busy、selection/fingerprint、连接生命周期和 mutation 发布窗口。F009 才以完整矩阵和
+Linux 浏览器/真实模型验收最终证明业务数据与 UI 正文零变化。
 
 ## 7. Word 与图片
 

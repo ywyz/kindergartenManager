@@ -1,6 +1,6 @@
 # KindergartenManager 受控 AI Agent Runtime 设计
 
-> 状态：已确认设计；F003-F007 已固定 GREEN；F008 稳定 RED 已固定、正在实施最小 GREEN，F009 仅在其前置门禁闭合后进入。本文落实
+> 状态：已确认设计；F003-F008 已固定 GREEN；当前只进入 F009 文档与稳定 RED 门禁。本文落实
 > [ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md)，不代表完整 Agent 已进入当前产品。本轮只授权在功能分支
 > 依序提交并推送 F007-F009；合并、关闭 Issue 或发布仍未授权。
 
@@ -393,8 +393,11 @@ F008 只在以下三个公共行为文件稳定 RED 后实施 GREEN：
 初始 RED `79f1f934…` 在实现前复核发现 wire alias 与已冻结 spec 不一致；只调整测试为双下划线显式别名后
 形成 `0cd4b3e…`。GREEN 验证又发现嵌套参数断言没有尊重 F006 深不可变容器；不改变生产契约，只将断言
 收敛为 canonical JSON 等价比较。最终稳定 RED 固定为 `b3cad08…`，在不含任何 F008 生产实现的干净
-worktree 连续两次均为 `175 collected / 110 passed / 65 failed`，旧 110 项保持 GREEN。当前只实施 F008
-最小 GREEN。
+worktree 连续两次均为 `175 collected / 110 passed / 65 failed`，旧 110 项保持 GREEN。最小 GREEN
+`80a20de…` 经双轴 Review 后，以 Review RED `b3c45d2…`、`b0647a9…` 固定取消、current fingerprint、
+selection、重入、连接生命周期与 mutation 发布窗口；最终候选 `f1f5e63…` 为 Foundation `180 passed`、
+全量 `551 passed`、Standards `0`、Spec `0`，Quality `32651221452` 精确匹配成功。F008 已固定 GREEN，
+当前只进入 F009 文档与稳定 RED。
 
 ## 12. 实现前置门禁
 

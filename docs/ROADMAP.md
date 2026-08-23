@@ -102,7 +102,7 @@ R0 事实基线与图谱
 
 ## 7. R3：Agent Foundation 规格与分支决策
 
-状态：`实现中`（F005-F007 固定 GREEN；F008 稳定 RED 已固定，正在实施最小 GREEN）。
+状态：`验收中`（F005-F008 固定 GREEN；当前只进入 F009 文档与稳定 RED 门禁）。
 
 已确认：[ADR-0005](ADR/ADR-0005-controlled-ai-agent-runtime.md) 和
 [Agent Runtime 设计](design/agent-runtime.md) 已经固定首期上限，即每日活动计划的单 Agent、
@@ -123,13 +123,12 @@ R0 事实基线与图谱
 - 是否仍保持模块化单体？服务拆分必须有独立 ADR 和运营理由。
 - 聚合事务和 tenant/user 投影修复后，每日计划、班级设置和日历的窄 Service 投影如何建立，使 Agent Tool 不直接调用 Repository？
 
-当前执行边界：F007 固定 SHA Review/CI/Issue 已闭合；当前只激活 F008 的 OpenAI-compatible Chat Completions
-Provider adapter、六个关闭 Tool executor、应用级单 coordinator 组合装配与每日计划 Agent UI。F008 seam 已在
-ADR/design/spec/tasks 冻结，但稳定 RED 固定前不得实施 GREEN，也不得进入 F009。
+当前执行边界：F008 固定 SHA Review/CI 已闭合；当前只激活 F009 文档/spec/tasks 与稳定 RED。零持久化全矩阵、
+Linux 浏览器 mock 和仅使用应用安全配置凭据的真实模型验收必须在 F009 RED 固定后执行。
 
 ## 8. R4A：受控 Agent Foundation READ/DRAFT
 
-状态：`实现中`（F005-F007 固定 GREEN；F008 稳定 RED 已固定，正在实施最小 GREEN）。
+状态：`验收中`（F005-F008 固定 GREEN；F009 文档与稳定 RED 待固定）。
 
 实现范围严格限定为：
 
@@ -166,8 +165,10 @@ F008 稳定 RED 固定在以下三个文件，且旧 Foundation 测试必须继�
 F008 公共 seam；不得通过 skip/xfail、固定 sleep、真实网络/凭据或实现 F009 来制造 RED。之后才可进入最小 GREEN。
 
 F008 RED 最终固定为 `b3cad08…`：`175 collected / 110 passed / 65 failed` 连续两次一致，旧 110 项
-全部 GREEN。该固定点在 `0cd4b3e…` 的 wire alias 修正后，进一步以 canonical JSON 等价比较嵌套 Provider
-参数，保留 F006 深不可变契约；当前已进入最小 GREEN，F009 仍等待。
+全部 GREEN。最小 GREEN 为 `80a20de…`；Review RED `b3c45d2…` 与 `b0647a9…` 依次固定装配期取消、
+fingerprint/selection 失效、同 controller 重入、连接生命周期、mutation 发布窗口和 host cancellation。
+最终候选 `f1f5e63…` 为 Foundation `180 passed`、全量 `551 passed`、Standards `0`、Spec `0`、scope creep `0`；
+Quality `32651221452` 的 `headSha` 精确匹配并成功。F008 已固定 GREEN，当前只进入 F009 文档与稳定 RED。
 
 完成证据必须包含：未知/WRITE Tool、额外参数、prompt injection、跨 tenant/user、取消、超时和
 过期结果的负向测试，以及所有路径对业务数据、页面正文、版本、preview、audit 和导出“零变化”的证明。

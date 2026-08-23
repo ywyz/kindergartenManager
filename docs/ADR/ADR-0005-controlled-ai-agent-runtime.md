@@ -132,6 +132,10 @@ operation”。页面交互由 `DailyPlanAgentController` 转成冻结 `AgentPan
 6. F009 才执行零持久化全矩阵、Linux 浏览器 mock 和只使用应用安全配置凭据的真实模型验收。
 7. 如有明确用户故事，再为 Agent WRITE 建立新 spec/Issue/迁移与 RED；不得由本 ADR 自动授权。
 
+F008 已按本顺序固定 GREEN：最终 RED `b3cad08…`，Review RED `b3c45d2…`、`b0647a9…`，最终候选
+`f1f5e63…`；Foundation `180 passed`、全量 `551 passed`、双轴 Review 0/0，Quality `32651221452`
+精确匹配成功。当前只进入 F009 文档与稳定 RED，不扩张本 ADR 的 WRITE、记忆或多 Agent 边界。
+
 ## 后果
 
 ### 收益

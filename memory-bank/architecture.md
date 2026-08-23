@@ -398,7 +398,7 @@ F004 在既有 F003 contracts/关闭 registry 之后，只建立应用层 READ s
 稳定 fingerprint。F004 初始 RED 为 `8297fce…`，Review RED 为 `f1797e6…`；GREEN 候选下
 Foundation 总计 **9 passed**。
 
-## 14. 受控 Agent Foundation F005-F007 内存边界
+## 14. 受控 Agent Foundation F005-F008 内存边界
 
 F005 在 F004 冻结 Context 之上增加纯应用层 `PlanPatch`：字段路径为关闭集合，proposal 必须完整绑定
 operation、turn、daily-plan target 与 base fingerprint；before/after 独立校验后按字段稳定排序，并以唯一
@@ -410,8 +410,11 @@ F006 只增加供应商中立的 Provider DTO/port、Tool executor port 和有�
 
 F007 在同一 Runtime seam 增加完整冻结 context stamp 的精确取消、单 Provider/Tool/总 operation 硬时限、
 UTC TTL 与 current-context 复核、迟到结果丢弃和取消后安全排空。即使 port 吞掉取消或抛出
-`SystemExit`/`KeyboardInterrupt`，公开 turn 也只返回稳定状态，旧 port 排空前继续保持 busy。具体 Provider adapter、
-Tool executor、组合装配、UI 和持久化均未实现。
+`SystemExit`/`KeyboardInterrupt`，公开 turn 也只返回稳定状态，旧 port 排空前继续保持 busy。
+
+F008 在该边界内新增具体 OpenAI-compatible Chat Completions adapter、六路静态 Tool executor、应用级单
+coordinator/controller、日期 generation/current fingerprint 失效和每日计划只读建议面板；仍无 Agent 持久化、
+WRITE、长期记忆或产品多 Agent。
 
 ### 核心模块
 
@@ -419,11 +422,17 @@ Tool executor、组合装配、UI 和持久化均未实现。
 |------|------|
 | `app/service/agent/patch.py` | 构造关闭字段、稳定排序和 canonical SHA-256 的只读 `PlanPatch` |
 | `app/service/agent/runtime.py` | 应用拥有的 Provider/Executor ports、冻结消息 DTO、busy 与有界串行 loop |
+| `app/integration/ai_client/agent_provider.py` | 关闭 wire allowlist、显式 Tool alias 与净化的 OpenAI-compatible adapter |
+| `app/service/agent/tools.py` | 四 READ 短 session 与两 DRAFT 零 session 的六路静态 executor |
+| `app/service/agent/composition.py` | 应用级单 Runtime、短命凭据、取消/current-state 与页面 controller/snapshot |
+| `app/ui/components/agent_draft.py` | 只读 assistant/字段差异/取消/丢弃面板，无采用或写入入口 |
 
 F005 固定 GREEN 为 `53dd2e8…`，双轴 Review 与精确远端 CI 已通过；F006 稳定 RED 为 `f0ab660…`，
 Review RED 为 `6b083fa…`、`8831b3f…`、`79e005a…`、`51f5e5f…`；最终本地实现/重构候选
 `99167ef…` 的双轴 Review 为 Standards `0`、Spec `0`，Foundation **73 passed**、全量 **551 passed**；证据
 SHA `049b520…` 的远端 Quality `32644290676` 精确匹配成功。F007 初始 RED `55b8702…`、Review RED
 `08ada78…` 与 `ddca78d…` 最终收敛到候选 `51443a3…`，Foundation **110 passed**、全量 **551 passed**、
-Standards `0`、Spec `0`；证据 SHA `2fb4e6f…` 的远端 Quality `32648599591` 精确匹配成功。F008 已成为
-下一授权切片，F009 仍等待其前置门禁闭合。
+Standards `0`、Spec `0`；证据 SHA `2fb4e6f…` 的远端 Quality `32648599591` 精确匹配成功。F008 最终
+RED `b3cad08…`、Review RED `b3c45d2…` 与 `b0647a9…` 收敛到候选 `f1f5e63…`，Foundation **180 passed**、
+全量 **551 passed**、Standards `0`、Spec `0`；远端 Quality `32651221452` 的 `headSha` 精确匹配成功。
+当前只进入 F009 文档与稳定 RED。
