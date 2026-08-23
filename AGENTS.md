@@ -6,6 +6,47 @@ Before non-trivial work, read `CONTEXT.md`, `docs/ROADMAP.md`, the relevant ADR/
 
 For code discovery, prefer the `codebase-memory` graph in this order: `search_graph`, `trace_path`, `get_code_snippet`, `query_graph`, `get_architecture`. Fall back to text search for literals, configuration, non-code files, or insufficient graph results. Use `graphify-out/` for cross-code/document relationships; Graphify is auxiliary evidence and never replaces live code, specs, migrations, or acceptance results.
 
+### Local Search Tool Priority
+
+When the knowledge graphs are not applicable or return insufficient results, choose the narrowest local search tool:
+
+- Filename search: `fd`.
+- Text/content search: `rg` (ripgrep).
+- AST/structural search: `sg` (`ast-grep`), preferred for code-aware queries such as imports, call expressions, decorators, and syntax nodes. The upstream `sg` alias is deprecated, so examples use the unambiguous `ast-grep` command; if using `sg`, verify that `sg --version` reports ast-grep rather than the Linux group-switching utility.
+
+#### AST-grep Usage (Windows and POSIX)
+
+- Before running a complex pattern, announce the intent and show the exact command.
+- Quote patterns so the shell does not expand ast-grep metavariables. Single-quoted patterns with double-quoted source literals work in POSIX shells and PowerShell.
+- `--lang`/`-l` selects one language per invocation. For a mixed-language tree, omit it and let file extensions select the parser, or run one explicit language at a time.
+- Common read-only queries:
+  - Find Python `from` imports: `ast-grep -p 'from $MODULE import $$$NAMES' -l python app tests`.
+  - Find TypeScript default imports from `node:path`: `ast-grep -p 'import $NAME from "node:path"' -l ts src`.
+  - Find CommonJS requires of `node:path`: `ast-grep -p 'require("node:path")' -l js src`.
+- Search first and present any proposed replacement as a diff. Do not pass `--rewrite`/`-r` or otherwise apply a structural rewrite unless the user has approved that edit.
+
+#### Search Hygiene (`fd`/`rg`/`sg`)
+
+- Scope searches to relevant paths such as `app`, `tests`, or `docs` whenever possible.
+- Exclude bulky or generated folders: `.git`, `node_modules`, `coverage`, `out`, `dist`, `build`, `.venv`, and `graphify-out`.
+- Prefer normal ignore handling. `fd`, `rg`, and ast-grep respect ignore files by default; add targeted ignore patterns instead of disabling ignores.
+- Examples:
+  - `rg -n 'pattern' -g '!{.git,node_modules,coverage,out,dist,build,.venv,graphify-out}/**' app tests`.
+  - `fd --hidden --exclude .git --exclude node_modules --exclude coverage --exclude out --exclude dist --exclude build --exclude .venv --exclude graphify-out --type f '\.py$' app tests`.
+  - `ast-grep -p '$FUNC($$$ARGS)' -l python app tests`.
+
+Repository-scoped skills are versioned under `.agents/skills/`: use `.agents/skills/graphify/` and `.agents/skills/codebase-memory/` for work in this repository. Do not add duplicate `.codex/skills/` copies: Codex discovers repository skills from `.agents/skills/`, and same-name skills are not merged. After upgrading Graphify, refresh both the global installation and the repository copy, keep `.agents/skills/graphify/.graphify_version` aligned with `graphify --version`, and validate both local skills before delivery.
+
+### Graphify Backend and Agent Fallback
+
+For semantic extraction of active governance or architecture documents, and for LLM-backed community naming, use this fixed fallback chain:
+
+1. First use the configured OpenAI-compatible backend: `graphify extract . --backend openai`.
+2. If the OpenAI-compatible backend fails, retry with the configured DeepSeek backend: `graphify extract . --backend deepseek`.
+3. Only if both backends fail, delegate the same bounded Graphify extraction or naming task to the installed `luna_worker` sub-agent. Do not substitute an unspecified agent or skip DeepSeek.
+
+The fixed order is `OpenAI-compatible -> DeepSeek -> luna_worker`; stop at the first semantically valid result. Use `--mode deep` only when broader inferred-edge reconstruction is required, and retain the same fallback order. Apply the same order to `graphify label` and `graphify cluster-only`. A zero exit status alone is not success: verify that the output is parseable, covers the changed sources and target concepts, does not cause an unexplained graph shrink, and passes Graphify integrity diagnostics. Record the backend or sub-agent actually used and concise reasons for earlier failures, but never expose API keys, endpoint URLs, or other secrets. If all three paths fail, report Graphify as unavailable rather than using a stale graph as evidence for changed documents. Do not hand-edit generated graph files.
+
 ## Project Structure & Module Organization
 
 This is a Python 3.14.7 monorepo for a NiceGUI app, FastAPI-style APIs, and gradually separated services.
