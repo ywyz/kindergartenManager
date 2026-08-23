@@ -14,6 +14,8 @@ import io
 import logging
 import os
 import stat
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -454,6 +456,78 @@ def test_existing_secrets_are_owner_only_before_first_read_without_content_chang
     assert settings.JWT_SECRET == expected_jwt_secret
 
 
+def test_concurrent_settings_initialization_returns_only_persisted_secret_pair(
+    tmp_path,
+    monkeypatch,
+):
+    """并发启动都只能返回同一组已持久化密钥，不能各自成功后丢失一组。"""
+    if os.name != "posix":
+        _assert_non_posix_regular_file_contract(tmp_path, monkeypatch)
+        return
+
+    from pydantic_settings import SettingsConfigDict
+    from app.core import config as config_mod
+
+    secrets_path = tmp_path / ".kindergarten_secrets"
+    secrets_path.write_text("F009_CONCURRENCY_SENTINEL=preserved\n", encoding="utf-8")
+    secrets_path.chmod(0o600)
+    monkeypatch.setattr("app.core.config._secrets_file_path", lambda: secrets_path)
+
+    ready = threading.Barrier(3)
+    start = threading.Event()
+    generation_gate = threading.Barrier(2)
+
+    def generated_token(size: int) -> str:
+        # 当前无锁实现的两个构造会在这里确定性交错。未来正确实现必须用跨进程
+        # 文件锁覆盖 read→generate→persist 全过程，不能只加进程内线程锁。
+        # 锁内首个参与者会超时降级，随后参与者应直接复用落盘值，避免测试死锁。
+        if size == 32:
+            try:
+                generation_gate.wait(timeout=1)
+            except threading.BrokenBarrierError:
+                pass
+        return f"generated-{size}-{threading.current_thread().name}"
+
+    monkeypatch.setattr(
+        "app.core.config.secrets.token_urlsafe",
+        generated_token,
+    )
+
+    class _ConcurrentSettings(config_mod.Settings):
+        model_config = SettingsConfigDict(
+            env_file=None,
+            env_file_encoding="utf-8",
+            extra="ignore",
+        )
+
+    def construct_settings() -> config_mod.Settings:
+        ready.wait(timeout=2)
+        assert start.wait(timeout=2)
+        return _ConcurrentSettings(ENCRYPTION_KEY="", JWT_SECRET="")
+
+    with ThreadPoolExecutor(max_workers=2, thread_name_prefix="f009-writer") as pool:
+        futures = [pool.submit(construct_settings) for _ in range(2)]
+        ready.wait(timeout=2)
+        start.set()
+        constructed = [future.result(timeout=5) for future in futures]
+
+    returned_pairs = {
+        (settings.ENCRYPTION_KEY, settings.JWT_SECRET) for settings in constructed
+    }
+    persisted = {
+        key: value
+        for line in secrets_path.read_text(encoding="utf-8").splitlines()
+        if (key_value := line.partition("="))[1]
+        for key, value in ((key_value[0], key_value[2]),)
+    }
+
+    assert len(returned_pairs) == 1
+    assert returned_pairs == {
+        (persisted["ENCRYPTION_KEY"], persisted["JWT_SECRET"]),
+    }
+    assert persisted["F009_CONCURRENCY_SENTINEL"] == "preserved"
+
+
 @pytest.mark.parametrize("env_overrides", _ENV_OVERRIDE_CASES)
 def test_secrets_symlink_is_rejected_without_reading_target(
     tmp_path,
@@ -488,6 +562,50 @@ def test_secrets_symlink_is_rejected_without_reading_target(
     assert read_observations == []
     assert secrets_path.is_symlink()
     assert _file_digest(target) == digest_before
+
+
+@pytest.mark.parametrize("env_overrides", _ENV_OVERRIDE_CASES)
+def test_secrets_fifo_is_rejected_without_blocking_or_reading(
+    tmp_path,
+    monkeypatch,
+    caplog,
+    env_overrides,
+):
+    """FIFO 必须以 non-blocking 方式打开并在任何正文读取前拒绝。"""
+    if os.name != "posix":
+        _assert_non_posix_regular_file_contract(tmp_path, monkeypatch)
+        return
+
+    secrets_path = tmp_path / ".kindergarten_secrets"
+    os.mkfifo(secrets_path, 0o600)
+    monkeypatch.setattr("app.core.config._secrets_file_path", lambda: secrets_path)
+    read_observations = _install_content_read_probe(monkeypatch, secrets_path)
+    target_open_flags: list[int] = []
+    real_os_open = os.open
+    blocking_open_sentinel = "fictional FIFO blocking open must not leak"
+
+    def require_nonblocking_open(path, flags, mode=0o777, *args, **kwargs):
+        if _same_reference(path, secrets_path):
+            target_open_flags.append(flags)
+            if not flags & os.O_NONBLOCK:
+                raise OSError(blocking_open_sentinel)
+        return real_os_open(path, flags, mode, *args, **kwargs)
+
+    monkeypatch.setattr(os, "open", require_nonblocking_open)
+    caplog.set_level(logging.INFO, logger="app.config")
+
+    error = _capture_settings_error(**env_overrides)
+
+    _assert_failure_is_sanitized(
+        error,
+        caplog,
+        blocking_open_sentinel,
+        *env_overrides.values(),
+    )
+    assert target_open_flags, "测试必须观测到密钥 FIFO 的安全打开边界"
+    assert all(flags & os.O_NONBLOCK for flags in target_open_flags)
+    assert read_observations == []
+    assert stat.S_ISFIFO(secrets_path.lstat().st_mode)
 
 
 @pytest.mark.parametrize("env_overrides", _ENV_OVERRIDE_CASES)
@@ -580,6 +698,52 @@ def test_secure_secrets_write_failure_is_fail_closed(tmp_path, monkeypatch, capl
     assert len(generated_calls) == 2
     _assert_failure_is_sanitized(
         error,
+        caplog,
+        _GENERATED_ENCRYPTION_SENTINEL,
+        _GENERATED_JWT_SENTINEL,
+    )
+    assert not secrets_path.exists()
+
+
+def test_interrupted_initial_posix_write_removes_partial_file_and_propagates(
+    tmp_path,
+    monkeypatch,
+    caplog,
+):
+    """首次创建被 BaseException 中断时不得遗留可被下次启动信任的残片。"""
+    if os.name != "posix":
+        _assert_non_posix_regular_file_contract(tmp_path, monkeypatch)
+        return
+
+    secrets_path = tmp_path / ".kindergarten_secrets"
+    monkeypatch.setattr("app.core.config._secrets_file_path", lambda: secrets_path)
+    generated_values = iter((_GENERATED_ENCRYPTION_SENTINEL, _GENERATED_JWT_SENTINEL))
+    monkeypatch.setattr(
+        "app.core.config.secrets.token_urlsafe",
+        lambda _size: next(generated_values),
+    )
+    real_os_write = os.write
+    interruption = KeyboardInterrupt("fictional interrupted secret creation")
+    partial_write_sizes: list[int] = []
+
+    def interrupt_after_partial_write(fd: int, payload: bytes) -> int:
+        if _same_reference(fd, secrets_path):
+            partial_size = max(1, len(payload) // 2)
+            written = real_os_write(fd, payload[:partial_size])
+            partial_write_sizes.append(written)
+            raise interruption
+        return real_os_write(fd, payload)
+
+    monkeypatch.setattr(os, "write", interrupt_after_partial_write)
+    caplog.set_level(logging.INFO, logger="app.config")
+
+    with pytest.raises(KeyboardInterrupt) as captured:
+        _make_settings()
+
+    assert captured.value is interruption
+    assert partial_write_sizes and all(size > 0 for size in partial_write_sizes)
+    _assert_failure_is_sanitized(
+        captured.value,
         caplog,
         _GENERATED_ENCRYPTION_SENTINEL,
         _GENERATED_JWT_SENTINEL,
