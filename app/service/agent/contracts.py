@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from enum import Enum
 import re
 from typing import TypeAlias
@@ -41,6 +41,8 @@ class Permission(str, Enum):
 
 
 FOUNDATION_ALLOWED_PERMISSIONS = frozenset({Permission.READ, Permission.DRAFT})
+FOUNDATION_CONTEXT_TTL = timedelta(minutes=5)
+FOUNDATION_LOCALE = "zh-CN"
 
 
 class ToolOutputKind(str, Enum):
@@ -469,9 +471,11 @@ def validate_agent_context(value: object) -> bool:
         or value.created_at_utc.tzinfo is not timezone.utc
         or type(value.expires_at_utc) is not datetime
         or value.expires_at_utc.tzinfo is not timezone.utc
-        or not 0 < (value.expires_at_utc - value.created_at_utc).total_seconds() <= 300
+        or not 0
+        < (value.expires_at_utc - value.created_at_utc).total_seconds()
+        <= FOUNDATION_CONTEXT_TTL.total_seconds()
         or type(value.locale) is not str
-        or value.locale != "zh-CN"
+        or value.locale != FOUNDATION_LOCALE
         or type(value.actor) is not TrustedActor
         or not _valid_plan_identity(value.actor.tenant_id)
         or not _valid_plan_identity(value.actor.user_id)

@@ -1,20 +1,20 @@
 """Build short-lived, frozen Agent contexts from the F004 READ seam."""
 
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 from app.service.agent.canonical import canonical_sha256
 from app.service.agent.contracts import (
     FOUNDATION_ALLOWED_PERMISSIONS,
+    FOUNDATION_CONTEXT_TTL,
+    FOUNDATION_LOCALE,
     AgentContext,
     ContextFact,
     ContextFactKind,
     DailyPlanScope,
 )
 from app.service.agent.read_service import AgentReadService
-
-CONTEXT_TTL = timedelta(minutes=5)
 
 
 def _utc_now() -> datetime:
@@ -65,35 +65,31 @@ class AgentContextBuilder:
             if ContextFactKind.CURRENT_PLAN in required_facts
             else None
         )
-        needs_plan_context = (
-            ContextFactKind.PLAN_CONTEXT in required_facts
-            or (
-                ContextFactKind.CALENDAR in required_facts
-                and scope.plan_date is None
-                and current_plan is None
-            )
+        needs_plan_context = ContextFactKind.PLAN_CONTEXT in required_facts or (
+            ContextFactKind.CALENDAR in required_facts
+            and scope.plan_date is None
+            and current_plan is None
         )
         loaded_plan_context = (
-            await self._read_service.read_context(scope)
-            if needs_plan_context
-            else None
+            await self._read_service.read_context(scope) if needs_plan_context else None
         )
         plan_context = (
             loaded_plan_context
             if ContextFactKind.PLAN_CONTEXT in required_facts
             else None
         )
-        target_date = scope.plan_date or (
-            current_plan.plan_date if current_plan is not None else None
-        ) or (
-            loaded_plan_context.plan_date
-            if loaded_plan_context is not None
-            else None
+        target_date = (
+            scope.plan_date
+            or (current_plan.plan_date if current_plan is not None else None)
+            or (
+                loaded_plan_context.plan_date
+                if loaded_plan_context is not None
+                else None
+            )
         )
         calendar = (
             await self._read_service.read_calendar(target_date)
-            if ContextFactKind.CALENDAR in required_facts
-            and target_date is not None
+            if ContextFactKind.CALENDAR in required_facts and target_date is not None
             else None
         )
         class_areas = (
@@ -123,8 +119,8 @@ class AgentContextBuilder:
             operation_id=operation_id,
             turn_id=turn_id,
             created_at_utc=created_at,
-            expires_at_utc=created_at + CONTEXT_TTL,
-            locale="zh-CN",
+            expires_at_utc=created_at + FOUNDATION_CONTEXT_TTL,
+            locale=FOUNDATION_LOCALE,
             actor=actor,
             active_scope=scope,
             facts=facts,
