@@ -12,7 +12,7 @@ import asyncio
 from datetime import date
 from pathlib import Path
 
-from nicegui import app, ui
+from nicegui import ui
 
 from app.core.database import AsyncSessionLocal
 from app.core.audit import log_audit
@@ -24,7 +24,7 @@ from app.repository.class_repository import get_class_config
 from app.repository.daily_plan_repository import (
     delete_daily_plan,
     get_daily_plan_by_date,
-    list_daily_plans,
+    list_daily_plans_for_user,
     save_daily_plan,
 )
 from app.repository.export_repository import save_export_record
@@ -690,10 +690,10 @@ async def daily_plan_page() -> None:
 
             try:
                 async with AsyncSessionLocal() as session:
-                    plans, total = await list_daily_plans(
+                    plans, total = await list_daily_plans_for_user(
                         session,
                         tenant_id,
-                        user_id=user_id,
+                        user_id,
                         start_date=start_date,
                         end_date=end_date,
                         limit=200,
@@ -786,10 +786,10 @@ async def daily_plan_page() -> None:
         history_container.clear()
         try:
             async with AsyncSessionLocal() as session:
-                plans, _ = await list_daily_plans(
+                plans, _ = await list_daily_plans_for_user(
                     session,
                     tenant_id,
-                    user_id=user_id,
+                    user_id,
                     limit=20,
                 )
             with history_container:

@@ -1,5 +1,4 @@
 """用户仓库层集成测试（SQLite 内存库）。"""
-import pytest
 
 from app.repository.user_repository import (
     create_user,

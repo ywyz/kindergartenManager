@@ -1,5 +1,7 @@
 # 自制教玩具子系统 — 开发与测试进度
 
+> **历史快照**：本文记录对应 SHA/阶段的进度证据，不代表当前检出代码或当前测试状态。当前事实以 [`../../CONTEXT.md`](../../CONTEXT.md)、[`../../docs/ROADMAP.md`](../../docs/ROADMAP.md) 和当前代码/测试为准。
+
 > 配套：[design.md](design.md)、[dev-plan.md](dev-plan.md)、[test-plan.md](test-plan.md)。
 
 ## 当前状态

@@ -22,15 +22,13 @@ from app.repository.homemade_teaching_repository import (
 )
 from app.service.homemade_teaching_service import generate_homemade_teaching_content
 from app.ui.components.app_shell import render_shell
+from app.ui.helpers import (
+    clean_filename_part as _clean_filename_part,
+    format_setting_summary,
+    validate_generation_context,
+)
 
 logger = get_logger(__name__)
-
-
-def _clean_filename_part(value: object, fallback: str) -> str:
-    text = str(value or "").strip() or fallback
-    for ch in ('/', '\\', ':', '*', '?', '"', '<', '>', '|', " "):
-        text = text.replace(ch, "")
-    return text or fallback
 
 
 def build_homemade_teaching_filename(
@@ -46,30 +44,6 @@ def build_homemade_teaching_filename(
     teacher = _clean_filename_part(teacher_name, "教师")
     rid = record_id if record_id is not None else "新记录"
     return f"{tenant_id}_{user_id}_{cls}_{teacher}_{rid}_自制教玩具.docx"
-
-
-def validate_generation_context(context: dict) -> list[str]:
-    """校验生成所需设置上下文，返回错误列表。"""
-    errors: list[str] = []
-    if not str(context.get("grade") or "").strip():
-        errors.append("请先在设置页选择年级")
-    if not str(context.get("class_name") or "").strip():
-        errors.append("请先在设置页填写班级名称")
-    if not str(context.get("teacher_name") or "").strip():
-        errors.append("请先在设置页填写教师姓名")
-    return errors
-
-
-def format_setting_summary(context: dict) -> str:
-    """格式化当前设置摘要。"""
-    grade = str(context.get("grade") or "").strip()
-    class_name = str(context.get("class_name") or "").strip()
-    teacher_name = str(context.get("teacher_name") or "").strip()
-    if not grade and not class_name and not teacher_name:
-        return "当前设置：未配置"
-    class_part = f"{grade} {class_name}".strip() or "未配置班级"
-    teacher_part = teacher_name or "未配置教师"
-    return f"当前设置：{class_part} / {teacher_part}"
 
 
 @ui.page("/homemade-teaching")

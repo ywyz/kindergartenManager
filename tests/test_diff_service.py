@@ -1,6 +1,5 @@
 """tests/test_diff_service.py — 差异比对服务测试。"""
 
-import pytest
 
 from app.service.diff_service import compute_diff
 

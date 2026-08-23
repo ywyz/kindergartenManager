@@ -20,12 +20,12 @@ async def test_add_and_list_images_by_domain(async_session):
     await add_image(async_session, tenant_id=1, user_id=1, record_id=10,
                     domain="语言", image_index=1, blob_content=b"l1")
 
-    health = await list_images_by_record(async_session, 1, 10, domain="健康")
+    health = await list_images_by_record(async_session, 1, 1, 10, domain="健康")
     assert len(health) == 2
     assert [i.image_index for i in health] == [1, 2]  # 按 image_index 升序
     assert health[0].image_description == "图1"
 
-    all_imgs = await list_images_by_record(async_session, 1, 10)
+    all_imgs = await list_images_by_record(async_session, 1, 1, 10)
     assert len(all_imgs) == 3
 
 
@@ -37,8 +37,8 @@ async def test_get_image_tenant_isolation(async_session):
     img = await add_image(async_session, tenant_id=1, user_id=1, record_id=10,
                           domain="健康", image_index=1, blob_content=b"x")
 
-    assert (await get_image(async_session, 1, img.id)).id == img.id
-    assert await get_image(async_session, 99, img.id) is None
+    assert (await get_image(async_session, 1, 1, img.id)).id == img.id
+    assert await get_image(async_session, 99, 1, img.id) is None
 
 
 @pytest.mark.asyncio
@@ -53,5 +53,5 @@ async def test_delete_images_by_record(async_session):
     await add_image(async_session, tenant_id=1, user_id=1, record_id=10,
                     domain="语言", image_index=1, blob_content=b"y")
 
-    await delete_images_by_record(async_session, 1, 10)
-    assert await list_images_by_record(async_session, 1, 10) == []
+    await delete_images_by_record(async_session, 1, 1, 10)
+    assert await list_images_by_record(async_session, 1, 1, 10) == []

@@ -35,7 +35,7 @@ async def save_record(
     class_name: str | None = None,
     observer: str | None = None,
 ) -> ListeningRecord:
-    """新建倾听记录主表并持久化，返回带 id 的对象。"""
+    """新建倾听记录主表并 flush，提交由最外层 use-case 负责。"""
     rec = ListeningRecord(
         tenant_id=tenant_id,
         user_id=user_id,
@@ -50,20 +50,21 @@ async def save_record(
         observer=observer,
     )
     session.add(rec)
-    await session.commit()
-    await session.refresh(rec)
+    await session.flush()
     return rec
 
 
 async def get_record_by_id(
     session: AsyncSession,
     tenant_id: int,
+    user_id: int,
     record_id: int,
 ) -> ListeningRecord | None:
-    """按 id 查询记录，强制 tenant_id 过滤。"""
+    """UI 单条记录投影，强制 tenant_id + user_id 过滤。"""
     result = await session.execute(
         select(ListeningRecord).where(
             ListeningRecord.tenant_id == tenant_id,
+            ListeningRecord.user_id == user_id,
             ListeningRecord.id == record_id,
         )
     )
@@ -121,7 +122,7 @@ async def update_record(
         )
         .values(**fields)
     )
-    await session.commit()
+    await session.flush()
     return bool(result.rowcount)
 
 
@@ -139,7 +140,7 @@ async def delete_record(
             ListeningRecord.id == record_id,
         )
     )
-    await session.commit()
+    await session.flush()
     return bool(result.rowcount)
 
 
@@ -162,7 +163,7 @@ async def save_domain(
     evaluation: str | None = None,
     support_strategy: str | None = None,
 ) -> ListeningDomain:
-    """新建一条领域内容并持久化，返回带 id 的对象。"""
+    """新建一条领域内容并 flush，提交由最外层 use-case 负责。"""
     dom = ListeningDomain(
         tenant_id=tenant_id,
         user_id=user_id,
@@ -178,21 +179,22 @@ async def save_domain(
         support_strategy=support_strategy,
     )
     session.add(dom)
-    await session.commit()
-    await session.refresh(dom)
+    await session.flush()
     return dom
 
 
 async def list_domains_by_record(
     session: AsyncSession,
     tenant_id: int,
+    user_id: int,
     record_id: int,
 ) -> list[ListeningDomain]:
-    """查询某记录下的全部领域，按 id 升序。"""
+    """UI 领域投影，强制 tenant_id + user_id 过滤。"""
     result = await session.execute(
         select(ListeningDomain)
         .where(
             ListeningDomain.tenant_id == tenant_id,
+            ListeningDomain.user_id == user_id,
             ListeningDomain.record_id == record_id,
         )
         .order_by(ListeningDomain.id.asc())
@@ -218,23 +220,25 @@ async def update_domain(
         )
         .values(**fields)
     )
-    await session.commit()
+    await session.flush()
     return bool(result.rowcount)
 
 
 async def delete_domains_by_record(
     session: AsyncSession,
     tenant_id: int,
+    user_id: int,
     record_id: int,
 ) -> None:
-    """删除某记录下的全部领域（tenant 隔离），供覆盖保存重建使用。"""
+    """删除某用户记录的全部领域，供覆盖保存重建使用。"""
     await session.execute(
         delete(ListeningDomain).where(
             ListeningDomain.tenant_id == tenant_id,
+            ListeningDomain.user_id == user_id,
             ListeningDomain.record_id == record_id,
         )
     )
-    await session.commit()
+    await session.flush()
 
 
 # ─── 指标结果表 listening_indicator_result ─────────────────────────────────
@@ -250,7 +254,7 @@ async def save_indicator_result(
     catalog_id: int,
     stars: int = 3,
 ) -> ListeningIndicatorResult:
-    """新建一条指标达成结果并持久化，返回带 id 的对象。"""
+    """新建一条指标结果并 flush，提交由最外层 use-case 负责。"""
     res = ListeningIndicatorResult(
         tenant_id=tenant_id,
         user_id=user_id,
@@ -260,20 +264,21 @@ async def save_indicator_result(
         stars=stars,
     )
     session.add(res)
-    await session.commit()
-    await session.refresh(res)
+    await session.flush()
     return res
 
 
 async def list_indicator_results(
     session: AsyncSession,
     tenant_id: int,
+    user_id: int,
     record_id: int,
     domain: str | None = None,
 ) -> list[ListeningIndicatorResult]:
     """查询某记录下的指标结果（可选按领域过滤），按 id 升序。"""
     filters = [
         ListeningIndicatorResult.tenant_id == tenant_id,
+        ListeningIndicatorResult.user_id == user_id,
         ListeningIndicatorResult.record_id == record_id,
     ]
     if domain is not None:
@@ -303,20 +308,22 @@ async def update_indicator_stars(
         )
         .values(stars=stars, updated_at=datetime.now(timezone.utc))
     )
-    await session.commit()
+    await session.flush()
     return bool(result.rowcount)
 
 
 async def delete_indicator_results_by_record(
     session: AsyncSession,
     tenant_id: int,
+    user_id: int,
     record_id: int,
 ) -> None:
-    """删除某记录下的全部指标结果（tenant 隔离）。"""
+    """删除某用户记录下的全部指标结果。"""
     await session.execute(
         delete(ListeningIndicatorResult).where(
             ListeningIndicatorResult.tenant_id == tenant_id,
+            ListeningIndicatorResult.user_id == user_id,
             ListeningIndicatorResult.record_id == record_id,
         )
     )
-    await session.commit()
+    await session.flush()

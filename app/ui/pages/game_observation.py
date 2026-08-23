@@ -15,19 +15,18 @@
 """
 from __future__ import annotations
 
-import io
-from datetime import date, datetime, timezone
+from datetime import date
 
-from nicegui import app, ui
+from nicegui import ui
 
 from app.core.audit import log_audit
 from app.core.database import AsyncSessionLocal
-from app.core.exceptions import AiCallError, AiParseError, AppError, ConfigError
+from app.core.exceptions import AiCallError, AiParseError, ConfigError
 from app.core.logging import get_logger
+from app.core.unit_of_work import AsyncSessionUnitOfWork
 from app.core.user_context import get_current_user
-from app.integration.image_storage.blob_backend import BlobImageStorage
+from app.integration.image_storage import get_storage_backend
 from app.integration.word_export.observation_exporter import export_observation
-from app.repository.ai_key_repository import get_active_ai_key, get_decrypted_key
 from app.repository.class_repository import get_class_config
 from app.repository.export_repository import save_export_record
 from app.repository.observation_image_repository import (
@@ -37,13 +36,13 @@ from app.repository.observation_image_repository import (
 from app.repository.observation_repository import (
     delete_observation,
     list_observations,
-    get_observation_by_id,
 )
 from app.service.observation_service import (
     generate_observation_content,
     save_observation_with_images,
 )
 from app.ui.components.app_shell import get_display_name, render_shell
+from app.ui.helpers import validate_image_count
 
 logger = get_logger(__name__)
 
@@ -70,11 +69,6 @@ def build_export_filename(
 def validate_big_env(value: str) -> bool:
     """校验大环境值是否合法（仅允许 户外/室内/公共）。"""
     return value.strip() in _BIG_ENV_OPTIONS
-
-
-def validate_image_count(count: int) -> bool:
-    """校验图片数量是否在合法范围（1~3 张）。"""
-    return 1 <= count <= 3
 
 
 # ─── 页面路由 ──────────────────────────────────────────────────────────────────
@@ -292,7 +286,7 @@ async def game_observation_page() -> None:
                     "support_strategy": strategy_area.value or None,
                 }
                 compressed = state.get("compressed_images", [])
-                storage = BlobImageStorage()
+                storage = get_storage_backend()
                 async with AsyncSessionLocal() as session:
                     obs_id = await save_observation_with_images(
                         session=session,
@@ -403,7 +397,10 @@ async def game_observation_page() -> None:
                                         try:
                                             async with AsyncSessionLocal() as s:
                                                 imgs = await list_images_by_observation(
-                                                    s, tenant_id=tenant_id, observation_id=r.id
+                                                    s,
+                                                    tenant_id=tenant_id,
+                                                    user_id=user_id,
+                                                    observation_id=r.id,
                                                 )
                                             obs_dict = {
                                                 "class_name": r.class_name,
@@ -447,12 +444,19 @@ async def game_observation_page() -> None:
                                         if result == "yes":
                                             try:
                                                 async with AsyncSessionLocal() as s:
-                                                    await delete_images_by_observation(
-                                                        s, tenant_id=tenant_id, observation_id=r.id
-                                                    )
-                                                    await delete_observation(
-                                                        s, tenant_id=tenant_id, user_id=user_id, observation_id=r.id
-                                                    )
+                                                    async with AsyncSessionUnitOfWork(s):
+                                                        await delete_images_by_observation(
+                                                                    s,
+                                                                    tenant_id=tenant_id,
+                                                                    user_id=user_id,
+                                                                    observation_id=r.id,
+                                                        )
+                                                        await delete_observation(
+                                                            s,
+                                                            tenant_id=tenant_id,
+                                                            user_id=user_id,
+                                                            observation_id=r.id,
+                                                        )
                                                 await refresh_history()
                                             except Exception as ex:
                                                 show_error(f"删除失败：{ex}")

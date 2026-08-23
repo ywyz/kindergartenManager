@@ -1,6 +1,6 @@
 # 进度记录
 
-> **历史证据说明（2026-08-22）**：以下测试数、迁移 head、分支和人工结果只属于记录时的 SHA/模式，不表示当前基线已重新通过。当前状态见 [`../CONTEXT.md`](../CONTEXT.md)，当前人工矩阵见 [`../docs/MANUAL_TESTING.md`](../docs/MANUAL_TESTING.md)。
+> **历史证据说明（2026-08-23）**：以下测试数、迁移 head、分支和人工结果只属于记录时的 SHA/模式，不表示当前基线已重新通过。当前状态见 [`../CONTEXT.md`](../CONTEXT.md)，当前人工矩阵见 [`../docs/MANUAL_TESTING.md`](../docs/MANUAL_TESTING.md)。
 
 ## 2026-06-28（课程审议记录子系统）
 
@@ -229,11 +229,11 @@ cp .env.example .env
 
 - **Bug 修复 — 登录响应极慢（IPv6 超时）**：
   - 现象：点击登录等待 2+ 分钟才响应。
-  - 根因：`aliyun.ywyz.tech` 同时有 A 和 AAAA 记录；`aiomysql` 优先尝试 IPv6（`2408:4002:...`），该地址在 13306 端口不通，等待 TCP 超时（约 2 分 15 秒）后才降级 IPv4。
-  - 修复：`.env` 中 `DATABASE_URL` 将主机名改为 IPv4 地址（`47.116.40.89`），绕过 DNS 双栈解析。
+  - 根因：历史数据库域名同时有 A 和 AAAA 记录；`aiomysql` 优先尝试不可达 IPv6，等待 TCP 超时后才降级 IPv4（地址与域名已脱敏）。
+  - 修复：当时在 `.env` 中把 `DATABASE_URL` 改为 IPv4 直连，绕过 DNS 双栈解析（地址已脱敏）。
   - 同步修改：`app/core/database.py` 将 `pool_pre_ping=True` 改为 `False`（避免每次取连接前额外发 `SELECT 1` 增加往返延迟），新增 `pool_recycle=1800` 防止服务端主动断连后复用报错。
   - **验证通过**：登录响应恢复正常。
-  - 后续建议：在 DNS 管理面板删除 `aliyun.ywyz.tech` 的 AAAA 记录（根治），届时可将 `DATABASE_URL` 改回域名。
+  - 当时建议：在 DNS 管理面板修正不可达的 AAAA 记录，再恢复域名连接。
 
 ### 当前状态
 

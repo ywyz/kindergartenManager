@@ -20,7 +20,7 @@ Word：Microsoft Word / LibreOffice / 未执行
 
 - [ ] 全新数据目录启动，迁移到 `a6c4d8e2f9b1`。
 - [ ] `/` 跳转 `/home`，没有登录表单。
-- [ ] `/home`、`/settings`、`/setup` 可打开。
+- [ ] `/home`、`/settings` 可打开；旧 `/setup` 立即跳转 `/settings`。
 - [ ] 重启后 SQLite、自动密钥和已保存 AI 配置可继续使用。
 - [ ] 迁移失败时明确记录实际行为，不能只记“页面打开”。
 - [ ] 日志不含 AI Key、数据库密码或完整幼儿图片内容。
@@ -31,7 +31,7 @@ Word：Microsoft Word / LibreOffice / 未执行
 - [ ] 保存年级、班级、教师、室内区域和户外内容。
 - [ ] 日期面板正确显示教学周、星期和节假日状态。
 - [ ] 节假日 API 不可用时出现降级提示，主流程仍可继续。
-- [ ] `/setup` 分别保存/脱敏文本与视觉 AI Key，并验证连接失败/成功提示。
+- [ ] `/settings` 分别保存/脱敏文本与视觉 AI Key，并验证连接失败/成功提示。
 - [ ] `/prompts` 可创建版本、切换 active 和回滚。
 
 ## 4. 每日活动计划

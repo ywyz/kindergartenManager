@@ -1,5 +1,7 @@
 # 一对一倾听观察子系统 — 设计文档
 
+> **历史快照**：本文记录 `dev3.1` 阶段的设计，不代表当前检出代码、事务实现或测试状态。当前事实以 [`../../CONTEXT.md`](../../CONTEXT.md)、[`../../docs/ROADMAP.md`](../../docs/ROADMAP.md) 和当前代码/测试为准。
+
 > 本文档为「一对一倾听观察记录」子系统（dev3.1）的需求与技术设计说明。配套文档：
 > - 开发计划：[dev-plan.md](dev-plan.md)
 > - 测试计划：[test-plan.md](test-plan.md)

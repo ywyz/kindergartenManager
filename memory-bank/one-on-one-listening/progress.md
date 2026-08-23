@@ -1,5 +1,7 @@
 # 一对一倾听观察子系统 — 进度记录
 
+> **历史快照**：本文记录 `dev3.1` 对应 SHA/阶段的证据，不代表当前检出代码或当前测试状态。当前事实以 [`../../CONTEXT.md`](../../CONTEXT.md)、[`../../docs/ROADMAP.md`](../../docs/ROADMAP.md) 和当前代码/测试为准。
+
 > 配套：[design.md](design.md)、[dev-plan.md](dev-plan.md)、[test-plan.md](test-plan.md)。
 > 分支：`dev3.1`（从 `dev3.0` 切出）。本文件随分支同步，便于跨电脑续作与测试。
 

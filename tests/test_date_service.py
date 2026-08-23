@@ -2,9 +2,8 @@
 Step 2.3 — 日期计算服务单元测试
 """
 import random
-from datetime import date, timedelta
+from datetime import date
 
-import pytest
 
 from app.service.date_service import (
     get_week_number,

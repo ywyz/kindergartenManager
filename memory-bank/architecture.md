@@ -1,14 +1,14 @@
 # 幼儿园教学管理系统架构文档（初始化）
 
-> **历史文档说明（2026-08-22）**：本文按开发阶段累积，包含已被后续单用户模式取代的登录描述和旧迁移/测试数字。当前架构事实见 [`../CONTEXT.md`](../CONTEXT.md)、[`../docs/design/system-architecture.md`](../docs/design/system-architecture.md)、[`../docs/design/data-model.md`](../docs/design/data-model.md) 和 [`../docs/ADR/README.md`](../docs/ADR/README.md)。受控 Agent 只处于已确认设计状态，边界见 [`../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md`](../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md) 与 [`../docs/design/agent-runtime.md`](../docs/design/agent-runtime.md)；下文历史内容不授权 Agent 实现或 WRITE。当前 Alembic head 为 `a6c4d8e2f9b1`。
+> **历史文档说明（2026-08-23）**：本文按开发阶段累积，包含已被后续单用户模式取代的登录描述和旧迁移/测试数字。当前架构事实见 [`../CONTEXT.md`](../CONTEXT.md)、[`../docs/design/system-architecture.md`](../docs/design/system-architecture.md)、[`../docs/design/data-model.md`](../docs/design/data-model.md) 和 [`../docs/ADR/README.md`](../docs/ADR/README.md)。受控 Agent 只处于已确认设计状态，边界见 [`../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md`](../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md) 与 [`../docs/design/agent-runtime.md`](../docs/design/agent-runtime.md)；下文历史内容不授权 Agent 实现或 WRITE。当前 Alembic head 为 `a6c4d8e2f9b1`。
 
-## 1. 当前阶段
+## 1. 历史阶段记录
 
 - 项目阶段：M2/M3 已完成；二期 REST API 已落地；v3.0.1 单用户模式重构完成。
 - 架构方向：Docker Compose AIO 编排，Monorepo，渐进式微服务化。
 - 开发策略：先架构后编码；每完成一个步骤同步更新本文件与 progress.md
 
-## 2. 当前模式（v3.0.1+）
+## 2. 历史记录中的 v3.0.1+ 模式
 
 ### 单用户模式
 - 登录功能已移除（后续恢复），根路径 `/` 重定向到 `/home`
@@ -21,7 +21,7 @@
 - MySQL 配置通过独立字段（服务器、端口、用户名、密码、数据库名）保存到 .env
 
 ### 部署架构
-- **生产**：Docker Compose AIO（Caddy + 主系统 + MySQL + 子系统）
+- **历史目标**：Docker Compose AIO（Caddy + 主系统 + MySQL + 规划中的子系统）；当前实际 Compose 没有独立子系统
 - **开发**：本地直接运行（SQLite），或 `docker-compose.dev.yml` 
 - **反向代理**：Caddy 替代 Nginx，支持自动 HTTPS（域名配置后自动申请 Let's Encrypt 证书）
 
@@ -41,8 +41,8 @@
 | 目录 | 职责 |
 |------|------|
 | `app/` | 应用根包，所有业务代码入口 |
-| `app/ui/` | NiceGUI 页面与组件，每个页面独立文件（如 `pages/login.py`、`pages/setup.py`、`components/date_panel.py`）；禁止在此层做权限逻辑 |
-| `app/api/` | 对外只读 REST API（二期）：`/api/v1` 路由、API Key + 可选 HMAC 签名鉴权；供子系统（幼儿园信息管理主系统）读取教学计划数据 |
+| `app/ui/` | NiceGUI 页面与组件；当前根路由为 `pages/root.py`，`pages/setup.py` 只兼容跳转到 `/settings` |
+| `app/api/` | 对外只读 REST API：`/api/v1` 路由、API Key + 可选 HMAC 签名鉴权；供未来其他系统集成 |
 | `app/service/` | 业务逻辑层：教案拆分协调、年龄适配、差异比对、日期计算、登录逻辑等；不直接发 HTTP 请求 |
 | `app/repository/` | 数据访问层：封装所有 SQL 查询，返回模型对象；所有查询必须携带 `tenant_id` 过滤条件 |
 | `app/integration/ai_client/` | OpenAI 兼容接口封装：`httpx` + `tenacity` 重试，强约束 JSON schema，解析失败抛出 `AiParseError` |
@@ -71,7 +71,7 @@
 | `.gitignore` | 忽略 `.env`、`.env.prod`、`.venv/`、`exports/`、`__pycache__/` 等 |
 | `app/core/config.py` | `Settings` 类（pydantic-settings），统一读取所有环境变量；单例 `settings` 供全局使用 |
 | `app/core/logging.py` | `get_logger(name)` — JSON 结构化日志，字段固定为 timestamp/level/logger/message；LOG_LEVEL 由 Settings 控制 |
-| `app/core/database.py` | `AsyncEngine`、`AsyncSessionLocal`（async_sessionmaker）、`Base`（DeclarativeBase）、`get_async_session()` 依赖注入生成器 |
+| `app/core/database.py` | `AsyncEngine`、`AsyncSessionLocal`（async_sessionmaker）、`Base`（DeclarativeBase）；API 会话依赖位于 `app/api/deps.py` |
 | `alembic/env.py` | 已配置读取 `Settings.DATABASE_URL`（迁移用 pymysql 同步驱动）并绑定 `Base.metadata` 支持 autogenerate |
 | `alembic.ini` | Alembic 默认配置，连接串由 env.py 覆盖 |
 
@@ -86,7 +86,7 @@
 
 | 表名 | 迁移版本 | 主要字段 |
 |------|---------|----------|
-| `users` | `5e03413fdeca` | id, tenant_id, username, hashed_password, role, is_active |
+| `user` | `5e03413fdeca` | id, tenant_id, username, hashed_password, role, is_active |
 | `semester_config` | `fd6d29f921b4` | id, tenant_id, user_id, semester_name, start_date, end_date, is_active |
 | `class_config` | `67b4aef28796` | id, tenant_id, user_id, grade, class_name, indoor_areas, outdoor_content |
 | `ai_api_key` | 阶段3迁移 | id, tenant_id, user_id, api_base_url, model_name, api_key_encrypted, is_active |
@@ -102,7 +102,7 @@
 | `app/core/models/user.py` | User ORM 模型 |
 | `app/core/models/semester.py` | SemesterConfig ORM 模型 |
 | `app/core/models/class_config.py` | ClassConfig ORM 模型 |
-| `app/auth/password.py` | Argon2 密码哈希与验证（passlib） |
+| `app/auth/password.py` | Argon2 密码哈希与验证（`argon2-cffi`） |
 | `app/auth/jwt.py` | JWT 生成/验证（python-jose HS256），payload 含 sub/tenant_id/role/exp |
 | `app/service/auth_service.py` | 登录逻辑（查用户→验密码→签 JWT）；修改密码 |
 | `app/service/date_service.py` | 纯函数：`get_week_number`、`get_weekday_cn`、`is_workday`、`is_within_semester` |
@@ -110,10 +110,9 @@
 | `app/repository/semester_repository.py` | `get_active_semester`、`upsert_active_semester` |
 | `app/repository/class_repository.py` | `get_class_config`、`upsert_class_config` |
 | `app/integration/holiday_client/client.py` | 法定节假日判定；法定节假日缓存 `dict[str, tuple[bool, str\|None, int]]`（含 day_type）；特殊节日缓存 `dict[str, list[str]]`；`is_holiday`、`is_near_holiday`、`get_holiday_name`、`get_special_day_tags`（sync，本地硬编码）、`is_adjusted_workday` |
-| `app/ui/pages/login.py` | 登录页（路由 `/`），token 写入 `app.storage.user` |
+| `app/ui/pages/root.py` | 当前根路由 `/`，跳转 `/home`；历史登录页已移除 |
 | `app/ui/pages/home.py` | 首页（路由 `/home`），快捷导航按钮 |
 | `app/ui/pages/settings.py` | 配置页（路由 `/settings`），学期配置、班级配置、AI 接口配置（含脱敏展示与验证连接） |
-| `app/ui/pages/date_test.py` | 日期测试页（路由 `/date-test`），嵌入 DatePanel |
 
 ## 6. 阶段 3 已实现文件清单
 
@@ -131,13 +130,13 @@
 | 文件 | 变更内容 |
 |------|----------|
 | `app/core/database.py` | `pool_pre_ping=False`（避免远程 DB 额外往返）；新增 `pool_recycle=1800` |
-| `.env` | `DATABASE_URL` 主机改为 IPv4 直连（`47.116.40.89`），规避双栈服务器 IPv6 超时问题 |
+| `.env` | 历史上曾把 `DATABASE_URL` 主机改为 IPv4 直连（地址已脱敏），规避双栈服务器 IPv6 超时问题 |
 
 ### 已知问题与决策记录
 
 | 编号 | 问题 | 决策 |
 |------|------|------|
-| BL-02 | `aliyun.ywyz.tech` 同时有 A/AAAA 记录，aiomysql 优先尝试 IPv6 导致连接超时 2+ 分钟 | `.env` 改用 IPv4 直连；根治方案：删除 DNS AAAA 记录 |
+| BL-02 | 历史数据库域名同时有 A/AAAA 记录，aiomysql 优先尝试不可达 IPv6 导致连接超时 | 当时改用 IPv4 直连；地址与域名现已脱敏 |
 | BL-01 | `get_special_day_tags` 曾计划在线 API，代价大于收益 | 回滚为本地硬编码同步实现 |
 
 ### Holiday Client 接口说明
@@ -186,6 +185,8 @@ type 值：0=工作日，1=周末，2=法定节假日，3=调班工作日。
 
 ## 7. 阶段 8：收尾与稳定性
 
+> 以下表格保留当时的实现记录。当前 `app/main.py` 不挂载 `AuthMiddleware`，`/setup` 只跳转 `/settings`，根路由由 `app/ui/pages/root.py` 提供；不得把本节历史内容当作当前产品行为。
+
 | 文件 | 职责 |
 |------|------|
 | `app/auth/middleware.py` | `AuthMiddleware`（`BaseHTTPMiddleware`）路由守卫：受限页面校验 `app.storage.user` 中 JWT token，无效则清空 storage 重定向 `/`；非页面路由（静态资源/`_nicegui`）放行；白名单 `UNRESTRICTED_PAGE_ROUTES = {"/", "/register", "/setup"}` |
@@ -198,7 +199,7 @@ type 值：0=工作日，1=周末，2=法定节假日，3=调班工作日。
 
 ## 8. 对外只读 REST API
 
-作为「幼儿园信息管理主系统」的子系统，本模块对外提供教学计划数据的**只读** REST API（路由前缀 `/api/v1`）。
+本模块提供教学计划数据的**只读** REST API（路由前缀 `/api/v1`），供未来经授权的其他系统集成。
 
 | 文件 | 职责 |
 |------|------|
@@ -230,6 +231,8 @@ Windows EXE 打包使用内嵌 SQLite，迁移链存在 3 处 MySQL 专属语法
 - PyInstaller 路径一致性：`sys.frozen` 检测 + `os.path.dirname(sys.executable)` 绝对路径
 
 ### 首次运行配置向导
+
+> 本节记录已废弃的四步向导。当前产品没有该向导，所有配置统一进入 `/settings`，旧 `/setup` 只做兼容跳转。
 
 #### 新增模块
 

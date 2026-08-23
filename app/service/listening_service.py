@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import log_audit
 from app.core.exceptions import AppError, ConfigError
+from app.core.unit_of_work import AsyncSessionUnitOfWork
 from app.integration.ai_client.listening_client import generate_listening_domain
 from app.integration.image_processing import CompressedImage, compress_image
 from app.integration.image_storage.base import ImageStorageBackend
@@ -248,15 +249,16 @@ async def save_record_with_all(
     Returns:
         新建的 listening_record.id。
     """
-    rec = await save_record(session, **record_data)
-    await _persist_domains(
-        session,
-        tenant_id=record_data["tenant_id"],
-        user_id=record_data["user_id"],
-        record_id=rec.id,
-        domains=domains,
-        storage=storage,
-    )
+    async with AsyncSessionUnitOfWork(session):
+        rec = await save_record(session, **record_data)
+        await _persist_domains(
+            session,
+            tenant_id=record_data["tenant_id"],
+            user_id=record_data["user_id"],
+            record_id=rec.id,
+            domains=domains,
+            storage=storage,
+        )
     return rec.id
 
 
@@ -286,45 +288,47 @@ async def update_record_with_all(
     update_fields = {
         k: v for k, v in record_data.items() if k not in ("tenant_id", "user_id", "id")
     }
-    ok = await update_record(session, tenant_id, user_id, record_id, **update_fields)
-    if not ok:
-        raise AppError("记录不存在或无权限修改")
+    async with AsyncSessionUnitOfWork(session):
+        ok = await update_record(session, tenant_id, user_id, record_id, **update_fields)
+        if not ok:
+            raise AppError("记录不存在或无权限修改")
 
-    await delete_images_by_record(session, tenant_id, record_id)
-    await delete_indicator_results_by_record(session, tenant_id, record_id)
-    await delete_domains_by_record(session, tenant_id, record_id)
+        await delete_images_by_record(session, tenant_id, user_id, record_id)
+        await delete_indicator_results_by_record(session, tenant_id, user_id, record_id)
+        await delete_domains_by_record(session, tenant_id, user_id, record_id)
 
-    await _persist_domains(
-        session,
-        tenant_id=tenant_id,
-        user_id=user_id,
-        record_id=record_id,
-        domains=domains,
-        storage=storage,
-    )
+        await _persist_domains(
+            session,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            record_id=record_id,
+            domains=domains,
+            storage=storage,
+        )
     return record_id
 
 
 async def load_record_detail(
     session: AsyncSession,
     tenant_id: int,
+    user_id: int,
     record_id: int,
 ) -> dict | None:
     """从 DB 装配整条记录详情（主表 + 各领域 + 图片 + 指标结果）。
 
     指标的 sort_order 经 indicator_catalog 映射，供导出打勾定位与详情展示。
-    强制 tenant_id 过滤；记录不存在返回 None。
+    强制 tenant_id + user_id 过滤；记录不存在返回 None。
 
     Returns:
         dict | None，结构见 to_export_payload 的输入约定。
     """
-    rec = await get_record_by_id(session, tenant_id, record_id)
+    rec = await get_record_by_id(session, tenant_id, user_id, record_id)
     if rec is None:
         return None
 
-    domains = await list_domains_by_record(session, tenant_id, record_id)
-    images = await list_images_by_record(session, tenant_id, record_id)
-    results = await list_indicator_results(session, tenant_id, record_id)
+    domains = await list_domains_by_record(session, tenant_id, user_id, record_id)
+    images = await list_images_by_record(session, tenant_id, user_id, record_id)
+    results = await list_indicator_results(session, tenant_id, user_id, record_id)
 
     catalog_map = await list_indicators_by_ids(
         session, tenant_id, [r.catalog_id for r in results]

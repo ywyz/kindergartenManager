@@ -103,7 +103,6 @@ class DatePanel:
         """外部或内部直接设置日期值，触发联动更新（同步入口）。"""
         if self._date_input:
             self._date_input.value = date_str
-        ui.run_javascript(f"")  # 触发 NiceGUI 刷新
         # 通过异步任务处理联动
         import asyncio
         asyncio.ensure_future(self._update_info(date_str))

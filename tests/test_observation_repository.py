@@ -53,12 +53,31 @@ async def test_get_observation_by_id_tenant_isolation(async_session):
     )
 
     # 正确 tenant 可查到
-    found = await get_observation_by_id(async_session, tenant_id=1, observation_id=obs.id)
+    found = await get_observation_by_id(
+        async_session, tenant_id=1, user_id=1, observation_id=obs.id
+    )
     assert found is not None
 
     # 跨 tenant 查不到
-    not_found = await get_observation_by_id(async_session, tenant_id=2, observation_id=obs.id)
+    not_found = await get_observation_by_id(
+        async_session, tenant_id=2, user_id=1, observation_id=obs.id
+    )
     assert not_found is None
+
+
+@pytest.mark.asyncio
+async def test_get_observation_by_id_rejects_same_tenant_other_user(async_session):
+    """UI 单条观察投影必须同时匹配 tenant 与当前 user。"""
+    from app.repository.observation_repository import get_observation_by_id, save_observation
+
+    obs = await save_observation(
+        async_session,
+        tenant_id=1,
+        user_id=1,
+        obs_date=date(2026, 6, 9),
+    )
+
+    assert await get_observation_by_id(async_session, 1, 99, obs.id) is None
 
 
 @pytest.mark.asyncio
@@ -115,8 +134,6 @@ async def test_update_observation_changes_field(async_session):
         child_age="4岁",
         observer="张老师",
     )
-    old_updated = obs.updated_at
-
     await update_observation(
         async_session,
         tenant_id=1,
@@ -128,6 +145,6 @@ async def test_update_observation_changes_field(async_session):
         support_strategy="提供更多积木类型",
     )
 
-    refreshed = await get_observation_by_id(async_session, 1, obs.id)
+    refreshed = await get_observation_by_id(async_session, 1, 1, obs.id)
     assert refreshed.observation_goal == "培养空间感知能力"
     assert refreshed.big_env == "户外"  # 未改的字段不变

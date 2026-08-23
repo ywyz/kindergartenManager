@@ -62,14 +62,14 @@ async def upsert_active_semester(
     return record
 
 
-async def list_semesters(
+async def list_semesters_for_tenant(
     session: AsyncSession,
     tenant_id: int,
     *,
     user_id: int | None = None,
     active_only: bool = False,
 ) -> list[SemesterConfig]:
-    """按租户（可选用户）查询学期配置列表，按更新时间降序。"""
+    """API tenant 投影；可在当前 tenant 内按 user_id 进一步筛选。"""
     conditions = [SemesterConfig.tenant_id == tenant_id]
     if user_id is not None:
         conditions.append(SemesterConfig.user_id == user_id)

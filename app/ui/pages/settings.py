@@ -9,8 +9,7 @@
 """
 from datetime import date
 
-import httpx
-from nicegui import app, ui
+from nicegui import ui
 
 from app.core.config import settings as app_settings
 from app.core.database import AsyncSessionLocal
@@ -27,16 +26,11 @@ from app.repository.semester_repository import (
     get_active_semester,
     upsert_active_semester,
 )
+from app.service.settings_service import verify_saved_ai_connection
 from app.ui.components.app_shell import render_shell
+from app.ui.helpers import mask_api_key as _mask_api_key
 
 _GRADES = ["小班", "中班", "大班"]
-
-
-def _mask_api_key(plain: str) -> str:
-    """将明文 API Key 脱敏，仅保留末 4 位，其余替换为 sk-**** 前缀。"""
-    if len(plain) >= 8:
-        return "sk-****" + plain[-4:]
-    return "sk-****"
 
 
 @ui.page("/settings")
@@ -68,7 +62,7 @@ async def settings_page() -> None:
                 ).classes("flex-1")
                 with start_date_input:
                     with ui.menu().props("no-parent-event") as start_menu:
-                        with ui.date().bind_value(start_date_input) as start_picker:
+                        with ui.date().bind_value(start_date_input):
                             with ui.row().classes("justify-end"):
                                 ui.button("确定", on_click=start_menu.close).props(
                                     "flat"
@@ -83,7 +77,7 @@ async def settings_page() -> None:
                 ).classes("flex-1")
                 with end_date_input:
                     with ui.menu().props("no-parent-event") as end_menu:
-                        with ui.date().bind_value(end_date_input) as end_picker:
+                        with ui.date().bind_value(end_date_input):
                             with ui.row().classes("justify-end"):
                                 ui.button("确定", on_click=end_menu.close).props(
                                     "flat"
@@ -296,38 +290,32 @@ async def settings_page() -> None:
                 ai_msg.text = "连接测试中……"
 
                 async with AsyncSessionLocal() as session:
-                    ai_key_record = await get_active_ai_key(session, tenant_id, user_id, key_type="text")
+                    result = await verify_saved_ai_connection(
+                        session,
+                        tenant_id=tenant_id,
+                        user_id=user_id,
+                        key_type="text",
+                    )
 
-                if ai_key_record is None:
+                if result.code == "not_configured":
                     ai_msg.text = "请先保存 AI 接口配置"
                     ai_msg.classes(add="text-red-500")
                     return
-
-                try:
-                    plain_key = get_decrypted_key(ai_key_record)
-                except CryptoError:
+                if result.code == "key_decryption_failed":
                     ai_msg.text = "Key 解密失败，请重新保存"
                     ai_msg.classes(add="text-red-500")
                     return
-
-                base_url = ai_key_record.api_base_url.rstrip("/")
-                try:
-                    async with httpx.AsyncClient(timeout=10.0) as client:
-                        resp = await client.get(
-                            f"{base_url}/models",
-                            headers={"Authorization": f"Bearer {plain_key}"},
-                        )
-                    if resp.is_success:
-                        ai_msg.text = "✓ 连接成功"
-                        ai_msg.classes(add="text-green-600")
-                    else:
-                        ai_msg.text = f"连接失败（HTTP {resp.status_code}）"
-                        ai_msg.classes(add="text-red-500")
-                except httpx.TimeoutException:
+                if result.code == "ok":
+                    ai_msg.text = "✓ 连接成功"
+                    ai_msg.classes(add="text-green-600")
+                elif result.code == "http_error":
+                    ai_msg.text = f"连接失败（HTTP {result.http_status}）"
+                    ai_msg.classes(add="text-red-500")
+                elif result.code == "timeout":
                     ai_msg.text = "连接失败（请求超时）"
                     ai_msg.classes(add="text-red-500")
-                except Exception as exc:
-                    ai_msg.text = f"连接失败（{type(exc).__name__}）"
+                else:
+                    ai_msg.text = "连接失败（网络请求异常）"
                     ai_msg.classes(add="text-red-500")
 
             with ui.row().classes("mt-3 gap-3"):
@@ -416,34 +404,32 @@ async def settings_page() -> None:
                 vision_msg.text = "连接测试中……"
 
                 async with AsyncSessionLocal() as session:
-                    ai_vision_key = await get_active_ai_key(session, tenant_id, user_id, key_type="vision")
+                    result = await verify_saved_ai_connection(
+                        session,
+                        tenant_id=tenant_id,
+                        user_id=user_id,
+                        key_type="vision",
+                    )
 
-                if ai_vision_key is None:
+                if result.code == "not_configured":
                     vision_msg.text = "请先保存视觉模型配置"
                     vision_msg.classes(add="text-red-500")
                     return
-                try:
-                    plain_key = get_decrypted_key(ai_vision_key)
-                except CryptoError:
+                if result.code == "key_decryption_failed":
                     vision_msg.text = "Key 解密失败，请重新保存"
                     vision_msg.classes(add="text-red-500")
                     return
-
-                base_url = ai_vision_key.api_base_url.rstrip("/")
-                try:
-                    async with httpx.AsyncClient(timeout=10.0) as client:
-                        resp = await client.get(
-                            f"{base_url}/models",
-                            headers={"Authorization": f"Bearer {plain_key}"},
-                        )
-                    if resp.is_success:
-                        vision_msg.text = "✓ 视觉模型连接成功"
-                        vision_msg.classes(add="text-green-600")
-                    else:
-                        vision_msg.text = f"连接失败（HTTP {resp.status_code}）"
-                        vision_msg.classes(add="text-red-500")
-                except Exception as exc:
-                    vision_msg.text = f"连接失败（{type(exc).__name__}）"
+                if result.code == "ok":
+                    vision_msg.text = "✓ 视觉模型连接成功"
+                    vision_msg.classes(add="text-green-600")
+                elif result.code == "http_error":
+                    vision_msg.text = f"连接失败（HTTP {result.http_status}）"
+                    vision_msg.classes(add="text-red-500")
+                elif result.code == "timeout":
+                    vision_msg.text = "连接失败（请求超时）"
+                    vision_msg.classes(add="text-red-500")
+                else:
+                    vision_msg.text = "连接失败（网络请求异常）"
                     vision_msg.classes(add="text-red-500")
 
             with ui.row().classes("mt-3 gap-3"):

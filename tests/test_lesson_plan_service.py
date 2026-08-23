@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from app.core.exceptions import AiParseError, ConfigError
+from app.core.exceptions import ConfigError
 from app.service.lesson_plan_service import LessonPlanResult, process_lesson_plan
 
 
@@ -100,7 +100,6 @@ async def test_process_lesson_plan_success():
 
     mock_key_record, plain_key = _make_mock_ai_key()
     ai_client = _make_mock_ai_client(split_resp, adapt_resp)
-
     mock_session = AsyncMock()
 
     with (
@@ -224,18 +223,12 @@ async def test_process_lesson_plan_uses_db_prompt_when_available():
     adapt_resp = {"adapted_process": "适配后的活动过程内容。"}
 
     mock_key_record, plain_key = _make_mock_ai_key()
-    ai_client = _make_mock_ai_client(split_resp, adapt_resp)
 
     # 模拟 split 有自定义激活提示词，adapt 无自定义提示词
     mock_split_template = MagicMock()
     mock_split_template.content = "自定义拆分提示词内容"
 
     captured_prompts: dict = {}
-
-    original_split = __import__(
-        "app.integration.ai_client.lesson_plan_client",
-        fromlist=["split_lesson_plan"],
-    ).split_lesson_plan
 
     async def _mock_split(raw_text, api_base_url, api_key, model_name, system_prompt=None, *, _client=None):
         captured_prompts["split"] = system_prompt

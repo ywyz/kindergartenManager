@@ -1,6 +1,6 @@
 # 对外 REST API 参考（v1）
 
-本系统作为「幼儿园信息管理主系统」的子系统，对外提供**只读**的教学计划数据接口，供主系统实时读取。所有端点以 `/api/v1` 为前缀。
+本系统提供**只读**教学计划数据接口，供未来经授权的其他系统集成。它不依赖某个特定“主系统”拓扑；所有端点以 `/api/v1` 为前缀。
 
 - 基础 URL：`https://<host>/api/v1`
 - 数据格式：JSON（UTF-8）
@@ -212,4 +212,4 @@ API_SIGNING_SECRET=please-change-me
 API_SIGNATURE_MAX_SKEW=300
 ```
 
-> 生产环境建议同时启用 API Key 与 HMAC 签名，并在反向代理层（Nginx）对 `/api/` 限制来源 IP 与速率。
+> 生产环境建议同时启用 API Key 与 HMAC 签名，并在当前 Caddy（或实际采用的反向代理）上对 `/api/` 限制来源 IP 与速率。

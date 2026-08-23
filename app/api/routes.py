@@ -21,12 +21,12 @@ from app.api.schemas import (
     PageMeta,
     SemesterOut,
 )
-from app.repository.class_repository import list_class_configs
+from app.repository.class_repository import list_class_configs_for_tenant
 from app.repository.daily_plan_repository import (
-    get_daily_plan_by_id,
-    list_daily_plans,
+    get_daily_plan_by_id_for_tenant,
+    list_daily_plans_for_tenant,
 )
-from app.repository.semester_repository import list_semesters
+from app.repository.semester_repository import list_semesters_for_tenant
 
 router = APIRouter(prefix="/api/v1", tags=["v1"])
 
@@ -52,7 +52,7 @@ async def query_daily_plans(
     limit: int = Query(50, ge=1, le=200, description="每页条数（1~200）"),
     offset: int = Query(0, ge=0, description="偏移量"),
 ) -> DailyPlanListOut:
-    records, total = await list_daily_plans(
+    records, total = await list_daily_plans_for_tenant(
         session,
         principal.tenant_id,
         user_id=user_id,
@@ -79,7 +79,7 @@ async def get_daily_plan(
     principal: ApiPrincipal = Depends(get_api_principal),
     session=Depends(get_db),
 ) -> DailyPlanOut:
-    plan = await get_daily_plan_by_id(session, principal.tenant_id, plan_id)
+    plan = await get_daily_plan_by_id_for_tenant(session, principal.tenant_id, plan_id)
     if plan is None:
         raise HTTPException(
             status_code=http_status.HTTP_404_NOT_FOUND,
@@ -99,7 +99,7 @@ async def query_semesters(
     user_id: int | None = Query(None, description="按用户过滤"),
     active_only: bool = Query(False, description="仅返回当前激活学期"),
 ) -> list[SemesterOut]:
-    records = await list_semesters(
+    records = await list_semesters_for_tenant(
         session,
         principal.tenant_id,
         user_id=user_id,
@@ -118,7 +118,7 @@ async def query_classes(
     session=Depends(get_db),
     user_id: int | None = Query(None, description="按用户过滤"),
 ) -> list[ClassConfigOut]:
-    records = await list_class_configs(
+    records = await list_class_configs_for_tenant(
         session,
         principal.tenant_id,
         user_id=user_id,

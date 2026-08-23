@@ -10,12 +10,12 @@
 """
 from __future__ import annotations
 
-from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import log_audit
 from app.core.exceptions import ConfigError
+from app.core.unit_of_work import AsyncSessionUnitOfWork
 from app.integration.ai_client.observation_client import generate_observation
 from app.integration.image_processing import CompressedImage, compress_image
 from app.integration.image_storage.base import ImageStorageBackend
@@ -126,25 +126,26 @@ async def save_observation_with_images(
     Returns:
         新建的 game_observation.id。
     """
-    obs = await save_observation(session, **obs_data)
+    async with AsyncSessionUnitOfWork(session):
+        obs = await save_observation(session, **obs_data)
 
-    tenant_id: int = obs_data["tenant_id"]
-    user_id: int = obs_data["user_id"]
+        tenant_id: int = obs_data["tenant_id"]
+        user_id: int = obs_data["user_id"]
 
-    for idx, ci in enumerate(compressed_images, start=1):
-        stored_ref = storage.put(ci.data, mime_type=ci.mime_type)
-        await add_image(
-            session,
-            tenant_id=tenant_id,
-            user_id=user_id,
-            observation_id=obs.id,
-            image_index=idx,
-            storage_backend=stored_ref.get("storage_backend", "mysql_blob"),
-            blob_content=stored_ref.get("blob_content"),
-            mime_type=stored_ref.get("mime_type", ci.mime_type),
-            file_size=ci.file_size,
-            width=ci.width,
-            height=ci.height,
-        )
+        for idx, ci in enumerate(compressed_images, start=1):
+            stored_ref = storage.put(ci.data, mime_type=ci.mime_type)
+            await add_image(
+                session,
+                tenant_id=tenant_id,
+                user_id=user_id,
+                observation_id=obs.id,
+                image_index=idx,
+                storage_backend=stored_ref.get("storage_backend", "mysql_blob"),
+                blob_content=stored_ref.get("blob_content"),
+                mime_type=stored_ref.get("mime_type", ci.mime_type),
+                file_size=ci.file_size,
+                width=ci.width,
+                height=ci.height,
+            )
 
     return obs.id

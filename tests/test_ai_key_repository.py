@@ -11,7 +11,6 @@
 5. 不同 tenant_id 下互不可见（租户隔离）。
 """
 
-import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repository.ai_key_repository import (

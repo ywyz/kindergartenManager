@@ -1,5 +1,7 @@
 # 课程审议记录子系统 — 设计文档
 
+> **历史快照**：本文记录对应开发阶段的设计，不代表当前检出代码、迁移或测试状态。当前事实以 [`../../CONTEXT.md`](../../CONTEXT.md)、[`../../docs/ROADMAP.md`](../../docs/ROADMAP.md) 和当前代码/测试为准。
+
 > 配套：[dev-plan.md](dev-plan.md)、[test-plan.md](test-plan.md)、[progress.md](progress.md)。
 
 ## 1. 目标与范围

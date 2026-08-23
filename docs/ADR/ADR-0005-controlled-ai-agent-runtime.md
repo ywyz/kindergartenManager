@@ -114,7 +114,7 @@ Runtime 将 DRAFT 输出重新构造成规范、确定有序的 `PlanPatch`，�
 - 自动采用 DRAFT、启动时授权或“本次会话始终允许”。
 - 持久化完整对话、向量记忆、教师画像或供应商托管 thread。
 - 多 Agent、隐藏 Planner/Executor/Critic 或无人值守工作流。
-- 在 Agent Foundation 中顺带恢复登录、合并 `dev3.4`、修改 Word 或拆分微服务。
+- 在 Agent Foundation 中顺带恢复登录、合并未经审查的历史分支、修改 Word 或拆分微服务。
 
 ## 复审条件
 

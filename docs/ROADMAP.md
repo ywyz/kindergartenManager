@@ -1,6 +1,6 @@
 # KindergartenManager 产品与工程路线图
 
-> 当前快照：2026-08-22，基线 `main@225fe139`。
+> 当前快照：2026-08-23；审查基线 `dev4.0@0657c3a`；最近产品主线 `main@225fe139`。
 
 ## 1. 状态语义
 
@@ -42,35 +42,45 @@ R0 事实基线与图谱
 
 ## 4. R0：事实基线与图谱
 
-状态：`自动验证`（文档和图谱在当前任务中生成，尚未提交/发布）。
+状态：`自动验证`（2026-08-23 本地审查完成；尚未提交/发布，也未执行平台人工验收）。
 
 范围：
 
-- 删除废弃的 dev4.0 及之后远端版本分支。
+- 区分当前维护审查分支与最近产品主线，不把分支状态或未提交改动混写为已发布事实。
 - 建立 `CONTEXT.md`、Roadmap、ADR、架构、数据模型和威胁模型。
 - 纠正单用户、多用户、微服务、迁移 head 和测试数字的漂移。
 - 建立 codebase-memory 与 Graphify 图谱并验证健康。
 
+本地证据（工作树，基于 `dev4.0@0657c3a` 起点）：
+
+- Ruff：`app`/`tests` 0 错误；全量 pytest `535 passed`。
+- 依赖与迁移：Python 3.14.7，83 个已安装包兼容；全新 SQLite 升级到 `a6c4d8e2f9b1`。
+- Graphify：OpenAI-compatible 完成代码/文档提取；其社区命名返回不可解析空 JSON 后，按固定顺序由 DeepSeek 完成命名。本轮非生成变更源全部覆盖，多重边诊断无缺失/悬空端点、自环或重复边；易随文档变化的节点计数不固化在路线图中。
+- codebase-memory：full index 已完成，共享压缩图已写入 `.codebase-memory/graph.db.zst`；易随生成报告变化的节点计数只记录在当次审查报告中。
+
 出口门禁：
 
 - 文档链接与事实检查通过。
-- codebase-memory 可查询当前 `main`。
+- codebase-memory 可查询当前审查基线。
 - Graphify 来源覆盖、端点和完整性诊断可回读。
 - 工作树改动清单明确，不夹带业务实现。
 
 ## 5. R1：质量、迁移与安全基线
 
-状态：`规划`。
+状态：`自动验证`（2026-08-23 本地门禁通过；远端 push/PR CI 待固定 SHA 回读）。
 
 目标：把“历史上能运行”提升为“当前 SHA 可重复验证”。
 
 范围：
 
 - 建立锁定或可审计的开发依赖安装方式。
-- 新增常规 push/PR 质量 CI，而不仅是 tag 发布工作流。
-- 在全新 SQLite 上执行 `alembic upgrade head`，运行全量 pytest。
-- 评审启动迁移 fail-open 行为，确定桌面与服务器模式的失败策略。
-- 清理或隔离未注册的登录/RBAC 页面和单用户残留 UI。
+- 已新增常规 push/PR 质量 CI，执行依赖检查、Ruff、全新 SQLite Alembic 迁移和全量 pytest；远端结果必须按 `headSha` 回读。
+- 本地全新 SQLite 已升级到 `a6c4d8e2f9b1`，全量 pytest `548 passed`。
+- 聚合失败注入 RED 已证明部分提交风险；一对一倾听和游戏观察现由 service/use-case 持有事务，内部 repository `flush()`、最外层 commit/rollback。
+- API tenant 投影与 UI tenant + user 投影已显式命名，跨 tenant/user 负向测试覆盖列表、详情和子表。
+- 设置页 AI `/models` HTTP 已移至 integration adapter，由 settings service 编排；大型页面的其余用例继续渐进抽离。
+- 启动迁移已决策为桌面、开发、服务器统一 fail-closed；迁移失败中止启动，不提供 fail-open 开关。
+- 隔离未注册的登录/RBAC 预备代码和单用户产品入口（当前 UI 仍为单用户；多用户优先级低）。
 - 修复 Compose 默认凭据和健康检查对环境变量不一致的问题。
 - 建立日志、导出、图片和数据库备份/恢复说明。
 
@@ -82,7 +92,7 @@ R0 事实基线与图谱
 
 按风险和未闭环程度建议顺序：
 
-1. 一对一倾听完整 P8/P8d 人工验收。
+1. 一对一倾听完整 P8/P8d 人工验收（在聚合事务修复后）。
 2. 每日活动计划在当前单用户模式下重跑主流程与 Word。
 3. 游戏观察图片/视觉 AI/历史/Word 复验。
 4. 自制教玩具与课程审议当前 SHA 回归。
@@ -92,7 +102,7 @@ R0 事实基线与图谱
 
 ## 7. R3：Agent Foundation 规格与分支决策
 
-状态：`设计中`。
+状态：`设计中`（R1 本地基础已具备；等待本轮固定分支/spec/Issue/稳定 RED）。
 
 已确认：[ADR-0005](ADR/ADR-0005-controlled-ai-agent-runtime.md) 和
 [Agent Runtime 设计](design/agent-runtime.md) 已经固定首期上限，即每日活动计划的单 Agent、
@@ -100,12 +110,11 @@ R0 事实基线与图谱
 
 开始前必须回答：
 
-- 新工作以 `main` 还是经审查后的 `origin/dev3.4` 为基线？
-- `dev3.4` 的 6 个未合并提交哪些保留、重写或放弃？
+- Agent 功能工作使用哪个经审查且固定的分支/SHA？当前维护审查分支不自动成为功能实现授权。
 - Agent Foundation 的 spec/Issue、任务顺序、稳定 RED 和停止边界是什么？
-- 是否继续单用户，还是正式恢复认证/多用户？两者不能隐式混合。
+- 当前继续单用户；NiceGUI 多用户/RBAC 代码仅作为低优先级预备资产，不进入 Foundation 范围。
 - 是否仍保持模块化单体？服务拆分必须有独立 ADR 和运营理由。
-- 每日计划、班级设置和日历的窄 Service 投影如何建立，使 Agent Tool 不直接调用 Repository？
+- 聚合事务和 tenant/user 投影修复后，每日计划、班级设置和日历的窄 Service 投影如何建立，使 Agent Tool 不直接调用 Repository？
 
 出口门禁：固定 spec、任务顺序、分支、Issue 和第一组稳定 RED。
 

@@ -9,7 +9,6 @@
 """
 import os
 
-import pytest
 
 
 def _make_settings(**env_overrides):
@@ -46,7 +45,6 @@ def _make_settings(**env_overrides):
 
 def test_settings_instantiates_with_no_config(tmp_path, monkeypatch):
     """无任何配置时，Settings() 应成功实例化（修复必填字段导致的启动崩溃）。"""
-    from app.core.config import _secrets_file_path
     monkeypatch.setattr("app.core.config._secrets_file_path", lambda: tmp_path / ".kindergarten_secrets")
 
     s = _make_settings()
@@ -153,8 +151,7 @@ def test_bootstrap_admin_allow_remote_default():
 def test_database_url_default_is_empty():
     """DATABASE_URL 默认空字符串（交由 database.py 降级为 SQLite）。"""
     # 这里读取全局 settings，它由项目 .env 或环境变量决定
-    from app.core.config import Settings, SettingsConfigDict
-    from pydantic_settings import SettingsConfigDict as PydanticSettingsConfigDict
+    from app.core.config import Settings
 
     # 只验证默认值，不依赖 .env
     assert Settings.model_fields["DATABASE_URL"].default == ""

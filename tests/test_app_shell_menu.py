@@ -2,7 +2,6 @@
 
 测试策略：将菜单项生成和显示名逻辑抽为纯函数，脱离 NiceGUI 渲染独立测试。
 """
-import pytest
 
 from app.ui.components.app_shell import get_display_name, get_menu_items
 

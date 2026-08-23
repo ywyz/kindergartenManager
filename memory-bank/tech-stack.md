@@ -94,7 +94,7 @@ tests/
 - NiceGUI 单体应用，教学管理核心闭环。
 - 默认 SQLite，可选 MySQL。单用户模式。
 
-### 阶段 2（当前）— Docker Compose AIO + 子系统拆分
+### 阶段 2（历史规划）— Docker Compose AIO + 子系统拆分
 - Docker Compose 编排：主系统 + Caddy + 可选 MySQL。
 - 渐进式拆分 `app/integration/` 为独立 FastAPI 子系统容器。
 - 子系统顺序：holiday-service → ai-service → word-service。
@@ -112,4 +112,4 @@ tests/
 - 消息队列/事件总线：当前收益不足。
 
 ## 一句话建议
-Docker Compose AIO 编排 Python 微服务（NiceGUI 主系统 + FastAPI 子系统 + Caddy），Monorepo 渐进式拆分，是当前阶段最优路线。
+历史上曾规划 Docker Compose AIO 编排 Python 微服务（NiceGUI 主系统 + FastAPI 子系统 + Caddy）并渐进式拆分；当前实际基线仍是模块化单体，是否拆分须由独立 ADR 和运维需求决定。

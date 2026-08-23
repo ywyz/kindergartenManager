@@ -88,7 +88,7 @@ async def get_daily_plan_by_date(
     return result.scalar_one_or_none()
 
 
-async def get_daily_plan_by_id(
+async def get_daily_plan_by_id_for_tenant(
     session: AsyncSession,
     tenant_id: int,
     plan_id: int,
@@ -102,7 +102,7 @@ async def get_daily_plan_by_id(
     return result.scalar_one_or_none()
 
 
-async def list_daily_plans(
+async def _list_daily_plans(
     session: AsyncSession,
     tenant_id: int,
     *,
@@ -143,6 +143,58 @@ async def list_daily_plans(
     )
     records = list((await session.execute(list_stmt)).scalars().all())
     return records, total
+
+
+async def list_daily_plans_for_tenant(
+    session: AsyncSession,
+    tenant_id: int,
+    *,
+    user_id: int | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    grade: str | None = None,
+    class_name: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[DailyPlan], int]:
+    """API tenant 投影；可在当前 tenant 内按 user_id 进一步筛选。"""
+    return await _list_daily_plans(
+        session,
+        tenant_id,
+        user_id=user_id,
+        start_date=start_date,
+        end_date=end_date,
+        grade=grade,
+        class_name=class_name,
+        limit=limit,
+        offset=offset,
+    )
+
+
+async def list_daily_plans_for_user(
+    session: AsyncSession,
+    tenant_id: int,
+    user_id: int,
+    *,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    grade: str | None = None,
+    class_name: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[DailyPlan], int]:
+    """UI tenant + user 投影；user_id 是不可省略的作用域。"""
+    return await _list_daily_plans(
+        session,
+        tenant_id,
+        user_id=user_id,
+        start_date=start_date,
+        end_date=end_date,
+        grade=grade,
+        class_name=class_name,
+        limit=limit,
+        offset=offset,
+    )
 
 
 async def delete_daily_plan(

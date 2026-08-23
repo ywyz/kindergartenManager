@@ -5,7 +5,7 @@
 
 ## 背景
 
-代码保留 JWT、密码、RBAC 和账号页面，但当前根路由直达 `/home`，中间件不鉴权，页面使用固定 tenant/user。与此同时 `/api/v1` 使用映射到 tenant 的 API Key。
+代码保留 JWT、密码、RBAC、账号页面和认证中间件，但当前根路由直达 `/home`，`app/main.py` 不注册账号页面或挂载认证中间件，页面使用固定 tenant/user。与此同时 `/api/v1` 使用映射到 tenant 的 API Key。
 
 ## 决策
 

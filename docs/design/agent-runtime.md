@@ -274,10 +274,10 @@ revision；当前不得预留空表或猜测迁移编号。
 
 ## 12. 实现前置门禁
 
-1. 确认以 `main` 还是审查后的 `dev3.4` 为实现基线。
-2. 当前 SHA 安装依赖、迁移和全量测试可重复；常规质量 CI 已建立或明确豁免。
+1. 为功能实现确认固定分支和 SHA；当前维护审查分支不自动构成 GREEN 授权。
+2. 先修复聚合事务的部分提交风险与 tenant/user 投影边界；当前 SHA 的依赖、迁移和全量测试可重复，常规质量 CI 已建立或明确豁免。
 3. 对 Agent 页面采用回环/可信网络限制；Agent 不被当作恢复 UI 认证的替代品。
-4. 为每日计划、班级和日历补只读 Service 投影，Agent Tool 不直接调用 Repository。
+4. 为每日计划、班级和日历补只读 Service 投影，Agent Tool 不直接调用 Repository；投影明确区分 API tenant 与 UI tenant + user 语义。
 5. 冻结 spec、Issue、任务顺序、RED 文件和停止边界；设计完成不自动授权 GREEN。
 6. Graphify/codebase-memory 更新只证明覆盖，不替代测试、Review 和人工验收。
 

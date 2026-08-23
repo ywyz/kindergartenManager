@@ -57,12 +57,14 @@ python-multipart 的实际版本。如修改了图片链，另跑 `tests/test_im
 
 ## 5. 2026-08-23 本地验证记录
 
+- 基线：`dev4.0@0657c3a`（本地维护审查起点；结果不代表 `main` 已发布）。
 - 环境：Python 3.14.7、uv 0.12.5。
-- 安装：共解析 79 个包，`uv pip check` 报告无依赖冲突。
+- 安装：当前环境 `uv pip check --python .venv/bin/python` 检查 83 个包，报告无依赖冲突；此前本分支依赖升级解析记录为 79 个包。
 - 关键实际版本：NiceGUI 3.16.0、FastAPI 0.141.1、Starlette 1.6.0、
   cryptography 50.0.0、aiohttp 3.14.3、python-socketio 5.16.4、
   python-engineio 4.13.5、python-multipart 0.0.32。
-- 自动回归：包含依赖安全下限和 Python 运行时一致性测试的全量 pytest `533 passed`。
+- 自动回归：清理后包含依赖安全下限和 Python 运行时一致性测试的全量 pytest `535 passed`。
+- 迁移：全新 SQLite 数据库从空库升级到 `a6c4d8e2f9b1 (head)` 成功。
 - Linux PyInstaller 冒烟：PyInstaller 6.22.2 在 Python 3.14.7 下成功生成 onedir 产物。
 - Docker Hub 已确认 `python:3.14.7-slim` 标签可用；本机 Docker daemon 不可访问，未把标签检查写成完整镜像构建通过。
 - `pip-audit` 对实际安装环境报告一个不在当前 Dependabot 列表中的残余风险：

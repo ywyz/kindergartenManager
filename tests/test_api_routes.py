@@ -65,9 +65,20 @@ async def _seed(session):
         )
     )
     session.add(
+        SemesterConfig(
+            tenant_id=OTHER_TENANT, user_id=99, semester_name="其它租户学期",
+            start_date=date(2026, 2, 23), end_date=date(2026, 7, 1), is_active=True,
+        )
+    )
+    session.add(
         ClassConfig(
             tenant_id=TENANT, user_id=11, grade="小班", class_name="阳光班",
             indoor_areas="积木区", outdoor_content="攀爬",
+        )
+    )
+    session.add(
+        ClassConfig(
+            tenant_id=OTHER_TENANT, user_id=99, grade="大班", class_name="其它租户班级",
         )
     )
     await session.flush()
@@ -107,6 +118,15 @@ class TestDailyPlans:
         assert body["meta"]["total"] == 2
         tenants = {item["tenant_id"] for item in body["items"]}
         assert tenants == {TENANT}
+
+    async def test_tenant_projection_includes_multiple_users(self, api_client, async_session):
+        """API Key 代表 tenant；不传 user 过滤时可读本 tenant 内多个教师。"""
+        await _seed(async_session)
+        resp = await api_client.get(
+            "/api/v1/daily-plans", headers={"X-Api-Key": API_KEY}
+        )
+
+        assert {item["user_id"] for item in resp.json()["items"]} == {11, 12}
 
     async def test_filter_by_grade(self, api_client, async_session):
         await _seed(async_session)
@@ -186,6 +206,7 @@ class TestConfigEndpoints:
         data = resp.json()
         assert len(data) == 1
         assert data[0]["semester_name"] == "2026春季"
+        assert {item["tenant_id"] for item in data} == {TENANT}
 
     async def test_classes(self, api_client, async_session):
         await _seed(async_session)
@@ -196,6 +217,7 @@ class TestConfigEndpoints:
         data = resp.json()
         assert len(data) == 1
         assert data[0]["class_name"] == "阳光班"
+        assert {item["tenant_id"] for item in data} == {TENANT}
 
 
 class TestSignature:

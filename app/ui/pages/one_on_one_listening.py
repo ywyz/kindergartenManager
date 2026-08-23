@@ -25,6 +25,7 @@ from app.core.audit import log_audit
 from app.core.database import AsyncSessionLocal
 from app.core.exceptions import AiCallError, AiParseError, AppError, ConfigError
 from app.core.logging import get_logger
+from app.core.unit_of_work import AsyncSessionUnitOfWork
 from app.core.user_context import get_current_user
 from app.integration.holiday_client.client import get_legal_holidays_in_year
 from app.integration.image_processing import (
@@ -32,7 +33,7 @@ from app.integration.image_processing import (
     compress_image,
     normalize_to_landscape,
 )
-from app.integration.image_storage.blob_backend import BlobImageStorage
+from app.integration.image_storage import get_storage_backend
 from app.integration.word_export.listening_exporter import (
     export_batch_by_domain,
     export_combined,
@@ -43,7 +44,6 @@ from app.repository.export_repository import save_export_record
 from app.repository.indicator_repository import list_available_stages, list_indicators
 from app.repository.listening_image_repository import (
     delete_images_by_record,
-    list_images_by_record,
 )
 from app.repository.listening_repository import (
     delete_domains_by_record,
@@ -61,6 +61,7 @@ from app.service.listening_service import (
     update_record_with_all,
 )
 from app.ui.components.app_shell import get_display_name, render_shell
+from app.ui.helpers import validate_image_count
 
 logger = get_logger(__name__)
 
@@ -81,11 +82,6 @@ def default_year_month(today: date | None = None) -> tuple[int, int]:
     """返回默认观察年月（当前年月）。"""
     d = today or date.today()
     return d.year, d.month
-
-
-def validate_image_count(count: int) -> bool:
-    """校验单领域图片数量是否在 1~3。"""
-    return 1 <= count <= 3
 
 
 def format_stage_label(grade: str, term: str) -> str:
@@ -642,13 +638,13 @@ async def one_on_one_listening_page() -> None:
                     rid = await update_record_with_all(
                         session, record_id=edit_state["record_id"],
                         record_data=record_full, domains=domains,
-                        storage=BlobImageStorage(),
+                        storage=get_storage_backend(),
                     )
                     show_info(f"覆盖保存成功（记录 ID：{rid}）", ok=True)
                 else:
                     rid = await save_record_with_all(
                         session, record_data=record_full, domains=domains,
-                        storage=BlobImageStorage(),
+                        storage=get_storage_backend(),
                     )
                     show_info(f"保存成功（记录 ID：{rid}）", ok=True)
             await refresh_history()
@@ -749,7 +745,7 @@ async def one_on_one_listening_page() -> None:
 
     async def do_load_for_edit(rid: int) -> None:
         async with AsyncSessionLocal() as session:
-            detail = await load_record_detail(session, tenant_id, rid)
+            detail = await load_record_detail(session, tenant_id, user_id, rid)
         if not detail:
             show_error("记录不存在")
             return
@@ -824,7 +820,7 @@ async def one_on_one_listening_page() -> None:
 
     async def _show_detail(rid: int) -> None:
         async with AsyncSessionLocal() as session:
-            detail = await load_record_detail(session, tenant_id, rid)
+            detail = await load_record_detail(session, tenant_id, user_id, rid)
         if not detail:
             show_error("记录不存在")
             return
@@ -865,7 +861,7 @@ async def one_on_one_listening_page() -> None:
     async def _reexport_combined(rid: int, child_name: str, year: int, month: int) -> None:
         try:
             async with AsyncSessionLocal() as session:
-                detail = await load_record_detail(session, tenant_id, rid)
+                detail = await load_record_detail(session, tenant_id, user_id, rid)
                 if not detail:
                     show_error("记录不存在")
                     return
@@ -890,7 +886,7 @@ async def one_on_one_listening_page() -> None:
     async def _reexport_split(rid: int, child_name: str, year: int, month: int) -> None:
         try:
             async with AsyncSessionLocal() as session:
-                detail = await load_record_detail(session, tenant_id, rid)
+                detail = await load_record_detail(session, tenant_id, user_id, rid)
                 if not detail:
                     show_error("记录不存在")
                     return
@@ -926,10 +922,13 @@ async def one_on_one_listening_page() -> None:
         if await dlg == "yes":
             try:
                 async with AsyncSessionLocal() as session:
-                    await delete_images_by_record(session, tenant_id, rid)
-                    await delete_indicator_results_by_record(session, tenant_id, rid)
-                    await delete_domains_by_record(session, tenant_id, rid)
-                    await delete_record(session, tenant_id, user_id, rid)
+                    async with AsyncSessionUnitOfWork(session):
+                        await delete_images_by_record(session, tenant_id, user_id, rid)
+                        await delete_indicator_results_by_record(
+                            session, tenant_id, user_id, rid
+                        )
+                        await delete_domains_by_record(session, tenant_id, user_id, rid)
+                        await delete_record(session, tenant_id, user_id, rid)
                 show_info("已删除", ok=True)
                 await refresh_history()
             except Exception as ex:  # noqa: BLE001
@@ -1006,7 +1005,7 @@ async def one_on_one_listening_page() -> None:
             children = []
             async with AsyncSessionLocal() as session:
                 for rid in ids:
-                    detail = await load_record_detail(session, tenant_id, rid)
+                    detail = await load_record_detail(session, tenant_id, user_id, rid)
                     if detail:
                         children.append(to_export_payload(detail))
             if not children:

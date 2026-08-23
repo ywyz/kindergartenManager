@@ -23,6 +23,23 @@ from app.service.observation_service import (
 _FAKE_IMAGE = b"\xff\xd8\xff\xe0" + b"\x00" * 200  # 简单 JPEG 字节前缀
 
 
+class _FailOnSecondPutStorage:
+    """在第二张图片写入前失败，模拟聚合中途的存储故障。"""
+
+    def __init__(self) -> None:
+        self._put_count = 0
+
+    def put(self, data: bytes, *, mime_type: str) -> dict:
+        self._put_count += 1
+        if self._put_count == 2:
+            raise RuntimeError("injected image storage failure")
+        return {
+            "storage_backend": "mysql_blob",
+            "blob_content": data,
+            "mime_type": mime_type,
+        }
+
+
 # ---------------------------------------------------------------------------
 # 1. 未配置视觉 Key → ConfigError
 # ---------------------------------------------------------------------------
@@ -216,14 +233,47 @@ async def test_save_observation_with_images(async_session):
     )
 
     # 取回记录
-    obs = await get_observation_by_id(async_session, tenant_id=1, observation_id=obs_id)
+    obs = await get_observation_by_id(
+        async_session, tenant_id=1, user_id=1, observation_id=obs_id
+    )
     assert obs is not None
     assert obs.observation_goal == "测试目标"
     assert obs.big_env == "户外"
 
     # 取回图片（有序）
-    images = await list_images_by_observation(async_session, observation_id=obs_id, tenant_id=1)
+    images = await list_images_by_observation(
+        async_session, observation_id=obs_id, tenant_id=1, user_id=1
+    )
     assert len(images) == 2
     assert images[0].blob_content == b"img1_data"
     assert images[1].blob_content == b"img2_data"
     assert images[0].image_index < images[1].image_index
+
+
+async def test_save_observation_with_images_rolls_back_on_mid_aggregate_failure(
+    async_session,
+):
+    """图片存储中途失败时，观察主记录和图片都不得残留。"""
+    from app.integration.image_processing import CompressedImage
+    from app.repository.observation_repository import list_observations
+
+    obs_data = {
+        "tenant_id": 1,
+        "user_id": 1,
+        "obs_date": date(2026, 6, 10),
+        "child_names": "原子性测试",
+    }
+    compressed_images = [
+        CompressedImage(data=b"img1", mime_type="image/jpeg", width=10, height=10),
+        CompressedImage(data=b"img2", mime_type="image/jpeg", width=10, height=10),
+    ]
+
+    with pytest.raises(RuntimeError, match="injected image storage failure"):
+        await save_observation_with_images(
+            session=async_session,
+            obs_data=obs_data,
+            compressed_images=compressed_images,
+            storage=_FailOnSecondPutStorage(),
+        )
+
+    assert await list_observations(async_session, tenant_id=1, user_id=1) == []

@@ -1,6 +1,6 @@
 # 幼儿园教学管理系统 — 分步实施计划
 
-> **历史计划说明（2026-08-22）**：本文记录旧阶段的实施顺序，其中账号恢复和微服务拆分并未进入当前 `main`。当前里程碑、门禁和下一步以 [`../docs/ROADMAP.md`](../docs/ROADMAP.md) 与 [`../CONTEXT.md`](../CONTEXT.md) 为准。
+> **历史计划说明（2026-08-23）**：本文记录旧阶段的实施顺序，其中账号恢复和微服务拆分未进入当前产品基线。当前里程碑、门禁和下一步以 [`../docs/ROADMAP.md`](../docs/ROADMAP.md) 与 [`../CONTEXT.md`](../CONTEXT.md) 为准。
 
 > **阅读规则**
 > - 每步必须完整完成并通过验证后再进行下一步。
@@ -107,7 +107,7 @@
 在 `app/core/database.py` 中：
 - 使用 `sqlalchemy.ext.asyncio` 创建 `AsyncEngine` 和 `AsyncSessionLocal`。
 - 定义 `Base`（`DeclarativeBase`）供所有模型继承。
-- 提供 `get_async_session()` 异步生成器，用于依赖注入。
+- 当时提供 `get_async_session()` 异步生成器；当前该重复入口已移除，API 使用 `app/api/deps.py::get_db`。
 - 连接串从 `Settings.DATABASE_URL` 读取。
 
 初始化 Alembic：运行 `alembic init alembic`，修改 `alembic/env.py`，使其读取 `Settings.DATABASE_URL` 并导入 `Base.metadata`。

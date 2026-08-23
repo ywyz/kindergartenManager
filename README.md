@@ -2,6 +2,8 @@
 
 KindergartenManager 是一个 Python 3.14.7 / NiceGUI 教学管理应用。当前主线是模块化单体：默认使用本地 SQLite，也可连接 MySQL；支持文本/视觉 AI、固定 Word 模板导出，以及按租户隔离的只读 REST API。
 
+> 仓库状态：当前维护审查基线为 `dev4.0@0657c3a`，最近产品主线为 `main@225fe139`；未提交的审查改动不等于主线发布。
+
 > 当前身份边界：UI 为固定身份的单用户模式，没有有效登录保护。PyInstaller 模式只监听本机；源码或 Docker 模式若暴露到网络，必须先增加可信网络边界或恢复认证。
 
 ## 当前能力
@@ -12,7 +14,7 @@ KindergartenManager 是一个 Python 3.14.7 / NiceGUI 教学管理应用。当�
 - 自制教玩具：AI 生成、编辑、保存、历史和 Word 导出。
 - 课程审议：教案拆分、审议调整、修订稿、历史、删除和 Word 导出。
 - 配置中心：学期、班级、教师、文本/视觉 AI Key、提示词版本。
-- 只读 API：`/api/v1`，API Key 必填，HMAC 可选，业务查询强制 `tenant_id`。
+- 只读 API：`/api/v1`，用于未来与其他系统集成；API Key 必填，HMAC 可选，业务查询强制 `tenant_id`。
 
 当前并未完成微服务拆分；`services/` 只是未来规划。实际运行单元为一个 NiceGUI 应用进程，外加可选 Caddy/MySQL。
 
@@ -42,7 +44,7 @@ python3.14 -m venv .venv
 4. 创建固定的默认管理员记录。
 5. 直接进入 `/home`。
 
-建议先打开 `/settings` 配置学期、班级和教师，再打开 `/setup` 配置 AI 接口。
+统一在 `/settings` 配置学期、班级、教师和 AI 接口。旧 `/setup` 只保留为跳转到 `/settings` 的兼容入口。
 
 当前 Web 框架安全基线为 NiceGUI 3.16.0 + FastAPI 0.141.1 + Starlette 1.6.0。
 其他 Dependabot 相关 Python 依赖下限、官方来源和验证方法见
@@ -144,4 +146,4 @@ NiceGUI UI / FastAPI-style API
 
 ## 当前开发门禁
 
-`origin/dev3.4` 保留了 6 个尚未进入 `main` 的提交。开始 Agent 实现前，需先确认以 `main` 还是经审查后的 `dev3.4` 为基线，并为 READ/DRAFT Agent Foundation 建立 spec/Issue/稳定 RED；不要把 ADR、设计文档或保留分支自动视为主线已交付。
+聚合保存的首批原子性修复、tenant/user 投影区分、设置页 AI adapter、启动迁移 fail-closed 和常规质量 CI 已通过本地自动验证。大型页面用例仍需渐进抽离；READ/DRAFT Agent Foundation 必须在独立分支固定 spec/Issue/稳定 RED 后才能开始 GREEN，不能把 ADR、设计文档或保留分支自动视为主线已交付。

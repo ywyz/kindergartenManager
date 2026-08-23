@@ -1,6 +1,6 @@
 # KindergartenManager 数据模型
 
-> 基线：`main@225fe139`；Alembic head：`a6c4d8e2f9b1`。
+> 审查基线：`dev4.0@0657c3a`；最近产品主线：`main@225fe139`；Alembic head：`a6c4d8e2f9b1`。
 
 ## 1. 建模原则
 
@@ -139,7 +139,7 @@ tenant
 `listening_indicator_result` 记录 `record_id`、领域、`catalog_id` 和 1–3 星。
 `indicator_catalog.sort_order` 与 Word 模板行序绑定，不能随意重排。
 
-保存、覆盖和删除必须把主记录、领域、图片、指标作为一个业务聚合处理。
+保存、覆盖和删除必须把主记录、领域、图片、指标作为一个业务聚合处理。一对一倾听和游戏观察的聚合 service/use-case 现由 Unit of Work 持有事务，内部 repository 仅 `flush()`；失败注入测试验证中途失败时新建全回滚、覆盖保留旧聚合。新增聚合路径必须沿用同一边界，不能在内部 repository 提交。
 
 ## 9. 自制教玩具与课程审议
 

@@ -9,7 +9,7 @@
 3. `docs/ROADMAP.md`
 4. 相关 ADR、设计、测试计划和代码
 
-当前 `main` 是单用户 NiceGUI 模块化单体，不是已完成的多用户系统或微服务系统。
+当前检出的维护审查基线是 `dev4.0@0657c3a`，最近产品主线是 `main@225fe139`。产品仍是单用户 NiceGUI 模块化单体，不是已完成的多用户系统或微服务系统。
 
 ## 2. 环境
 
@@ -70,7 +70,7 @@ UI 固定使用：
 {"sub": "1", "tenant_id": 1, "role": "sys_admin", "username": "admin"}
 ```
 
-`sub` 在页面中转换为 `user_id`。JWT、密码和 RBAC 代码仍保留，但当前根路由和中间件不执行登录鉴权。
+`sub` 在页面中转换为 `user_id`。JWT、密码、RBAC 页面和中间件仍作为低优先级多用户预备资产保留，但当前 `app/main.py` 不注册相关页面或挂载认证中间件。
 
 API 身份独立：`X-Api-Key` 映射到 tenant；配置 `API_SIGNING_SECRET` 后要求 `X-Timestamp` + `X-Signature`。
 
@@ -99,7 +99,7 @@ API 身份独立：`X-Api-Key` 映射到 tenant；配置 `API_SIGNING_SECRET` �
 - 只验证 SQLite 就宣称 MySQL enum/BLOB/ALTER 通过。
 - 在日志中输出含凭据的完整数据库 URL。
 
-所有业务查询必须执行 tenant 隔离；user-owned 数据还应验证 user。逻辑外键的聚合删除要在 service/repository 中显式完成并测试回滚。
+所有业务查询必须执行 tenant 隔离；user-owned 数据还应验证 user。API tenant 投影与 UI tenant + user 投影要使用不同的窄查询入口。逻辑外键聚合写入/删除必须由 service/use-case 持有事务；repository 内部不得提前 commit，并要用失败注入测试证明回滚。
 
 ## 6. AI 集成
 

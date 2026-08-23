@@ -26,7 +26,9 @@ async def test_add_and_list_images_ordered(async_session):
             file_size=len(sample),
         )
 
-    images = await list_images_by_observation(async_session, tenant_id=1, observation_id=100)
+    images = await list_images_by_observation(
+        async_session, tenant_id=1, user_id=1, observation_id=100
+    )
     assert len(images) == 3
     assert [img.image_index for img in images] == [1, 2, 3]
 
@@ -49,11 +51,28 @@ async def test_get_image_cross_tenant_returns_none(async_session):
         file_size=len(sample),
     )
 
-    found = await get_image(async_session, tenant_id=1, image_id=img.id)
+    found = await get_image(async_session, tenant_id=1, user_id=1, image_id=img.id)
     assert found is not None
 
-    not_found = await get_image(async_session, tenant_id=2, image_id=img.id)
+    not_found = await get_image(async_session, tenant_id=2, user_id=1, image_id=img.id)
     assert not_found is None
+
+
+@pytest.mark.asyncio
+async def test_get_image_rejects_same_tenant_other_user(async_session):
+    """UI 图片投影必须同时匹配 tenant 与当前 user。"""
+    from app.repository.observation_image_repository import add_image, get_image
+
+    img = await add_image(
+        async_session,
+        tenant_id=1,
+        user_id=1,
+        observation_id=200,
+        image_index=1,
+        blob_content=b"private image",
+    )
+
+    assert await get_image(async_session, 1, 99, img.id) is None
 
 
 @pytest.mark.asyncio
@@ -79,7 +98,11 @@ async def test_delete_images_by_observation(async_session):
             file_size=len(sample),
         )
 
-    await delete_images_by_observation(async_session, tenant_id=1, observation_id=300)
+    await delete_images_by_observation(
+        async_session, tenant_id=1, user_id=1, observation_id=300
+    )
 
-    remaining = await list_images_by_observation(async_session, tenant_id=1, observation_id=300)
+    remaining = await list_images_by_observation(
+        async_session, tenant_id=1, user_id=1, observation_id=300
+    )
     assert len(remaining) == 0

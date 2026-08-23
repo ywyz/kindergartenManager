@@ -1,6 +1,6 @@
 # KindergartenManager 系统架构设计
 
-> 本文描述 `main@225fe139` 的实际架构，不把旧分支或未来规划写成当前能力。
+> 本文描述审查基线 `dev4.0@0657c3a` 的实际架构；最近产品主线为 `main@225fe139`。不把旧分支、未提交改动或未来规划写成已发布能力。
 
 ## 1. 架构目标
 
@@ -62,7 +62,7 @@ python -m app.main
   ├─ 解析配置与用户数据目录
   ├─ 尝试 Alembic upgrade head
   ├─ 注册默认单用户
-  ├─ 注册异常处理、AuthMiddleware、/api/v1
+  ├─ 注册异常处理、当前单用户路由、/api/v1
   └─ NiceGUI 监听 0.0.0.0:PORT
 ```
 
@@ -113,7 +113,7 @@ app/jobs        ─┘
 - `/` → `/home`
 - `/home`
 - `/settings`
-- `/setup`（当前是 AI 接口配置页，不是多步管理员初始化向导）
+- `/setup`（旧链接兼容入口，立即跳转 `/settings`）
 - `/daily-plan`
 - `/prompts`
 - `/game-observation`
@@ -121,7 +121,7 @@ app/jobs        ─┘
 - `/homemade-teaching`
 - `/course-review-activity`
 
-代码库仍有 `/register`、`/profile`、`/user-admin` 页面模块，但 `app/main.py` 当前不导入它们，因此不属于有效产品导航基线。
+代码库仍有 `/register`、`/profile`、`/user-admin` 页面模块和认证中间件，但 `app/main.py` 当前不导入/挂载它们，因此不属于有效产品导航或安全边界；这些代码只作为低优先级多用户预备资产保留。
 
 当前 API（统一前缀 `/api/v1`）：
 
@@ -202,9 +202,10 @@ DRAFT 只返回内存 `PlanPatch`，不修改 UI 正文、数据库、版本、p
 ## 8. 数据与事务
 
 - `AsyncSessionLocal` 为 SQLAlchemy 异步会话工厂。
-- Repository 接收 session，并在写操作中明确 commit/rollback 责任。
-- 业务资源的读取、更新和删除必须同时验证租户；适用时再验证用户。
-- 多个子表的 listening 保存/覆盖需要在一个可恢复事务意图内完成。
+- 一对一倾听和游戏观察的聚合保存/覆盖由 service/use-case 持有 `AsyncSessionUnitOfWork`；相关内部 repository 只 `flush()`，由最外层统一 commit，任一存储或子记录写入失败都会 rollback。
+- UI 触发的聚合删除也在最外层 Unit of Work 中完成；其他单记录 repository 的事务迁移按用例逐步进行，不把局部完成误写为全仓库完成。
+- API 只读路由使用显式 `for_tenant` 投影；UI 用户资源使用 tenant + user 投影。ID、父记录 ID 和同租户关系都不能替代 user 条件。
+- 失败注入测试覆盖两次图片写入间失败时的新建全回滚、覆盖保留原聚合，以及观察记录全回滚；跨 tenant/user 负向测试守卫详情与子表读取。
 - `export_records` 和图片/倾听子表使用逻辑外键，数据库不会自动保证级联完整性；删除服务必须显式处理。
 
 ## 9. 配置与密钥
@@ -223,7 +224,7 @@ DRAFT 只返回内存 `PlanPatch`，不修改 UI 正文、数据库、版本、p
 
 | 边界 | 当前行为 | 风险/要求 |
 |---|---|---|
-| Alembic 启动迁移 | 失败记录异常后继续启动 | 可能出现“页面能开、数据不可用”；R1 需决策 |
+| Alembic 启动迁移 | 失败记录异常并中止启动 | 所有入口统一 fail-closed；恢复前不得服务旧 schema |
 | Holiday API | 缓存并允许未知/降级 | UI 必须提示人工核对，不伪造节假日 |
 | AI API | 超时、重试、结构校验、业务异常 | 失败不应覆盖教师已有输入 |
 | 模板缺失/异常 | 部分 exporter 有降级路径 | 正式交付必须验证固定模板，不以降级稿代替 |
@@ -235,7 +236,7 @@ DRAFT 只返回内存 `PlanPatch`，不修改 UI 正文、数据库、版本、p
 ## 11. 可观测性与审计
 
 - 全局异常以结构化日志记录类型、消息和 traceback。
-- `log_audit` 用于登录历史路径、AI、导出和关键设置动作；审计失败不应阻断主流程。
+- `log_audit` 用于 AI、导出、关键设置及保留的历史登录路径；审计失败不应阻断主流程。
 - 日志不得出现密码、API Key、HMAC secret、完整数据库 URL 或幼儿图片内容。
 - 当前没有集中式 metrics/tracing；需要时先定义运营问题，不盲目引入平台。
 
@@ -261,11 +262,11 @@ codebase-memory/Graphify 只能发现结构、热点和文档关系，不替代�
 
 ## 14. 后续架构决策点
 
-- 单用户继续保留，还是恢复多用户/RBAC。
-- 启动迁移在桌面和服务器场景是否采用不同失败策略。
-- `dev3.4` 的功能是否进入新基线。
+- 当前继续单用户；多用户/RBAC 为低优先级预备能力，恢复时需独立门禁。
+- 启动迁移已统一采用 fail-closed；若未来需要离线只读恢复模式，需独立 ADR。
+- 下一项功能开发使用哪个固定分支/SHA。
 - 逻辑外键是否逐步收紧为数据库外键。
 - 是否有真实吞吐/运维需求足以支持微服务拆分。
 - 图片后端、备份恢复和数据保留策略。
-- Agent Foundation 的实现分支、spec/Issue/RED 和窄 Service 投影。
+- Agent Foundation 已具备冻结分支/spec/Issue/RED 的前置基础；具体窄 Service 投影仍按后续任务逐项建立。
 - Agent WRITE 是否有真实需求；如有，需独立决定可信 actor、`daily_plan` revision、确认、版本和审计模型。
