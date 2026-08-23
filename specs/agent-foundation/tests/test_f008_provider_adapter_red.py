@@ -422,7 +422,9 @@ async def test_all_six_wire_aliases_parse_to_descriptor_owned_permissions():
     assert tuple(call.call_id for call in result.tool_calls) == tuple(
         uuid5(OPERATION_ID, raw_id) for raw_id in raw_ids
     )
-    assert tuple(dict(call.arguments) for call in result.tool_calls) == tuple(
+    assert tuple(
+        json.loads(canonical_json(call.arguments)) for call in result.tool_calls
+    ) == tuple(
         json.loads(_arguments_for(descriptor.name)) for descriptor in descriptors
     )
     _assert_no_sensitive_text(values=raw_ids, objects=(result, *result.tool_calls))
