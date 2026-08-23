@@ -12,9 +12,9 @@
 | F004 | 建立 tenant+user 窄 READ service 投影 | F003 + 明确授权 | GREEN（`729f446…`，Review/CI 通过） |
 | F005 | 实现规范 PlanPatch | F004 | GREEN（`53dd2e8…`，双轴 Review/CI 通过） |
 | F006 | 实现 Provider port 与有界 Runtime | F005 | GREEN（RED `f0ab660…`；Review RED `6b083fa…`、`8831b3f…`、`79e005a…`、`51f5e5f…`；实现/重构 `99167ef…`；证据 `049b520…`；Review 0/0；本地 `73 + 551 passed`；CI `32644290676`） |
-| F007 | 实现取消/超时/context current-state/迟到丢弃 | F006 | RED（`97 collected / 73 passed / 24 failed`） |
+| F007 | 实现取消/超时/context current-state/迟到丢弃 | F006 | 自动验证（RED `55b8702…`；Review RED `08ada78…`、`ddca78d…`；候选 `51443a3…`；Review 0/0；本地 `110 + 551 passed`；待精确 SHA CI） |
 | F008 | OpenAI-compatible Provider adapter、六个关闭 Tool executor、组合装配与每日计划 Agent UI | F007 固定 GREEN + Review/CI/Issue | 已授权，等待 F007 |
 | F009 | 零持久化全矩阵、Linux 浏览器 mock 与安全配置真实模型验收 | F008 固定 GREEN + Review/CI/Issue | 已授权，等待 F008 |
 
-当前只激活 F007。F008/F009 不得提前实现；全程禁止 migration、WRITE、长期记忆、产品多 Agent、合并 main、
+当前只执行 F007 的证据提交、精确 SHA Quality 与 Issue 回写。F008/F009 不得提前实现；全程禁止 migration、WRITE、长期记忆、产品多 Agent、合并 main、
 关闭 Issue 或发布。

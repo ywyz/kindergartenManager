@@ -1,6 +1,6 @@
 # Agent Foundation 冻结规格
 
-- 状态：F005、F006 固定 GREEN；F007 稳定 RED，F008/F009 仅在前置切片闭合后依序进入
+- 状态：F005、F006 固定 GREEN；F007 本地 Review 0/0，待精确 SHA Quality；F008/F009 仅在前置切片闭合后依序进入
 - 分支：`feat/agent-foundation`
 - 安全同步 RED 基线：`5de2e49bee19749f611b50747a31be9464b92d7b`
 - Issue：[#48](https://github.com/ywyz/kindergartenManager/issues/48)
@@ -123,9 +123,19 @@ GREEN，新 24 项稳定失败，只因 F007 的 `AgentContextStamp`/current-sta
 `max_provider_duration_ms`/`max_tool_duration_ms`/`max_total_duration_ms` 尚未实现；collection clean，无 skip/xfail、固定 sleep、UI、
 具体 Provider/Tool 或持久化依赖。
 
+F007 初始 RED 固定为 `55b8702b9acbece01705bbf6961717227e0c7e4f`，最小 GREEN 为 `94394c9…`。
+首轮 Review RED `08ada78db4a7c32815f619e8bdc583d22efb3aaf` 稳定为
+`107 collected / 97 passed / 10 failed`，覆盖端口伪造内部停止异常、非宿主伪取消、吞取消时三类硬时限、
+host cancellation 和异常终态 current-context/TTL 复核；修复为 `664972b…`。复审继续发现 drain 登记
+交错与 child Task 外 BaseException 净化缺口，第二轮 Review RED
+`ddca78d63aae5b7a43f7f73e98bac935136750c8` 稳定为 `110 collected / 107 passed / 3 failed`；
+最终本地候选 `51443a374003ddde2509d47262e959e4ad691ad7` 保持 `110 passed`，全量回归 `551 passed`，
+双轴 Review 为 Standards `0`、Spec `0`、scope creep `0`。具体 Provider adapter、六 Tool executor、
+组合装配、UI 和持久化均不属于 F007；远端 Quality 仍须对本次固定证据 SHA 精确回读。
+
 ## 7. 当前授权与停止边界
 
 本分支从 `0880f64c419e4fc27c45f4a7207e547077736056` 获得 F007 → F008 → F009 连续授权，但必须逐切片闭合
-`RED → 最小 GREEN → 双轴 Review → 固定 SHA Quality → Issue 证据`，不得横向并行实现。当前只激活 F007；
-F007 闭合前不得实现具体 Provider adapter、六 Tool executor、组合装配或 UI。全程禁止合并 `main`、关闭 Issue、
+`RED → 最小 GREEN → 双轴 Review → 固定 SHA Quality → Issue 证据`，不得横向并行实现。当前只执行 F007 的
+固定证据提交、Quality 回读与 Issue 回写；这些门禁闭合前不得实现具体 Provider adapter、六 Tool executor、组合装配或 UI。全程禁止合并 `main`、关闭 Issue、
 发布、Agent WRITE、长期记忆、migration 或产品多 Agent。

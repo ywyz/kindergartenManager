@@ -1,6 +1,6 @@
 # 幼儿园教学管理系统架构文档（初始化）
 
-> **历史文档说明（2026-08-23）**：本文按开发阶段累积，包含已被后续单用户模式取代的登录描述和旧迁移/测试数字。当前架构事实见 [`../CONTEXT.md`](../CONTEXT.md)、[`../docs/design/system-architecture.md`](../docs/design/system-architecture.md)、[`../docs/design/data-model.md`](../docs/design/data-model.md) 和 [`../docs/ADR/README.md`](../docs/ADR/README.md)。受控 Agent 只处于已确认设计状态，边界见 [`../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md`](../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md) 与 [`../docs/design/agent-runtime.md`](../docs/design/agent-runtime.md)；下文历史内容不授权 Agent 实现或 WRITE。当前 Alembic head 为 `a6c4d8e2f9b1`。
+> **历史文档说明（2026-08-23）**：本文按开发阶段累积，包含已被后续单用户模式取代的登录描述和旧迁移/测试数字。当前架构事实见 [`../CONTEXT.md`](../CONTEXT.md)、[`../docs/design/system-architecture.md`](../docs/design/system-architecture.md)、[`../docs/design/data-model.md`](../docs/design/data-model.md) 和 [`../docs/ADR/README.md`](../docs/ADR/README.md)。受控 Agent 的 F003-F007 应用层基础已实现到本地 Review 归零，具体 Provider/Tool/UI 与验收仍未完成；边界见 [`../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md`](../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md) 与 [`../docs/design/agent-runtime.md`](../docs/design/agent-runtime.md)。下文历史内容不授权 Agent WRITE。当前 Alembic head 为 `a6c4d8e2f9b1`。
 
 ## 1. 历史阶段记录
 
@@ -398,7 +398,7 @@ F004 在既有 F003 contracts/关闭 registry 之后，只建立应用层 READ s
 稳定 fingerprint。F004 初始 RED 为 `8297fce…`，Review RED 为 `f1797e6…`；GREEN 候选下
 Foundation 总计 **9 passed**。
 
-## 14. 受控 Agent Foundation F005-F006 内存边界
+## 14. 受控 Agent Foundation F005-F007 内存边界
 
 F005 在 F004 冻结 Context 之上增加纯应用层 `PlanPatch`：字段路径为关闭集合，proposal 必须完整绑定
 operation、turn、daily-plan target 与 base fingerprint；before/after 独立校验后按字段稳定排序，并以唯一
@@ -406,8 +406,12 @@ canonical JSON 计算 SHA-256。成功与拒绝路径都不依赖 UI、数据库
 
 F006 只增加供应商中立的 Provider DTO/port、Tool executor port 和有界串行 Runtime。Runtime 重新校验
 六个关闭工具的名称、Permission、嵌套输入/输出与 operation/turn 绑定，拒绝 WRITE/未知/额外参数，限制 Tool 次数、
-消息窗口、intent、响应、ToolResult 和 request-id 大小，完整复核返回 Patch，并把 Provider/Tool 异常压缩为稳定本地错误码。具体 Provider adapter、Tool executor、
-取消/超时/迟到丢弃、UI 和持久化均未实现。
+消息窗口、intent、响应、ToolResult 和 request-id 大小，完整复核返回 Patch，并把 Provider/Tool 异常压缩为稳定本地错误码。
+
+F007 在同一 Runtime seam 增加完整冻结 context stamp 的精确取消、单 Provider/Tool/总 operation 硬时限、
+UTC TTL 与 current-context 复核、迟到结果丢弃和取消后安全排空。即使 port 吞掉取消或抛出
+`SystemExit`/`KeyboardInterrupt`，公开 turn 也只返回稳定状态，旧 port 排空前继续保持 busy。具体 Provider adapter、
+Tool executor、组合装配、UI 和持久化均未实现。
 
 ### 核心模块
 
@@ -419,4 +423,6 @@ F006 只增加供应商中立的 Provider DTO/port、Tool executor port 和有�
 F005 固定 GREEN 为 `53dd2e8…`，双轴 Review 与精确远端 CI 已通过；F006 稳定 RED 为 `f0ab660…`，
 Review RED 为 `6b083fa…`、`8831b3f…`、`79e005a…`、`51f5e5f…`；最终本地实现/重构候选
 `99167ef…` 的双轴 Review 为 Standards `0`、Spec `0`，Foundation **73 passed**、全量 **551 passed**；证据
-SHA `049b520…` 的远端 Quality `32644290676` 精确匹配成功。F007 及以后仍需独立授权。
+SHA `049b520…` 的远端 Quality `32644290676` 精确匹配成功。F007 初始 RED `55b8702…`、Review RED
+`08ada78…` 与 `ddca78d…` 最终收敛到候选 `51443a3…`，Foundation **110 passed**、全量 **551 passed**、
+Standards `0`、Spec `0`；仍待固定证据 SHA 的远端 Quality 回读。F008/F009 已获严格串行授权，但不得提前进入。

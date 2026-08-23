@@ -112,7 +112,7 @@ API 身份独立：`X-Api-Key` 映射到 tenant；配置 `API_SIGNING_SECRET` �
 
 测试使用 `httpx.MockTransport` 或 mock 边界，不调用真实 AI。
 
-### 6.1 受控 Agent Foundation（F005、F006 已固定）
+### 6.1 受控 Agent Foundation（F005、F006 固定；F007 待远端证据）
 
 实现前必须阅读 [ADR-0005](ADR/ADR-0005-controlled-ai-agent-runtime.md) 和
 [Agent Runtime 设计](design/agent-runtime.md)。规划依赖方向为：
@@ -122,8 +122,9 @@ API 身份独立：`X-Api-Key` 映射到 tenant；配置 `API_SIGNING_SECRET` �
 Provider DTO/port、Tool executor port 与有界串行 Runtime；Tool 输入嵌套结构和输出 DTO 均为关闭集合，
 Runtime 对 ID、周次、metadata、ToolResult 与 provider request-id 设置本地上限，拒绝有状态内建类型子类，
 逐字段复核 Provider-visible `AgentContext`，复制冻结的 Tool DTO 而不保留 executor 对象，并完整复核返回的
-F005 Patch。具体 Provider adapter、Tool executor、
-UI 与持久化仍未实现。取消、超时、scope/fingerprint 变化和迟到丢弃属于 F007，仍未授权。
+F005 Patch。F007 本地 Review 已归零，Runtime 还使用完整冻结 stamp 做精确取消，以本地硬时限约束单次
+Provider、单 Tool 和总 operation，在每个终态重新检查 UTC TTL/current-context，并在吞取消 port 真正排空前
+保持 busy、丢弃迟到正文/Patch/异常。具体 Provider adapter、Tool executor、UI 与持久化仍未实现。
 
 ```text
 ui/components/agent_draft
@@ -142,8 +143,8 @@ ui/components/agent_draft
 - 首期不引入 Agent 迁移。不使用 `updated_at` 或内容哈希代替将来 WRITE 所需的显式 revision。
 
 测试先用确定性 Scripted Provider 建立 RED。F006 覆盖纯文本、串行 Tool loop、未知/WRITE Tool、
-额外参数、绑定错误、超长、busy、Tool/消息上限和异常净化；F007 才覆盖超时、取消、scope/fingerprint
-变化与迟到丢弃。每条路径最终都需断言业务数据和 UI 正文零变化。
+额外参数、绑定错误、超长、busy、Tool/消息上限和异常净化；F007 已覆盖超时、取消、scope/fingerprint
+变化、迟到丢弃、host cancellation、drain 竞态及 BaseException 净化。每条路径最终都需断言业务数据和 UI 正文零变化。
 
 ## 7. Word 与图片
 

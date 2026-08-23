@@ -1,7 +1,7 @@
 # KindergartenManager 项目上下文
 
 > 状态快照：2026-08-23；Agent 安全同步 RED 基线：`5de2e49bee19749f611b50747a31be9464b92d7b`；
-> 当前检出分支：`feat/agent-foundation`（F005、F006 已固定 GREEN；F007 稳定 RED）；
+> 当前检出分支：`feat/agent-foundation`（F005、F006 已固定 GREEN；F007 本地 Review 0/0，待精确 SHA Quality）；
 > 最近远端产品主线：`origin/main@cfeadefd7dfa056c1b3757876658493110d8cf84`。
 >
 > 本文件用于回答“当前仓库实际上是什么、哪些事实已经确认、下一步可以做什么”。
@@ -99,15 +99,16 @@ UI 的固定单用户身份与 API 的租户主体是两个不同边界，不得
 - 最近远端产品主线为 `origin/main@cfeadefd7dfa056c1b3757876658493110d8cf84`；
   本地 `main` 引用仍落后，不作为当前远端证据。
 - 当前远端仍有 `origin/dev3.4` 和 `origin/dev4.0`；没有发现 `origin/dev5.0`、`origin/dev6.0` 或 `origin/trae-dev-v6.0`。本轮未获授权删除任何分支。
-- `feat/agent-foundation` 的 F005 固定 GREEN 为 `53dd2e8d1af3f6633a114e4892dcfe1216ce091a`；双轴 Review 均为零发现，远端 Quality run `32641923137` 的 `headSha` 完全匹配且成功。F006 稳定 RED 为 `f0ab660f46d9293df53c13f5698c7dffd99892bc`，最终实现/重构候选为 `99167ef4abba447ed5369642e9ed3c855263a4d3`，固定 GREEN 证据 SHA 为 `049b52040c61727b1418dbf3cce018ead76e6edc`；双轴 Review 均为零发现，远端 Quality run `32644290676` 的 `headSha` 完全匹配且成功。F007-F009 已获严格串行授权；合入 `main`、关闭 Issue 或发布仍未授权。
+- `feat/agent-foundation` 的 F005 固定 GREEN 为 `53dd2e8d1af3f6633a114e4892dcfe1216ce091a`；双轴 Review 均为零发现，远端 Quality run `32641923137` 的 `headSha` 完全匹配且成功。F006 稳定 RED 为 `f0ab660f46d9293df53c13f5698c7dffd99892bc`，最终实现/重构候选为 `99167ef4abba447ed5369642e9ed3c855263a4d3`，固定 GREEN 证据 SHA 为 `049b52040c61727b1418dbf3cce018ead76e6edc`；双轴 Review 均为零发现，远端 Quality run `32644290676` 的 `headSha` 完全匹配且成功。F007 初始 RED 为 `55b8702b9acbece01705bbf6961717227e0c7e4f`，最终本地实现候选为 `51443a374003ddde2509d47262e959e4ad691ad7`；双轴 Review 已为 Standards `0`、Spec `0`，待固定证据 SHA 的远端 Quality 回读。F007-F009 已获严格串行授权；合入 `main`、关闭 Issue 或发布仍未授权。
 
 ## 8. 已确认的下一能力：受控 AI Agent
 
 项目已接受 [ADR-0005](docs/ADR/ADR-0005-controlled-ai-agent-runtime.md) 并完成
 [Agent Runtime 设计](docs/design/agent-runtime.md)。当前代码已实现 F003 的 contracts 与关闭 registry、F004 的
 冻结 Context 与 tenant+user READ 投影；F005 已固定纯内存、关闭字段路径且规范哈希的 `PlanPatch`；
-F006 已固定 GREEN，新增应用拥有的 Provider DTO/port、Tool executor port 和有界串行 Runtime。
-尚无具体 Provider adapter、Tool executor、UI 或持久化，也没有 F007 的取消、超时、过期/迟到丢弃，
+F006 已固定 GREEN，新增应用拥有的 Provider DTO/port、Tool executor port 和有界串行 Runtime；F007 本地
+Review 已归零，增加精确 context stamp 取消、单 Provider/Tool/总 operation 硬时限、UTC TTL/current-state
+复核、迟到结果丢弃和取消后安全排空。尚无具体 Provider adapter、Tool executor、UI 或持久化，
 不得宣称整个 Agent Foundation 已实现。
 
 当前已冻结 [Foundation spec](specs/agent-foundation/spec.md)、[任务顺序](specs/agent-foundation/tasks.md) 和
@@ -125,6 +126,13 @@ Review RED `6b083fa…` 稳定为 `54 collected / 44 passed / 10 failed`。首�
 `67 passed`。第四个 Review RED `51f5e5f…` 再固定任意可变 dataclass、AgentContext 内层越界与
 ToolResult error metadata 扩张，稳定为 `73 collected / 67 passed / 6 failed`；当前修正后的本地
 GREEN 候选共 `73 passed`，没有 skip、xfail 或放宽原测试；最终双轴 Review 为 Standards `0`、Spec `0`。
+F007 初始 RED `55b8702…` 为 `97 collected / 73 passed / 24 failed`；最小 GREEN `94394c9…` 后，首轮
+Review RED `08ada78…` 固定端口异常伪造、伪取消、硬时限和异常终态门禁，稳定为
+`107 collected / 97 passed / 10 failed`。修复 `664972b…` 后复审继续捕获 drain 登记竞态与
+`SystemExit`/`KeyboardInterrupt` 越界，第二轮 Review RED `ddca78d…` 稳定为
+`110 collected / 107 passed / 3 failed`；最终本地候选 `51443a3…` 为 Foundation `110 passed`、
+全量 `551 passed`，`pip check`、变更文件 Ruff/format 和 diff check 均通过。取消交错额外连续 20 次通过，
+复审对 0–3 次事件循环交错各运行 100 次，最终 Standards `0`、Spec `0`、scope creep `0`。
 
 首期范围只是每日活动计划页的单 Agent Foundation：
 
@@ -148,7 +156,7 @@ F003 固定 SHA 的双轴 Review 和远端 CI `headSha` 已通过。
 3. **投影边界需持续守卫**：API 列表显式使用 tenant 投影，UI 详情和子表使用 tenant + user 投影并已有跨 tenant/user 负向测试；新增查询仍必须选择并测试正确投影。
 4. **类型债务**：Ruff 已清零，但当前 Pyright 仍报告既有第三方类型与结构问题，尚未建立可执行的类型门禁。
 5. **发布证据漂移**：Linux 本地结果不能代替 Windows 安装、浏览器打开、模板 Word 保真和真实 AI/MySQL 验收。
-6. **远端质量证据需按 SHA 回读**：F005 固定 SHA `53dd2e8…` 与 F006 证据 SHA `049b520…` 的 push Quality 均已通过；后续提交仍必须用自身 `headSha` 回读，不能沿用旧 CI。
+6. **远端质量证据需按 SHA 回读**：F005 固定 SHA `53dd2e8…` 与 F006 证据 SHA `049b520…` 的 push Quality 均已通过；F007 仍须用本次证据提交自身的 `headSha` 回读，不能沿用旧 CI。
 7. **Agent 作用域风险**：当前 UI 是网络可达的固定管理员身份；首期 Agent 必须保持零写入，
    并拒绝 prompt injection、跨 tenant/user、动态工具和过期结果。
 
@@ -156,12 +164,11 @@ F003 固定 SHA 的双轴 Review 和远端 CI `headSha` 已通过。
 
 R1 基础修复的本地门禁已经通过，当前共同下一步是：
 
-1. F006 门禁已闭合；F007 已建立 `97 collected / 73 passed / 24 failed` 的稳定 RED，当前实施精确取消、
-   单 Provider/Tool/总时限、Context TTL、current-context stamp 与迟到结果丢弃的最小 GREEN。
-2. F007 已获授权，并须遵循 `spec/任务 → 稳定 RED → 最小 GREEN → 双轴 Review → 固定 SHA CI → Issue`；
-   F008/F009 虽已连续授权，仍必须等待各自前置切片闭合。
+1. F007 本地实现与双轴 Review 已闭合；提交本次证据后推送功能分支，并按精确 `headSha` 回读远端 Quality。
+2. Quality 成功并回写 Issue #48 后才激活 F008；F008/F009 虽已连续授权，仍必须等待各自前置切片闭合。
 3. NiceGUI 多用户预备功能保持低优先级，不与 Agent Foundation 隐式捆绑。
 4. F006 最终实现/重构候选 `99167ef…` 的 Linux 本地证据为 Python 3.14.7、`pip check`/严格依赖审计通过、变更文件 Ruff 0 错误、全新 SQLite Alembic head `a6c4d8e2f9b1`、Foundation `73 passed` 与全量 `551 passed`；证据 SHA `049b520…` 的远端 Quality `32644290676` 全部成功。Windows、Word、MySQL 和真实 AI 仍是独立人工门禁。
+5. F007 最终本地候选 `51443a3…` 的证据为 Foundation `110 passed`、全量 `551 passed`、双轴 Review 0/0；具体 Provider、Tool 和每日计划 UI 仍属于 F008，零持久化全矩阵与真实模型验收仍属于 F009。
 
 ## 11. 更新规则
 

@@ -1,6 +1,6 @@
 # KindergartenManager 受控 AI Agent Runtime 设计
 
-> 状态：已确认设计；F003-F006 已固定 GREEN；F007 已授权建立 RED，F008/F009 仅在前置门禁闭合后依序进入。本文落实
+> 状态：已确认设计；F003-F006 已固定 GREEN；F007 本地 Review 0/0，待精确 SHA Quality，F008/F009 仅在前置门禁闭合后依序进入。本文落实
 > [ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md)，不代表完整 Agent 已进入当前产品。本轮只授权在功能分支
 > 依序提交并推送 F007-F009；合并、关闭 Issue 或发布仍未授权。
 
@@ -45,7 +45,7 @@ app/service/agent/
   read_service.py    # 已实现：tenant+user 四类 READ 投影
   registry.py        # 已实现：关闭 Tool registry
   patch.py           # 已实现：关闭路径、完整绑定、规范 PlanPatch
-  runtime.py         # 已实现：Provider port、单 operation 串行 loop 与本地上限
+  runtime.py         # 已实现：Provider port、单 operation loop、精确取消、硬时限与安全排空
   tools.py           # 未实现：READ/DRAFT 应用工具
 
 app/integration/ai_client/
@@ -55,8 +55,8 @@ app/ui/components/
   agent_draft.py     # 状态、回答、字段差异、取消/丢弃
 ```
 
-标为“已实现”的文件已进入 F003-F006；其余目录仍只是设计目标。F006 不包含具体
-Provider adapter、Tool executor，也不包含 F007 的取消、超时、scope/fingerprint 变化和迟到丢弃。后续实现时若现有层次出现更小而清晰的
+标为“已实现”的文件已进入 F003-F007；其余目录仍只是设计目标。F007 不包含具体
+Provider adapter、Tool executor、组合装配或 UI。后续实现时若现有层次出现更小而清晰的
 seam，可在不放宽本契约的前提下调整文件拆分。
 
 ## 4. 核心类型
@@ -273,7 +273,8 @@ revision；当前不得预留空表或猜测迁移编号。
 
 ### 应用测试
 
-- F006 Scripted Provider 覆盖纯文本、一次/多次 Tool call、拒绝、超长和结构错误；F007 再覆盖超时和取消。
+- F006 Scripted Provider 覆盖纯文本、一次/多次 Tool call、拒绝、超长和结构错误；F007 已覆盖精确取消、
+  单 Provider/Tool/总时限、TTL/current-context、迟到丢弃、吞取消安全排空、host cancellation 与异常净化。
 - READ 只含白名单字段；另一 tenant/user、Key、路径、图片和完整历史不进入 Context/log/repr。
 - DRAFT 产生确定 PlanPatch；任何成功/失败/取消后数据库、正文、版本、preview、audit 和导出均零变化。
 - 第二个 operation 被拒绝，旧 scope/operation 的迟到结果被丢弃。
