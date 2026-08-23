@@ -51,14 +51,19 @@ python-engineio 4.13.5 和 python-socketio 5.16.4。NiceGUI 3.16.0 与 FastAPI
 
 ## 5. 本地复验
 
-在 Python 3.14.7 新建的隔离环境中执行：
+在 Python 3.14.7 新建的隔离环境中执行。迁移复验必须显式指向一次性 SQLite，
+避免读取 `.env` 后修改应用数据库或真实集成数据库；临时目录在当前 shell 退出时清理：
 
 ```bash
 python -m pip install -r requirements.txt ruff==0.15.22 pip-audit==2.10.1
 python -m pip check
 python -m pip_audit -r requirements.txt --strict --ignore-vuln PYSEC-2026-1325
 ruff check tests/test_dependency_security_floor.py
-python -m alembic upgrade head
+quality_db_dir="$(mktemp -d)"
+trap 'rm -rf -- "$quality_db_dir"' EXIT
+quality_database_url="sqlite+aiosqlite:///$quality_db_dir/quality.sqlite3"
+DATABASE_URL="$quality_database_url" python -m alembic upgrade head
+DATABASE_URL="$quality_database_url" python -m alembic current
 python -m pytest tests/ -q
 ```
 
