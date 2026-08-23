@@ -1,6 +1,6 @@
 # Agent Foundation 冻结规格
 
-- 状态：F005、F006 固定 GREEN；F007 及以后未授权
+- 状态：F005、F006 固定 GREEN；F007 稳定 RED，F008/F009 仅在前置切片闭合后依序进入
 - 分支：`feat/agent-foundation`
 - 安全同步 RED 基线：`5de2e49bee19749f611b50747a31be9464b92d7b`
 - Issue：[#48](https://github.com/ywyz/kindergartenManager/issues/48)
@@ -54,7 +54,26 @@
 6. 每日计划页只读/草案展示：运行、取消、失败、草案、丢弃；无采用/保存/确认。
 7. 全边界零持久化证明与目标平台人工验收。
 
-## 6. F002-F006 RED/GREEN 检查点
+### 5.1 F007 固定公共 seam
+
+F007 只扩展应用层 `AgentRuntime` 的 operation 生命周期，不接入具体 Provider、Tool executor 或 UI：
+
+- `run_turn(...)` 继续是执行与终态观察的唯一入口；新增接收完整冻结 context stamp 的取消入口，错误
+  context/operation/turn/actor/scope/fingerprint 不得影响当前 turn。
+- Runtime 只依赖一个应用拥有的最小 current-context port；该 port 返回 operation、turn、actor、scope 与
+  `base_fingerprint` 的冻结 stamp。是否匹配由 Runtime 本地判断，UI/Provider/Tool 不得自行放行。
+- 单次 Provider、单 Tool 与总 operation 时限均由本地 `RuntimeLimits` 约束；Tool descriptor 继续提供关闭的
+  本地默认值，Runtime 使用更严格的有效上限。
+- Context TTL 在开始、Provider 返回、Tool 返回和终态发布前复核；取消、超时、port 失败、scope/fingerprint
+  变化或迟到结果均不得返回 assistant 正文或 Patch，也不得进入下一次 Provider 调用。
+- 取消终态使用关闭状态与稳定 `agent.cancelled`；超时使用 `agent.timeout`；过期、current-context 不匹配、
+  port 返回 `None`/畸形值或抛错均 fail-closed 为 `agent.context_stale`。UTC clock 默认使用真实时间，测试可注入
+  manual clock；异常正文、迟到正文和迟到 ToolResult 不进入 outcome、repr 或日志。
+
+F007 RED 测试只穿过上述公开 seam，使用事件协调的确定性 Provider/Tool adapter，不读取 Runtime 私有字段，
+不使用固定 `sleep` 推测调度，不预建 F008 组合装配或页面控件。
+
+## 6. F002-F007 RED/GREEN 检查点
 
 切片公共行为测试放在 `specs/agent-foundation/tests/`；从 F005 GREEN 起由 Quality 独立步骤执行，仍不混入常规 `pytest tests/` 套件。
 F002 原始 SHA `ad13a6aa3e44ff98b2604d4a008649cd66185d80` 和安全同步基线
@@ -99,7 +118,14 @@ READ DTO 的逐字段关闭与深不可变要求。后续复审补充内建类�
 `049b52040c61727b1418dbf3cce018ead76e6edc` 的远端 Quality `32644290676` 精确匹配成功。具体 Provider adapter、Tool executor、取消、超时、
 过期/迟到丢弃、UI 和持久化均不属于 F006。
 
-## 7. 停止边界
+F007 新增 24 项公开生命周期行为测试；Foundation 共 `97 collected / 73 passed / 24 failed`。原 73 项继续
+GREEN，新 24 项稳定失败，只因 F007 的 `AgentContextStamp`/current-state port、取消入口与
+`max_provider_duration_ms`/`max_tool_duration_ms`/`max_total_duration_ms` 尚未实现；collection clean，无 skip/xfail、固定 sleep、UI、
+具体 Provider/Tool 或持久化依赖。
 
-本分支当前授权到 F006 Provider port 与有界 Runtime，且其固定 SHA Review/CI 门禁已闭合。F007 取消/超时/迟到丢弃、
-Tool 实现、UI 控件、schema/migration 或多用户工作仍需要下一道明确授权。
+## 7. 当前授权与停止边界
+
+本分支从 `0880f64c419e4fc27c45f4a7207e547077736056` 获得 F007 → F008 → F009 连续授权，但必须逐切片闭合
+`RED → 最小 GREEN → 双轴 Review → 固定 SHA Quality → Issue 证据`，不得横向并行实现。当前只激活 F007；
+F007 闭合前不得实现具体 Provider adapter、六 Tool executor、组合装配或 UI。全程禁止合并 `main`、关闭 Issue、
+发布、Agent WRITE、长期记忆、migration 或产品多 Agent。

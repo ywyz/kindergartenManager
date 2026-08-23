@@ -102,7 +102,7 @@ R0 事实基线与图谱
 
 ## 7. R3：Agent Foundation 规格与分支决策
 
-状态：`自动验证`（F005、F006 固定 GREEN 已验证；F007 未授权）。
+状态：`RED`（F005、F006 固定 GREEN 已验证；F007 为 `97 collected / 73 passed / 24 failed`）。
 
 已确认：[ADR-0005](ADR/ADR-0005-controlled-ai-agent-runtime.md) 和
 [Agent Runtime 设计](design/agent-runtime.md) 已经固定首期上限，即每日活动计划的单 Agent、
@@ -118,18 +118,19 @@ R0 事实基线与图谱
 - 是否仍保持模块化单体？服务拆分必须有独立 ADR 和运营理由。
 - 聚合事务和 tenant/user 投影修复后，每日计划、班级设置和日历的窄 Service 投影如何建立，使 Agent Tool 不直接调用 Repository？
 
-当前停止边界：F006 Provider port 与有界串行 Runtime 的固定 SHA Review/CI 已闭合。F007 取消/超时/scope-fingerprint 变化/迟到丢弃、Tool 实现、UI 或 migration 仍需新的明确授权。
+当前执行边界：F006 Provider port 与有界串行 Runtime 的固定 SHA Review/CI 已闭合；当前只激活 F007 的取消、
+单 Provider/Tool/总时限、context current-state 与迟到丢弃。F007 闭合前不得进入具体 Tool、Provider adapter、UI 或 migration。
 
 ## 8. R4A：受控 Agent Foundation READ/DRAFT
 
-状态：`自动验证`（F005、F006 固定 GREEN；F007 未授权）。
+状态：`RED`（F005、F006 固定 GREEN；F007 为 `97 collected / 73 passed / 24 failed`）。
 
 实现范围严格限定为：
 
 1. 应用层单 `AgentRuntime`、供应商中立 `AgentProviderPort` 和关闭 `ToolRegistry`。
 2. 四个 READ Tool：当前计划、计划上下文、日历判定、班级区域。
 3. 两个 DRAFT Tool：登记栏目 Patch 和一日反思 Patch。
-4. F006 提供有界串行 Tool loop、busy、Tool/消息/响应/ToolResult/request-id 上限和关闭输入输出校验；取消、超时与迟到/过期结果丢弃属于未授权 F007。
+4. F006 提供有界串行 Tool loop、busy、Tool/消息/响应/ToolResult/request-id 上限和关闭输入输出校验；F007 正在固定取消、超时与迟到/过期结果丢弃。
 5. 只展示 assistant 文本和字段级 `PlanPatch`；无采用、保存、确认 WRITE 或历史恢复。
 
 完成证据必须包含：未知/WRITE Tool、额外参数、prompt injection、跨 tenant/user、取消、超时和

@@ -1,8 +1,8 @@
 # KindergartenManager 受控 AI Agent Runtime 设计
 
-> 状态：已确认设计；F003-F006 已固定 GREEN；F007 及以后未授权。本文落实
-> [ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md)，不代表完整 Agent 已进入当前产品，也不授权
-> 提交、推送、合并或发布。
+> 状态：已确认设计；F003-F006 已固定 GREEN；F007 已授权建立 RED，F008/F009 仅在前置门禁闭合后依序进入。本文落实
+> [ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md)，不代表完整 Agent 已进入当前产品。本轮只授权在功能分支
+> 依序提交并推送 F007-F009；合并、关闭 Issue 或发布仍未授权。
 
 ## 1. 目标与非目标
 
@@ -212,7 +212,9 @@ idle -> running -> draft_ready | succeeded | failed | cancelled -> idle
   fingerprint 与精确 READ/DRAFT permissions；ToolResult 不保留 executor 的任意 dataclass 引用，错误 metadata 最多 128 字符。
 - Provider 等待期间不得保持数据库事务。
 - 每个 READ Tool 在执行时创建并关闭自己的短会话；DRAFT 只消费冻结 DTO。
-- F007 才增加单 Tool/总时限，以及取消、页面切换、actor/scope/fingerprint 变化或 operation ID 不匹配时的迟到结果丢弃。
+- F007 增加精确 operation 取消、Context TTL、单 Provider/Tool/总时限，以及由应用拥有的最小 current-context stamp
+  驱动的页面切换、actor/scope/fingerprint/operation/turn 变化检查。Runtime 本地比较 stamp，并在 Provider
+  返回、Tool 返回与终态发布前 fail-closed 丢弃迟到结果；current-state adapter 无权自行放宽匹配规则。
 - Runtime 重启回到 idle；不恢复 Context、消息、Patch、operation 或 Provider thread。
 
 建议稳定错误码：
