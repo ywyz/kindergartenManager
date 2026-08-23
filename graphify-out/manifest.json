@@ -1,9 +1,9 @@
 {
   ".codebase-memory/artifact.json": {
-    "mtime": 1787468873.6652217,
-    "seen": 1787471131.898411,
-    "ast_hash": "7db0bd34cb4685603ef793a9dba668b9",
-    "semantic_hash": "7db0bd34cb4685603ef793a9dba668b9"
+    "mtime": 1787471721.02732,
+    "seen": 1787471824.1707516,
+    "ast_hash": "70a83b511758ef5c28908a6bc29c7c63",
+    "semantic_hash": "70a83b511758ef5c28908a6bc29c7c63"
   },
   ".vscode/launch.json": {
     "mtime": 1787385361.9680276,
@@ -1636,14 +1636,14 @@
     "semantic_hash": "52a89df5ddbe01e9d7c85889fcedd990"
   },
   "specs/agent-foundation/tests/test_closed_registry_red.py": {
-    "mtime": 1787470870.8092904,
-    "seen": 1787471131.9022346,
+    "mtime": 1787471721.0903199,
+    "seen": 1787471824.1751075,
     "ast_hash": "9aa294d5f5f4410a364df2229e33c074",
     "semantic_hash": "9aa294d5f5f4410a364df2229e33c074"
   },
   "specs/agent-foundation/tests/test_contracts_red.py": {
-    "mtime": 1787470870.8092904,
-    "seen": 1787471131.9022365,
+    "mtime": 1787471721.0913198,
+    "seen": 1787471824.1751094,
     "ast_hash": "88279c72e1918af328cfb34774655d18",
     "semantic_hash": "88279c72e1918af328cfb34774655d18"
   },
@@ -1666,10 +1666,10 @@
     "semantic_hash": "0bf936abe99c9326f722f8070b0a9706"
   },
   ".github/workflows/quality.yml": {
-    "mtime": 1787470517.2772784,
-    "seen": 1787471131.9038768,
-    "ast_hash": "d4db50642bcc2eeb81904e3dfafc9aa0",
-    "semantic_hash": "d4db50642bcc2eeb81904e3dfafc9aa0"
+    "mtime": 1787471721.16832,
+    "seen": 1787471824.1771278,
+    "ast_hash": "5132062b7cd009ff19a0a99d06e6d43c",
+    "semantic_hash": "5132062b7cd009ff19a0a99d06e6d43c"
   },
   "specs/agent-foundation/spec.md": {
     "mtime": 1787470913.615292,

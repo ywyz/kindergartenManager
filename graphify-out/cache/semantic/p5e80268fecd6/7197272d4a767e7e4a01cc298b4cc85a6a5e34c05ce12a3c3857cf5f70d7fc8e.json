@@ -1,1 +1,0 @@
-{"nodes": [{"id": "github_workflows_quality", "label": "Quality CI Workflow", "file_type": "code", "source_file": ".github/workflows/quality.yml", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null, "rationale": null}], "edges": [], "hyperedges": []}
