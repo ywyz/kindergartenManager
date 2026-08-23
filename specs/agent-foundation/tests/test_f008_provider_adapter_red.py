@@ -35,12 +35,12 @@ BASE_FINGERPRINT = "d" * 64
 TENANT_ID = 1_234_567_890
 USER_ID = 1_987_654_321
 EXPECTED_WIRE_NAMES = {
-    "daily_plan.read_current": "daily_plan_read_current",
-    "daily_plan.read_context": "daily_plan_read_context",
-    "calendar.read_evaluation": "calendar_read_evaluation",
-    "settings.read_class_areas": "settings_read_class_areas",
-    "daily_plan.draft_section_patch": "daily_plan_draft_section_patch",
-    "daily_plan.draft_reflection_patch": "daily_plan_draft_reflection_patch",
+    "daily_plan.read_current": "daily_plan__read_current",
+    "daily_plan.read_context": "daily_plan__read_context",
+    "calendar.read_evaluation": "calendar__read_evaluation",
+    "settings.read_class_areas": "settings__read_class_areas",
+    "daily_plan.draft_section_patch": "daily_plan__draft_section_patch",
+    "daily_plan.draft_reflection_patch": "daily_plan__draft_reflection_patch",
 }
 WIRE_NAME_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,64}")
 
@@ -566,7 +566,7 @@ def _invalid_cases() -> list[pytest.ParamSpec]:
                 tool_calls=[
                     _wire_call(
                         raw_id="bad-arguments-json",
-                        alias="settings_read_class_areas",
+                        alias="settings__read_class_areas",
                         arguments="{",
                     )
                 ],
@@ -581,7 +581,7 @@ def _invalid_cases() -> list[pytest.ParamSpec]:
                 tool_calls=[
                     _wire_call(
                         raw_id="arguments-not-object",
-                        alias="settings_read_class_areas",
+                        alias="settings__read_class_areas",
                         arguments="[]",
                     )
                 ],
@@ -596,7 +596,7 @@ def _invalid_cases() -> list[pytest.ParamSpec]:
                 tool_calls=[
                     _wire_call(
                         raw_id="arguments-schema-open",
-                        alias="settings_read_class_areas",
+                        alias="settings__read_class_areas",
                         arguments='{"unexpected":true}',
                     )
                 ],
