@@ -206,6 +206,8 @@ idle -> running -> draft_ready | succeeded | failed | cancelled -> idle
 - 全应用同时最多一个 operation；第二个请求返回稳定 busy 错误。
 - F006 Tool loop 串行运行，并设置 Tool call 次数、消息窗口、intent、响应与单个 ToolResult 大小上限；
   READ 结果必须是 descriptor 登记的冻结应用 DTO，DRAFT 结果必须与从关闭参数重建的规范 Patch 完全一致。
+- Provider/Tool 边界只接受精确内建类型，不接受带状态的 `str`/`tuple` 子类；业务 ID 为正的 signed-64
+  范围，周次为 1–53，metadata 单字段最多 256 字符，投影正文单字段最多 4096 字符。
 - Provider 等待期间不得保持数据库事务。
 - 每个 READ Tool 在执行时创建并关闭自己的短会话；DRAFT 只消费冻结 DTO。
 - F007 才增加单 Tool/总时限，以及取消、页面切换、actor/scope/fingerprint 变化或 operation ID 不匹配时的迟到结果丢弃。

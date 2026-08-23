@@ -26,6 +26,9 @@ DAILY_PLAN_SECTION_PATHS = (
 MAX_TOOL_TEXT_LENGTH = 4096
 MAX_TOOL_WARNINGS = 8
 MAX_TOOL_WARNING_LENGTH = 256
+MAX_TOOL_METADATA_LENGTH = 256
+MAX_TOOL_ID = 2**63 - 1
+MAX_WEEK_NUMBER = 53
 SHA256_HEX_PATTERN = re.compile(r"[0-9a-f]{64}")
 
 
@@ -61,13 +64,13 @@ class ClosedToolInputSchema:
             not isinstance(self.required_fields, frozenset)
             or not isinstance(self.optional_fields, frozenset)
             or not all(
-                isinstance(name, str) and name
+                type(name) is str and name
                 for name in self.required_fields | self.optional_fields
             )
             or self.required_fields & self.optional_fields
             or not isinstance(self.operation_paths, frozenset)
             or not all(
-                isinstance(path, str) and path in DAILY_PLAN_SECTION_PATHS
+                type(path) is str and path in DAILY_PLAN_SECTION_PATHS
                 for path in self.operation_paths
             )
             or self.additional_properties is not False
@@ -77,7 +80,7 @@ class ClosedToolInputSchema:
     def accepts(self, arguments: Mapping[str, object]) -> bool:
         """Return whether provider arguments have exactly the closed key shape."""
         if not isinstance(arguments, Mapping) or not all(
-            isinstance(name, str) for name in arguments
+            type(name) is str for name in arguments
         ):
             return False
         names = frozenset(arguments)
@@ -100,7 +103,7 @@ class ClosedToolInputSchema:
         if (
             str(operation_id) != arguments["operation_id"]
             or str(turn_id) != arguments["turn_id"]
-            or not isinstance(arguments["base_fingerprint"], str)
+            or type(arguments["base_fingerprint"]) is not str
             or SHA256_HEX_PATTERN.fullmatch(arguments["base_fingerprint"]) is None
         ):
             return False
@@ -111,9 +114,12 @@ class ClosedToolInputSchema:
             "plan_date",
         }:
             return False
-        if type(target["daily_plan_id"]) is not int or target["daily_plan_id"] <= 0:
+        if (
+            type(target["daily_plan_id"]) is not int
+            or not 0 < target["daily_plan_id"] <= MAX_TOOL_ID
+        ):
             return False
-        if not isinstance(target["plan_date"], str):
+        if type(target["plan_date"]) is not str:
             return False
         try:
             if (
@@ -140,10 +146,7 @@ class ClosedToolInputSchema:
             }:
                 return False
             field_path = operation["field_path"]
-            if (
-                not isinstance(field_path, str)
-                or field_path not in self.operation_paths
-            ):
+            if type(field_path) is not str or field_path not in self.operation_paths:
                 return False
             if field_path in paths or any(
                 field_path.startswith(f"{other}.") or other.startswith(f"{field_path}.")
@@ -151,7 +154,7 @@ class ClosedToolInputSchema:
             ):
                 return False
             if any(
-                not isinstance(operation[name], str)
+                type(operation[name]) is not str
                 or len(operation[name]) > MAX_TOOL_TEXT_LENGTH
                 for name in ("before_value", "after_value")
             ):
@@ -163,7 +166,7 @@ class ClosedToolInputSchema:
             isinstance(warnings, (tuple, list))
             and len(warnings) <= MAX_TOOL_WARNINGS
             and all(
-                isinstance(warning, str)
+                type(warning) is str
                 and bool(warning.strip())
                 and len(warning) <= MAX_TOOL_WARNING_LENGTH
                 for warning in warnings
@@ -334,7 +337,11 @@ class AgentContext:
 
 
 def _valid_plan_identity(value: object) -> bool:
-    return type(value) is int and value > 0
+    return type(value) is int and 0 < value <= MAX_TOOL_ID
+
+
+def _valid_metadata_text(value: object) -> bool:
+    return type(value) is str and len(value) <= MAX_TOOL_METADATA_LENGTH
 
 
 def _valid_plan_metadata(
@@ -350,24 +357,24 @@ def _valid_plan_metadata(
         _valid_plan_identity(plan_id)
         and type(plan_date) is date
         and type(week_number) is int
-        and week_number > 0
-        and isinstance(weekday_cn, str)
-        and isinstance(grade, str)
-        and isinstance(class_name, str)
+        and 0 < week_number <= MAX_WEEK_NUMBER
+        and _valid_metadata_text(weekday_cn)
+        and _valid_metadata_text(grade)
+        and _valid_metadata_text(class_name)
     )
 
 
 def _valid_plan_sections(value: object) -> bool:
     return (
-        isinstance(value, tuple)
+        type(value) is tuple
         and tuple(
             section.field_path for section in value if type(section) is PlanSection
         )
         == DAILY_PLAN_SECTION_PATHS
         and all(
             type(section) is PlanSection
-            and isinstance(section.field_path, str)
-            and isinstance(section.content, str)
+            and type(section.field_path) is str
+            and type(section.content) is str
             and len(section.content) <= MAX_TOOL_TEXT_LENGTH
             and type(section.truncated) is bool
             for section in value
@@ -377,12 +384,12 @@ def _valid_plan_sections(value: object) -> bool:
 
 def _valid_section_states(value: object) -> bool:
     return (
-        isinstance(value, tuple)
+        type(value) is tuple
         and tuple(state.field_path for state in value if type(state) is SectionState)
         == DAILY_PLAN_SECTION_PATHS
         and all(
             type(state) is SectionState
-            and isinstance(state.field_path, str)
+            and type(state.field_path) is str
             and type(state.has_content) is bool
             for state in value
         )
@@ -403,7 +410,7 @@ def _tool_output_matches(kind: ToolOutputKind, value: object) -> bool:
             )
             and _valid_plan_sections(value.sections)
             and type(value.updated_at_utc) is datetime
-            and isinstance(value.content_sha256, str)
+            and type(value.content_sha256) is str
             and SHA256_HEX_PATTERN.fullmatch(value.content_sha256) is not None
         )
     if kind is ToolOutputKind.DAILY_PLAN_CONTEXT_PROJECTION:
@@ -417,7 +424,9 @@ def _tool_output_matches(kind: ToolOutputKind, value: object) -> bool:
                 grade=value.grade,
                 class_name=value.class_name,
             )
-            and (value.semester_name is None or isinstance(value.semester_name, str))
+            and (
+                value.semester_name is None or _valid_metadata_text(value.semester_name)
+            )
             and _valid_section_states(value.section_states)
         )
     if kind is ToolOutputKind.CALENDAR_EVALUATION_PROJECTION:
@@ -426,20 +435,20 @@ def _tool_output_matches(kind: ToolOutputKind, value: object) -> bool:
             and type(value.target_date) is date
             and (value.within_semester is None or type(value.within_semester) is bool)
             and isinstance(value.day_type, CalendarDayType)
-            and (value.holiday_name is None or isinstance(value.holiday_name, str))
+            and (value.holiday_name is None or _valid_metadata_text(value.holiday_name))
             and (
                 value.degradation_code is None
-                or isinstance(value.degradation_code, str)
+                or _valid_metadata_text(value.degradation_code)
             )
         )
     if kind is ToolOutputKind.CLASS_AREAS_PROJECTION:
         return (
             type(value) is ClassAreasProjection
-            and isinstance(value.grade, str)
-            and isinstance(value.class_name, str)
-            and isinstance(value.indoor_areas, str)
+            and _valid_metadata_text(value.grade)
+            and _valid_metadata_text(value.class_name)
+            and type(value.indoor_areas) is str
             and len(value.indoor_areas) <= MAX_TOOL_TEXT_LENGTH
-            and isinstance(value.outdoor_content, str)
+            and type(value.outdoor_content) is str
             and len(value.outdoor_content) <= MAX_TOOL_TEXT_LENGTH
         )
     return kind is ToolOutputKind.PLAN_PATCH

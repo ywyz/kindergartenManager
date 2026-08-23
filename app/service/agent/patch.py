@@ -8,6 +8,8 @@ from uuid import UUID, uuid4
 from app.service.agent.canonical import canonical_sha256
 from app.service.agent.contracts import (
     DAILY_PLAN_SECTION_PATHS,
+    MAX_TOOL_ID,
+    MAX_TOOL_METADATA_LENGTH,
     MAX_TOOL_TEXT_LENGTH,
     MAX_TOOL_WARNINGS,
     MAX_TOOL_WARNING_LENGTH,
@@ -46,7 +48,10 @@ class PlanPatchTarget:
     plan_date: date
 
     def __post_init__(self) -> None:
-        if type(self.daily_plan_id) is not int or self.daily_plan_id <= 0:
+        if (
+            type(self.daily_plan_id) is not int
+            or not 0 < self.daily_plan_id <= MAX_TOOL_ID
+        ):
             _reject("target_invalid")
         if type(self.plan_date) is not date:
             _reject("target_invalid")
@@ -365,8 +370,45 @@ def build_plan_patch_from_arguments(
 def plan_patch_matches_expected(*, actual: object, expected: PlanPatch) -> bool:
     """Verify every canonical PlanPatch field except its intentionally random id."""
     return (
-        isinstance(actual, PlanPatch)
+        type(actual) is PlanPatch
         and type(actual.patch_id) is UUID
+        and type(actual.schema_version) is int
+        and type(actual.operation_id) is UUID
+        and type(actual.turn_id) is UUID
+        and type(actual.tool_name) is str
+        and len(actual.tool_name) <= MAX_TOOL_METADATA_LENGTH
+        and type(actual.target) is PlanPatchTarget
+        and type(actual.target.daily_plan_id) is int
+        and 0 < actual.target.daily_plan_id <= MAX_TOOL_ID
+        and type(actual.target.plan_date) is date
+        and type(actual.base_fingerprint) is str
+        and _SHA256_PATTERN.fullmatch(actual.base_fingerprint) is not None
+        and type(actual.operations) is tuple
+        and bool(actual.operations)
+        and all(
+            type(operation) is PatchOperation
+            and type(operation.field_path) is str
+            and operation.field_path in ALLOWED_PLAN_PATCH_PATHS
+            and type(operation.before_sha256) is str
+            and _SHA256_PATTERN.fullmatch(operation.before_sha256) is not None
+            and type(operation.before_display) is str
+            and len(operation.before_display) <= MAX_PATCH_VALUE_LENGTH
+            and type(operation.after_value) is str
+            and len(operation.after_value) <= MAX_PATCH_VALUE_LENGTH
+            and type(operation.after_display) is str
+            and len(operation.after_display) <= MAX_PATCH_VALUE_LENGTH
+            for operation in actual.operations
+        )
+        and type(actual.warnings) is tuple
+        and len(actual.warnings) <= MAX_PATCH_WARNINGS
+        and all(
+            type(warning) is str
+            and bool(warning.strip())
+            and len(warning) <= MAX_PATCH_WARNING_LENGTH
+            for warning in actual.warnings
+        )
+        and type(actual.canonical_sha256) is str
+        and _SHA256_PATTERN.fullmatch(actual.canonical_sha256) is not None
         and actual.schema_version == expected.schema_version
         and actual.operation_id == expected.operation_id
         and actual.turn_id == expected.turn_id

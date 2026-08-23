@@ -2,7 +2,7 @@
 
 import asyncio
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, is_dataclass
 from enum import Enum
 from types import MappingProxyType
 from typing import Protocol, runtime_checkable
@@ -10,13 +10,8 @@ from uuid import UUID
 
 from app.service.agent.contracts import (
     AgentContext,
-    CalendarEvaluationProjection,
-    ClassAreasProjection,
-    DailyPlanContextProjection,
-    DailyPlanProjection,
     Permission,
     ToolDescriptor,
-    ToolOutputKind,
 )
 from app.service.agent.canonical import canonical_json
 from app.service.agent.patch import (
@@ -85,25 +80,11 @@ class _InvalidToolPayload:
 
 
 _INVALID_TOOL_PAYLOAD = _InvalidToolPayload()
-_REGISTERED_TOOL_VALUE_TYPES = (
-    DailyPlanProjection,
-    DailyPlanContextProjection,
-    CalendarEvaluationProjection,
-    ClassAreasProjection,
-    PlanPatch,
-)
-_OUTPUT_TYPES = {
-    ToolOutputKind.DAILY_PLAN_PROJECTION: DailyPlanProjection,
-    ToolOutputKind.DAILY_PLAN_CONTEXT_PROJECTION: DailyPlanContextProjection,
-    ToolOutputKind.CALENDAR_EVALUATION_PROJECTION: CalendarEvaluationProjection,
-    ToolOutputKind.CLASS_AREAS_PROJECTION: ClassAreasProjection,
-    ToolOutputKind.PLAN_PATCH: PlanPatch,
-}
 
 
 def _freeze_tool_value(value: object) -> object:
     """Deep-copy allowed payload containers without retaining executor objects."""
-    if type(value) in _REGISTERED_TOOL_VALUE_TYPES:
+    if is_dataclass(value):
         return value
     if value is None or type(value) in {str, int, float, bool}:
         return value
@@ -134,7 +115,7 @@ class ProviderToolCall:
             type(self.call_id) is not UUID
             or type(self.operation_id) is not UUID
             or type(self.turn_id) is not UUID
-            or not isinstance(self.tool_name, str)
+            or type(self.tool_name) is not str
             or not self.tool_name
             or not isinstance(self.permission, Permission)
             or not isinstance(self.arguments, Mapping)
@@ -164,11 +145,11 @@ class ToolExecutionResult:
             type(self.call_id) is not UUID
             or type(self.operation_id) is not UUID
             or type(self.turn_id) is not UUID
-            or not isinstance(self.tool_name, str)
+            or type(self.tool_name) is not str
             or not self.tool_name
             or not isinstance(self.permission, Permission)
             or not isinstance(self.status, ToolExecutionStatus)
-            or (self.error_code is not None and not isinstance(self.error_code, str))
+            or (self.error_code is not None and type(self.error_code) is not str)
         ):
             raise ValueError("tool_execution_result_invalid")
         object.__setattr__(self, "value", _freeze_tool_value(self.value))
@@ -186,14 +167,14 @@ class ProviderMessage:
     def __post_init__(self) -> None:
         if not isinstance(self.role, ProviderRole):
             raise ValueError("provider_message_invalid")
-        if self.content is not None and not isinstance(self.content, str):
+        if self.content is not None and type(self.content) is not str:
             raise ValueError("provider_message_invalid")
-        if not isinstance(self.tool_calls, tuple) or not all(
-            isinstance(call, ProviderToolCall) for call in self.tool_calls
+        if type(self.tool_calls) is not tuple or not all(
+            type(call) is ProviderToolCall for call in self.tool_calls
         ):
             raise ValueError("provider_message_invalid")
-        if not isinstance(self.tool_results, tuple) or not all(
-            isinstance(result, ToolExecutionResult) for result in self.tool_results
+        if type(self.tool_results) is not tuple or not all(
+            type(result) is ToolExecutionResult for result in self.tool_results
         ):
             raise ValueError("provider_message_invalid")
 
@@ -214,15 +195,13 @@ class ProviderTurnRequest:
             type(self.operation_id) is not UUID
             or not isinstance(self.context, AgentContext)
             or self.operation_id != self.context.operation_id
-            or not isinstance(self.local_policy_version, str)
+            or type(self.local_policy_version) is not str
             or not self.local_policy_version
-            or not isinstance(self.messages, tuple)
+            or type(self.messages) is not tuple
             or not self.messages
-            or not all(
-                isinstance(message, ProviderMessage) for message in self.messages
-            )
-            or not isinstance(self.tools, tuple)
-            or not all(isinstance(tool, ToolDescriptor) for tool in self.tools)
+            or not all(type(message) is ProviderMessage for message in self.messages)
+            or type(self.tools) is not tuple
+            or not all(type(tool) is ToolDescriptor for tool in self.tools)
             or type(self.response_limit) is not int
             or self.response_limit <= 0
         ):
@@ -239,18 +218,20 @@ class ProviderTurnResult:
     provider_request_id: str | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
-        if self.assistant_content is not None and not isinstance(
-            self.assistant_content, str
+        if (
+            self.assistant_content is not None
+            and type(self.assistant_content) is not str
         ):
             raise ValueError("provider_result_invalid")
-        if not isinstance(self.tool_calls, tuple) or not all(
-            isinstance(call, ProviderToolCall) for call in self.tool_calls
+        if type(self.tool_calls) is not tuple or not all(
+            type(call) is ProviderToolCall for call in self.tool_calls
         ):
             raise ValueError("provider_result_invalid")
         if not isinstance(self.finish_reason, ProviderFinishReason):
             raise ValueError("provider_result_invalid")
-        if self.provider_request_id is not None and not isinstance(
-            self.provider_request_id, str
+        if (
+            self.provider_request_id is not None
+            and type(self.provider_request_id) is not str
         ):
             raise ValueError("provider_result_invalid")
         if (
@@ -338,7 +319,7 @@ class AgentRuntime:
 
     async def run_turn(self, *, context: AgentContext, intent: str) -> AgentTurnOutcome:
         """Run a bounded serial turn; never expose provider exception details."""
-        if not isinstance(context, AgentContext) or not isinstance(intent, str):
+        if type(context) is not AgentContext or type(intent) is not str:
             return _failure("agent.tool_schema_invalid")
         normalized_intent = intent.strip()
         if not normalized_intent:
@@ -379,7 +360,7 @@ class AgentRuntime:
                 result = await self._provider.complete(request)
             except Exception:
                 return _failure("agent.provider_failed")
-            if not isinstance(result, ProviderTurnResult):
+            if type(result) is not ProviderTurnResult:
                 return _failure("agent.provider_failed")
             if (
                 result.assistant_content is not None
@@ -496,7 +477,7 @@ class AgentRuntime:
         execution: object,
         expected_patch: PlanPatch | None,
     ) -> str | None:
-        if not isinstance(execution, ToolExecutionResult):
+        if type(execution) is not ToolExecutionResult:
             return "agent.tool_schema_invalid"
         if (
             execution.call_id != call.call_id
@@ -508,14 +489,11 @@ class AgentRuntime:
             return "agent.tool_schema_invalid"
         if execution.status is not ToolExecutionStatus.OK:
             return "agent.tool_failed"
-        expected_type = _OUTPUT_TYPES[descriptor.output_schema.kind]
-        if type(execution.value) is not expected_type:
-            return "agent.tool_schema_invalid"
-        if not descriptor.output_schema.accepts(execution.value):
-            return "agent.tool_schema_invalid"
-        if expected_patch is not None and not plan_patch_matches_expected(
-            actual=execution.value,
-            expected=expected_patch,
+        if expected_patch is None:
+            if not descriptor.output_schema.accepts(execution.value):
+                return "agent.tool_schema_invalid"
+        elif not plan_patch_matches_expected(
+            actual=execution.value, expected=expected_patch
         ):
             return "agent.tool_schema_invalid"
         try:

@@ -90,7 +90,9 @@ F006 在 `f0ab660f46d9293df53c13f5698c7dffd99892bc` 固定 15 项公共行为 RE
 `6b083fa3fa185882b88d9d743ec9af8b5cfd34c5` 稳定为 `54 collected / 44 passed / 10 failed`，当前
 首轮修正为 `54 passed`。Spec 复审继续发现冻结 dataclass 内部字段仍可能错型/可变；第二个 Review RED
 `8831b3f712be8428f543b49c1aa33c01127f04e5` 稳定为 `58 collected / 54 passed / 4 failed`，分别覆盖四种
-READ DTO 的逐字段关闭与深不可变要求。当前修正后的 GREEN 候选必须保持 `58 passed`。具体 Provider adapter、Tool executor、取消、超时、
+READ DTO 的逐字段关闭与深不可变要求。后续复审补充内建类型子类逃逸及 ID、周次、metadata 字段上限；
+第三个 Review RED `79e005a929e5a1a4979cad6e28d71ef5f9ab1e17` 稳定为
+`67 collected / 58 passed / 9 failed`，当前修正后的 GREEN 候选必须保持 `67 passed`。具体 Provider adapter、Tool executor、取消、超时、
 过期/迟到丢弃、UI 和持久化均不属于 F006。
 
 ## 7. 停止边界

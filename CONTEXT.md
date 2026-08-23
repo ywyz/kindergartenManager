@@ -120,7 +120,9 @@ Review RED 为 `f1797e6…`，固定 GREEN 为 `729f446…`；F005 RED 固定为
 Review RED `6b083fa…` 稳定为 `54 collected / 44 passed / 10 failed`。首轮修正后的本地 GREEN 候选共
 `54 passed`。Spec 复审继续发现冻结 dataclass 可藏入可变/错型字段，第二个 Review RED `8831b3f…`
 稳定为 `58 collected / 54 passed / 4 failed`；补齐四种 READ DTO 的逐字段关闭验证后，当前共
-`58 passed`，没有 skip、xfail 或放宽原测试。
+`58 passed`。后续双轴复审又固定内建类型子类逃逸及 ID/周次/metadata 字段上限，第三个 Review RED
+`79e005a…` 稳定为 `67 collected / 58 passed / 9 failed`；当前修正后的本地 GREEN 候选共
+`67 passed`，没有 skip、xfail 或放宽原测试。
 
 首期范围只是每日活动计划页的单 Agent Foundation：
 
@@ -153,10 +155,10 @@ F003 固定 SHA 的双轴 Review 和远端 CI `headSha` 已通过。
 R1 基础修复的本地门禁已经通过，当前共同下一步是：
 
 1. 对修正后的 F006 GREEN 候选完成双轴复审，再固定最终 SHA。
-2. 对最终 F006 SHA 运行完整 Quality、无忽略依赖审计、Foundation 58 项与远端 CI `headSha` 回读。
+2. 对最终 F006 SHA 运行完整 Quality、无忽略依赖审计、Foundation 67 项与远端 CI `headSha` 回读。
 3. F006 门禁闭合后只规划 F007 的稳定 RED；取消、超时、scope/fingerprint 变化和迟到结果丢弃不得提前实现。
 4. NiceGUI 多用户预备功能保持低优先级，不与 Agent Foundation 隐式捆绑。
-5. 当前 F006 GREEN 候选的 Linux 本地证据为 Python 3.14.7、变更文件 Ruff 0 错误、Foundation `58 passed`；全量 `551 passed` 是第二轮 Review 前候选结果，需在最终固定 SHA 复跑。Windows、Word、MySQL 和真实 AI 仍是独立人工门禁。
+5. 当前 F006 GREEN 候选的 Linux 本地证据为 Python 3.14.7、变更文件 Ruff 0 错误、Foundation `67 passed`；全量 `551 passed` 是第三个 Review RED 前候选结果，需在最终固定 SHA 复跑。Windows、Word、MySQL 和真实 AI 仍是独立人工门禁。
 
 ## 11. 更新规则
 
