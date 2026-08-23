@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from enum import Enum
 import re
 from typing import TypeAlias
@@ -38,6 +38,9 @@ class Permission(str, Enum):
     READ = "READ"
     DRAFT = "DRAFT"
     WRITE = "WRITE"
+
+
+FOUNDATION_ALLOWED_PERMISSIONS = frozenset({Permission.READ, Permission.DRAFT})
 
 
 class ToolOutputKind(str, Enum):
@@ -181,7 +184,7 @@ class ClosedToolOutputSchema:
     kind: ToolOutputKind
 
     def __post_init__(self) -> None:
-        if not isinstance(self.kind, ToolOutputKind):
+        if type(self.kind) is not ToolOutputKind:
             raise ValueError("tool_output_schema_invalid")
 
     def accepts(self, value: object) -> bool:
@@ -410,6 +413,7 @@ def _tool_output_matches(kind: ToolOutputKind, value: object) -> bool:
             )
             and _valid_plan_sections(value.sections)
             and type(value.updated_at_utc) is datetime
+            and value.updated_at_utc.tzinfo is timezone.utc
             and type(value.content_sha256) is str
             and SHA256_HEX_PATTERN.fullmatch(value.content_sha256) is not None
         )
@@ -434,7 +438,7 @@ def _tool_output_matches(kind: ToolOutputKind, value: object) -> bool:
             type(value) is CalendarEvaluationProjection
             and type(value.target_date) is date
             and (value.within_semester is None or type(value.within_semester) is bool)
-            and isinstance(value.day_type, CalendarDayType)
+            and type(value.day_type) is CalendarDayType
             and (value.holiday_name is None or _valid_metadata_text(value.holiday_name))
             and (
                 value.degradation_code is None
@@ -454,7 +458,52 @@ def _tool_output_matches(kind: ToolOutputKind, value: object) -> bool:
     return kind is ToolOutputKind.PLAN_PATCH
 
 
-FOUNDATION_ALLOWED_PERMISSIONS = frozenset({Permission.READ, Permission.DRAFT})
+def validate_agent_context(value: object) -> bool:
+    """Validate every nested Provider-visible Context field without staleness checks."""
+    if (
+        type(value) is not AgentContext
+        or type(value.context_id) is not UUID
+        or type(value.operation_id) is not UUID
+        or type(value.turn_id) is not UUID
+        or type(value.created_at_utc) is not datetime
+        or value.created_at_utc.tzinfo is not timezone.utc
+        or type(value.expires_at_utc) is not datetime
+        or value.expires_at_utc.tzinfo is not timezone.utc
+        or not 0 < (value.expires_at_utc - value.created_at_utc).total_seconds() <= 300
+        or type(value.locale) is not str
+        or value.locale != "zh-CN"
+        or type(value.actor) is not TrustedActor
+        or not _valid_plan_identity(value.actor.tenant_id)
+        or not _valid_plan_identity(value.actor.user_id)
+        or type(value.active_scope) is not DailyPlanScope
+        or type(value.facts) is not tuple
+        or len({type(fact) for fact in value.facts}) != len(value.facts)
+        or type(value.base_fingerprint) is not str
+        or SHA256_HEX_PATTERN.fullmatch(value.base_fingerprint) is None
+        or type(value.allowed_permissions) is not frozenset
+        or not all(
+            type(permission) is Permission for permission in value.allowed_permissions
+        )
+        or value.allowed_permissions != FOUNDATION_ALLOWED_PERMISSIONS
+    ):
+        return False
+    scope = value.active_scope
+    if scope.daily_plan_id is not None:
+        if scope.plan_date is not None or not _valid_plan_identity(scope.daily_plan_id):
+            return False
+    elif type(scope.plan_date) is not date:
+        return False
+    read_kinds = (
+        ToolOutputKind.DAILY_PLAN_PROJECTION,
+        ToolOutputKind.DAILY_PLAN_CONTEXT_PROJECTION,
+        ToolOutputKind.CALENDAR_EVALUATION_PROJECTION,
+        ToolOutputKind.CLASS_AREAS_PROJECTION,
+    )
+    return all(
+        any(_tool_output_matches(kind, fact) for kind in read_kinds)
+        for fact in value.facts
+    )
+
 
 _READ_TOOL_INPUT = ClosedToolInputSchema()
 _SECTION_DRAFT_TOOL_INPUT = ClosedToolInputSchema(

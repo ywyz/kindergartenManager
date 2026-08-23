@@ -2,7 +2,8 @@
 
 import asyncio
 from collections.abc import Mapping
-from dataclasses import dataclass, field, is_dataclass
+from dataclasses import dataclass, field, fields, is_dataclass
+from datetime import date, datetime
 from enum import Enum
 from types import MappingProxyType
 from typing import Protocol, runtime_checkable
@@ -12,6 +13,7 @@ from app.service.agent.contracts import (
     AgentContext,
     Permission,
     ToolDescriptor,
+    validate_agent_context,
 )
 from app.service.agent.canonical import canonical_json
 from app.service.agent.patch import (
@@ -24,6 +26,7 @@ from app.service.agent.registry import AgentToolRegistry, AgentToolRejected
 
 LOCAL_POLICY_VERSION = "agent-foundation-v1"
 MAX_PROVIDER_REQUEST_ID_LENGTH = 128
+MAX_TOOL_ERROR_CODE_LENGTH = 128
 
 
 class ProviderRole(str, Enum):
@@ -85,7 +88,7 @@ _INVALID_TOOL_PAYLOAD = _InvalidToolPayload()
 def _freeze_tool_value(value: object) -> object:
     """Deep-copy allowed payload containers without retaining executor objects."""
     if is_dataclass(value):
-        return value
+        return _freeze_dataclass_value(value)
     if value is None or type(value) in {str, int, float, bool}:
         return value
     if isinstance(value, Mapping):
@@ -96,6 +99,37 @@ def _freeze_tool_value(value: object) -> object:
         )
     if isinstance(value, (list, tuple)):
         return tuple(_freeze_tool_value(item) for item in value)
+    return _INVALID_TOOL_PAYLOAD
+
+
+def _freeze_dataclass_value(value: object) -> object:
+    """Copy a frozen dataclass while marking mutable or unsupported fields invalid."""
+    if isinstance(value, type):
+        return _INVALID_TOOL_PAYLOAD
+    parameters = getattr(type(value), "__dataclass_params__", None)
+    if parameters is None or not parameters.frozen:
+        return _INVALID_TOOL_PAYLOAD
+    copied = {
+        item.name: _freeze_dataclass_field(getattr(value, item.name))
+        for item in fields(value)
+    }
+    try:
+        return type(value)(**copied)
+    except (TypeError, ValueError):
+        return _INVALID_TOOL_PAYLOAD
+
+
+def _freeze_dataclass_field(value: object) -> object:
+    if value is None or type(value) in {str, int, float, bool, date, datetime, UUID}:
+        return value
+    if isinstance(value, Enum):
+        return value
+    if type(value) is tuple:
+        return tuple(_freeze_dataclass_field(item) for item in value)
+    if type(value) is frozenset:
+        return frozenset(_freeze_dataclass_field(item) for item in value)
+    if is_dataclass(value):
+        return _freeze_dataclass_value(value)
     return _INVALID_TOOL_PAYLOAD
 
 
@@ -193,7 +227,7 @@ class ProviderTurnRequest:
     def __post_init__(self) -> None:
         if (
             type(self.operation_id) is not UUID
-            or not isinstance(self.context, AgentContext)
+            or not validate_agent_context(self.context)
             or self.operation_id != self.context.operation_id
             or type(self.local_policy_version) is not str
             or not self.local_policy_version
@@ -319,7 +353,7 @@ class AgentRuntime:
 
     async def run_turn(self, *, context: AgentContext, intent: str) -> AgentTurnOutcome:
         """Run a bounded serial turn; never expose provider exception details."""
-        if type(context) is not AgentContext or type(intent) is not str:
+        if not validate_agent_context(context) or type(intent) is not str:
             return _failure("agent.tool_schema_invalid")
         normalized_intent = intent.strip()
         if not normalized_intent:
@@ -485,6 +519,16 @@ class AgentRuntime:
             or execution.turn_id != context.turn_id
             or execution.tool_name != call.tool_name
             or execution.permission is not call.permission
+        ):
+            return "agent.tool_schema_invalid"
+        if (
+            execution.error_code is not None
+            and len(execution.error_code) > MAX_TOOL_ERROR_CODE_LENGTH
+        ):
+            return "agent.tool_schema_invalid"
+        if (
+            execution.status is ToolExecutionStatus.OK
+            and execution.error_code is not None
         ):
             return "agent.tool_schema_invalid"
         if execution.status is not ToolExecutionStatus.OK:
