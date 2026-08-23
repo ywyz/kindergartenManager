@@ -102,7 +102,7 @@ R0 事实基线与图谱
 
 ## 7. R3：Agent Foundation 规格与分支决策
 
-状态：`自动验证`（F005 固定 GREEN 已验证；F006 本地实现与双轴 Review 已完成，待远端 CI）。
+状态：`自动验证`（F005、F006 固定 GREEN 已验证；F007 未授权）。
 
 已确认：[ADR-0005](ADR/ADR-0005-controlled-ai-agent-runtime.md) 和
 [Agent Runtime 设计](design/agent-runtime.md) 已经固定首期上限，即每日活动计划的单 Agent、
@@ -113,16 +113,16 @@ R0 事实基线与图谱
 - 功能分支固定为 `feat/agent-foundation`；F002 原始 RED SHA 为 `ad13a6aa3e44ff98b2604d4a008649cd66185d80`。
 - `main@cfeadefd7dfa056c1b3757876658493110d8cf84` 通过双亲 merge commit 同步到 `5de2e49bee19749f611b50747a31be9464b92d7b`；该远端 SHA 的 Quality 已通过。
 - [冻结规格与停止边界](../specs/agent-foundation/spec.md)、[任务顺序](../specs/agent-foundation/tasks.md) 和 [Issue #48](https://github.com/ywyz/kindergartenManager/issues/48) 已建立。
-- `specs/agent-foundation/tests/` 的 F005 固定 GREEN 为 `53dd2e8…`，双轴 Review 零发现且远端 Quality `32641923137` 精确匹配成功；F006 稳定 RED 为 `f0ab660…`，Review RED 为 `6b083fa…`、`8831b3f…`、`79e005a…` 与 `51f5e5f…`，最终本地实现/重构候选 `99167ef…` 为 Standards `0`、Spec `0`，Foundation `73 passed`、全量 `551 passed`，待远端 CI 回读。
+- `specs/agent-foundation/tests/` 的 F005 固定 GREEN 为 `53dd2e8…`，双轴 Review 零发现且远端 Quality `32641923137` 精确匹配成功；F006 稳定 RED 为 `f0ab660…`，Review RED 为 `6b083fa…`、`8831b3f…`、`79e005a…` 与 `51f5e5f…`，最终实现/重构候选 `99167ef…` 为 Standards `0`、Spec `0`，Foundation `73 passed`、全量 `551 passed`；证据 SHA `049b520…` 的远端 Quality `32644290676` 精确匹配成功。
 - 当前继续单用户；NiceGUI 多用户/RBAC 代码仅作为低优先级预备资产，不进入 Foundation 范围。
 - 是否仍保持模块化单体？服务拆分必须有独立 ADR 和运营理由。
 - 聚合事务和 tenant/user 投影修复后，每日计划、班级设置和日历的窄 Service 投影如何建立，使 Agent Tool 不直接调用 Repository？
 
-当前停止边界：只实现 F006 Provider port 与有界串行 Runtime并完成固定 SHA Review/CI。F007 取消/超时/scope-fingerprint 变化/迟到丢弃、Tool 实现、UI 或 migration 仍需新的明确授权。
+当前停止边界：F006 Provider port 与有界串行 Runtime 的固定 SHA Review/CI 已闭合。F007 取消/超时/scope-fingerprint 变化/迟到丢弃、Tool 实现、UI 或 migration 仍需新的明确授权。
 
 ## 8. R4A：受控 Agent Foundation READ/DRAFT
 
-状态：`自动验证`（F005 固定 GREEN；F006 本地双轴 Review 完成、待精确 SHA CI；F007 未授权）。
+状态：`自动验证`（F005、F006 固定 GREEN；F007 未授权）。
 
 实现范围严格限定为：
 

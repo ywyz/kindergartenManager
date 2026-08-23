@@ -1,6 +1,6 @@
 # KindergartenManager 受控 AI Agent Runtime 设计
 
-> 状态：已确认设计；F003-F005 已固定 GREEN，F006 Provider port/有界串行 Runtime 已完成本地实现与双轴 Review，待远端 CI；F007 及以后未授权。本文落实
+> 状态：已确认设计；F003-F006 已固定 GREEN；F007 及以后未授权。本文落实
 > [ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md)，不代表完整 Agent 已进入当前产品，也不授权
 > 提交、推送、合并或发布。
 

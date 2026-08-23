@@ -1,6 +1,6 @@
 # Agent Foundation 冻结规格
 
-- 状态：F005 固定 GREEN；F006 Provider port/有界 Runtime 已完成本地实现与双轴 Review，待远端 CI 回读
+- 状态：F005、F006 固定 GREEN；F007 及以后未授权
 - 分支：`feat/agent-foundation`
 - 安全同步 RED 基线：`5de2e49bee19749f611b50747a31be9464b92d7b`
 - Issue：[#48](https://github.com/ywyz/kindergartenManager/issues/48)
@@ -95,10 +95,11 @@ READ DTO 的逐字段关闭与深不可变要求。后续复审补充内建类�
 `67 collected / 58 passed / 9 failed`。第四个 Review RED `51f5e5f3227a2d6f8861331995545fddf79650c7`
 固定任意可变 dataclass 保留、AgentContext actor/scope/locale/facts 内层越界和 ToolResult error metadata 扩张，
 稳定为 `73 collected / 67 passed / 6 failed`；最终本地实现/重构候选 `99167ef4abba447ed5369642e9ed3c855263a4d3`
-保持 `73 passed`，双轴 Review 为 Standards `0`、Spec `0`，全量回归为 `551 passed`。具体 Provider adapter、Tool executor、取消、超时、
+保持 `73 passed`，双轴 Review 为 Standards `0`、Spec `0`，全量回归为 `551 passed`；证据 SHA
+`049b52040c61727b1418dbf3cce018ead76e6edc` 的远端 Quality `32644290676` 精确匹配成功。具体 Provider adapter、Tool executor、取消、超时、
 过期/迟到丢弃、UI 和持久化均不属于 F006。
 
 ## 7. 停止边界
 
-本分支当前授权到 F006 Provider port 与有界 Runtime，并停在其固定 SHA Review/CI 门禁。F007 取消/超时/迟到丢弃、
+本分支当前授权到 F006 Provider port 与有界 Runtime，且其固定 SHA Review/CI 门禁已闭合。F007 取消/超时/迟到丢弃、
 Tool 实现、UI 控件、schema/migration 或多用户工作仍需要下一道明确授权。
