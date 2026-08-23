@@ -1,12 +1,12 @@
 """Application-owned provider port and bounded serial Agent runtime."""
 
 import asyncio
-from collections.abc import Mapping
+from collections.abc import Awaitable, Mapping
 from dataclasses import dataclass, field, fields, is_dataclass
 from datetime import date, datetime, timezone
 from enum import Enum
 from types import MappingProxyType
-from typing import Callable, Protocol, runtime_checkable
+from typing import Any, Callable, Protocol, cast, runtime_checkable
 from uuid import UUID
 
 from app.service.agent.contracts import (
@@ -114,7 +114,7 @@ def _valid_stamp_scope(scope: DailyPlanScope) -> bool:
     return type(scope.plan_date) is date
 
 
-def _valid_context_stamp_fields(value: object) -> bool:
+def _valid_context_stamp_fields(value: AgentContextStamp) -> bool:
     """Validate the complete closed stamp shape from one shared predicate."""
     try:
         return (
@@ -726,16 +726,7 @@ class AgentRuntime:
         """Return at the hard boundary while draining a defiant port in background."""
         if self._active_stop_code is not None:
             raise _OperationStopped(self._active_stop_code)
-        try:
-            awaitable = invoke()
-        except BaseException:
-            raise _PortFailure from None
-        if not hasattr(awaitable, "__await__"):
-            raise _PortFailure
-        try:
-            task = asyncio.create_task(awaitable)
-        except BaseException:
-            raise _PortFailure from None
+        task = asyncio.create_task(self._invoke_port(invoke))
         self._active_io_task = task
         self._active_io_cancel_sent = False
         loop = asyncio.get_running_loop()
@@ -785,6 +776,19 @@ class AgentRuntime:
         except BaseException:
             raise _PortFailure from None
 
+    @staticmethod
+    async def _invoke_port(invoke: Callable[[], object]) -> object:
+        """Contain every port BaseException before it crosses a child Task."""
+        try:
+            awaitable = invoke()
+            if not hasattr(awaitable, "__await__"):
+                raise _PortFailure
+            return await cast(Awaitable[object], awaitable)
+        except asyncio.CancelledError:
+            raise
+        except BaseException:
+            raise _PortFailure from None
+
     async def _cancel_or_drain_port(
         self,
         *,
@@ -793,8 +797,10 @@ class AgentRuntime:
     ) -> None:
         """Deliver cancellation once, then detach if the port suppresses it."""
         self._request_port_cancel(task)
-        await asyncio.sleep(0)
-        self._detach_port_task(task=task, expected_stamp=expected_stamp)
+        try:
+            await asyncio.sleep(0)
+        finally:
+            self._detach_port_task(task=task, expected_stamp=expected_stamp)
 
     def _request_port_cancel(self, task: asyncio.Task[object]) -> None:
         if (
@@ -846,7 +852,7 @@ class AgentRuntime:
                 self._clear_active_locked()
 
     @staticmethod
-    def _discard_task_result(task: asyncio.Future[object]) -> None:
+    def _discard_task_result(task: asyncio.Future[Any]) -> None:
         if not task.done():
             return
         try:
