@@ -1,8 +1,10 @@
 """F005 public RED tests for the closed, canonical ``PlanPatch`` seam."""
 
+import ast
 from dataclasses import fields, replace
 from datetime import date, datetime, timedelta, timezone
 from importlib import import_module
+import inspect
 import re
 from uuid import UUID
 
@@ -138,6 +140,56 @@ def test_patch_paths_and_input_shape_are_closed_and_prefix_free():
             path="/activity_goal",
             value="通用 JSON Patch 不得进入",
         )
+
+
+@pytest.mark.parametrize(
+    ("daily_plan_id", "plan_date"),
+    (
+        (True, PLAN_DATE),
+        (7.0, PLAN_DATE),
+        (0, PLAN_DATE),
+        (7, "2026-09-07"),
+    ),
+)
+def test_patch_target_strictly_rejects_invalid_id_and_date_types(
+    daily_plan_id: object,
+    plan_date: object,
+):
+    patch = _patch_module()
+
+    with pytest.raises(patch.PlanPatchRejected) as error:
+        patch.PlanPatchTarget(
+            daily_plan_id=daily_plan_id,
+            plan_date=plan_date,
+        )
+    assert error.value.code == "target_invalid"
+
+
+def test_patch_seam_has_no_ui_database_or_repository_dependency():
+    patch = _patch_module()
+    tree = ast.parse(inspect.getsource(patch))
+    imported_modules = {
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    } | {
+        node.module
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+    }
+
+    assert tuple(inspect.signature(patch.build_plan_patch).parameters) == (
+        "context",
+        "proposal",
+    )
+    assert not any(
+        module == "nicegui"
+        or module.startswith("app.ui")
+        or module.startswith("app.core.database")
+        or module.startswith("app.repository")
+        for module in imported_modules
+    )
 
 
 def test_patch_binds_context_and_has_stable_canonical_sha256():
