@@ -14,10 +14,15 @@ import pytest
 from app.service.agent.contracts import (
     FOUNDATION_ALLOWED_PERMISSIONS,
     AgentContext,
+    CalendarDayType,
+    CalendarEvaluationProjection,
+    ClassAreasProjection,
+    DailyPlanContextProjection,
     DailyPlanProjection,
     DailyPlanScope,
     Permission,
     PlanSection,
+    SectionState,
     TrustedActor,
 )
 
@@ -88,12 +93,13 @@ def _provider_result(
     content: str | None = None,
     tool_calls: tuple[object, ...] = (),
     finish_reason: str = "completed",
+    provider_request_id: str = "fictional-request-id",
 ):
     return runtime.ProviderTurnResult(
         assistant_content=content,
         tool_calls=tool_calls,
         finish_reason=runtime.ProviderFinishReason(finish_reason),
-        provider_request_id="fictional-request-id",
+        provider_request_id=provider_request_id,
     )
 
 
@@ -167,9 +173,49 @@ class ScriptedProvider:
         return response
 
 
+def _read_value(call: object, context: AgentContext) -> object:
+    projection = next(
+        fact for fact in context.facts if isinstance(fact, DailyPlanProjection)
+    )
+    if call.tool_name == "daily_plan.read_current":
+        return projection
+    if call.tool_name == "daily_plan.read_context":
+        return DailyPlanContextProjection(
+            plan_id=projection.plan_id,
+            plan_date=projection.plan_date,
+            week_number=projection.week_number,
+            weekday_cn=projection.weekday_cn,
+            grade=projection.grade,
+            class_name=projection.class_name,
+            semester_name="2026 秋季",
+            section_states=tuple(
+                SectionState(
+                    field_path=section.field_path,
+                    has_content=bool(section.content),
+                )
+                for section in projection.sections
+            ),
+        )
+    if call.tool_name == "calendar.read_evaluation":
+        return CalendarEvaluationProjection(
+            target_date=projection.plan_date,
+            within_semester=True,
+            day_type=CalendarDayType.WORKDAY,
+            holiday_name=None,
+            degradation_code=None,
+        )
+    return ClassAreasProjection(
+        grade=projection.grade,
+        class_name=projection.class_name,
+        indoor_areas="建构区",
+        outdoor_content="平衡木",
+    )
+
+
 @dataclass
 class ScriptedExecutor:
     draft_patch: object | None = None
+    read_value: object | None = None
     calls: list[object] = field(default_factory=list)
     active: int = 0
     max_active: int = 0
@@ -182,9 +228,13 @@ class ScriptedExecutor:
         self.calls.append(call)
         await asyncio.sleep(0)
         self.active -= 1
-        value = (
-            self.draft_patch if call.permission is Permission.DRAFT else {"ok": True}
-        )
+        value = self.draft_patch
+        if call.permission is Permission.READ:
+            value = (
+                self.read_value
+                if self.read_value is not None
+                else _read_value(call, context)
+            )
         return runtime.ToolExecutionResult(
             call_id=UUID(int=999) if self.corrupt_binding else call.call_id,
             operation_id=context.operation_id,
@@ -240,6 +290,14 @@ def test_provider_contracts_are_frozen_application_owned_and_closed():
     assert isinstance(ScriptedProvider([]), runtime.AgentProviderPort)
     assert all(
         tool.input_schema.additional_properties is False for tool in request.tools
+    )
+    assert tuple(tool.output_schema.kind.value for tool in request.tools) == (
+        "daily_plan_projection",
+        "daily_plan_context_projection",
+        "calendar_evaluation_projection",
+        "class_areas_projection",
+        "plan_patch",
+        "plan_patch",
     )
     draft_schema = request.tools[4].input_schema
     assert draft_schema.required_fields == frozenset(
@@ -513,3 +571,214 @@ async def test_runtime_sanitizes_provider_failure_and_rejects_misbound_tool_resu
     assert provider_outcome.error_code == "agent.provider_failed"
     assert "secret-provider-payload" not in repr(provider_outcome)
     assert result_outcome.error_code == "agent.tool_schema_invalid"
+
+
+@pytest.mark.parametrize(
+    "arguments_change",
+    (
+        {"operations": "not-an-operation-list"},
+        {
+            "operations": [
+                {
+                    "field_path": "activity_goal",
+                    "before_value": "认识秋天",
+                    "after_value": "探索秋天",
+                    "extra": "not-closed",
+                }
+            ]
+        },
+        {
+            "operations": [
+                {
+                    "field_path": "/activity_goal",
+                    "before_value": "认识秋天",
+                    "after_value": "探索秋天",
+                }
+            ]
+        },
+        {
+            "operations": [
+                {
+                    "field_path": "activity_goal",
+                    "before_value": "认识秋天",
+                    "after_value": "后" * 4097,
+                }
+            ]
+        },
+    ),
+)
+@pytest.mark.asyncio
+async def test_runtime_rejects_nested_draft_schema_before_execution(
+    arguments_change: dict[str, object],
+):
+    runtime = _runtime_module()
+    context = _context()
+    arguments = _draft_arguments()
+    arguments.update(arguments_change)
+    call = _tool_call(
+        runtime,
+        call_id=20,
+        tool_name="daily_plan.draft_section_patch",
+        permission=Permission.DRAFT,
+        arguments=arguments,
+    )
+    provider = ScriptedProvider(
+        [
+            _provider_result(runtime, tool_calls=(call,), finish_reason="tool_calls"),
+            _provider_result(runtime, content="不应到达"),
+        ]
+    )
+    executor = ScriptedExecutor(draft_patch=_plan_patch(context))
+    agent = _agent_runtime(runtime, provider, executor)
+
+    outcome = await agent.run_turn(context=context, intent="尝试扩大嵌套参数")
+
+    assert outcome.error_code == "agent.tool_schema_invalid"
+    assert executor.calls == []
+    assert len(provider.requests) == 1
+
+
+@pytest.mark.parametrize("tamper", ("target", "canonical_sha256"))
+@pytest.mark.asyncio
+async def test_runtime_revalidates_complete_plan_patch_integrity(tamper: str):
+    runtime = _runtime_module()
+    patch_module = import_module("app.service.agent.patch")
+    context = _context()
+    valid = _plan_patch(context)
+    changed = (
+        {
+            "target": patch_module.PlanPatchTarget(
+                daily_plan_id=8,
+                plan_date=PLAN_DATE,
+            )
+        }
+        if tamper == "target"
+        else {"canonical_sha256": "0" * 64}
+    )
+    call = _tool_call(
+        runtime,
+        call_id=21,
+        tool_name="daily_plan.draft_section_patch",
+        permission=Permission.DRAFT,
+        arguments=_draft_arguments(),
+    )
+    provider = ScriptedProvider(
+        [
+            _provider_result(runtime, tool_calls=(call,), finish_reason="tool_calls"),
+            _provider_result(runtime, content="不应到达"),
+        ]
+    )
+    agent = _agent_runtime(
+        runtime,
+        provider,
+        ScriptedExecutor(draft_patch=replace(valid, **changed)),
+    )
+
+    outcome = await agent.run_turn(context=context, intent="检查草案完整性")
+
+    assert outcome.error_code == "agent.tool_schema_invalid"
+    assert len(provider.requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_runtime_rejects_unregistered_read_output_before_provider_reentry():
+    runtime = _runtime_module()
+    call = _tool_call(runtime, call_id=22)
+    provider = ScriptedProvider(
+        [
+            _provider_result(runtime, tool_calls=(call,), finish_reason="tool_calls"),
+            _provider_result(runtime, content="不应到达"),
+        ]
+    )
+    executor = ScriptedExecutor(read_value={"session": object()})
+    agent = _agent_runtime(runtime, provider, executor)
+
+    outcome = await agent.run_turn(context=_context(), intent="检查输出关闭边界")
+
+    assert outcome.error_code == "agent.tool_schema_invalid"
+    assert len(provider.requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_runtime_bounds_registered_tool_output_size():
+    runtime = _runtime_module()
+    call = _tool_call(runtime, call_id=23)
+    oversized = ClassAreasProjection(
+        grade="大班",
+        class_name="星星班",
+        indoor_areas="敏" * 500,
+        outdoor_content="平衡木",
+    )
+    provider = ScriptedProvider(
+        [_provider_result(runtime, tool_calls=(call,), finish_reason="tool_calls")]
+    )
+    agent = _agent_runtime(
+        runtime,
+        provider,
+        ScriptedExecutor(read_value=oversized),
+        limits=runtime.RuntimeLimits(max_tool_result_chars=100),
+    )
+
+    outcome = await agent.run_turn(context=_context(), intent="检查工具输出长度")
+
+    assert outcome.error_code == "agent.limit_exceeded"
+
+
+def test_tool_result_payload_is_deeply_frozen_and_request_id_is_bounded():
+    runtime = _runtime_module()
+    source = {"items": []}
+    result = runtime.ToolExecutionResult(
+        call_id=UUID(int=24),
+        operation_id=OPERATION_ID,
+        turn_id=TURN_ID,
+        tool_name="settings.read_class_areas",
+        permission=Permission.READ,
+        status=runtime.ToolExecutionStatus.OK,
+        value=source,
+        error_code=None,
+    )
+
+    source["items"].append("mutated-after-construction")
+
+    assert result.value["items"] == ()
+    with pytest.raises(TypeError):
+        result.value["new"] = True
+    with pytest.raises(ValueError, match="provider_request_id_too_large"):
+        _provider_result(runtime, provider_request_id="r" * 129)
+
+
+@pytest.mark.asyncio
+async def test_runtime_normalizes_refusal_and_executor_failure_codes():
+    runtime = _runtime_module()
+    refused = _agent_runtime(
+        runtime,
+        ScriptedProvider(
+            [
+                _provider_result(
+                    runtime, content="provider detail", finish_reason="refused"
+                )
+            ]
+        ),
+    )
+
+    @dataclass
+    class FailingExecutor:
+        async def execute(self, _call: object, _context: AgentContext) -> object:
+            raise RuntimeError("executor-secret")
+
+    call = _tool_call(runtime, call_id=25)
+    failed = _agent_runtime(
+        runtime,
+        ScriptedProvider(
+            [_provider_result(runtime, tool_calls=(call,), finish_reason="tool_calls")]
+        ),
+        FailingExecutor(),
+    )
+
+    refused_outcome = await refused.run_turn(context=_context(), intent="拒绝路径")
+    failed_outcome = await failed.run_turn(context=_context(), intent="执行失败路径")
+
+    assert refused_outcome.error_code == "agent.provider_failed"
+    assert "provider detail" not in repr(refused_outcome)
+    assert failed_outcome.error_code == "agent.tool_failed"
+    assert "executor-secret" not in repr(failed_outcome)
