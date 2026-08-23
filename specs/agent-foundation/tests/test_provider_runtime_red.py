@@ -819,3 +819,108 @@ async def test_runtime_rejects_mutable_or_mistyped_registered_read_dto_fields(
 
     assert outcome.error_code == "agent.tool_schema_invalid"
     assert len(provider.requests) == 1
+
+
+class MutableText(str):
+    def __new__(cls, value: str):
+        instance = super().__new__(cls, value)
+        instance.mutable_state = []
+        return instance
+
+
+class MutableTuple(tuple):
+    def __new__(cls, values: tuple[object, ...]):
+        instance = super().__new__(cls, values)
+        instance.mutable_state = []
+        return instance
+
+
+@pytest.mark.parametrize("escape_kind", ("text_subclass", "tuple_subclass"))
+@pytest.mark.asyncio
+async def test_runtime_rejects_stateful_builtin_subclasses_in_read_dtos(
+    escape_kind: str,
+):
+    runtime = _runtime_module()
+    context = _context()
+    if escape_kind == "text_subclass":
+        call = _tool_call(runtime, call_id=27)
+        valid = _read_value(call, context)
+        malformed = replace(valid, indoor_areas=MutableText("建构区"))
+    else:
+        call = _tool_call(runtime, call_id=28, tool_name="daily_plan.read_current")
+        valid = _read_value(call, context)
+        malformed = replace(valid, sections=MutableTuple(valid.sections))
+    provider = ScriptedProvider(
+        [
+            _provider_result(runtime, tool_calls=(call,), finish_reason="tool_calls"),
+            _provider_result(runtime, content="不应到达"),
+        ]
+    )
+    agent = _agent_runtime(
+        runtime,
+        provider,
+        ScriptedExecutor(read_value=malformed),
+    )
+
+    outcome = await agent.run_turn(context=context, intent="检查内建类型子类逃逸")
+
+    assert outcome.error_code == "agent.tool_schema_invalid"
+    assert len(provider.requests) == 1
+
+
+def test_provider_contracts_reject_stateful_text_subclasses():
+    runtime = _runtime_module()
+
+    with pytest.raises(ValueError, match="provider_message_invalid"):
+        runtime.ProviderMessage(
+            role=runtime.ProviderRole.USER,
+            content=MutableText("不可保留可变子类"),
+        )
+    with pytest.raises(ValueError, match="provider_result_invalid"):
+        runtime.ProviderTurnResult(
+            assistant_content="完成",
+            finish_reason=runtime.ProviderFinishReason.COMPLETED,
+            provider_request_id=MutableText("mutable-request-id"),
+        )
+
+
+@pytest.mark.parametrize(
+    ("tool_name", "field_name", "out_of_bounds"),
+    (
+        ("daily_plan.read_current", "plan_id", 2**63),
+        ("daily_plan.read_current", "week_number", 54),
+        ("daily_plan.read_current", "grade", "年" * 257),
+        ("daily_plan.read_context", "semester_name", "学" * 257),
+        ("calendar.read_evaluation", "holiday_name", "节" * 257),
+        ("settings.read_class_areas", "class_name", "班" * 257),
+    ),
+)
+@pytest.mark.asyncio
+async def test_runtime_rejects_read_dto_field_bound_expansion(
+    tool_name: str,
+    field_name: str,
+    out_of_bounds: object,
+):
+    runtime = _runtime_module()
+    context = _context()
+    call = _tool_call(runtime, call_id=29, tool_name=tool_name)
+    malformed = replace(
+        _read_value(call, context),
+        **{field_name: out_of_bounds},
+    )
+    provider = ScriptedProvider(
+        [
+            _provider_result(runtime, tool_calls=(call,), finish_reason="tool_calls"),
+            _provider_result(runtime, content="不应到达"),
+        ]
+    )
+    agent = _agent_runtime(
+        runtime,
+        provider,
+        ScriptedExecutor(read_value=malformed),
+    )
+
+    outcome = await agent.run_turn(context=context, intent="检查 READ DTO 字段上限")
+
+    assert outcome.error_code == "agent.tool_schema_invalid"
+    assert len(provider.requests) == 1
