@@ -88,7 +88,7 @@ class DailyPlanAgentPanel:
             self._result_container = ui.column().classes("w-full gap-2")
 
         client = context.client
-        client.on_disconnect(self.close)
+        client.on_disconnect(self.disconnect)
         client.on_delete(self.close)
         self._render(controller.snapshot)
 
@@ -97,6 +97,20 @@ class DailyPlanAgentPanel:
         if self._closed:
             return
         snapshot = self._controller.scope_changed(selected_date)
+        self._render(snapshot)
+
+    def plan_changed(self, changed_date: date) -> None:
+        """Invalidate suggestions based on an authoritative plan before mutation."""
+        if self._closed:
+            return
+        snapshot = self._controller.plan_changed(changed_date)
+        self._render(snapshot)
+
+    async def disconnect(self) -> None:
+        """Cancel connection-local work while keeping the controller reusable."""
+        if self._closed:
+            return
+        snapshot = await self._controller.disconnect()
         self._render(snapshot)
 
     async def close(self) -> None:

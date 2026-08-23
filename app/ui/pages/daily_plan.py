@@ -532,6 +532,7 @@ async def daily_plan_page() -> None:
                                 daily_reflection=daily_reflection_area.value,
                             )
 
+                    agent_panel.plan_changed(d)
                     save_msg.classes(add="text-green-600")
                     save_msg.text = f"✅ 草稿已保存（{d}）"
                 except Exception:
@@ -572,6 +573,7 @@ async def daily_plan_page() -> None:
                                 plan_date=state["selected_date"],
                             )
                         if deleted:
+                            agent_panel.plan_changed(state["selected_date"])
                             save_msg.classes(
                                 remove="text-green-600 text-orange-500",
                                 add="text-gray-500",
@@ -889,12 +891,14 @@ async def daily_plan_page() -> None:
                                     if result == "yes":
                                         try:
                                             async with AsyncSessionLocal() as s:
-                                                await delete_daily_plan(
+                                                deleted = await delete_daily_plan(
                                                     s,
                                                     tenant_id=tenant_id,
                                                     user_id=user_id,
                                                     plan_date=p.plan_date,
                                                 )
+                                            if deleted:
+                                                agent_panel.plan_changed(p.plan_date)
                                             await refresh_history()
                                         except Exception as ex:
                                             ui.notify(

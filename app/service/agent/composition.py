@@ -107,6 +107,13 @@ def _failure(code: str) -> AgentTurnOutcome:
     return AgentTurnOutcome(status=AgentTurnStatus.FAILED, error_code=code)
 
 
+def _cancelled() -> AgentTurnOutcome:
+    return AgentTurnOutcome(
+        status=AgentTurnStatus.CANCELLED,
+        error_code="agent.cancelled",
+    )
+
+
 def _default_provider_factory(config: AgentProviderConfig) -> AgentProviderPort:
     return OpenAICompatibleAgentProvider(
         api_base_url=config.api_base_url,
@@ -211,6 +218,8 @@ class _CurrentContextState:
 @dataclass(slots=True)
 class _ActiveOperation:
     owner_id: UUID
+    actor: TrustedActor
+    scope: DailyPlanScope
     stamp: AgentContextStamp | None = None
     invalidated: bool = False
     cancel_requested: bool = False
@@ -266,7 +275,7 @@ class DailyPlanAgentCoordinator:
         async with self._admission_lock:
             if self._active is not None:
                 return _failure("agent.busy")
-            active = _ActiveOperation(owner_id=owner_id)
+            active = _ActiveOperation(owner_id=owner_id, actor=actor, scope=scope)
             self._active = active
 
         try:
@@ -274,12 +283,20 @@ class DailyPlanAgentCoordinator:
             turn_id = uuid4()
             try:
                 async with self._session_factory() as session:
+                    if active.cancel_requested:
+                        return _cancelled()
+                    if active.invalidated:
+                        return _failure("agent.context_stale")
                     key_record = await get_active_ai_key(
                         session,
                         actor.tenant_id,
                         actor.user_id,
                         key_type="text",
                     )
+                    if active.cancel_requested:
+                        return _cancelled()
+                    if active.invalidated:
+                        return _failure("agent.context_stale")
                     if key_record is None:
                         return _failure("agent.configuration_missing")
                     api_base_url = key_record.api_base_url
@@ -300,6 +317,8 @@ class DailyPlanAgentCoordinator:
             except Exception:
                 return _failure("agent.configuration_failed")
 
+            if active.cancel_requested:
+                return _cancelled()
             if not any(type(fact) is DailyPlanProjection for fact in context.facts):
                 return _failure("agent.plan_not_found")
             if active.invalidated:
@@ -320,8 +339,6 @@ class DailyPlanAgentCoordinator:
             self._provider.bind(provider)
             if active.invalidated:
                 self._context_state.invalidate()
-            if active.cancel_requested:
-                await self._runtime.cancel(stamp)
             return await self._runtime.run_turn(context=context, intent=intent)
         finally:
             self._context_state.clear()
@@ -340,6 +357,14 @@ class DailyPlanAgentCoordinator:
         stamp = active.stamp
         if stamp is not None:
             asyncio.create_task(self._runtime.cancel(stamp))
+
+    def plan_changed(self, actor: TrustedActor, scope: DailyPlanScope) -> None:
+        """Invalidate an active context whose authoritative plan has changed."""
+        active = self._active
+        if active is None or active.actor != actor or active.scope != scope:
+            return
+        active.invalidated = True
+        self._context_state.invalidate()
 
     async def cancel(self, owner_id: UUID) -> bool:
         """Cancel only the exact active operation belonging to one controller."""
@@ -398,6 +423,8 @@ class DailyPlanAgentController:
             return self._set_failure("agent.page_closed")
         if selected_date is None:
             return self._set_failure("agent.scope_required")
+        if self._snapshot.status is AgentPanelStatus.RUNNING:
+            return self._snapshot
         generation = self._generation
         self._snapshot = AgentPanelSnapshot(
             status=AgentPanelStatus.RUNNING,
@@ -431,6 +458,35 @@ class DailyPlanAgentController:
 
     async def cancel(self) -> bool:
         return await self._coordinator.cancel(self._owner_id)
+
+    def plan_changed(self, changed_date: date) -> AgentPanelSnapshot:
+        """Publish an authoritative plan mutation and forget its prior snapshot."""
+        if type(changed_date) is not date:
+            raise ValueError("agent_scope_invalid")
+        self._coordinator.plan_changed(
+            self._actor,
+            DailyPlanScope(plan_date=changed_date),
+        )
+        if self._selected_date == changed_date:
+            self._generation += 1
+            self._snapshot = AgentPanelSnapshot(
+                status=AgentPanelStatus.IDLE,
+                selected_date=self._selected_date,
+            )
+        return self._snapshot
+
+    async def disconnect(self) -> AgentPanelSnapshot:
+        """Discard connection-local state without permanently closing the page."""
+        if self._closed:
+            return self._snapshot
+        self._generation += 1
+        self._coordinator.invalidate(self._owner_id)
+        await self._coordinator.cancel(self._owner_id)
+        self._snapshot = AgentPanelSnapshot(
+            status=AgentPanelStatus.IDLE,
+            selected_date=self._selected_date,
+        )
+        return self._snapshot
 
     def discard(self) -> AgentPanelSnapshot:
         """Forget assistant/Patch display state without any business mutation."""
