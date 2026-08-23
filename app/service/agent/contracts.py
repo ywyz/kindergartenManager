@@ -1,6 +1,6 @@
 """Closed contracts for the authorized Agent Foundation slices."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
 from typing import TypeAlias
@@ -39,14 +39,14 @@ class TrustedActor:
 class DailyPlanScope:
     """Exactly one current-plan locator; actor identity is deliberately absent."""
 
-    plan_id: int | None = None
+    daily_plan_id: int | None = None
     plan_date: date | None = None
 
     def __post_init__(self) -> None:
-        if (self.plan_id is None) == (self.plan_date is None):
+        if (self.daily_plan_id is None) == (self.plan_date is None):
             raise ValueError("scope_requires_exactly_one_locator")
-        if self.plan_id is not None and self.plan_id <= 0:
-            raise ValueError("plan_id_must_be_positive")
+        if self.daily_plan_id is not None and self.daily_plan_id <= 0:
+            raise ValueError("daily_plan_id_must_be_positive")
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,7 +54,7 @@ class PlanSection:
     """One allowlisted, bounded daily-plan section."""
 
     field_path: str
-    content: str
+    content: str = field(repr=False)
     truncated: bool
 
 
@@ -122,8 +122,17 @@ class ClassAreasProjection:
 
     grade: str
     class_name: str
-    indoor_areas: str
-    outdoor_content: str
+    indoor_areas: str = field(repr=False)
+    outdoor_content: str = field(repr=False)
+
+
+class ContextFactKind(str, Enum):
+    """Closed fact choices used to minimize context for the current intent."""
+
+    CURRENT_PLAN = "daily_plan.current"
+    PLAN_CONTEXT = "daily_plan.context"
+    CALENDAR = "calendar.evaluation"
+    CLASS_AREAS = "settings.class_areas"
 
 
 ContextFact: TypeAlias = (
@@ -146,7 +155,7 @@ class AgentContext:
     locale: str
     actor: TrustedActor
     active_scope: DailyPlanScope
-    facts: tuple[ContextFact, ...]
+    facts: tuple[ContextFact, ...] = field(repr=False)
     base_fingerprint: str
     allowed_permissions: frozenset[Permission]
 

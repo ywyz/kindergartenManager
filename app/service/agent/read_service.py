@@ -3,8 +3,6 @@
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
-import hashlib
-import json
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,6 +28,7 @@ from app.service.agent.contracts import (
     SectionState,
     TrustedActor,
 )
+from app.service.agent.canonical import canonical_sha256
 from app.service.date_service import is_within_semester
 
 MAX_PROJECTION_TEXT_LENGTH = 4096
@@ -90,17 +89,8 @@ def _plan_sections(plan: object) -> tuple[PlanSection, ...]:
 
 
 def _content_sha256(sections: tuple[PlanSection, ...]) -> str:
-    payload = [
-        {"field_path": section.field_path, "content": section.content}
-        for section in sections
-    ]
-    canonical = json.dumps(
-        payload,
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
-    ).encode("utf-8")
-    return hashlib.sha256(canonical).hexdigest()
+    content = tuple((section.field_path, section.content) for section in sections)
+    return canonical_sha256(content)
 
 
 class AgentReadService:
@@ -123,13 +113,15 @@ class AgentReadService:
         return self._actor
 
     async def _get_plan(self, scope: DailyPlanScope):
-        if scope.plan_id is not None:
+        if scope.daily_plan_id is not None:
             return await get_daily_plan_by_id_for_user(
                 self._session,
                 self._actor.tenant_id,
                 self._actor.user_id,
-                scope.plan_id,
+                scope.daily_plan_id,
             )
+        if scope.plan_date is None:
+            raise ValueError("scope_requires_plan_date")
         return await get_daily_plan_by_date(
             self._session,
             self._actor.tenant_id,

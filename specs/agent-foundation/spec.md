@@ -69,10 +69,10 @@ F002 原始 SHA `ad13a6aa3e44ff98b2604d4a008649cd66185d80` 和安全同步基线
 F003 不修改、skip、xfail 或放宽这 4 个测试；只新增 contracts 与关闭 registry，
 当前预期为收集 4 项且执行 `4 passed`。
 
-F004 在同一目录新增 4 项公共行为测试，固定 tenant+user READ 投影、裁剪/冻结、日历降级和
-`AgentContext` fingerprint。RED 阶段预期总计收集 8 项，其中 F003 的 4 项继续通过，F004 的
-4 项在 `8297fce…` 因 `app.service.agent.read_service` / `context` 尚不存在而失败；最小 GREEN
-后预期为 `8 passed`，不得修改、skip、xfail 或放宽这 8 项测试。
+F004 在同一目录新增公共行为测试，固定 tenant+user READ 投影、裁剪/冻结、日历降级、敏感正文
+`repr` 关闭、按 intent 最小 facts 和 `AgentContext` fingerprint。初始 4 项在 `8297fce…` 因
+`app.service.agent.read_service` / `context` 尚不存在而失败；Review RED `f1797e6…` 将 F004
+扩为 5 项并修正契约。GREEN 后预期总计 `9 passed`，不得 skip、xfail 或放宽测试。
 
 ## 7. 停止边界
 

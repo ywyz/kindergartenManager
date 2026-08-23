@@ -88,7 +88,8 @@ Tests use `pytest` with `pytest-asyncio`; `pytest.ini` sets `asyncio_mode = auto
 ## Controlled AI Agent Boundary
 
 The accepted Agent design is documented in `docs/ADR/ADR-0005-controlled-ai-agent-runtime.md` and
-`docs/design/agent-runtime.md`; it is not implemented yet. The Foundation is one application-layer Agent for the
+`docs/design/agent-runtime.md`. F003 contracts/closed registry and F004 actor-scoped READ projections/frozen Context
+are implemented; F005 and later slices remain unauthorized. The Foundation is one application-layer Agent for the
 daily-plan page with exactly four READ tools and two DRAFT tools. DRAFT returns an in-memory, discardable `PlanPatch`
 and must not mutate UI body fields, database rows, versions, previews, audits, or exports.
 

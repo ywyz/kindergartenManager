@@ -1,7 +1,7 @@
 # KindergartenManager 受控 AI Agent Runtime 设计
 
-> 状态：已确认设计，尚未实现。本文落实
-> [ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md)，不代表 Agent 已进入当前产品，也不授权
+> 状态：已确认设计；F003 contracts/关闭 registry 与 F004 Context/READ 投影已实现，F005 及以后未授权。本文落实
+> [ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md)，不代表完整 Agent 已进入当前产品，也不授权
 > 提交、推送、合并或发布。
 
 ## 1. 目标与非目标
@@ -31,7 +31,7 @@ app/service/agent/AgentRuntime
 
 - UI 不传任意业务对象、Session 或自由拼接 Context。
 - Runtime 只依赖应用拥有的 DTO、Tool interface 和 Provider port。
-- Tool 调用窄 Service/use-case seam；不得直接暴露 Repository。当前缺少的读取投影先在 Service 层补齐。
+- Tool 调用窄 Service/use-case seam；不得直接暴露 Repository。F004 已在 Service 层补齐受信 actor 绑定的读取投影。
 - Adapter 不执行 Tool；Provider 的 Tool call 只是必须重新校验的不受信输入。
 - `app/integration/ai_client/` 继续拥有原始 HTTP、Endpoint、超时、重试和供应商格式。
 
@@ -39,11 +39,13 @@ app/service/agent/AgentRuntime
 
 ```text
 app/service/agent/
-  contracts.py       # 冻结 DTO、Permission、ToolResult、PlanPatch
-  context.py         # 最小上下文构建和数据裁剪
-  registry.py        # 关闭 Tool registry
-  runtime.py         # 单 operation loop、上限、取消、迟到丢弃
-  tools.py           # READ/DRAFT 应用工具
+  contracts.py       # 已实现：冻结 DTO、Permission、关闭 fact kind
+  canonical.py       # 已实现：投影/Context 规范 SHA-256
+  context.py         # 已实现：按 intent 最小构建和数据裁剪
+  read_service.py    # 已实现：tenant+user 四类 READ 投影
+  registry.py        # 已实现：关闭 Tool registry
+  runtime.py         # 未实现：单 operation loop、上限、取消、迟到丢弃
+  tools.py           # 未实现：READ/DRAFT 应用工具
 
 app/integration/ai_client/
   agent_provider.py  # OpenAI 兼容 Provider Adapter
@@ -52,8 +54,8 @@ app/ui/components/
   agent_draft.py     # 状态、回答、字段差异、取消/丢弃
 ```
 
-目录是设计目标，不表示当前文件已经存在。实现时若现有层次出现更小而清晰的 seam，可在不放宽本契约的
-前提下调整文件拆分。
+标为“已实现”的文件已进入 F003-F004；其余目录仍只是设计目标。后续实现时若现有层次出现更小而清晰的
+seam，可在不放宽本契约的前提下调整文件拆分。
 
 ## 4. 核心类型
 

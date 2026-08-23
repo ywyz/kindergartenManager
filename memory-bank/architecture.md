@@ -382,9 +382,10 @@ F004 在既有 F003 contracts/关闭 registry 之后，只建立应用层 READ s
 
 | 文件 | 职责 |
 |------|------|
-| `app/service/agent/contracts.py` | 冻结 actor/scope、每日计划、日历、班级区域和 `AgentContext` DTO；不含 ORM、Session 或供应商类型 |
+| `app/service/agent/contracts.py` | 冻结 actor/scope、关闭 fact kind、每日计划、日历、班级区域和 `AgentContext` DTO；正文不进入 `repr` |
+| `app/service/agent/canonical.py` | 为投影内容和 Context fingerprint 提供唯一规范 JSON/SHA-256 实现 |
 | `app/service/agent/read_service.py` | `AgentReadService` 绑定受信 tenant+user，提供当前计划、计划上下文、日历和班级区域四个白名单投影 |
-| `app/service/agent/context.py` | 按固定顺序组装短生命周期 facts，并基于 actor/scope/facts 计算稳定 SHA-256 fingerprint |
+| `app/service/agent/context.py` | 只读取当前 intent 明确请求的 fact kind，按固定顺序组装短生命周期 facts，并计算稳定 fingerprint |
 | `app/repository/daily_plan_repository.py` | 新增按 `tenant_id + user_id + plan_id` 的 UI 详情读取，跨 actor 返回 `None` |
 
 每日计划正文按关闭字段集合投影且单字段最多 4096 字符；班级投影排除教师姓名；节假日 API
@@ -393,5 +394,6 @@ F004 在既有 F003 contracts/关闭 registry 之后，只建立应用层 READ s
 ### 测试
 
 `specs/agent-foundation/tests/test_read_projections_red.py` 通过真实内存 SQLite 和确定性节假日 adapter
-覆盖白名单、tenant/user 负向读取、裁剪/冻结、日历降级和稳定 fingerprint。F004 RED 固定为
-`8297fce…`；GREEN 候选下 Foundation 总计 **8 passed**。
+覆盖白名单、tenant/user 负向读取、裁剪/冻结、日历降级、正文 `repr` 关闭、intent 最小 facts 和
+稳定 fingerprint。F004 初始 RED 为 `8297fce…`，Review RED 为 `f1797e6…`；GREEN 候选下
+Foundation 总计 **9 passed**。

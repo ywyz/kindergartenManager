@@ -110,8 +110,8 @@ F004 已最小实现冻结 Context 与 tenant+user READ 投影，尚无 Tool 实
 
 当前已冻结 [Foundation spec](specs/agent-foundation/spec.md)、[任务顺序](specs/agent-foundation/tasks.md) 和
 [Issue #48](https://github.com/ywyz/kindergartenManager/issues/48)。F002 在安全同步基线上仍稳定为同样的 4 RED；
-F003 只通过新增 contracts 与关闭 registry 使原 4 项 GREEN；F004 RED 固定为 `8297fce…`，新增 4 项后
-当前 Foundation 共 `8 passed`，没有修改、skip 或 xfail 原测试。
+F003 只通过新增 contracts 与关闭 registry 使原 4 项 GREEN；F004 初始 RED 固定为 `8297fce…`，
+Review RED 为 `f1797e6…`；当前 Foundation 共 `9 passed`，没有 skip、xfail 或放宽原测试。
 
 首期范围只是每日活动计划页的单 Agent Foundation：
 
@@ -143,7 +143,7 @@ F003 固定 SHA 的双轴 Review 和远端 CI `headSha` 已通过。
 
 R1 基础修复的本地门禁已经通过，当前共同下一步是：
 
-1. 对 F004 GREEN 候选运行完整 Quality、无忽略依赖审计和 Foundation 8 项验证。
+1. 对 F004 GREEN 候选运行完整 Quality、无忽略依赖审计和 Foundation 9 项验证。
 2. 对 F004 固定 SHA 完成双轴 Review 和远端 Quality `headSha` 回读，然后停止；F005 不得自动开始。
 3. NiceGUI 多用户预备功能保持低优先级，不与 Agent Foundation 隐式捆绑。
 4. 本轮 Linux 本地证据为 Python 3.14.7、Ruff 0 错误、全新 SQLite 到 `a6c4d8e2f9b1`、全量 `551 passed`；Windows、Word、MySQL 和真实 AI 仍是独立人工门禁。

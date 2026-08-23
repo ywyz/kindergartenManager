@@ -1,18 +1,15 @@
 """Build short-lived, frozen Agent contexts from the F004 READ seam."""
 
 from collections.abc import Callable
-from dataclasses import fields, is_dataclass
-from datetime import date, datetime, timedelta, timezone
-from enum import Enum
-import hashlib
-import json
-from typing import Any
+from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
+from app.service.agent.canonical import canonical_sha256
 from app.service.agent.contracts import (
     FOUNDATION_ALLOWED_PERMISSIONS,
     AgentContext,
     ContextFact,
+    ContextFactKind,
     DailyPlanScope,
 )
 from app.service.agent.read_service import AgentReadService
@@ -24,38 +21,19 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _canonical(value: Any) -> Any:
-    if is_dataclass(value):
-        return {
-            field.name: _canonical(getattr(value, field.name))
-            for field in fields(value)
-        }
-    if isinstance(value, Enum):
-        return value.value
-    if isinstance(value, UUID):
-        return str(value)
-    if isinstance(value, (datetime, date)):
-        return value.isoformat()
-    if isinstance(value, (tuple, list)):
-        return [_canonical(item) for item in value]
-    if isinstance(value, (frozenset, set)):
-        return sorted(_canonical(item) for item in value)
-    return value
-
-
-def _fingerprint(actor: object, scope: DailyPlanScope, facts: tuple[ContextFact, ...]) -> str:
+def _fingerprint(
+    actor: object,
+    scope: DailyPlanScope,
+    required_facts: frozenset[ContextFactKind],
+    facts: tuple[ContextFact, ...],
+) -> str:
     payload = {
-        "actor": _canonical(actor),
-        "scope": _canonical(scope),
-        "facts": _canonical(facts),
+        "actor": actor,
+        "scope": scope,
+        "required_facts": required_facts,
+        "facts": facts,
     }
-    canonical = json.dumps(
-        payload,
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
-    ).encode("utf-8")
-    return hashlib.sha256(canonical).hexdigest()
+    return canonical_sha256(payload)
 
 
 class AgentContextBuilder:
@@ -76,23 +54,63 @@ class AgentContextBuilder:
         operation_id: UUID,
         turn_id: UUID,
         scope: DailyPlanScope,
+        required_facts: frozenset[ContextFactKind],
     ) -> AgentContext:
         """Read and freeze facts in the contract-defined order."""
-        current_plan = await self._read_service.read_current(scope)
-        plan_context = await self._read_service.read_context(scope)
+        if not required_facts:
+            raise ValueError("context_requires_facts")
+
+        current_plan = (
+            await self._read_service.read_current(scope)
+            if ContextFactKind.CURRENT_PLAN in required_facts
+            else None
+        )
+        needs_plan_context = (
+            ContextFactKind.PLAN_CONTEXT in required_facts
+            or (
+                ContextFactKind.CALENDAR in required_facts
+                and scope.plan_date is None
+                and current_plan is None
+            )
+        )
+        loaded_plan_context = (
+            await self._read_service.read_context(scope)
+            if needs_plan_context
+            else None
+        )
+        plan_context = (
+            loaded_plan_context
+            if ContextFactKind.PLAN_CONTEXT in required_facts
+            else None
+        )
         target_date = scope.plan_date or (
             current_plan.plan_date if current_plan is not None else None
+        ) or (
+            loaded_plan_context.plan_date
+            if loaded_plan_context is not None
+            else None
         )
         calendar = (
             await self._read_service.read_calendar(target_date)
-            if target_date is not None
+            if ContextFactKind.CALENDAR in required_facts
+            and target_date is not None
             else None
         )
-        class_areas = await self._read_service.read_class_areas()
+        class_areas = (
+            await self._read_service.read_class_areas()
+            if ContextFactKind.CLASS_AREAS in required_facts
+            else None
+        )
+        ordered_facts = (
+            (ContextFactKind.CURRENT_PLAN, current_plan),
+            (ContextFactKind.PLAN_CONTEXT, plan_context),
+            (ContextFactKind.CALENDAR, calendar),
+            (ContextFactKind.CLASS_AREAS, class_areas),
+        )
         facts: tuple[ContextFact, ...] = tuple(
             fact
-            for fact in (current_plan, plan_context, calendar, class_areas)
-            if fact is not None
+            for kind, fact in ordered_facts
+            if kind in required_facts and fact is not None
         )
         created_at = self._clock()
         if created_at.tzinfo is None:
@@ -110,6 +128,6 @@ class AgentContextBuilder:
             actor=actor,
             active_scope=scope,
             facts=facts,
-            base_fingerprint=_fingerprint(actor, scope, facts),
+            base_fingerprint=_fingerprint(actor, scope, required_facts, facts),
             allowed_permissions=FOUNDATION_ALLOWED_PERMISSIONS,
         )
