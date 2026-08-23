@@ -94,6 +94,22 @@ def _field_names(value: object) -> set[str]:
     return {field.name for field in fields(value)}
 
 
+def test_sensitive_projection_repr_omits_bodies():
+    contracts = import_module("app.service.agent.contracts")
+
+    section = contracts.PlanSection("activity_goal", "不应进入repr的正文", False)
+    class_areas = contracts.ClassAreasProjection(
+        grade="大班",
+        class_name="星星班",
+        indoor_areas="不应进入repr的室内内容",
+        outdoor_content="不应进入repr的户外内容",
+    )
+
+    assert "不应进入repr的正文" not in repr(section)
+    assert "不应进入repr的室内内容" not in repr(class_areas)
+    assert "不应进入repr的户外内容" not in repr(class_areas)
+
+
 @pytest.mark.asyncio
 async def test_current_plan_projection_is_allowlisted_and_actor_scoped(
     async_session: AsyncSession,
@@ -106,7 +122,7 @@ async def test_current_plan_projection_is_allowlisted_and_actor_scoped(
         read_service.TrustedActor(tenant_id=1, user_id=10),
     )
     own = await own_reader.read_current(
-        read_service.DailyPlanScope(plan_id=own_plan.id)
+        read_service.DailyPlanScope(daily_plan_id=own_plan.id)
     )
 
     assert own is not None
@@ -126,6 +142,7 @@ async def test_current_plan_projection_is_allowlisted_and_actor_scoped(
         "activity_goal"
     ] == "认识秋天"
     assert re.fullmatch(r"[0-9a-f]{64}", own.content_sha256)
+    assert "认识秋天" not in repr(own)
 
     other_reader = read_service.AgentReadService(
         async_session,
@@ -133,7 +150,7 @@ async def test_current_plan_projection_is_allowlisted_and_actor_scoped(
     )
     assert (
         await other_reader.read_current(
-            read_service.DailyPlanScope(plan_id=own_plan.id)
+            read_service.DailyPlanScope(daily_plan_id=own_plan.id)
         )
         is None
     )
@@ -141,7 +158,7 @@ async def test_current_plan_projection_is_allowlisted_and_actor_scoped(
         read_service.DailyPlanScope(plan_date=other_plan.plan_date)
     )
     assert other is not None
-    assert "另一用户的秘密目标" in repr(other)
+    assert "另一用户的秘密目标" not in repr(other)
     assert "另一用户的秘密目标" not in repr(own)
 
 
@@ -157,7 +174,7 @@ async def test_context_and_class_area_projections_are_frozen_and_cropped(
     )
 
     plan_context = await reader.read_context(
-        read_service.DailyPlanScope(plan_id=own_plan.id)
+        read_service.DailyPlanScope(daily_plan_id=own_plan.id)
     )
     class_areas = await reader.read_class_areas()
 
@@ -187,7 +204,7 @@ async def test_context_and_class_area_projections_are_frozen_and_cropped(
         read_service.TrustedActor(tenant_id=2, user_id=10),
     )
     assert await other_reader.read_context(
-        read_service.DailyPlanScope(plan_id=own_plan.id)
+        read_service.DailyPlanScope(daily_plan_id=own_plan.id)
     ) is None
     assert await other_reader.read_class_areas() is None
 
@@ -256,7 +273,7 @@ async def test_context_builder_freezes_ordered_facts_and_stable_fingerprint(
     )
     now = datetime(2026, 9, 7, 1, 2, 3, tzinfo=timezone.utc)
     builder = context_module.AgentContextBuilder(reader, clock=lambda: now)
-    scope = read_service.DailyPlanScope(plan_id=own_plan.id)
+    scope = read_service.DailyPlanScope(plan_date=own_plan.plan_date)
     operation_id = UUID("00000000-0000-0000-0000-000000000101")
     turn_id = UUID("00000000-0000-0000-0000-000000000102")
 
@@ -264,11 +281,13 @@ async def test_context_builder_freezes_ordered_facts_and_stable_fingerprint(
         operation_id=operation_id,
         turn_id=turn_id,
         scope=scope,
+        required_facts=frozenset(contracts.ContextFactKind),
     )
     second = await builder.build(
         operation_id=operation_id,
         turn_id=turn_id,
         scope=scope,
+        required_facts=frozenset(contracts.ContextFactKind),
     )
 
     assert first.actor == actor
@@ -285,6 +304,19 @@ async def test_context_builder_freezes_ordered_facts_and_stable_fingerprint(
     assert first.base_fingerprint == second.base_fingerprint
     assert re.fullmatch(r"[0-9a-f]{64}", first.base_fingerprint)
     assert "张老师" not in repr(first)
+    assert "认识秋天" not in repr(first)
+    assert "落叶" not in repr(first)
+    assert "沙水区" not in repr(first)
+
+    minimal = await builder.build(
+        operation_id=operation_id,
+        turn_id=turn_id,
+        scope=scope,
+        required_facts=frozenset({contracts.ContextFactKind.PLAN_CONTEXT}),
+    )
+    assert tuple(type(fact).__name__ for fact in minimal.facts) == (
+        "DailyPlanContextProjection",
+    )
 
     with pytest.raises(FrozenInstanceError):
         first.locale = "en-US"
