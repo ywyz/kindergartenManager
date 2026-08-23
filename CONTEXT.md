@@ -88,20 +88,23 @@ UI 的固定单用户身份与 API 的租户主体是两个不同边界，不得
 
 ## 7. 分支与仓库状态
 
-- R1 基线已固定为 `dev4.0@1a72c2d4b439743e358e71a7bf4c5321e1d889f8`；Agent 规格工作位于独立分支 `feat/agent-foundation`。
-- 最近产品主线：`main` 与 `origin/main` 均为 `225fe139`；本文不会把尚未提交的审查改动写成主线已交付。
+- Agent F002 原始 RED 证据保留在 `ad13a6aa3e44ff98b2604d4a008649cd66185d80`；
+  安全同步 RED 基线为 merge commit `5de2e49bee19749f611b50747a31be9464b92d7b`，
+  其双亲为 `ad13a6aa…` 和 `main@cfeadefd7dfa056c1b3757876658493110d8cf84`。
+- 最近远端产品主线为 `origin/main@cfeadefd7dfa056c1b3757876658493110d8cf84`；
+  本地 `main` 引用仍落后，不作为当前远端证据。
 - 当前远端仍有 `origin/dev3.4` 和 `origin/dev4.0`；没有发现 `origin/dev5.0`、`origin/dev6.0` 或 `origin/trae-dev-v6.0`。本轮未获授权删除任何分支。
-- Agent Foundation 已按本轮授权从上述 R1 基线创建分支；这不授权 GREEN、合并或吸收其他历史分支。
+- `feat/agent-foundation` 已获授权实施且仅实施 F003；F004、合入 `main` 或其他后续行为仍需独立授权。
 
 ## 8. 已确认的下一能力：受控 AI Agent
 
 项目已接受 [ADR-0005](docs/ADR/ADR-0005-controlled-ai-agent-runtime.md) 并完成
-[Agent Runtime 设计](docs/design/agent-runtime.md)，但当前代码、路由、数据表和用户界面中都没有 Agent，
-不得宣称已实现。
+[Agent Runtime 设计](docs/design/agent-runtime.md)。当前代码仅实现 F003 的 contracts 与关闭 registry；
+尚无 Context/READ 投影、Tool 实现、Provider、Runtime、UI 或持久化，不得宣称整个 Agent Foundation 已实现。
 
 当前已冻结 [Foundation spec](specs/agent-foundation/spec.md)、[任务顺序](specs/agent-foundation/tasks.md) 和
-[Issue #48](https://github.com/ywyz/kindergartenManager/issues/48)。首组契约/关闭 registry 测试处于稳定 RED；
-缺少 `app.service.agent` 是预期失败，不得用空壳、skip 或 xfail 消除，也不得据此开始 GREEN。
+[Issue #48](https://github.com/ywyz/kindergartenManager/issues/48)。F002 在安全同步基线上仍稳定为同样的 4 RED；
+F003 只通过新增 contracts 与关闭 registry 使这 4 个测试 GREEN，没有修改、skip 或 xfail 原测试。
 
 首期范围只是每日活动计划页的单 Agent Foundation：
 
@@ -113,8 +116,8 @@ UI 的固定单用户身份与 API 的租户主体是两个不同边界，不得
   向量、教师画像或供应商托管记忆。
 - 不开放文件、URL、shell、Python、SQL、MCP、插件、动态 Tool 或多 Agent。
 
-实现前仍需固定功能开发基线、spec、Issue、任务顺序和稳定 RED。R1 已完成聚合事务、投影隔离及首个
-设置页 use-case/adapter seam；每日计划/班级/日历的 Agent 专用窄 Service 投影仍属于 Foundation 后续切片。
+F003 交付仍以固定 SHA 双轴 Review 和远端 CI `headSha` 为门禁。
+每日计划/班级/日历的 Agent 专用窄 Service 投影属于 F004，当前未授权。
 未来 WRITE 属于独立里程碑，至少需恢复可信用户身份、引入显式
 `daily_plan` revision、逐次确认、操作前版本和不可变审计，不由当前设计自动授权。
 
@@ -125,7 +128,7 @@ UI 的固定单用户身份与 API 的租户主体是两个不同边界，不得
 3. **投影边界需持续守卫**：API 列表显式使用 tenant 投影，UI 详情和子表使用 tenant + user 投影并已有跨 tenant/user 负向测试；新增查询仍必须选择并测试正确投影。
 4. **类型债务**：Ruff 已清零，但当前 Pyright 仍报告既有第三方类型与结构问题，尚未建立可执行的类型门禁。
 5. **发布证据漂移**：Linux 本地结果不能代替 Windows 安装、浏览器打开、模板 Word 保真和真实 AI/MySQL 验收。
-6. **远端质量证据待回读**：常规 push/PR 工作流已经建立，但在固定远端 SHA 的 GitHub Actions 结果回读前，只能宣称本地通过。
+6. **远端质量证据需按 SHA 回读**：安全 RED 基线 `5de2e49…` 的 push Quality 已通过；F003 仍必须以自身固定 `headSha` 回读，不能沿用基线 CI。
 7. **Agent 作用域风险**：当前 UI 是网络可达的固定管理员身份；首期 Agent 必须保持零写入，
    并拒绝 prompt injection、跨 tenant/user、动态工具和过期结果。
 
@@ -133,11 +136,10 @@ UI 的固定单用户身份与 API 的租户主体是两个不同边界，不得
 
 R1 基础修复的本地门禁已经通过，当前共同下一步是：
 
-1. 在远端固定 SHA 回读常规 push CI，保持迁移 fail-closed，不以页面可启动掩盖 schema 失败。
-2. 为 Agent Foundation 固定独立功能分支、spec/Issue、任务顺序、稳定 RED 和停止边界；此门禁只冻结契约，不授权 GREEN。
-3. 后续实现按窄切片建立每日计划、班级设置和日历 Service 投影；页面用例继续按测试逐步抽离，不做一次性大重写。
-4. NiceGUI 多用户预备功能保持低优先级，不与 Agent Foundation 隐式捆绑。
-5. 本轮 Linux 本地证据为 Python 3.14.7、Ruff 0 错误、全新 SQLite 到 `a6c4d8e2f9b1`、全量 `548 passed`；Windows、Word、MySQL 和真实 AI 仍是独立人工门禁。
+1. 对 F003 固定 SHA 完成双轴 Review 和远端 Quality `headSha` 回读，然后停止。
+2. F004 的 tenant+user 窄 READ Service 投影需新的明确授权；不得由 F003 GREEN 自动开始。
+3. NiceGUI 多用户预备功能保持低优先级，不与 Agent Foundation 隐式捆绑。
+4. 本轮 Linux 本地证据为 Python 3.14.7、Ruff 0 错误、全新 SQLite 到 `a6c4d8e2f9b1`、全量 `551 passed`；Windows、Word、MySQL 和真实 AI 仍是独立人工门禁。
 
 ## 11. 更新规则
 

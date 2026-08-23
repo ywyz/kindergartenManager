@@ -1,8 +1,8 @@
 # Agent Foundation 冻结规格
 
-- 状态：RED 冻结；未授权 GREEN
+- 状态：F003 GREEN；F004 及以后未授权
 - 分支：`feat/agent-foundation`
-- 基线：`dev4.0@1a72c2d4b439743e358e71a7bf4c5321e1d889f8`
+- 安全同步 RED 基线：`5de2e49bee19749f611b50747a31be9464b92d7b`
 - Issue：[#48](https://github.com/ywyz/kindergartenManager/issues/48)
 - 权威设计：[ADR-0005](../../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md)、[Agent Runtime](../../docs/design/agent-runtime.md)
 
@@ -54,17 +54,23 @@
 6. 每日计划页只读/草案展示：运行、取消、失败、草案、丢弃；无采用/保存/确认。
 7. 全边界零持久化证明与目标平台人工验收。
 
-## 6. 当前 RED 检查点
+## 6. F002 RED 与 F003 GREEN 检查点
 
-当前只冻结切片 1 的公共行为测试，放在 `specs/agent-foundation/tests/`，不进入常规 `pytest tests/` 质量套件；这是为了让 R1 基线 CI 保持可用，同时用独立命令保留可重复的预期失败。
+切片 1 的公共行为测试放在 `specs/agent-foundation/tests/`，不进入常规 `pytest tests/` 质量套件。
+F002 原始 SHA `ad13a6aa3e44ff98b2604d4a008649cd66185d80` 和安全同步基线
+`5de2e49bee19749f611b50747a31be9464b92d7b` 均保留同样的 4 个预期 RED，原因为
+`app.service.agent` 公共模块不存在。
 
 ```bash
 .venv/bin/python -m pytest specs/agent-foundation/tests --collect-only -q
 .venv/bin/python -m pytest specs/agent-foundation/tests -q
 ```
 
-预期：收集成功；执行稳定失败，原因是 `app.service.agent` 公共模块尚不存在。不得通过 skip、xfail、空壳或放宽断言把 RED 伪装为 GREEN。
+F003 不修改、skip、xfail 或放宽这 4 个测试；只新增 contracts 与关闭 registry，
+当前预期为收集 4 项且执行 `4 passed`。
 
 ## 7. 停止边界
 
-本分支当前授权到“固定 spec、Issue 和首组稳定 RED”为止。完成后停止；任何 `app/service/agent/`、Provider adapter、Tool 实现、UI 控件、schema/migration 或 GREEN 都需要下一道明确授权。
+本分支当前授权到 F003 contracts 与关闭 registry GREEN 为止。固定 SHA 双轴 Review
+和远端 CI 回读后停止；F004 的 Context/READ 投影及任何 Provider adapter、Tool 实现、
+UI 控件、schema/migration 或多用户工作都需要下一道明确授权。

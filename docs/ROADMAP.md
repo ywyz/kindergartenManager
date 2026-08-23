@@ -1,6 +1,6 @@
 # KindergartenManager 产品与工程路线图
 
-> 当前快照：2026-08-23；审查基线 `dev4.0@0657c3a`；最近产品主线 `main@225fe139`。
+> 当前快照：2026-08-23；Agent 安全同步 RED 基线 `5de2e49bee19749f611b50747a31be9464b92d7b`；最近远端产品主线 `main@cfeadefd7dfa056c1b3757876658493110d8cf84`。
 
 ## 1. 状态语义
 
@@ -102,26 +102,27 @@ R0 事实基线与图谱
 
 ## 7. R3：Agent Foundation 规格与分支决策
 
-状态：`RED`（`feat/agent-foundation` 基于 `dev4.0@1a72c2d4`；规格与 [Issue #48](https://github.com/ywyz/kindergartenManager/issues/48) 已冻结；首组契约测试稳定 4 failed，尚未授权 GREEN）。
+状态：`自动验证`（F002 安全同步 RED 基线已固定并推送；Issue #48 已授权且仅授权 F003；contracts/关闭 registry 的 4 个契约测试已本地 GREEN）。
 
 已确认：[ADR-0005](ADR/ADR-0005-controlled-ai-agent-runtime.md) 和
 [Agent Runtime 设计](design/agent-runtime.md) 已经固定首期上限，即每日活动计划的单 Agent、
 4 个 READ、2 个 DRAFT、零持久化和零长期记忆。设计接受不代表 spec/Issue、RED 或实现已完成。
 
-冻结结果：
+当前结果：
 
-- 功能分支固定为 `feat/agent-foundation`，R1 基线固定为 `dev4.0@1a72c2d4b439743e358e71a7bf4c5321e1d889f8`。
+- 功能分支固定为 `feat/agent-foundation`；F002 原始 RED SHA 为 `ad13a6aa3e44ff98b2604d4a008649cd66185d80`。
+- `main@cfeadefd7dfa056c1b3757876658493110d8cf84` 通过双亲 merge commit 同步到 `5de2e49bee19749f611b50747a31be9464b92d7b`；该远端 SHA 的 Quality 已通过。
 - [冻结规格与停止边界](../specs/agent-foundation/spec.md)、[任务顺序](../specs/agent-foundation/tasks.md) 和 [Issue #48](https://github.com/ywyz/kindergartenManager/issues/48) 已建立。
-- `specs/agent-foundation/tests/` 首组 RED 可干净收集 4 项，并连续三次以缺少 `app.service.agent` 公共模块稳定失败；它与常规 R1 GREEN 套件分离。
+- `specs/agent-foundation/tests/` 在同步基线上仍为同样的 4 RED；F003 不改测试，只新增 contracts 与关闭 registry 使其 4 GREEN。
 - 当前继续单用户；NiceGUI 多用户/RBAC 代码仅作为低优先级预备资产，不进入 Foundation 范围。
 - 是否仍保持模块化单体？服务拆分必须有独立 ADR 和运营理由。
 - 聚合事务和 tenant/user 投影修复后，每日计划、班级设置和日历的窄 Service 投影如何建立，使 Agent Tool 不直接调用 Repository？
 
-当前停止边界：不得实现 contracts/registry GREEN、Provider、Tool、UI 或 migration；下一步需新的明确授权。
+当前停止边界：F003 只实现 contracts/关闭 registry；完成固定 SHA Review 与远端 CI 后停止。F004、Provider、Tool 实现、UI 或 migration 需新的明确授权。
 
 ## 8. R4A：受控 Agent Foundation READ/DRAFT
 
-状态：`规划`。
+状态：`实现中`（仅 F003 GREEN；F004 及以后未授权）。
 
 实现范围严格限定为：
 
