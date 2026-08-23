@@ -31,6 +31,7 @@ from app.service.agent.runtime import (
     AgentTurnStatus,
     ProviderTurnRequest,
     ProviderTurnResult,
+    RuntimeLimits,
 )
 from app.service.agent.tools import FoundationToolExecutor
 
@@ -235,6 +236,7 @@ class DailyPlanAgentCoordinator:
         provider_factory: ProviderFactory = _default_provider_factory,
         registry: AgentToolRegistry | None = None,
         clock: Callable[[], datetime] | None = None,
+        runtime_limits: RuntimeLimits | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._provider_factory = provider_factory
@@ -251,6 +253,7 @@ class DailyPlanAgentCoordinator:
             executor=self._executor,
             registry=self._registry,
             context_state=self._context_state,
+            limits=runtime_limits,
             clock=clock,
         )
         self._admission_lock = asyncio.Lock()
