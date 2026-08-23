@@ -10,7 +10,7 @@
 | F003 | 最小实现 contracts 与关闭 registry | F002 + 明确 GREEN 授权 | GREEN |
 | F004 | 建立 tenant+user 窄 READ service 投影 | F003 + 明确授权 | GREEN（`729f446…`，Review/CI 通过） |
 | F005 | 实现规范 PlanPatch | F004 | GREEN（`53dd2e8…`，双轴 Review/CI 通过） |
-| F006 | 实现 Provider port 与有界 Runtime | F005 | GREEN 候选（RED `f0ab660…`；Review RED `6b083fa…`；本地 `54 passed`；待复审/CI） |
+| F006 | 实现 Provider port 与有界 Runtime | F005 | GREEN 候选（RED `f0ab660…`；Review RED `6b083fa…`、`8831b3f…`；本地 `58 passed`；待复审/CI） |
 | F007 | 实现取消/超时/迟到丢弃 | F006 | 未授权 |
 | F008 | 接入每日计划页只读/草案 UI | F007 | 未授权 |
 | F009 | 零持久化全矩阵、Review 与人工验收 | F008 | 未授权 |

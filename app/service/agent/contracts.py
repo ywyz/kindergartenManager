@@ -181,6 +181,10 @@ class ClosedToolOutputSchema:
         if not isinstance(self.kind, ToolOutputKind):
             raise ValueError("tool_output_schema_invalid")
 
+    def accepts(self, value: object) -> bool:
+        """Return whether every field is a closed, deeply immutable DTO value."""
+        return _tool_output_matches(self.kind, value)
+
 
 @dataclass(frozen=True, slots=True)
 class ToolDescriptor:
@@ -327,6 +331,118 @@ class AgentContext:
     facts: tuple[ContextFact, ...] = field(repr=False)
     base_fingerprint: str
     allowed_permissions: frozenset[Permission]
+
+
+def _valid_plan_identity(value: object) -> bool:
+    return type(value) is int and value > 0
+
+
+def _valid_plan_metadata(
+    *,
+    plan_id: object,
+    plan_date: object,
+    week_number: object,
+    weekday_cn: object,
+    grade: object,
+    class_name: object,
+) -> bool:
+    return (
+        _valid_plan_identity(plan_id)
+        and type(plan_date) is date
+        and type(week_number) is int
+        and week_number > 0
+        and isinstance(weekday_cn, str)
+        and isinstance(grade, str)
+        and isinstance(class_name, str)
+    )
+
+
+def _valid_plan_sections(value: object) -> bool:
+    return (
+        isinstance(value, tuple)
+        and tuple(
+            section.field_path for section in value if type(section) is PlanSection
+        )
+        == DAILY_PLAN_SECTION_PATHS
+        and all(
+            type(section) is PlanSection
+            and isinstance(section.field_path, str)
+            and isinstance(section.content, str)
+            and len(section.content) <= MAX_TOOL_TEXT_LENGTH
+            and type(section.truncated) is bool
+            for section in value
+        )
+    )
+
+
+def _valid_section_states(value: object) -> bool:
+    return (
+        isinstance(value, tuple)
+        and tuple(state.field_path for state in value if type(state) is SectionState)
+        == DAILY_PLAN_SECTION_PATHS
+        and all(
+            type(state) is SectionState
+            and isinstance(state.field_path, str)
+            and type(state.has_content) is bool
+            for state in value
+        )
+    )
+
+
+def _tool_output_matches(kind: ToolOutputKind, value: object) -> bool:
+    if kind is ToolOutputKind.DAILY_PLAN_PROJECTION:
+        return (
+            type(value) is DailyPlanProjection
+            and _valid_plan_metadata(
+                plan_id=value.plan_id,
+                plan_date=value.plan_date,
+                week_number=value.week_number,
+                weekday_cn=value.weekday_cn,
+                grade=value.grade,
+                class_name=value.class_name,
+            )
+            and _valid_plan_sections(value.sections)
+            and type(value.updated_at_utc) is datetime
+            and isinstance(value.content_sha256, str)
+            and SHA256_HEX_PATTERN.fullmatch(value.content_sha256) is not None
+        )
+    if kind is ToolOutputKind.DAILY_PLAN_CONTEXT_PROJECTION:
+        return (
+            type(value) is DailyPlanContextProjection
+            and _valid_plan_metadata(
+                plan_id=value.plan_id,
+                plan_date=value.plan_date,
+                week_number=value.week_number,
+                weekday_cn=value.weekday_cn,
+                grade=value.grade,
+                class_name=value.class_name,
+            )
+            and (value.semester_name is None or isinstance(value.semester_name, str))
+            and _valid_section_states(value.section_states)
+        )
+    if kind is ToolOutputKind.CALENDAR_EVALUATION_PROJECTION:
+        return (
+            type(value) is CalendarEvaluationProjection
+            and type(value.target_date) is date
+            and (value.within_semester is None or type(value.within_semester) is bool)
+            and isinstance(value.day_type, CalendarDayType)
+            and (value.holiday_name is None or isinstance(value.holiday_name, str))
+            and (
+                value.degradation_code is None
+                or isinstance(value.degradation_code, str)
+            )
+        )
+    if kind is ToolOutputKind.CLASS_AREAS_PROJECTION:
+        return (
+            type(value) is ClassAreasProjection
+            and isinstance(value.grade, str)
+            and isinstance(value.class_name, str)
+            and isinstance(value.indoor_areas, str)
+            and len(value.indoor_areas) <= MAX_TOOL_TEXT_LENGTH
+            and isinstance(value.outdoor_content, str)
+            and len(value.outdoor_content) <= MAX_TOOL_TEXT_LENGTH
+        )
+    return kind is ToolOutputKind.PLAN_PATCH
 
 
 FOUNDATION_ALLOWED_PERMISSIONS = frozenset({Permission.READ, Permission.DRAFT})

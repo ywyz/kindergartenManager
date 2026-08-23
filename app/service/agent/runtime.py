@@ -511,6 +511,8 @@ class AgentRuntime:
         expected_type = _OUTPUT_TYPES[descriptor.output_schema.kind]
         if type(execution.value) is not expected_type:
             return "agent.tool_schema_invalid"
+        if not descriptor.output_schema.accepts(execution.value):
+            return "agent.tool_schema_invalid"
         if expected_patch is not None and not plan_patch_matches_expected(
             actual=execution.value,
             expected=expected_patch,
