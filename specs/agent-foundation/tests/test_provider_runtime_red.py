@@ -173,6 +173,14 @@ class ScriptedProvider:
         return response
 
 
+@dataclass
+class StaticContextState:
+    stamp: object
+
+    def current_stamp(self) -> object:
+        return self.stamp
+
+
 def _read_value(call: object, context: AgentContext) -> object:
     projection = next(
         fact for fact in context.facts if isinstance(fact, DailyPlanProjection)
@@ -255,10 +263,15 @@ def _agent_runtime(
     limits: object | None = None,
 ):
     registry = import_module("app.service.agent.registry").build_foundation_registry()
+    context = _context()
     return runtime.AgentRuntime(
         provider=provider,
         executor=executor or ScriptedExecutor(),
         registry=registry,
+        context_state=StaticContextState(
+            runtime.AgentContextStamp.from_context(context)
+        ),
+        clock=lambda: context.created_at_utc,
         limits=limits or runtime.RuntimeLimits(),
     )
 

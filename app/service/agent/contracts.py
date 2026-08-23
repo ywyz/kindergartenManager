@@ -29,6 +29,7 @@ MAX_TOOL_WARNING_LENGTH = 256
 MAX_TOOL_METADATA_LENGTH = 256
 MAX_TOOL_ID = 2**63 - 1
 MAX_WEEK_NUMBER = 53
+FOUNDATION_TOOL_TIMEOUT_MS = 10_000
 SHA256_HEX_PATTERN = re.compile(r"[0-9a-f]{64}")
 
 
@@ -202,6 +203,19 @@ class ToolDescriptor:
     permission: Permission
     input_schema: ClosedToolInputSchema
     output_schema: ClosedToolOutputSchema
+    timeout_ms: int = FOUNDATION_TOOL_TIMEOUT_MS
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.name) is not str
+            or not self.name
+            or type(self.permission) is not Permission
+            or type(self.input_schema) is not ClosedToolInputSchema
+            or type(self.output_schema) is not ClosedToolOutputSchema
+            or type(self.timeout_ms) is not int
+            or self.timeout_ms <= 0
+        ):
+            raise ValueError("tool_descriptor_invalid")
 
 
 @dataclass(frozen=True, slots=True)

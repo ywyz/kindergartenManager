@@ -374,7 +374,9 @@ async def test_runtime_cancels_only_the_exact_active_operation_and_recovers():
     )
     busy = await agent.run_turn(context=_context(), intent="并发请求")
     assert busy.error_code == "agent.busy"
-    assert await agent.cancel(runtime.AgentContextStamp.from_context(_context())) is True
+    assert (
+        await agent.cancel(runtime.AgentContextStamp.from_context(_context())) is True
+    )
 
     cancelled = await asyncio.wait_for(first, 1)
     assert cancelled.status is runtime.AgentTurnStatus.CANCELLED
@@ -401,7 +403,9 @@ async def test_runtime_keeps_busy_until_a_cancel_defying_provider_is_drained():
 
     pending = asyncio.create_task(agent.run_turn(context=_context(), intent="运行"))
     await asyncio.wait_for(provider.entered.wait(), 1)
-    assert await agent.cancel(runtime.AgentContextStamp.from_context(_context())) is True
+    assert (
+        await agent.cancel(runtime.AgentContextStamp.from_context(_context())) is True
+    )
     await asyncio.wait_for(provider.cancellation_seen.wait(), 1)
 
     busy = await agent.run_turn(context=_context(), intent="排空前请求")
@@ -530,7 +534,9 @@ async def test_runtime_single_tool_timeout_stops_before_provider_reentry():
     assert recovered.status is runtime.AgentTurnStatus.SUCCEEDED
 
 
-@pytest.mark.parametrize("invalid_state", (None, object(), RuntimeError("state-secret")))
+@pytest.mark.parametrize(
+    "invalid_state", (None, object(), RuntimeError("state-secret"))
+)
 @pytest.mark.asyncio
 async def test_runtime_fails_closed_when_current_context_is_unavailable(
     invalid_state: object,
@@ -552,7 +558,9 @@ async def test_runtime_fails_closed_when_current_context_is_unavailable(
     assert "state-secret" not in repr(outcome)
 
 
-@pytest.mark.parametrize("clock_offset", (-timedelta(microseconds=1), timedelta(minutes=5)))
+@pytest.mark.parametrize(
+    "clock_offset", (-timedelta(microseconds=1), timedelta(minutes=5))
+)
 @pytest.mark.asyncio
 async def test_runtime_rejects_a_future_or_expired_context_before_provider_entry(
     clock_offset: timedelta,
@@ -667,7 +675,9 @@ async def test_runtime_cancellation_drops_an_inflight_tool_result():
 
     pending = asyncio.create_task(agent.run_turn(context=_context(), intent="读取区域"))
     await asyncio.wait_for(entered.wait(), 1)
-    assert await agent.cancel(runtime.AgentContextStamp.from_context(_context())) is True
+    assert (
+        await agent.cancel(runtime.AgentContextStamp.from_context(_context())) is True
+    )
 
     outcome = await asyncio.wait_for(pending, 1)
     assert outcome.status is runtime.AgentTurnStatus.CANCELLED

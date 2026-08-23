@@ -3,16 +3,20 @@
 import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass, field, fields, is_dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from enum import Enum
 from types import MappingProxyType
-from typing import Protocol, runtime_checkable
+from typing import Callable, Protocol, runtime_checkable
 from uuid import UUID
 
 from app.service.agent.contracts import (
     AgentContext,
+    DailyPlanScope,
+    MAX_TOOL_ID,
     Permission,
+    SHA256_HEX_PATTERN,
     ToolDescriptor,
+    TrustedActor,
     validate_agent_context,
 )
 from app.service.agent.canonical import canonical_json
@@ -60,6 +64,88 @@ class AgentTurnStatus(str, Enum):
     SUCCEEDED = "succeeded"
     DRAFT_READY = "draft_ready"
     FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+@dataclass(frozen=True, slots=True)
+class AgentContextStamp:
+    """Closed copy of the live actor, scope, and operation binding."""
+
+    context_id: UUID
+    operation_id: UUID
+    turn_id: UUID
+    actor: TrustedActor
+    active_scope: DailyPlanScope
+    base_fingerprint: str
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.context_id) is not UUID
+            or type(self.operation_id) is not UUID
+            or type(self.turn_id) is not UUID
+            or type(self.actor) is not TrustedActor
+            or type(self.actor.tenant_id) is not int
+            or not 0 < self.actor.tenant_id <= MAX_TOOL_ID
+            or type(self.actor.user_id) is not int
+            or not 0 < self.actor.user_id <= MAX_TOOL_ID
+            or type(self.active_scope) is not DailyPlanScope
+            or not _valid_stamp_scope(self.active_scope)
+            or type(self.base_fingerprint) is not str
+            or SHA256_HEX_PATTERN.fullmatch(self.base_fingerprint) is None
+        ):
+            raise ValueError("agent_context_stamp_invalid")
+
+    @classmethod
+    def from_context(cls, context: AgentContext) -> "AgentContextStamp":
+        """Copy a fully validated context without retaining its nested objects."""
+        if not validate_agent_context(context):
+            raise ValueError("agent_context_stamp_invalid")
+        scope = context.active_scope
+        return cls(
+            context_id=context.context_id,
+            operation_id=context.operation_id,
+            turn_id=context.turn_id,
+            actor=TrustedActor(
+                tenant_id=context.actor.tenant_id,
+                user_id=context.actor.user_id,
+            ),
+            active_scope=DailyPlanScope(
+                daily_plan_id=scope.daily_plan_id,
+                plan_date=scope.plan_date,
+            ),
+            base_fingerprint=context.base_fingerprint,
+        )
+
+
+def _valid_stamp_scope(scope: DailyPlanScope) -> bool:
+    if scope.daily_plan_id is not None:
+        return (
+            scope.plan_date is None
+            and type(scope.daily_plan_id) is int
+            and 0 < scope.daily_plan_id <= MAX_TOOL_ID
+        )
+    return type(scope.plan_date) is date
+
+
+def _valid_context_stamp(value: object) -> bool:
+    try:
+        return (
+            type(value) is AgentContextStamp
+            and type(value.context_id) is UUID
+            and type(value.operation_id) is UUID
+            and type(value.turn_id) is UUID
+            and type(value.actor) is TrustedActor
+            and type(value.actor.tenant_id) is int
+            and 0 < value.actor.tenant_id <= MAX_TOOL_ID
+            and type(value.actor.user_id) is int
+            and 0 < value.actor.user_id <= MAX_TOOL_ID
+            and type(value.active_scope) is DailyPlanScope
+            and _valid_stamp_scope(value.active_scope)
+            and type(value.base_fingerprint) is str
+            and SHA256_HEX_PATTERN.fullmatch(value.base_fingerprint) is not None
+        )
+    except (AttributeError, TypeError):
+        return False
 
 
 def _freeze_json(value: object) -> object:
@@ -284,6 +370,9 @@ class RuntimeLimits:
     max_tool_result_chars: int = 16_384
     max_tool_calls: int = 6
     max_messages: int = 12
+    max_provider_duration_ms: int = 30_000
+    max_tool_duration_ms: int = 10_000
+    max_total_duration_ms: int = 60_000
 
     def __post_init__(self) -> None:
         if any(
@@ -294,6 +383,9 @@ class RuntimeLimits:
                 self.max_tool_result_chars,
                 self.max_tool_calls,
                 self.max_messages,
+                self.max_provider_duration_ms,
+                self.max_tool_duration_ms,
+                self.max_total_duration_ms,
             )
         ):
             raise ValueError("runtime_limits_invalid")
@@ -329,8 +421,34 @@ class AgentToolExecutorPort(Protocol):
         ...
 
 
+@runtime_checkable
+class AgentCurrentContextPort(Protocol):
+    """Return the application's current immutable context binding."""
+
+    def current_stamp(self) -> AgentContextStamp | None:
+        """Return the current stamp, or ``None`` when the binding is unavailable."""
+        ...
+
+
+class _OperationStopped(Exception):
+    """Private control flow carrying only a stable public error code."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
+
 def _failure(code: str) -> AgentTurnOutcome:
     return AgentTurnOutcome(status=AgentTurnStatus.FAILED, error_code=code)
+
+
+def _stopped_outcome(code: str) -> AgentTurnOutcome:
+    if code == "agent.cancelled":
+        return AgentTurnOutcome(
+            status=AgentTurnStatus.CANCELLED,
+            error_code="agent.cancelled",
+        )
+    return _failure(code)
 
 
 class AgentRuntime:
@@ -342,14 +460,21 @@ class AgentRuntime:
         provider: AgentProviderPort,
         executor: AgentToolExecutorPort,
         registry: AgentToolRegistry,
+        context_state: AgentCurrentContextPort,
         limits: RuntimeLimits | None = None,
+        clock: Callable[[], datetime] | None = None,
     ) -> None:
         self._provider = provider
         self._executor = executor
         self._registry = registry
         self._limits = limits or RuntimeLimits()
+        self._context_state = context_state
+        self._clock = clock or (lambda: datetime.now(timezone.utc))
         self._state_lock = asyncio.Lock()
         self._active_operation_id: UUID | None = None
+        self._active_stamp: AgentContextStamp | None = None
+        self._active_io_task: asyncio.Task[object] | None = None
+        self._active_stop_code: str | None = None
 
     async def run_turn(self, *, context: AgentContext, intent: str) -> AgentTurnOutcome:
         """Run a bounded serial turn; never expose provider exception details."""
@@ -360,21 +485,73 @@ class AgentRuntime:
             return _failure("agent.tool_schema_invalid")
         if len(normalized_intent) > self._limits.max_intent_chars:
             return _failure("agent.limit_exceeded")
+        try:
+            stamp = AgentContextStamp.from_context(context)
+        except ValueError:
+            return _failure("agent.tool_schema_invalid")
 
         async with self._state_lock:
             if self._active_operation_id is not None:
                 return _failure("agent.busy")
             self._active_operation_id = context.operation_id
+            self._active_stamp = stamp
+            self._active_stop_code = None
 
+        deadline = (
+            asyncio.get_running_loop().time()
+            + self._limits.max_total_duration_ms / 1000
+        )
+        final_stop_code: str | None = None
         try:
-            return await self._run_active(context=context, intent=normalized_intent)
+            initial_error = self._gate_error(
+                context=context,
+                expected_stamp=stamp,
+                deadline=deadline,
+            )
+            if initial_error is not None:
+                outcome = _stopped_outcome(initial_error)
+            else:
+                try:
+                    outcome = await self._run_active(
+                        context=context,
+                        intent=normalized_intent,
+                        expected_stamp=stamp,
+                        deadline=deadline,
+                    )
+                except _OperationStopped as stopped:
+                    outcome = _stopped_outcome(stopped.code)
         finally:
             async with self._state_lock:
-                if self._active_operation_id == context.operation_id:
+                if self._active_stamp == stamp:
+                    final_stop_code = self._active_stop_code
                     self._active_operation_id = None
+                    self._active_stamp = None
+                    self._active_io_task = None
+                    self._active_stop_code = None
+        if final_stop_code is not None:
+            return _stopped_outcome(final_stop_code)
+        return outcome
+
+    async def cancel(self, stamp: AgentContextStamp) -> bool:
+        """Cancel only the active operation with the exact complete binding."""
+        if not _valid_context_stamp(stamp):
+            return False
+        async with self._state_lock:
+            if self._active_stamp != stamp or self._active_stop_code is not None:
+                return False
+            self._active_stop_code = "agent.cancelled"
+            active_task = self._active_io_task
+            if active_task is not None and not active_task.done():
+                active_task.cancel()
+            return True
 
     async def _run_active(
-        self, *, context: AgentContext, intent: str
+        self,
+        *,
+        context: AgentContext,
+        intent: str,
+        expected_stamp: AgentContextStamp,
+        deadline: float,
     ) -> AgentTurnOutcome:
         messages = (ProviderMessage(role=ProviderRole.USER, content=intent),)
         total_tool_calls = 0
@@ -382,6 +559,13 @@ class AgentRuntime:
         patches: list[PlanPatch] = []
 
         while True:
+            gate_error = self._gate_error(
+                context=context,
+                expected_stamp=expected_stamp,
+                deadline=deadline,
+            )
+            if gate_error is not None:
+                return _stopped_outcome(gate_error)
             request = ProviderTurnRequest(
                 operation_id=context.operation_id,
                 local_policy_version=LOCAL_POLICY_VERSION,
@@ -391,9 +575,24 @@ class AgentRuntime:
                 response_limit=self._limits.max_response_chars,
             )
             try:
-                result = await self._provider.complete(request)
+                result = await self._await_port(
+                    self._provider.complete(request),
+                    operation_id=context.operation_id,
+                    deadline=deadline,
+                    max_duration_ms=self._limits.max_provider_duration_ms,
+                    cancelled_code="agent.provider_failed",
+                )
+            except _OperationStopped:
+                raise
             except Exception:
                 return _failure("agent.provider_failed")
+            gate_error = self._gate_error(
+                context=context,
+                expected_stamp=expected_stamp,
+                deadline=deadline,
+            )
+            if gate_error is not None:
+                return _stopped_outcome(gate_error)
             if type(result) is not ProviderTurnResult:
                 return _failure("agent.provider_failed")
             if (
@@ -405,6 +604,13 @@ class AgentRuntime:
             if not result.tool_calls:
                 if result.finish_reason is not ProviderFinishReason.COMPLETED:
                     return _failure("agent.provider_failed")
+                gate_error = self._gate_error(
+                    context=context,
+                    expected_stamp=expected_stamp,
+                    deadline=deadline,
+                )
+                if gate_error is not None:
+                    return _stopped_outcome(gate_error)
                 status = (
                     AgentTurnStatus.DRAFT_READY
                     if patches
@@ -443,9 +649,27 @@ class AgentRuntime:
             results: list[ToolExecutionResult] = []
             for call, descriptor, expected_patch in resolved_calls:
                 try:
-                    execution = await self._executor.execute(call, context)
+                    execution = await self._await_port(
+                        self._executor.execute(call, context),
+                        operation_id=context.operation_id,
+                        deadline=deadline,
+                        max_duration_ms=min(
+                            self._limits.max_tool_duration_ms,
+                            descriptor.timeout_ms,
+                        ),
+                        cancelled_code="agent.tool_failed",
+                    )
+                except _OperationStopped:
+                    raise
                 except Exception:
                     return _failure("agent.tool_failed")
+                gate_error = self._gate_error(
+                    context=context,
+                    expected_stamp=expected_stamp,
+                    deadline=deadline,
+                )
+                if gate_error is not None:
+                    return _stopped_outcome(gate_error)
                 error = self._validate_execution(
                     call=call,
                     context=context,
@@ -470,6 +694,88 @@ class AgentRuntime:
                     tool_results=tuple(results),
                 ),
             )
+
+    async def _await_port(
+        self,
+        awaitable: object,
+        *,
+        operation_id: UUID,
+        deadline: float,
+        max_duration_ms: int,
+        cancelled_code: str,
+    ) -> object:
+        """Await one port call while retaining busy until cancellation is drained."""
+        if not hasattr(awaitable, "__await__"):
+            raise TypeError("agent_port_result_invalid")
+        task = asyncio.create_task(awaitable)
+        self._active_io_task = task
+        loop = asyncio.get_running_loop()
+        timeout_seconds = min(max_duration_ms / 1000, max(0.0, deadline - loop.time()))
+
+        def expire() -> None:
+            if (
+                self._active_operation_id == operation_id
+                and self._active_io_task is task
+                and self._active_stop_code is None
+            ):
+                self._active_stop_code = "agent.timeout"
+                task.cancel()
+
+        timeout_handle = loop.call_later(timeout_seconds, expire)
+        if self._active_stop_code is not None:
+            task.cancel()
+        try:
+            result = await task
+        except asyncio.CancelledError:
+            current_task = asyncio.current_task()
+            if current_task is not None and current_task.cancelling():
+                raise
+            raise _OperationStopped(self._active_stop_code or cancelled_code) from None
+        finally:
+            timeout_handle.cancel()
+            if self._active_io_task is task:
+                self._active_io_task = None
+
+        current_task = asyncio.current_task()
+        if current_task is not None and current_task.cancelling():
+            raise asyncio.CancelledError
+        if self._active_stop_code is not None:
+            raise _OperationStopped(self._active_stop_code)
+        return result
+
+    def _gate_error(
+        self,
+        *,
+        context: AgentContext,
+        expected_stamp: AgentContextStamp,
+        deadline: float,
+    ) -> str | None:
+        if self._active_stop_code is not None:
+            return self._active_stop_code
+        if asyncio.get_running_loop().time() >= deadline:
+            self._active_stop_code = "agent.timeout"
+            return self._active_stop_code
+        if not validate_agent_context(context):
+            return "agent.context_stale"
+        try:
+            context_stamp = AgentContextStamp.from_context(context)
+            now = self._clock()
+        except Exception:
+            return "agent.context_stale"
+        if (
+            context_stamp != expected_stamp
+            or type(now) is not datetime
+            or now.tzinfo is not timezone.utc
+            or not context.created_at_utc <= now < context.expires_at_utc
+        ):
+            return "agent.context_stale"
+        try:
+            current_stamp = self._context_state.current_stamp()
+        except Exception:
+            return "agent.context_stale"
+        if not _valid_context_stamp(current_stamp) or current_stamp != expected_stamp:
+            return "agent.context_stale"
+        return None
 
     def _validate_call(
         self,
