@@ -42,7 +42,6 @@ jobs:
           --requirement requirements.txt
           --strict
           --progress-spinner off
-          --ignore-vuln PYSEC-2026-1325
 
       - name: Ruff changed Python files
         shell: bash

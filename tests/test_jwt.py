@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from jose import jwt
+import jwt
 
 from app.auth.jwt import _ALGORITHM, create_access_token, decode_access_token
 from app.core.config import settings
@@ -36,7 +36,11 @@ def test_wrong_secret_raises_auth_error():
         "role": "teacher",
         "exp": datetime.now(tz=timezone.utc) + timedelta(minutes=60),
     }
-    bad_token = jwt.encode(payload, "wrong-secret", algorithm=_ALGORITHM)
+    bad_token = jwt.encode(
+        payload,
+        "wrong-secret-that-is-at-least-32-bytes-long",
+        algorithm=_ALGORITHM,
+    )
     with pytest.raises(AuthError):
         decode_access_token(bad_token)
 

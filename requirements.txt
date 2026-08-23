@@ -17,7 +17,7 @@ pydantic-settings>=2.0.0
 
 # 鉴权与加密
 argon2-cffi>=23.1.0
-python-jose[cryptography]>=3.3.0  # ecdsa 无修复公告例外见 docs/DEPENDENCIES.md
+PyJWT>=2.13.0         # Dependabot #38；替代含未修复 ecdsa 的 python-jose
 cryptography>=50.0.0   # Dependabot #20/#35–#37
 
 # HTTP 客户端
