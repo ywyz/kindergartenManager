@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
+import re
 from typing import TypeAlias
 from uuid import UUID
 
@@ -22,6 +23,10 @@ DAILY_PLAN_SECTION_PATHS = (
     "morning_talk_questions",
     "daily_reflection",
 )
+MAX_TOOL_TEXT_LENGTH = 4096
+MAX_TOOL_WARNINGS = 8
+MAX_TOOL_WARNING_LENGTH = 256
+SHA256_HEX_PATTERN = re.compile(r"[0-9a-f]{64}")
 
 
 class Permission(str, Enum):
@@ -32,12 +37,23 @@ class Permission(str, Enum):
     WRITE = "WRITE"
 
 
+class ToolOutputKind(str, Enum):
+    """Exact application DTO kind a registered tool may return."""
+
+    DAILY_PLAN_PROJECTION = "daily_plan_projection"
+    DAILY_PLAN_CONTEXT_PROJECTION = "daily_plan_context_projection"
+    CALENDAR_EVALUATION_PROJECTION = "calendar_evaluation_projection"
+    CLASS_AREAS_PROJECTION = "class_areas_projection"
+    PLAN_PATCH = "plan_patch"
+
+
 @dataclass(frozen=True, slots=True)
 class ClosedToolInputSchema:
-    """Closed top-level input names accepted from a provider tool call."""
+    """Closed top-level and nested shape accepted from a provider tool call."""
 
     required_fields: frozenset[str] = frozenset()
     optional_fields: frozenset[str] = frozenset()
+    operation_paths: frozenset[str] = frozenset()
     additional_properties: bool = False
 
     def __post_init__(self) -> None:
@@ -49,6 +65,11 @@ class ClosedToolInputSchema:
                 for name in self.required_fields | self.optional_fields
             )
             or self.required_fields & self.optional_fields
+            or not isinstance(self.operation_paths, frozenset)
+            or not all(
+                isinstance(path, str) and path in DAILY_PLAN_SECTION_PATHS
+                for path in self.operation_paths
+            )
             or self.additional_properties is not False
         ):
             raise ValueError("tool_input_schema_invalid")
@@ -60,20 +81,115 @@ class ClosedToolInputSchema:
         ):
             return False
         names = frozenset(arguments)
-        return (
+        if not (
             self.required_fields
             <= names
             <= (self.required_fields | self.optional_fields)
+        ):
+            return False
+        if not self.operation_paths:
+            return not arguments
+        return self._accepts_patch(arguments)
+
+    def _accepts_patch(self, arguments: Mapping[str, object]) -> bool:
+        try:
+            operation_id = UUID(str(arguments["operation_id"]))
+            turn_id = UUID(str(arguments["turn_id"]))
+        except (KeyError, TypeError, ValueError):
+            return False
+        if (
+            str(operation_id) != arguments["operation_id"]
+            or str(turn_id) != arguments["turn_id"]
+            or not isinstance(arguments["base_fingerprint"], str)
+            or SHA256_HEX_PATTERN.fullmatch(arguments["base_fingerprint"]) is None
+        ):
+            return False
+
+        target = arguments["target"]
+        if not isinstance(target, Mapping) or frozenset(target) != {
+            "daily_plan_id",
+            "plan_date",
+        }:
+            return False
+        if type(target["daily_plan_id"]) is not int or target["daily_plan_id"] <= 0:
+            return False
+        if not isinstance(target["plan_date"], str):
+            return False
+        try:
+            if (
+                date.fromisoformat(target["plan_date"]).isoformat()
+                != target["plan_date"]
+            ):
+                return False
+        except ValueError:
+            return False
+
+        operations = arguments["operations"]
+        if (
+            not isinstance(operations, (tuple, list))
+            or not operations
+            or len(operations) > len(self.operation_paths)
+        ):
+            return False
+        paths: list[str] = []
+        for operation in operations:
+            if not isinstance(operation, Mapping) or frozenset(operation) != {
+                "field_path",
+                "before_value",
+                "after_value",
+            }:
+                return False
+            field_path = operation["field_path"]
+            if (
+                not isinstance(field_path, str)
+                or field_path not in self.operation_paths
+            ):
+                return False
+            if field_path in paths or any(
+                field_path.startswith(f"{other}.") or other.startswith(f"{field_path}.")
+                for other in paths
+            ):
+                return False
+            if any(
+                not isinstance(operation[name], str)
+                or len(operation[name]) > MAX_TOOL_TEXT_LENGTH
+                for name in ("before_value", "after_value")
+            ):
+                return False
+            paths.append(field_path)
+
+        warnings = arguments.get("warnings", ())
+        return (
+            isinstance(warnings, (tuple, list))
+            and len(warnings) <= MAX_TOOL_WARNINGS
+            and all(
+                isinstance(warning, str)
+                and bool(warning.strip())
+                and len(warning) <= MAX_TOOL_WARNING_LENGTH
+                for warning in warnings
+            )
         )
 
 
 @dataclass(frozen=True, slots=True)
+class ClosedToolOutputSchema:
+    """Exact application DTO kind accepted back from a local executor."""
+
+    kind: ToolOutputKind
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.kind, ToolOutputKind):
+            raise ValueError("tool_output_schema_invalid")
+
+
+@dataclass(frozen=True, slots=True)
 class ToolDescriptor:
-    """Name, permission, and closed input shape exposed by the registry."""
+    """Name, permission, and closed input/output shapes exposed by the registry."""
 
     name: str
     permission: Permission
     input_schema: ClosedToolInputSchema
+    output_schema: ClosedToolOutputSchema
 
 
 @dataclass(frozen=True, slots=True)
@@ -216,23 +332,59 @@ class AgentContext:
 FOUNDATION_ALLOWED_PERMISSIONS = frozenset({Permission.READ, Permission.DRAFT})
 
 _READ_TOOL_INPUT = ClosedToolInputSchema()
-_DRAFT_TOOL_INPUT = ClosedToolInputSchema(
+_SECTION_DRAFT_TOOL_INPUT = ClosedToolInputSchema(
     required_fields=frozenset(
         {"operation_id", "turn_id", "target", "base_fingerprint", "operations"}
     ),
     optional_fields=frozenset({"warnings"}),
+    operation_paths=frozenset(
+        path for path in DAILY_PLAN_SECTION_PATHS if path != "daily_reflection"
+    ),
+)
+_REFLECTION_DRAFT_TOOL_INPUT = ClosedToolInputSchema(
+    required_fields=frozenset(
+        {"operation_id", "turn_id", "target", "base_fingerprint", "operations"}
+    ),
+    optional_fields=frozenset({"warnings"}),
+    operation_paths=frozenset({"daily_reflection"}),
 )
 
 FOUNDATION_TOOL_DESCRIPTORS = (
-    ToolDescriptor("daily_plan.read_current", Permission.READ, _READ_TOOL_INPUT),
-    ToolDescriptor("daily_plan.read_context", Permission.READ, _READ_TOOL_INPUT),
-    ToolDescriptor("calendar.read_evaluation", Permission.READ, _READ_TOOL_INPUT),
-    ToolDescriptor("settings.read_class_areas", Permission.READ, _READ_TOOL_INPUT),
     ToolDescriptor(
-        "daily_plan.draft_section_patch", Permission.DRAFT, _DRAFT_TOOL_INPUT
+        "daily_plan.read_current",
+        Permission.READ,
+        _READ_TOOL_INPUT,
+        ClosedToolOutputSchema(ToolOutputKind.DAILY_PLAN_PROJECTION),
     ),
     ToolDescriptor(
-        "daily_plan.draft_reflection_patch", Permission.DRAFT, _DRAFT_TOOL_INPUT
+        "daily_plan.read_context",
+        Permission.READ,
+        _READ_TOOL_INPUT,
+        ClosedToolOutputSchema(ToolOutputKind.DAILY_PLAN_CONTEXT_PROJECTION),
+    ),
+    ToolDescriptor(
+        "calendar.read_evaluation",
+        Permission.READ,
+        _READ_TOOL_INPUT,
+        ClosedToolOutputSchema(ToolOutputKind.CALENDAR_EVALUATION_PROJECTION),
+    ),
+    ToolDescriptor(
+        "settings.read_class_areas",
+        Permission.READ,
+        _READ_TOOL_INPUT,
+        ClosedToolOutputSchema(ToolOutputKind.CLASS_AREAS_PROJECTION),
+    ),
+    ToolDescriptor(
+        "daily_plan.draft_section_patch",
+        Permission.DRAFT,
+        _SECTION_DRAFT_TOOL_INPUT,
+        ClosedToolOutputSchema(ToolOutputKind.PLAN_PATCH),
+    ),
+    ToolDescriptor(
+        "daily_plan.draft_reflection_patch",
+        Permission.DRAFT,
+        _REFLECTION_DRAFT_TOOL_INPUT,
+        ClosedToolOutputSchema(ToolOutputKind.PLAN_PATCH),
     ),
 )
 

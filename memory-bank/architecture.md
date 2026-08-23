@@ -405,8 +405,8 @@ operation、turn、daily-plan target 与 base fingerprint；before/after 独立�
 canonical JSON 计算 SHA-256。成功与拒绝路径都不依赖 UI、数据库或 repository。
 
 F006 只增加供应商中立的 Provider DTO/port、Tool executor port 和有界串行 Runtime。Runtime 重新校验
-六个关闭工具的名称、Permission、参数与 operation/turn 绑定，拒绝 WRITE/未知/额外参数，限制 Tool 次数、
-消息窗口、intent 和响应大小，并把 Provider 异常压缩为稳定本地错误码。具体 Provider adapter、Tool executor、
+六个关闭工具的名称、Permission、嵌套输入/输出与 operation/turn 绑定，拒绝 WRITE/未知/额外参数，限制 Tool 次数、
+消息窗口、intent、响应、ToolResult 和 request-id 大小，完整复核返回 Patch，并把 Provider/Tool 异常压缩为稳定本地错误码。具体 Provider adapter、Tool executor、
 取消/超时/迟到丢弃、UI 和持久化均未实现。
 
 ### 核心模块
@@ -417,4 +417,4 @@ F006 只增加供应商中立的 Provider DTO/port、Tool executor port 和有�
 | `app/service/agent/runtime.py` | 应用拥有的 Provider/Executor ports、冻结消息 DTO、busy 与有界串行 loop |
 
 F005 固定 GREEN 为 `53dd2e8…`，双轴 Review 与精确远端 CI 已通过；F006 稳定 RED 为 `f0ab660…`，
-当前本地 GREEN 候选下 Foundation 总计 **44 passed**。F007 及以后仍需独立授权。
+Review RED 为 `6b083fa…`，当前本地 GREEN 候选下 Foundation 总计 **54 passed**。F007 及以后仍需独立授权。

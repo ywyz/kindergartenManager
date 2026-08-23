@@ -119,7 +119,8 @@ API 身份独立：`X-Api-Key` 映射到 tenant；配置 `API_SIGNING_SECRET` �
 
 当前存在 contracts/关闭 registry、tenant+user READ 投影、按 intent 白名单构建的冻结 Context，
 以及已固定的纯内存、关闭字段路径和规范 SHA-256 PlanPatch。F006 GREEN 候选新增应用拥有的冻结
-Provider DTO/port、Tool executor port 与有界串行 Runtime；具体 Provider adapter、Tool executor、
+Provider DTO/port、Tool executor port 与有界串行 Runtime；Tool 输入嵌套结构和输出 DTO 均为关闭集合，
+Runtime 对 ToolResult 与 provider request-id 设置本地上限，并完整复核返回的 F005 Patch。具体 Provider adapter、Tool executor、
 UI 与持久化仍未实现。取消、超时、scope/fingerprint 变化和迟到丢弃属于 F007，仍未授权。
 
 ```text

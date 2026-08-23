@@ -1,13 +1,17 @@
 """Build immutable, canonical PlanPatch suggestions without side effects."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date
-import re
 from uuid import UUID, uuid4
 
 from app.service.agent.canonical import canonical_sha256
 from app.service.agent.contracts import (
     DAILY_PLAN_SECTION_PATHS,
+    MAX_TOOL_TEXT_LENGTH,
+    MAX_TOOL_WARNINGS,
+    MAX_TOOL_WARNING_LENGTH,
+    SHA256_HEX_PATTERN,
     AgentContext,
     DailyPlanProjection,
     Permission,
@@ -15,15 +19,15 @@ from app.service.agent.contracts import (
 )
 
 PATCH_SCHEMA_VERSION = 1
-MAX_PATCH_VALUE_LENGTH = 4096
-MAX_PATCH_WARNING_LENGTH = 256
-MAX_PATCH_WARNINGS = 8
+MAX_PATCH_VALUE_LENGTH = MAX_TOOL_TEXT_LENGTH
+MAX_PATCH_WARNING_LENGTH = MAX_TOOL_WARNING_LENGTH
+MAX_PATCH_WARNINGS = MAX_TOOL_WARNINGS
 ALLOWED_PLAN_PATCH_PATHS = DAILY_PLAN_SECTION_PATHS
 SECTION_PATCH_PATHS = frozenset(
     path for path in ALLOWED_PLAN_PATCH_PATHS if path != "daily_reflection"
 )
 REFLECTION_PATCH_PATHS = frozenset({"daily_reflection"})
-_SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
+_SHA256_PATTERN = SHA256_HEX_PATTERN
 
 
 class PlanPatchRejected(ValueError):
@@ -274,4 +278,102 @@ def build_plan_patch(
         operations=operations,
         warnings=warnings,
         canonical_sha256=canonical_sha256(canonical_payload),
+    )
+
+
+def build_plan_patch_from_arguments(
+    *,
+    context: AgentContext,
+    tool_name: str,
+    arguments: Mapping[str, object],
+) -> PlanPatch:
+    """Parse one closed provider payload and rebuild the authoritative F005 patch."""
+    required = {
+        "operation_id",
+        "turn_id",
+        "target",
+        "base_fingerprint",
+        "operations",
+    }
+    if not isinstance(arguments, Mapping) or not (
+        required <= set(arguments) <= required | {"warnings"}
+    ):
+        _reject("proposal_invalid")
+    try:
+        operation_id = UUID(arguments["operation_id"])
+        turn_id = UUID(arguments["turn_id"])
+        if (
+            str(operation_id) != arguments["operation_id"]
+            or str(turn_id) != arguments["turn_id"]
+        ):
+            _reject("proposal_invalid")
+        target_value = arguments["target"]
+        if not isinstance(target_value, Mapping) or set(target_value) != {
+            "daily_plan_id",
+            "plan_date",
+        }:
+            _reject("target_invalid")
+        target = PlanPatchTarget(
+            daily_plan_id=target_value["daily_plan_id"],
+            plan_date=date.fromisoformat(target_value["plan_date"]),
+        )
+        if target.plan_date.isoformat() != target_value["plan_date"]:
+            _reject("target_invalid")
+
+        raw_operations = arguments["operations"]
+        if not isinstance(raw_operations, (tuple, list)):
+            _reject("patch_operation_invalid")
+        operations: list[DraftPatchOperation] = []
+        for raw_operation in raw_operations:
+            if not isinstance(raw_operation, Mapping) or set(raw_operation) != {
+                "field_path",
+                "before_value",
+                "after_value",
+            }:
+                _reject("patch_operation_invalid")
+            operations.append(
+                DraftPatchOperation(
+                    field_path=raw_operation["field_path"],
+                    before_value=raw_operation["before_value"],
+                    after_value=raw_operation["after_value"],
+                )
+            )
+        raw_warnings = arguments.get("warnings", ())
+        if not isinstance(raw_warnings, (tuple, list)):
+            _reject("warnings_invalid")
+        proposal = DraftPatchProposal(
+            operation_id=operation_id,
+            turn_id=turn_id,
+            tool_name=tool_name,
+            target=target,
+            base_fingerprint=arguments["base_fingerprint"],
+            operations=tuple(operations),
+            warnings=tuple(raw_warnings),
+        )
+    except PlanPatchRejected:
+        raise
+    except (KeyError, TypeError, ValueError):
+        _reject("proposal_invalid")
+    try:
+        return build_plan_patch(context=context, proposal=proposal)
+    except PlanPatchRejected:
+        raise
+    except (TypeError, ValueError):
+        _reject("proposal_invalid")
+
+
+def plan_patch_matches_expected(*, actual: object, expected: PlanPatch) -> bool:
+    """Verify every canonical PlanPatch field except its intentionally random id."""
+    return (
+        isinstance(actual, PlanPatch)
+        and type(actual.patch_id) is UUID
+        and actual.schema_version == expected.schema_version
+        and actual.operation_id == expected.operation_id
+        and actual.turn_id == expected.turn_id
+        and actual.tool_name == expected.tool_name
+        and actual.target == expected.target
+        and actual.base_fingerprint == expected.base_fingerprint
+        and actual.operations == expected.operations
+        and actual.warnings == expected.warnings
+        and actual.canonical_sha256 == expected.canonical_sha256
     )

@@ -194,6 +194,7 @@ ProviderTurnResult
 - Runtime/Application 不依赖具体 SDK message、stream、usage 或异常类型。
 - Adapter 复用当前 OpenAI 兼容模型配置和 Key 边界；测试使用确定性的 Scripted Adapter。
 - Tool calls、finish reason 和文本长度必须在本地重新验证。
+- `provider_request_id` 最多 128 字符，只用于内存内关联且不进入失败输出或日志正文。
 - Provider 请求默认排除教师显示名、幼儿身份、完整图片、凭据、路径和无关正文。
 
 ## 7. Runtime 状态与上限
@@ -203,7 +204,8 @@ idle -> running -> draft_ready | succeeded | failed | cancelled -> idle
 ```
 
 - 全应用同时最多一个 operation；第二个请求返回稳定 busy 错误。
-- F006 Tool loop 串行运行，并设置 Tool call 次数、消息窗口、intent 与响应大小上限。
+- F006 Tool loop 串行运行，并设置 Tool call 次数、消息窗口、intent、响应与单个 ToolResult 大小上限；
+  READ 结果必须是 descriptor 登记的冻结应用 DTO，DRAFT 结果必须与从关闭参数重建的规范 Patch 完全一致。
 - Provider 等待期间不得保持数据库事务。
 - 每个 READ Tool 在执行时创建并关闭自己的短会话；DRAFT 只消费冻结 DTO。
 - F007 才增加单 Tool/总时限，以及取消、页面切换、actor/scope/fingerprint 变化或 operation ID 不匹配时的迟到结果丢弃。
@@ -217,6 +219,7 @@ agent.cancelled
 agent.context_stale
 agent.tool_not_allowed
 agent.tool_schema_invalid
+agent.tool_failed
 agent.provider_failed
 agent.response_too_large
 agent.limit_exceeded

@@ -84,9 +84,12 @@ UI/DB 依赖 seam；修正后的 Review RED 为 `6097b1d194adff4528911821d34e0fd
 
 F006 在 `f0ab660f46d9293df53c13f5698c7dffd99892bc` 固定 15 项公共行为 RED；44 项可完整收集，
 原 29 项继续 GREEN，新 15 项连续运行均只因 `app.service.agent.runtime` 尚不存在而失败。GREEN 候选
-必须保持 `44 passed`，覆盖应用拥有且冻结的 Provider DTO/port、关闭参数、六工具精确注册、串行执行、
-busy、Tool/消息/响应上限、Provider 异常净化和 F005 `PlanPatch` 绑定复核。具体 Provider adapter、
-Tool executor、取消、超时、过期/迟到丢弃、UI 和持久化均不属于 F006。
+必须覆盖应用拥有且冻结的 Provider DTO/port、关闭参数、六工具精确注册、串行执行、busy、Tool/消息/
+响应上限、Provider 异常净化和 F005 `PlanPatch` 绑定复核。首轮 Review 补充关闭 READ 输出、嵌套 DRAFT
+结构、target/canonical 完整复核、ToolResult/request-id 上限、拒绝与 Tool 失败路径；Review RED
+`6b083fa3fa185882b88d9d743ec9af8b5cfd34c5` 稳定为 `54 collected / 44 passed / 10 failed`，当前
+修正后的 GREEN 候选必须保持 `54 passed`。具体 Provider adapter、Tool executor、取消、超时、
+过期/迟到丢弃、UI 和持久化均不属于 F006。
 
 ## 7. 停止边界
 

@@ -113,7 +113,7 @@ R0 事实基线与图谱
 - 功能分支固定为 `feat/agent-foundation`；F002 原始 RED SHA 为 `ad13a6aa3e44ff98b2604d4a008649cd66185d80`。
 - `main@cfeadefd7dfa056c1b3757876658493110d8cf84` 通过双亲 merge commit 同步到 `5de2e49bee19749f611b50747a31be9464b92d7b`；该远端 SHA 的 Quality 已通过。
 - [冻结规格与停止边界](../specs/agent-foundation/spec.md)、[任务顺序](../specs/agent-foundation/tasks.md) 和 [Issue #48](https://github.com/ywyz/kindergartenManager/issues/48) 已建立。
-- `specs/agent-foundation/tests/` 的 F005 固定 GREEN 为 `53dd2e8…`，双轴 Review 零发现且远端 Quality `32641923137` 精确匹配成功；F006 稳定 RED 为 `f0ab660…`，当前本地 GREEN 候选总计 `44 passed`。
+- `specs/agent-foundation/tests/` 的 F005 固定 GREEN 为 `53dd2e8…`，双轴 Review 零发现且远端 Quality `32641923137` 精确匹配成功；F006 稳定 RED 为 `f0ab660…`，Review RED 为 `6b083fa…`，当前修正后的本地 GREEN 候选总计 `54 passed`。
 - 当前继续单用户；NiceGUI 多用户/RBAC 代码仅作为低优先级预备资产，不进入 Foundation 范围。
 - 是否仍保持模块化单体？服务拆分必须有独立 ADR 和运营理由。
 - 聚合事务和 tenant/user 投影修复后，每日计划、班级设置和日历的窄 Service 投影如何建立，使 Agent Tool 不直接调用 Repository？
@@ -129,7 +129,7 @@ R0 事实基线与图谱
 1. 应用层单 `AgentRuntime`、供应商中立 `AgentProviderPort` 和关闭 `ToolRegistry`。
 2. 四个 READ Tool：当前计划、计划上下文、日历判定、班级区域。
 3. 两个 DRAFT Tool：登记栏目 Patch 和一日反思 Patch。
-4. F006 提供有界串行 Tool loop、busy、Tool/消息/响应上限和结构校验；取消、超时与迟到/过期结果丢弃属于未授权 F007。
+4. F006 提供有界串行 Tool loop、busy、Tool/消息/响应/ToolResult/request-id 上限和关闭输入输出校验；取消、超时与迟到/过期结果丢弃属于未授权 F007。
 5. 只展示 assistant 文本和字段级 `PlanPatch`；无采用、保存、确认 WRITE 或历史恢复。
 
 完成证据必须包含：未知/WRITE Tool、额外参数、prompt injection、跨 tenant/user、取消、超时和

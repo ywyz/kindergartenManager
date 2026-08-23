@@ -10,14 +10,25 @@ from uuid import UUID
 
 from app.service.agent.contracts import (
     AgentContext,
+    CalendarEvaluationProjection,
+    ClassAreasProjection,
+    DailyPlanContextProjection,
     DailyPlanProjection,
     Permission,
     ToolDescriptor,
+    ToolOutputKind,
 )
-from app.service.agent.patch import PlanPatch
+from app.service.agent.canonical import canonical_json
+from app.service.agent.patch import (
+    PlanPatch,
+    PlanPatchRejected,
+    build_plan_patch_from_arguments,
+    plan_patch_matches_expected,
+)
 from app.service.agent.registry import AgentToolRegistry, AgentToolRejected
 
 LOCAL_POLICY_VERSION = "agent-foundation-v1"
+MAX_PROVIDER_REQUEST_ID_LENGTH = 128
 
 
 class ProviderRole(str, Enum):
@@ -69,6 +80,45 @@ def _freeze_json(value: object) -> object:
 
 
 @dataclass(frozen=True, slots=True)
+class _InvalidToolPayload:
+    """Immutable marker replacing unsupported executor-owned values."""
+
+
+_INVALID_TOOL_PAYLOAD = _InvalidToolPayload()
+_REGISTERED_TOOL_VALUE_TYPES = (
+    DailyPlanProjection,
+    DailyPlanContextProjection,
+    CalendarEvaluationProjection,
+    ClassAreasProjection,
+    PlanPatch,
+)
+_OUTPUT_TYPES = {
+    ToolOutputKind.DAILY_PLAN_PROJECTION: DailyPlanProjection,
+    ToolOutputKind.DAILY_PLAN_CONTEXT_PROJECTION: DailyPlanContextProjection,
+    ToolOutputKind.CALENDAR_EVALUATION_PROJECTION: CalendarEvaluationProjection,
+    ToolOutputKind.CLASS_AREAS_PROJECTION: ClassAreasProjection,
+    ToolOutputKind.PLAN_PATCH: PlanPatch,
+}
+
+
+def _freeze_tool_value(value: object) -> object:
+    """Deep-copy allowed payload containers without retaining executor objects."""
+    if type(value) in _REGISTERED_TOOL_VALUE_TYPES:
+        return value
+    if value is None or type(value) in {str, int, float, bool}:
+        return value
+    if isinstance(value, Mapping):
+        if not all(isinstance(key, str) for key in value):
+            return _INVALID_TOOL_PAYLOAD
+        return MappingProxyType(
+            {key: _freeze_tool_value(item) for key, item in value.items()}
+        )
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_tool_value(item) for item in value)
+    return _INVALID_TOOL_PAYLOAD
+
+
+@dataclass(frozen=True, slots=True)
 class ProviderToolCall:
     """One provider-requested call, fully bound to the operation and turn."""
 
@@ -108,6 +158,20 @@ class ToolExecutionResult:
     status: ToolExecutionStatus
     value: object = field(repr=False)
     error_code: str | None
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.call_id) is not UUID
+            or type(self.operation_id) is not UUID
+            or type(self.turn_id) is not UUID
+            or not isinstance(self.tool_name, str)
+            or not self.tool_name
+            or not isinstance(self.permission, Permission)
+            or not isinstance(self.status, ToolExecutionStatus)
+            or (self.error_code is not None and not isinstance(self.error_code, str))
+        ):
+            raise ValueError("tool_execution_result_invalid")
+        object.__setattr__(self, "value", _freeze_tool_value(self.value))
 
 
 @dataclass(frozen=True, slots=True)
@@ -189,6 +253,11 @@ class ProviderTurnResult:
             self.provider_request_id, str
         ):
             raise ValueError("provider_result_invalid")
+        if (
+            self.provider_request_id is not None
+            and len(self.provider_request_id) > MAX_PROVIDER_REQUEST_ID_LENGTH
+        ):
+            raise ValueError("provider_request_id_too_large")
 
 
 @dataclass(frozen=True, slots=True)
@@ -197,6 +266,7 @@ class RuntimeLimits:
 
     max_intent_chars: int = 2_000
     max_response_chars: int = 4_096
+    max_tool_result_chars: int = 16_384
     max_tool_calls: int = 6
     max_messages: int = 12
 
@@ -206,6 +276,7 @@ class RuntimeLimits:
             for value in (
                 self.max_intent_chars,
                 self.max_response_chars,
+                self.max_tool_result_chars,
                 self.max_tool_calls,
                 self.max_messages,
             )
@@ -338,20 +409,24 @@ class AgentRuntime:
             if len(messages) + 2 > self._limits.max_messages:
                 return _failure("agent.limit_exceeded")
 
-            resolved_calls: list[ProviderToolCall] = []
+            resolved_calls: list[
+                tuple[ProviderToolCall, ToolDescriptor, PlanPatch | None]
+            ] = []
             for call in result.tool_calls:
-                error = self._validate_call(
+                error, descriptor, expected_patch = self._validate_call(
                     call=call,
                     context=context,
                     seen_call_ids=call_ids,
                 )
                 if error is not None:
                     return _failure(error)
+                if descriptor is None:
+                    return _failure("agent.tool_schema_invalid")
                 call_ids.add(call.call_id)
-                resolved_calls.append(call)
+                resolved_calls.append((call, descriptor, expected_patch))
 
             results: list[ToolExecutionResult] = []
-            for call in resolved_calls:
+            for call, descriptor, expected_patch in resolved_calls:
                 try:
                     execution = await self._executor.execute(call, context)
                 except Exception:
@@ -359,7 +434,9 @@ class AgentRuntime:
                 error = self._validate_execution(
                     call=call,
                     context=context,
+                    descriptor=descriptor,
                     execution=execution,
+                    expected_patch=expected_patch,
                 )
                 if error is not None:
                     return _failure(error)
@@ -371,7 +448,7 @@ class AgentRuntime:
                 ProviderMessage(
                     role=ProviderRole.ASSISTANT,
                     content=result.assistant_content,
-                    tool_calls=tuple(resolved_calls),
+                    tool_calls=tuple(call for call, _, _ in resolved_calls),
                 ),
                 ProviderMessage(
                     role=ProviderRole.TOOL,
@@ -385,60 +462,39 @@ class AgentRuntime:
         call: ProviderToolCall,
         context: AgentContext,
         seen_call_ids: set[UUID],
-    ) -> str | None:
+    ) -> tuple[str | None, ToolDescriptor | None, PlanPatch | None]:
         if call.operation_id != context.operation_id or call.turn_id != context.turn_id:
-            return "agent.tool_schema_invalid"
+            return "agent.tool_schema_invalid", None, None
         if call.call_id in seen_call_ids:
-            return "agent.tool_schema_invalid"
+            return "agent.tool_schema_invalid", None, None
         if call.permission not in context.allowed_permissions:
-            return "agent.tool_not_allowed"
+            return "agent.tool_not_allowed", None, None
         try:
             descriptor = self._registry.resolve(call.tool_name, call.permission)
         except AgentToolRejected:
-            return "agent.tool_not_allowed"
+            return "agent.tool_not_allowed", None, None
         if not descriptor.input_schema.accepts(call.arguments):
-            return "agent.tool_schema_invalid"
-        if call.permission is Permission.DRAFT and not self._draft_binding_matches(
-            call=call, context=context
-        ):
-            return "agent.tool_schema_invalid"
-        return None
+            return "agent.tool_schema_invalid", None, None
+        expected_patch = None
+        if call.permission is Permission.DRAFT:
+            try:
+                expected_patch = build_plan_patch_from_arguments(
+                    context=context,
+                    tool_name=call.tool_name,
+                    arguments=call.arguments,
+                )
+            except PlanPatchRejected:
+                return "agent.tool_schema_invalid", None, None
+        return None, descriptor, expected_patch
 
-    @staticmethod
-    def _draft_binding_matches(
-        *, call: ProviderToolCall, context: AgentContext
-    ) -> bool:
-        arguments = call.arguments
-        if (
-            arguments.get("operation_id") != str(context.operation_id)
-            or arguments.get("turn_id") != str(context.turn_id)
-            or arguments.get("base_fingerprint") != context.base_fingerprint
-        ):
-            return False
-        target = arguments.get("target")
-        if not isinstance(target, Mapping) or frozenset(target) != {
-            "daily_plan_id",
-            "plan_date",
-        }:
-            return False
-        projections = tuple(
-            fact for fact in context.facts if isinstance(fact, DailyPlanProjection)
-        )
-        if len(projections) != 1:
-            return False
-        projection = projections[0]
-        return (
-            type(target.get("daily_plan_id")) is int
-            and target.get("daily_plan_id") == projection.plan_id
-            and target.get("plan_date") == projection.plan_date.isoformat()
-        )
-
-    @staticmethod
     def _validate_execution(
+        self,
         *,
         call: ProviderToolCall,
         context: AgentContext,
+        descriptor: ToolDescriptor,
         execution: object,
+        expected_patch: PlanPatch | None,
     ) -> str | None:
         if not isinstance(execution, ToolExecutionResult):
             return "agent.tool_schema_invalid"
@@ -452,15 +508,18 @@ class AgentRuntime:
             return "agent.tool_schema_invalid"
         if execution.status is not ToolExecutionStatus.OK:
             return "agent.tool_failed"
-        if call.permission is Permission.DRAFT:
-            patch = execution.value
-            if not isinstance(patch, PlanPatch):
-                return "agent.tool_schema_invalid"
-            if (
-                patch.operation_id != context.operation_id
-                or patch.turn_id != context.turn_id
-                or patch.tool_name != call.tool_name
-                or patch.base_fingerprint != context.base_fingerprint
-            ):
-                return "agent.tool_schema_invalid"
+        expected_type = _OUTPUT_TYPES[descriptor.output_schema.kind]
+        if type(execution.value) is not expected_type:
+            return "agent.tool_schema_invalid"
+        if expected_patch is not None and not plan_patch_matches_expected(
+            actual=execution.value,
+            expected=expected_patch,
+        ):
+            return "agent.tool_schema_invalid"
+        try:
+            serialized = canonical_json(execution.value)
+        except (TypeError, ValueError):
+            return "agent.tool_schema_invalid"
+        if len(serialized) > self._limits.max_tool_result_chars:
+            return "agent.limit_exceeded"
         return None

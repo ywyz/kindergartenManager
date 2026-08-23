@@ -37,10 +37,14 @@ def _canonical(value: Any) -> Any:
 
 def canonical_sha256(value: Any) -> str:
     """Hash supported DTO values using stable UTF-8 JSON encoding."""
-    payload = json.dumps(
+    return hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest()
+
+
+def canonical_json(value: Any) -> str:
+    """Serialize supported DTO values to the one canonical JSON representation."""
+    return json.dumps(
         _canonical(value),
         ensure_ascii=False,
         separators=(",", ":"),
         sort_keys=True,
-    ).encode("utf-8")
-    return hashlib.sha256(payload).hexdigest()
+    )
