@@ -924,3 +924,95 @@ async def test_runtime_rejects_read_dto_field_bound_expansion(
 
     assert outcome.error_code == "agent.tool_schema_invalid"
     assert len(provider.requests) == 1
+
+
+@dataclass
+class MutableExecutorPayload:
+    items: list[str]
+
+
+def test_tool_result_does_not_retain_arbitrary_mutable_dataclasses():
+    runtime = _runtime_module()
+    source = MutableExecutorPayload(items=[])
+    result = runtime.ToolExecutionResult(
+        call_id=UUID(int=30),
+        operation_id=OPERATION_ID,
+        turn_id=TURN_ID,
+        tool_name="settings.read_class_areas",
+        permission=Permission.READ,
+        status=runtime.ToolExecutionStatus.OK,
+        value=source,
+        error_code=None,
+    )
+    before = repr(result.value)
+
+    source.items.append("mutated-after-construction")
+
+    assert result.value is not source
+    assert repr(result.value) == before
+
+
+@pytest.mark.parametrize(
+    "context_change",
+    (
+        {
+            "actor": TrustedActor(
+                tenant_id=2**63,
+                user_id=True,
+            )
+        },
+        {"active_scope": DailyPlanScope(daily_plan_id=2**63)},
+        {"locale": MutableText("zh-CN")},
+        {"facts": MutableTuple(_context().facts)},
+    ),
+)
+@pytest.mark.asyncio
+async def test_runtime_revalidates_complete_context_before_provider(
+    context_change: dict[str, object],
+):
+    runtime = _runtime_module()
+    provider = ScriptedProvider([_provider_result(runtime, content="不应到达")])
+    agent = _agent_runtime(runtime, provider)
+
+    outcome = await agent.run_turn(
+        context=replace(_context(), **context_change),
+        intent="检查完整 Context",
+    )
+
+    assert outcome.error_code == "agent.tool_schema_invalid"
+    assert provider.requests == []
+
+
+@pytest.mark.asyncio
+async def test_runtime_rejects_tool_result_error_metadata_expansion():
+    runtime = _runtime_module()
+    call = _tool_call(runtime, call_id=31)
+
+    @dataclass
+    class ErrorMetadataExecutor:
+        async def execute(self, received: object, context: AgentContext) -> object:
+            return runtime.ToolExecutionResult(
+                call_id=received.call_id,
+                operation_id=context.operation_id,
+                turn_id=context.turn_id,
+                tool_name=received.tool_name,
+                permission=received.permission,
+                status=runtime.ToolExecutionStatus.OK,
+                value=_read_value(received, context),
+                error_code="error-detail" * 10_000,
+            )
+
+    provider = ScriptedProvider(
+        [
+            _provider_result(runtime, tool_calls=(call,), finish_reason="tool_calls"),
+            _provider_result(runtime, content="不应到达"),
+        ]
+    )
+    agent = _agent_runtime(runtime, provider, ErrorMetadataExecutor())
+
+    outcome = await agent.run_turn(
+        context=_context(), intent="检查 ToolResult metadata"
+    )
+
+    assert outcome.error_code == "agent.tool_schema_invalid"
+    assert len(provider.requests) == 1
