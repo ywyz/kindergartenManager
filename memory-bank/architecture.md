@@ -1,6 +1,6 @@
 # 幼儿园教学管理系统架构文档（初始化）
 
-> **历史文档说明（2026-08-23）**：本文按开发阶段累积，包含已被后续单用户模式取代的登录描述和旧迁移/测试数字。当前架构事实见 [`../CONTEXT.md`](../CONTEXT.md)、[`../docs/design/system-architecture.md`](../docs/design/system-architecture.md)、[`../docs/design/data-model.md`](../docs/design/data-model.md) 和 [`../docs/ADR/README.md`](../docs/ADR/README.md)。受控 Agent 的 F003-F007 应用层基础已实现到本地 Review 归零，具体 Provider/Tool/UI 与验收仍未完成；边界见 [`../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md`](../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md) 与 [`../docs/design/agent-runtime.md`](../docs/design/agent-runtime.md)。下文历史内容不授权 Agent WRITE。当前 Alembic head 为 `a6c4d8e2f9b1`。
+> **历史文档说明（2026-08-23）**：本文按开发阶段累积，包含已被后续单用户模式取代的登录描述和旧迁移/测试数字。当前架构事实见 [`../CONTEXT.md`](../CONTEXT.md)、[`../docs/design/system-architecture.md`](../docs/design/system-architecture.md)、[`../docs/design/data-model.md`](../docs/design/data-model.md) 和 [`../docs/ADR/README.md`](../docs/ADR/README.md)。受控 Agent 的 F003-F007 应用层基础已固定 GREEN，具体 Provider/Tool/UI 与验收仍未完成；边界见 [`../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md`](../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md) 与 [`../docs/design/agent-runtime.md`](../docs/design/agent-runtime.md)。下文历史内容不授权 Agent WRITE。当前 Alembic head 为 `a6c4d8e2f9b1`。
 
 ## 1. 历史阶段记录
 
@@ -425,4 +425,5 @@ Review RED 为 `6b083fa…`、`8831b3f…`、`79e005a…`、`51f5e5f…`；最�
 `99167ef…` 的双轴 Review 为 Standards `0`、Spec `0`，Foundation **73 passed**、全量 **551 passed**；证据
 SHA `049b520…` 的远端 Quality `32644290676` 精确匹配成功。F007 初始 RED `55b8702…`、Review RED
 `08ada78…` 与 `ddca78d…` 最终收敛到候选 `51443a3…`，Foundation **110 passed**、全量 **551 passed**、
-Standards `0`、Spec `0`；仍待固定证据 SHA 的远端 Quality 回读。F008/F009 已获严格串行授权，但不得提前进入。
+Standards `0`、Spec `0`；证据 SHA `2fb4e6f…` 的远端 Quality `32648599591` 精确匹配成功。F008 已成为
+下一授权切片，F009 仍等待其前置门禁闭合。

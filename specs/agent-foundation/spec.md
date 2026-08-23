@@ -1,6 +1,6 @@
 # Agent Foundation 冻结规格
 
-- 状态：F005、F006 固定 GREEN；F007 本地 Review 0/0，待精确 SHA Quality；F008/F009 仅在前置切片闭合后依序进入
+- 状态：F005-F007 固定 GREEN；当前激活 F008，F009 仅在 F008 门禁闭合后进入
 - 分支：`feat/agent-foundation`
 - 安全同步 RED 基线：`5de2e49bee19749f611b50747a31be9464b92d7b`
 - Issue：[#48](https://github.com/ywyz/kindergartenManager/issues/48)
@@ -130,12 +130,13 @@ host cancellation 和异常终态 current-context/TTL 复核；修复为 `664972
 交错与 child Task 外 BaseException 净化缺口，第二轮 Review RED
 `ddca78d63aae5b7a43f7f73e98bac935136750c8` 稳定为 `110 collected / 107 passed / 3 failed`；
 最终本地候选 `51443a374003ddde2509d47262e959e4ad691ad7` 保持 `110 passed`，全量回归 `551 passed`，
-双轴 Review 为 Standards `0`、Spec `0`、scope creep `0`。具体 Provider adapter、六 Tool executor、
-组合装配、UI 和持久化均不属于 F007；远端 Quality 仍须对本次固定证据 SHA 精确回读。
+双轴 Review 为 Standards `0`、Spec `0`、scope creep `0`。证据 SHA
+`2fb4e6f414853dfb892b2cba0e6c84adbd655187` 的远端 Quality `32648599591` 精确匹配成功。具体 Provider adapter、
+六 Tool executor、组合装配、UI 和持久化均不属于 F007。
 
 ## 7. 当前授权与停止边界
 
 本分支从 `0880f64c419e4fc27c45f4a7207e547077736056` 获得 F007 → F008 → F009 连续授权，但必须逐切片闭合
-`RED → 最小 GREEN → 双轴 Review → 固定 SHA Quality → Issue 证据`，不得横向并行实现。当前只执行 F007 的
-固定证据提交、Quality 回读与 Issue 回写；这些门禁闭合前不得实现具体 Provider adapter、六 Tool executor、组合装配或 UI。全程禁止合并 `main`、关闭 Issue、
+`RED → 最小 GREEN → 双轴 Review → 固定 SHA Quality → Issue 证据`，不得横向并行实现。F007 已闭合，
+当前只激活 F008 的文档、seam 与稳定 RED；RED 固定前不得实施具体 Provider adapter、六 Tool executor、组合装配或 UI GREEN。全程禁止合并 `main`、关闭 Issue、
 发布、Agent WRITE、长期记忆、migration 或产品多 Agent。

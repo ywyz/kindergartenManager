@@ -9,7 +9,7 @@
 3. `docs/ROADMAP.md`
 4. 相关 ADR、设计、测试计划和代码
 
-当前检出 `feat/agent-foundation`，其 F007 本地证据从授权基线 `0880f64…` 严格串行形成；最近远端产品主线为
+当前检出 `feat/agent-foundation`，其 F007 固定证据从授权基线 `0880f64…` 严格串行形成；最近远端产品主线为
 `origin/main@cfeadef…`。产品仍是单用户 NiceGUI 模块化单体，不是已完成的多用户系统或微服务系统。
 
 ## 2. 环境
@@ -113,7 +113,7 @@ API 身份独立：`X-Api-Key` 映射到 tenant；配置 `API_SIGNING_SECRET` �
 
 测试使用 `httpx.MockTransport` 或 mock 边界，不调用真实 AI。
 
-### 6.1 受控 Agent Foundation（F005、F006 固定；F007 待远端证据）
+### 6.1 受控 Agent Foundation（F005-F007 已固定）
 
 实现前必须阅读 [ADR-0005](ADR/ADR-0005-controlled-ai-agent-runtime.md) 和
 [Agent Runtime 设计](design/agent-runtime.md)。规划依赖方向为：
@@ -123,7 +123,7 @@ API 身份独立：`X-Api-Key` 映射到 tenant；配置 `API_SIGNING_SECRET` �
 Provider DTO/port、Tool executor port 与有界串行 Runtime；Tool 输入嵌套结构和输出 DTO 均为关闭集合，
 Runtime 对 ID、周次、metadata、ToolResult 与 provider request-id 设置本地上限，拒绝有状态内建类型子类，
 逐字段复核 Provider-visible `AgentContext`，复制冻结的 Tool DTO 而不保留 executor 对象，并完整复核返回的
-F005 Patch。F007 本地 Review 已归零，Runtime 还使用完整冻结 stamp 做精确取消，以本地硬时限约束单次
+F005 Patch。F007 已固定 GREEN，Runtime 还使用完整冻结 stamp 做精确取消，以本地硬时限约束单次
 Provider、单 Tool 和总 operation，在每个终态重新检查 UTC TTL/current-context，并在吞取消 port 真正排空前
 保持 busy、丢弃迟到正文/Patch/异常。具体 Provider adapter、Tool executor、UI 与持久化仍未实现。
 

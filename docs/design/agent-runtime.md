@@ -1,6 +1,6 @@
 # KindergartenManager 受控 AI Agent Runtime 设计
 
-> 状态：已确认设计；F003-F006 已固定 GREEN；F007 本地 Review 0/0，待精确 SHA Quality，F008/F009 仅在前置门禁闭合后依序进入。本文落实
+> 状态：已确认设计；F003-F007 已固定 GREEN；F008 是下一授权切片，F009 仅在其前置门禁闭合后进入。本文落实
 > [ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md)，不代表完整 Agent 已进入当前产品。本轮只授权在功能分支
 > 依序提交并推送 F007-F009；合并、关闭 Issue 或发布仍未授权。
 

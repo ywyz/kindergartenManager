@@ -90,7 +90,7 @@ Tests use `pytest` with `pytest-asyncio`; `pytest.ini` sets `asyncio_mode = auto
 The accepted Agent design is documented in `docs/ADR/ADR-0005-controlled-ai-agent-runtime.md` and
 `docs/design/agent-runtime.md`. F003 contracts/closed registry, F004 actor-scoped READ projections/frozen Context,
 and F005 canonical PlanPatch, F006 Provider port/bounded serial Runtime, and F007 cancellation/timeout/stale-result
-handling are fixed local GREEN; F007 still requires its exact-SHA remote Quality evidence before F008 begins. The Foundation is one application-layer Agent for the
+handling are fixed GREEN. F008 is the next authorized slice. The Foundation is one application-layer Agent for the
 daily-plan page with exactly four READ tools and two DRAFT tools. DRAFT returns an in-memory, discardable `PlanPatch`
 and must not mutate UI body fields, database rows, versions, previews, audits, or exports.
 

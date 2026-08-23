@@ -102,7 +102,7 @@ R0 事实基线与图谱
 
 ## 7. R3：Agent Foundation 规格与分支决策
 
-状态：`自动验证`（F005、F006 固定 GREEN 已验证；F007 本地 Review 0/0，待精确 SHA Quality）。
+状态：`设计中`（F005-F007 固定 GREEN；下一切片 F008 正在冻结 seam 与 RED）。
 
 已确认：[ADR-0005](ADR/ADR-0005-controlled-ai-agent-runtime.md) 和
 [Agent Runtime 设计](design/agent-runtime.md) 已经固定首期上限，即每日活动计划的单 Agent、
@@ -117,24 +117,24 @@ R0 事实基线与图谱
 - F007 初始 RED `55b8702…` 为 `97 collected / 73 passed / 24 failed`；Review RED `08ada78…` 与
   `ddca78d…` 依次固定异常净化、硬时限、终态 current-context/TTL、drain 竞态和 BaseException 边界。
   最终本地候选 `51443a3…` 为 Foundation `110 passed`、全量 `551 passed`、Standards `0`、Spec `0`、
-  scope creep `0`；尚待本次证据 SHA 的远端 Quality 精确回读。
+  scope creep `0`；证据 SHA `2fb4e6f…` 的远端 Quality `32648599591` 精确匹配成功。
 - 当前继续单用户；NiceGUI 多用户/RBAC 代码仅作为低优先级预备资产，不进入 Foundation 范围。
 - 是否仍保持模块化单体？服务拆分必须有独立 ADR 和运营理由。
 - 聚合事务和 tenant/user 投影修复后，每日计划、班级设置和日历的窄 Service 投影如何建立，使 Agent Tool 不直接调用 Repository？
 
-当前执行边界：F007 本地实现与 Review 已闭合，当前只执行证据提交、功能分支推送、精确 SHA Quality 和
-Issue #48 回写。远端门禁闭合前不得进入具体 Tool、Provider adapter、UI 或 migration。
+当前执行边界：F007 固定 SHA Review/CI/Issue 已闭合；当前只激活 F008 的 OpenAI-compatible Provider adapter、
+六个关闭 Tool executor、组合装配与每日计划 Agent UI。F008 稳定 RED 固定前不得实施 GREEN，也不得进入 F009。
 
 ## 8. R4A：受控 Agent Foundation READ/DRAFT
 
-状态：`自动验证`（F005、F006 固定 GREEN；F007 本地 Review 0/0，待远端 Quality）。
+状态：`设计中`（F005-F007 固定 GREEN；F008 正在建立稳定 RED）。
 
 实现范围严格限定为：
 
 1. 应用层单 `AgentRuntime`、供应商中立 `AgentProviderPort` 和关闭 `ToolRegistry`。
 2. 四个 READ Tool：当前计划、计划上下文、日历判定、班级区域。
 3. 两个 DRAFT Tool：登记栏目 Patch 和一日反思 Patch。
-4. F006 提供有界串行 Tool loop、busy、Tool/消息/响应/ToolResult/request-id 上限和关闭输入输出校验；F007 已完成本地精确取消、硬时限、current-context/TTL、迟到丢弃和安全排空，并等待固定 SHA Quality。
+4. F006 提供有界串行 Tool loop、busy、Tool/消息/响应/ToolResult/request-id 上限和关闭输入输出校验；F007 已固定精确取消、硬时限、current-context/TTL、迟到丢弃和安全排空。
 5. 只展示 assistant 文本和字段级 `PlanPatch`；无采用、保存、确认 WRITE 或历史恢复。
 
 完成证据必须包含：未知/WRITE Tool、额外参数、prompt injection、跨 tenant/user、取消、超时和
