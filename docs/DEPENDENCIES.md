@@ -5,9 +5,10 @@
 
 ## 1. 27 项 Dependabot 告警
 
-GitHub 当前将 27 项开放告警归因到已经从仓库删除、但仍存在于依赖图快照中的
-`uv.lock`。默认分支原有的 `requirements.txt` 下限同样不安全，因此不能把这些告警
-作为误报直接关闭。
+GitHub 将 27 项开放告警归因到历史 `uv.lock` 中的漏洞版本。仅删除锁文件并刷新
+`requirements.txt` 后，旧锁快照仍保留在依赖图中；本次恢复 `pyproject.toml` 并重新
+生成安全的 `uv.lock`，用于让依赖图以新快照覆盖旧版本。告警是否转为 `fixed` 仍须在
+变更进入默认分支、依赖图完成刷新后回读，不能作为误报直接关闭。
 
 | 依赖族 | 告警 | 安全下限 |
 |---|---:|---:|
@@ -36,9 +37,13 @@ python-engineio 4.13.5 和 python-socketio 5.16.4。NiceGUI 3.16.0 与 FastAPI
 
 ## 3. 约束策略
 
-- 项目当前使用 `requirements.txt` 和 `>=` 安全下限，安装时解析当时兼容的较新版本。
+- `pyproject.toml` 中的运行与开发依赖只声明包名，不添加版本约束；`uv lock --upgrade`
+  解析当时与 Python 3.12+ 兼容的最新版，并在 `uv.lock` 中记录精确版本。
+- `requirements.txt` 继续保留 `>=` 安全下限，供现有 Quality 安装流程和稳定 RED
+  回归测试使用。两者分别承担安全下限门禁与可复现锁定职责。
 - 直接声明传递依赖是为了防止解析回落，不表示应用直接调用这些包。
-- 当前没有带哈希的锁文件，因此验收必须记录实际解析版本，不能只报告声明下限。
+- 新版本发布不会自动使锁文件过期；升级时必须显式执行 `uv lock --upgrade`，并提交
+  `pyproject.toml` 与 `uv.lock` 的一致变更。
 - 本地通过不等于 GitHub 告警已关闭。只有变更进入默认分支且依赖图重新计算后，
   才能回读 27 项告警的最终 `fixed` 状态。
 
@@ -55,6 +60,9 @@ python-engineio 4.13.5 和 python-socketio 5.16.4。NiceGUI 3.16.0 与 FastAPI
 避免读取 `.env` 后修改应用数据库或真实集成数据库；临时目录在当前 shell 退出时清理：
 
 ```bash
+uv lock --check
+uv sync --locked --all-groups
+uv pip check
 python -m pip install -r requirements.txt ruff==0.15.22 pip-audit==2.10.1
 python -m pip check
 python -m pip_audit -r requirements.txt --strict --ignore-vuln PYSEC-2026-1325
@@ -77,4 +85,15 @@ python -m pytest tests/ -q
   python-engineio 4.13.5、python-socketio 5.16.4。
 - `pip-audit 2.10.1`：`No known vulnerabilities found, 1 ignored`；唯一忽略项为
   第 4 节明确记录的 `PYSEC-2026-1325`。
+- 全新 SQLite 从空库迁移到 `a6c4d8e2f9b1 (head)`；全量 pytest：`530 passed`。
+
+2026-08-23 的锁文件恢复复验记录：
+
+- 基线：`main@af33c142be04760b618703859fcbe7668f7dfb6d`；Python 3.14.7、uv 0.11.30。
+- `pyproject.toml` 的 28 个直接依赖均无版本约束；`uv lock --upgrade` 解析 82 个包，
+  隔离环境安装 79 个包，`uv lock --check` 与 `uv pip check` 均通过。
+- 六族精确锁定版本：aiohttp 3.14.3、cryptography 50.0.0、Starlette 1.6.0、
+  python-multipart 0.0.32、python-engineio 4.13.5、python-socketio 5.16.4。
+- 对已安装锁定环境执行 pip-audit：`No known vulnerabilities found, 1 ignored`；唯一忽略项
+  仍为第 4 节记录的 `PYSEC-2026-1325`。
 - 全新 SQLite 从空库迁移到 `a6c4d8e2f9b1 (head)`；全量 pytest：`530 passed`。
