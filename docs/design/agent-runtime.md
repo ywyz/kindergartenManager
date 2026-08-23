@@ -1,6 +1,6 @@
 # KindergartenManager 受控 AI Agent Runtime 设计
 
-> 状态：已确认设计；F003-F007 已固定 GREEN；F008 是下一授权切片，F009 仅在其前置门禁闭合后进入。本文落实
+> 状态：已确认设计；F003-F007 已固定 GREEN；F008 seam 已冻结、稳定 RED 待固定，F009 仅在其前置门禁闭合后进入。本文落实
 > [ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md)，不代表完整 Agent 已进入当前产品。本轮只授权在功能分支
 > 依序提交并推送 F007-F009；合并、关闭 Issue 或发布仍未授权。
 
@@ -46,13 +46,13 @@ app/service/agent/
   registry.py        # 已实现：关闭 Tool registry
   patch.py           # 已实现：关闭路径、完整绑定、规范 PlanPatch
   runtime.py         # 已实现：Provider port、单 operation loop、精确取消、硬时限与安全排空
-  tools.py           # 未实现：READ/DRAFT 应用工具
+  tools.py           # F008 目标：六路静态 FoundationToolExecutor
 
 app/integration/ai_client/
-  agent_provider.py  # OpenAI 兼容 Provider Adapter
+  agent_provider.py  # F008 目标：OpenAI-compatible Chat Completions Adapter
 
 app/ui/components/
-  agent_draft.py     # 状态、回答、字段差异、取消/丢弃
+  agent_draft.py     # F008 目标：controller/snapshot、状态、回答、字段差异、取消/丢弃
 ```
 
 标为“已实现”的文件已进入 F003-F007；其余目录仍只是设计目标。F007 不包含具体
@@ -171,6 +171,29 @@ PatchOperation
 首期可登记的字段路径只来自 `daily_plan` 可编辑教学内容。用户/角色、AI Key、Prompt、班级/学期设置、
 归档/删除、图片、导出路径和任何文件字段均不在 registry。
 
+### 5.1 F008 六路 executor
+
+F008 的公开 executor seam 为：
+
+```text
+FoundationToolExecutor(
+  session_factory,
+  registry: AgentToolRegistry,
+  holiday_lookup=...
+).execute(call, context) -> ToolExecutionResult
+```
+
+- 路由表恰好等于 `FOUNDATION_TOOL_NAMES`，不提供 register、fallback、反射或动态发现。
+- `daily_plan.read_current`、`daily_plan.read_context`、`settings.read_class_areas` 各在自己的短 session 内调用
+  `AgentReadService` 对应 actor-scoped 投影。`calendar.read_evaluation` 同样只开一个短 session；按 plan id
+  定位时先从同一 session 的 actor-scoped context 投影解析日期，再读取日历判定。
+- 四个 READ 的输入均为空关闭对象；日期、plan id、tenant/user 只从已经验证的 `AgentContext` 取值。
+  每次 READ 成功、缺失或异常后 session 均关闭，Provider 等待期绝不持有 session/事务。
+- 两个 DRAFT 不创建 session，只调用 `build_plan_patch_from_arguments(context, tool_name, arguments)`；输出必须
+  逐字段等于权威规范 Patch，section/reflection 关闭字段面不得交叉。
+- 未知/WRITE Tool、permission、operation/turn/call 绑定错误及额外 actor/scope 参数，在打开 session 或调用
+  service 前拒绝。Service 异常净化为稳定失败，结果不泄漏 Repository、ORM、Session 或原异常正文。
+
 ## 6. Provider port
 
 ```text
@@ -196,6 +219,45 @@ ProviderTurnResult
 - Tool calls、finish reason 和文本长度必须在本地重新验证。
 - `provider_request_id` 最多 128 字符，只用于内存内关联且不进入失败输出或日志正文。
 - Provider 请求默认排除教师显示名、幼儿身份、完整图片、凭据、路径和无关正文。
+
+### 6.1 F008 OpenAI-compatible Chat Completions adapter
+
+公开 seam 固定为 `FOUNDATION_TOOL_WIRE_NAMES`、`OpenAICompatibleAgentProvider`、
+`AgentProviderAdapterError`，并由构造函数显式注入 `api_base_url`、`api_key`、`model_name` 与可测试 HTTP
+`client`；`complete(ProviderTurnRequest)` 是唯一 Provider 操作。它只使用 Chat Completions，不引入
+Responses/thread/run/store 或具体 SDK 类型到应用层。
+
+`FOUNDATION_TOOL_WIRE_NAMES` 是以下六项显式静态双射：
+
+| Canonical Tool | Legal wire alias |
+|---|---|
+| `daily_plan.read_current` | `daily_plan__read_current` |
+| `daily_plan.read_context` | `daily_plan__read_context` |
+| `calendar.read_evaluation` | `calendar__read_evaluation` |
+| `settings.read_class_areas` | `settings__read_class_areas` |
+| `daily_plan.draft_section_patch` | `daily_plan__draft_section_patch` |
+| `daily_plan.draft_reflection_patch` | `daily_plan__draft_reflection_patch` |
+
+不得使用通用 dotted-name 替换、反射、未登记别名、Provider 返回的 Tool 定义或动态发现来扩大映射。
+
+Adapter 为每个 request 生成一个固定 system policy/context message；`content` 是可解析的规范 JSON，顶层 key
+必须恰好是 `policy_version`、`operation_id`、`turn_id`、`scope`、`facts`、`base_fingerprint`。`scope`
+必须恰好含 `daily_plan_id`、`plan_date`，未使用的 locator 为 `null`；`facts` 只序列化已校验应用 DTO 的
+JSON 值。system message 和其余 wire payload 均不得出现 `context_id`、`actor`、`tenant_id`、`user_id`、
+`api_key`、任意配置对象或未知 metadata。
+
+Provider 返回的每个原始 wire `tool_call.id` 视为不可信字符串，以当前 `operation_id` 为 namespace 执行
+`uuid5(request.operation_id, raw_wire_id)`，生成应用 `ProviderToolCall.call_id`。在下一次 Chat Completions request 中重放 assistant Tool call
+和对应 tool result 时，两侧必须使用同一个归一 UUID 字符串；原始 ID 不再作为权威关联值。canonical/wire
+Tool 名、permission、arguments、finish reason、request id、choices 数量和所有字符串/集合上限均关闭解析。
+`choices` 必须恰好一项，消费的 choice/message/tool_call/function 形状错型、额外或超限时 fail-closed 为净化后的
+`AgentProviderAdapterError`。标准顶层 envelope 元数据 `id`/`object`/`created`/`model`/`usage` 可忽略，但
+不得留存或进入应用 DTO、repr、日志。
+
+wire request 参数同样由固定 allowlist 构造，不透传任意 client option；明确不发送 `store` 或
+`parallel_tool_calls`。HTTP 400 或兼容性错误不得触发“删除参数再试”的降级重试，防止同一 operation 隐式
+产生第二次请求或改变安全语义。明文 Key 和 adapter 配置只在当前 operation 的短命 composition 内存在，
+不进入 wire message、Tool 参数、Runtime DTO、结果、repr、日志、coordinator 或页面持久状态。
 
 ## 7. Runtime 状态与上限
 
@@ -244,6 +306,23 @@ Agent 面板首阶段只提供：
 不提供：采用、保存、确认 WRITE、“本次会话允许”、自动执行、隐藏后台运行、跨页面恢复或会话历史。
 页面只根据 operation ID 接受最新结果；关闭/切换后不得回填迟到结果。
 
+### 8.1 F008 组合装配与面板状态 seam
+
+- 应用级共享一个 `DailyPlanAgentCoordinator`（或完全满足同一关闭契约的等价 seam），由它持有唯一
+  `AgentRuntime` 并负责 operation admission、run 与 exact-stamp cancel；每个页面/浏览器标签不得各自构造
+  Runtime，否则会绕过 `agent.busy`。
+- Provider 凭据从现有安全配置边界为当前 operation 取得并解密，只组装短命
+  `OpenAICompatibleAgentProvider`；operation 结束立即释放引用，不在 coordinator 单例中缓存明文 Key。
+- `DailyPlanAgentController` 只接收受信 actor 与当前日期/plan selection，向页面发布冻结
+  `AgentPanelSnapshot`。Snapshot 的关闭状态只允许 idle/running/cancelled/failed/assistant/draft，且正文/Patch 隐藏于
+  repr；Controller/Runtime 不保存或接收 NiceGUI Widget、Repository、Session。
+- `DatePanel` 的每次日期/计划 selection event 都递增单调 selection generation，并立即使旧 snapshot/草案失效。
+  operation 捕获 generation 与完整 `AgentContextStamp`；只有 generation、operation ID、context/turn/actor/scope/
+  fingerprint 全部精确相等，且页面仍存活时，Controller 才发布 assistant 或 Patch。因此 A→B→A 即使重新
+  选择相同日期，第一次 A 的迟到结果也不能通过。
+- UI 只提供意图输入、运行、取消、失败后重新发起、assistant、只读字段差异和丢弃。丢弃只清除内存 snapshot；
+  不修改任何每日计划正文，也绝不渲染 adopt/save/confirm、“总是允许”或隐藏 WRITE handler。
+
 ## 9. 数据、事务与审计
 
 Agent Foundation 不新增业务表或 Alembic migration。以下对象只存在内存：
@@ -287,13 +366,38 @@ revision；当前不得预留空表或猜测迁移编号。
 - 输入 prompt injection、“直接保存”“总是允许”均无法出现写入或确认路径。
 - 真实模型验收与 mock 自动测试分开记录；真实幼儿数据不得用于测试。
 
+### F008 稳定 RED 文件与矩阵
+
+F008 只在以下三个公共行为文件稳定 RED 后实施 GREEN：
+
+1. `specs/agent-foundation/tests/test_f008_provider_adapter_red.py`
+   - 静态 canonical/wire 双射、固定 system JSON 闭包、actor/Key 不上 wire、UUID5 call ID 与 assistant/tool
+     历史自洽；
+   - 关闭 request/消费响应形状、单 choice、错型/超限净化、顶层 envelope 元数据不留存、异常正文不泄漏；
+   - 不发送 `store`/`parallel_tool_calls`，HTTP 400 恰好一次请求且不做兼容性降级重试。
+2. `specs/agent-foundation/tests/test_f008_tool_executor_red.py`
+   - 恰好六路静态分派、未知/WRITE/权限/绑定/额外 actor 参数在 service/session 前拒绝；
+   - 四 READ 的 tenant+user 投影、每次独立短 session/异常后关闭，两个 DRAFT 零 session；
+   - DRAFT 等于权威 Patch，成功/拒绝/异常路径对 DB、页面正文、preview/audit/export 零变化。
+3. `specs/agent-foundation/tests/test_f008_composition_ui_red.py`
+   - 应用级单 coordinator 的跨 controller/多标签 busy，短命凭据组装与零 Key 泄漏；
+   - controller/snapshot 的 running/cancelled/failed/assistant/draft/discard 状态；
+   - selection generation + exact stamp 防 A→B 和 A→B→A 迟到结果/草稿回填；页面正文不变且不存在
+     adopt/save/confirm/WRITE 控件或 handler。
+
+三个文件必须 collection clean；连续两次执行得到完全相同的 collected/passed/failed 分布，旧 Foundation
+测试继续 GREEN，新增失败只指向尚不存在或尚未满足的 F008 public seam。不得用 skip/xfail、固定 sleep、
+真实网络/真实凭据、私有实现字段或 F009 验收来制造 RED。固定 RED commit 之后才允许最小 GREEN；GREEN 后
+仍须双轴 Review、Review findings 的新 RED/修正、固定 SHA Quality 和 Issue #48 证据闭合，才可进入 F009。
+
 ## 12. 实现前置门禁
 
 1. 为功能实现确认固定分支和 SHA；当前维护审查分支不自动构成 GREEN 授权。
 2. 先修复聚合事务的部分提交风险与 tenant/user 投影边界；当前 SHA 的依赖、迁移和全量测试可重复，常规质量 CI 已建立或明确豁免。
 3. 对 Agent 页面采用回环/可信网络限制；Agent 不被当作恢复 UI 认证的替代品。
 4. 为每日计划、班级和日历补只读 Service 投影，Agent Tool 不直接调用 Repository；投影明确区分 API tenant 与 UI tenant + user 语义。
-5. 冻结 spec、Issue、任务顺序、RED 文件和停止边界；设计完成不自动授权 GREEN。
+5. 冻结 spec、Issue、任务顺序、上述三个 F008 RED 文件和停止边界；设计完成不自动授权 GREEN，只有稳定
+   RED commit 才开放 F008 最小 GREEN。
 6. Graphify/codebase-memory 更新只证明覆盖，不替代测试、Review 和人工验收。
 
 ## 13. 未来 WRITE 的额外前置条件

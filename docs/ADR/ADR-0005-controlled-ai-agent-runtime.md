@@ -34,6 +34,33 @@ Adapter 只解析 assistant 文本和结构化 Tool call，不执行 Tool，也�
 Provider 不得获得 Repository、SQLAlchemy Session、数据库 URL/路径、文件句柄、Widget、任意 HTTP
 客户端、服务定位器、shell/Python/SQL、动态 import、MCP/插件发现或任意 URL 访问能力。
 
+F008 只实现 `OpenAICompatibleAgentProvider` 的 Chat Completions adapter，并作如下固定决策：
+
+- canonical Tool 名继续使用下文六个 dotted name；wire 层只允许以下显式静态双射。禁止把 `.` 通用替换为
+  `_`、按反射生成别名、接受未登记别名或从 Provider 动态发现 Tool。
+
+| Canonical name | Wire alias |
+|---|---|
+| `daily_plan.read_current` | `daily_plan__read_current` |
+| `daily_plan.read_context` | `daily_plan__read_context` |
+| `calendar.read_evaluation` | `calendar__read_evaluation` |
+| `settings.read_class_areas` | `settings__read_class_areas` |
+| `daily_plan.draft_section_patch` | `daily_plan__draft_section_patch` |
+| `daily_plan.draft_reflection_patch` | `daily_plan__draft_reflection_patch` |
+
+- 不受信的 wire `tool_call.id` 先以当前 `operation_id` 为 UUID5 namespace 归一为本地 `call_id`；后续发给
+  Chat Completions 的 assistant Tool call 与对应 tool result 必须使用同一个归一 ID，不能混用原始 ID。
+- wire request 只由本地 allowlist 逐字段构造；固定 system policy/context 消息是规范 JSON，顶层 key 恰好为
+  `policy_version`、`operation_id`、`turn_id`、`scope`、`facts`、`base_fingerprint`；`scope` 恰好为
+  `daily_plan_id`/`plan_date`，未使用 locator 为 `null`。它不包含 actor、`context_id`、凭据或任意对象。
+  Adapter 同样按关闭 allowlist 解析 response：`choices` 必须恰好一项，消费的 choice/message/tool_call/function、
+  finish reason、content、arguments 与 request-id 形状错型、超限或漂移时 fail-closed。标准顶层 envelope
+  元数据 `id`/`object`/`created`/`model`/`usage` 可以忽略但不得留存或进入 DTO/repr/log。
+- 不发送 `store` 或 `parallel_tool_calls`。兼容性差异返回 HTTP 400 时不得删减安全参数再隐式重试；错误直接
+  归一为稳定 `AgentProviderAdapterError`，由 Runtime 现有异常边界处理。
+- `api_base_url`、`api_key`、`model_name` 和 HTTP client 只作为显式构造依赖；明文 Key/短命配置只存活于当前
+  operation，不进入 wire message、Tool 参数、结果、repr 或日志，也不在 coordinator/页面全局缓存。
+
 ### 3. 首阶段严格 READ/DRAFT、零持久化
 
 权限枚举预留 `READ`、`DRAFT`、`WRITE`，但 Agent Foundation 只注册以下工具：
@@ -49,6 +76,11 @@ DRAFT daily_plan.draft_reflection_patch
 
 `READ` 只返回经过 tenant/user 和字段白名单裁剪的业务投影。`DRAFT` 只消费冻结输入并生成
 `PlanPatch`；不得打开写事务、修改页面正文、保存 preview、创建版本、写审计或改变任何业务状态。
+
+F008 的 `FoundationToolExecutor` 只静态分派这六个 Tool，不提供 register、fallback 或动态路由。每个 READ
+在调用既有窄 Service 投影时各自创建并关闭一个独立短 SQLAlchemy session；Provider 等待期间不得持有 session
+或事务。两个 DRAFT 只调用规范 Patch builder，整个路径创建零 session。未知 Tool、WRITE、权限/绑定错误或
+额外参数必须在打开 session 前拒绝，且错误不得泄漏 Repository、ORM、Session 或异常正文。
 
 未知 Tool、额外参数、越界 ID/长度、伪造 Permission、WRITE 请求以及“直接修改”“总是允许”等
 自然语言指令全部拒绝。实现 WRITE 前不预建隐藏入口、确认控件或可调用空壳。
@@ -74,6 +106,13 @@ Runtime 将 DRAFT 输出重新构造成规范、确定有序的 `PlanPatch`，�
 当前 `daily_plan` 没有显式单调 revision，因此 Agent Foundation 不得把 `updated_at` 或内容哈希伪装成
 可安全写入的乐观锁。未来如需 Agent WRITE，必须先通过新规格冻结 revision、确认、事务和迁移方案。
 
+F008 组合装配在应用级共享一个 `DailyPlanAgentCoordinator`（或满足同一关闭契约的等价 seam），由它持有
+唯一 Runtime 并执行全应用 busy/cancel 协调；不得让每个页面或浏览器标签创建独立 Runtime 绕过“同时最多一个
+operation”。页面交互由 `DailyPlanAgentController` 转成冻结 `AgentPanelSnapshot`，Runtime/Tool 不接触 Widget。
+每次日期或计划选择递增 selection generation；结果只有在 generation、operation ID 与完整 context stamp
+全部精确匹配时才可发布。即使 A→B→A 回到同一日期，第一次 A 的 assistant/Patch 也必须因 generation 不匹配丢弃。
+面板只显示运行/取消、失败、assistant、字段级 `PlanPatch` 和丢弃；不回填正文，不提供 adopt/save/confirm。
+
 ### 6. 未来 WRITE 是独立里程碑
 
 未来 WRITE 至少需要：可信 UI actor、显式业务 revision、字段级 before hash、规范 Patch hash、绑定
@@ -88,9 +127,10 @@ Runtime 将 DRAFT 输出重新构造成规范、确定有序的 `PlanPatch`，�
 1. 当前文档与安全边界确认。
 2. 质量、迁移、身份暴露和 Service seam 前置基线。
 3. Agent 契约与零写入测试进入稳定 RED。
-4. 最小 Agent Foundation：单 Runtime、Provider port、关闭 registry、READ/DRAFT、取消和过期丢弃。
-5. 当前 SHA 自动验证与真实浏览器人工验收。
-6. 如有明确用户故事，再为 Agent WRITE 建立新 spec/Issue/迁移与 RED；不得由本 ADR 自动授权。
+4. F003-F007 依序固定单 Runtime、Provider port、关闭 registry、READ/DRAFT、取消、超时与过期丢弃。
+5. F008 先固定 adapter/executor/composition/UI 稳定 RED，再实施最小 GREEN、双轴 Review 与当前 SHA Quality。
+6. F009 才执行零持久化全矩阵、Linux 浏览器 mock 和只使用应用安全配置凭据的真实模型验收。
+7. 如有明确用户故事，再为 Agent WRITE 建立新 spec/Issue/迁移与 RED；不得由本 ADR 自动授权。
 
 ## 后果
 

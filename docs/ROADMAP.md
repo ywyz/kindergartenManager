@@ -102,11 +102,12 @@ R0 事实基线与图谱
 
 ## 7. R3：Agent Foundation 规格与分支决策
 
-状态：`设计中`（F005-F007 固定 GREEN；下一切片 F008 正在冻结 seam 与 RED）。
+状态：`设计中`（F005-F007 固定 GREEN；F008 seam 已冻结，稳定 RED 待固定）。
 
 已确认：[ADR-0005](ADR/ADR-0005-controlled-ai-agent-runtime.md) 和
 [Agent Runtime 设计](design/agent-runtime.md) 已经固定首期上限，即每日活动计划的单 Agent、
-4 个 READ、2 个 DRAFT、零持久化和零长期记忆。设计接受不代表 spec/Issue、RED 或实现已完成。
+4 个 READ、2 个 DRAFT、零持久化和零长期记忆。F003-F007 的完成证据见下；F008 设计/seam 冻结不代表
+其稳定 RED 或实现已完成。
 
 当前结果：
 
@@ -122,12 +123,13 @@ R0 事实基线与图谱
 - 是否仍保持模块化单体？服务拆分必须有独立 ADR 和运营理由。
 - 聚合事务和 tenant/user 投影修复后，每日计划、班级设置和日历的窄 Service 投影如何建立，使 Agent Tool 不直接调用 Repository？
 
-当前执行边界：F007 固定 SHA Review/CI/Issue 已闭合；当前只激活 F008 的 OpenAI-compatible Provider adapter、
-六个关闭 Tool executor、组合装配与每日计划 Agent UI。F008 稳定 RED 固定前不得实施 GREEN，也不得进入 F009。
+当前执行边界：F007 固定 SHA Review/CI/Issue 已闭合；当前只激活 F008 的 OpenAI-compatible Chat Completions
+Provider adapter、六个关闭 Tool executor、应用级单 coordinator 组合装配与每日计划 Agent UI。F008 seam 已在
+ADR/design/spec/tasks 冻结，但稳定 RED 固定前不得实施 GREEN，也不得进入 F009。
 
 ## 8. R4A：受控 Agent Foundation READ/DRAFT
 
-状态：`设计中`（F005-F007 固定 GREEN；F008 正在建立稳定 RED）。
+状态：`设计中`（F005-F007 固定 GREEN；F008 seam 已冻结，正在建立稳定 RED）。
 
 实现范围严格限定为：
 
@@ -136,6 +138,32 @@ R0 事实基线与图谱
 3. 两个 DRAFT Tool：登记栏目 Patch 和一日反思 Patch。
 4. F006 提供有界串行 Tool loop、busy、Tool/消息/响应/ToolResult/request-id 上限和关闭输入输出校验；F007 已固定精确取消、硬时限、current-context/TTL、迟到丢弃和安全排空。
 5. 只展示 assistant 文本和字段级 `PlanPatch`；无采用、保存、确认 WRITE 或历史恢复。
+
+F008 固定集成 seam：
+
+- `OpenAICompatibleAgentProvider` 只调用 OpenAI-compatible Chat Completions。六个 canonical dotted Tool 名与
+  六个合法 wire alias 采用显式静态双射；禁止通用替换、动态发现、`store`、`parallel_tool_calls`，也禁止收到
+  400 后删除参数再重试。wire `tool_call.id` 以 operation UUID 为 namespace 做 UUID5 归一，并在 assistant/tool
+  回传历史中保持同一 ID。
+- Provider wire 参数与响应采用关闭 allowlist；actor、tenant/user、明文 Key、未知字段、SDK 对象与异常正文不外泄。
+  凭据配置只在当前 operation 内短命存在。
+- 六个 Tool 静态分派；每个 READ 各自创建/关闭一个短 session，DRAFT 零 session，Provider 等待期间不持有事务。
+- 全应用共享一个 `DailyPlanAgentCoordinator`（或契约等价关闭 seam）防止多标签并发绕过 busy；
+  `DailyPlanAgentController` 只发布冻结 `AgentPanelSnapshot`。每次日期/计划选择递增 generation，只有 generation、
+  operation ID 与完整 context stamp 精确相等才可显示结果，A→B→A 的旧结果也必须丢弃。
+- UI 只含运行、取消、失败、assistant、`PlanPatch` 和丢弃；不回填正文，不出现 adopt/save/confirm 或隐藏 WRITE。
+
+F008 稳定 RED 固定在以下三个文件，且旧 Foundation 测试必须继续 GREEN：
+
+1. `test_f008_provider_adapter_red.py`：关闭 wire DTO/响应、静态 Tool 名双射、UUID5 call ID、协议历史自洽、
+   400 不降级重试、凭据/actor/异常不泄漏。
+2. `test_f008_tool_executor_red.py`：六路静态分派、tenant+user 投影、每 READ 独立短 session、DRAFT 零 session、
+   关闭拒绝和零业务/UI 变化。
+3. `test_f008_composition_ui_red.py`：应用级单 coordinator/busy、controller/snapshot 状态机、取消/失败/丢弃、
+   selection generation 与 exact stamp 防迟到回填，以及无正文写回和无 WRITE 控件。
+
+三个文件必须 collection clean、连续两次得到同一 collected/passed/failed 分布，且新增失败只指向尚未实现的
+F008 公共 seam；不得通过 skip/xfail、固定 sleep、真实网络/凭据或实现 F009 来制造 RED。之后才可进入最小 GREEN。
 
 完成证据必须包含：未知/WRITE Tool、额外参数、prompt injection、跨 tenant/user、取消、超时和
 过期结果的负向测试，以及所有路径对业务数据、页面正文、版本、preview、audit 和导出“零变化”的证明。

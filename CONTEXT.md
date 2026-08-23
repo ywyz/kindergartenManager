@@ -1,7 +1,7 @@
 # KindergartenManager 项目上下文
 
 > 状态快照：2026-08-23；Agent 安全同步 RED 基线：`5de2e49bee19749f611b50747a31be9464b92d7b`；
-> 当前检出分支：`feat/agent-foundation`（F005-F007 已固定 GREEN；下一切片为 F008）；
+> 当前检出分支：`feat/agent-foundation`（F005-F007 已固定 GREEN；F008 seam 已冻结，稳定 RED 待固定）；
 > 最近远端产品主线：`origin/main@cfeadefd7dfa056c1b3757876658493110d8cf84`。
 >
 > 本文件用于回答“当前仓库实际上是什么、哪些事实已经确认、下一步可以做什么”。
@@ -35,7 +35,7 @@
 ## 3. 当前产品定位
 
 KindergartenManager 是一个 Python 3.14.7、NiceGUI 前后端一体化的幼儿园教学管理应用。
-当前检出 `feat/agent-foundation` 已完成 F006，其安全 RED 起点为 `5de2e49bee19749f611b50747a31be9464b92d7b`；
+当前检出 `feat/agent-foundation` 已完成 F007，其安全 RED 起点为 `5de2e49bee19749f611b50747a31be9464b92d7b`；
 最近远端产品主线为 `origin/main@cfeadefd7dfa056c1b3757876658493110d8cf84`。两者都保持可打包、可本地运行、
 也可用 Docker 部署的模块化单体定位，主要能力包括：
 
@@ -108,7 +108,8 @@ UI 的固定单用户身份与 API 的租户主体是两个不同边界，不得
 冻结 Context 与 tenant+user READ 投影；F005 已固定纯内存、关闭字段路径且规范哈希的 `PlanPatch`；
 F006 已固定 GREEN，新增应用拥有的 Provider DTO/port、Tool executor port 和有界串行 Runtime；F007
 已固定 GREEN，增加精确 context stamp 取消、单 Provider/Tool/总 operation 硬时限、UTC TTL/current-state
-复核、迟到结果丢弃和取消后安全排空。尚无具体 Provider adapter、Tool executor、UI 或持久化，
+复核、迟到结果丢弃和取消后安全排空。F008 已冻结具体 Provider adapter、Tool executor、组合装配与 UI seam，
+但只有稳定 RED 固定后才可实施 GREEN；当前仍尚无这些具体实现或任何 Agent 持久化，
 不得宣称整个 Agent Foundation 已实现。
 
 当前已冻结 [Foundation spec](specs/agent-foundation/spec.md)、[任务顺序](specs/agent-foundation/tasks.md) 和
@@ -144,6 +145,24 @@ Review RED `08ada78…` 固定端口异常伪造、伪取消、硬时限和异�
   向量、教师画像或供应商托管记忆。
 - 不开放文件、URL、shell、Python、SQL、MCP、插件、动态 Tool 或多 Agent。
 
+F008 的固定集成上限为：
+
+- `OpenAICompatibleAgentProvider` 只使用 OpenAI-compatible Chat Completions；六个 dotted canonical Tool 名通过
+  `FOUNDATION_TOOL_WIRE_NAMES` 与六个合法双下划线边界 wire alias 显式静态双射，不做通用字符替换或动态发现。
+  Provider 返回的 wire `tool_call.id` 以当前 `operation_id` 为 UUID5 namespace 归一；后续 assistant/tool
+  历史必须使用同一归一 ID。请求不发送 `store` 或 `parallel_tool_calls`，遇到 HTTP 400 不删参数降级重试。
+- Provider 请求和响应逐字段按关闭 allowlist 构造/解析；tenant/user actor、Key、任意配置/metadata、SDK 对象、
+  原始异常与未知响应字段不得进入 wire DTO、结果、repr 或日志。明文 Key 只存在于当前 operation 的短命配置。
+- `FoundationToolExecutor` 只静态分派恰好六个 Tool。每个 READ 自建并关闭一个独立短 SQLAlchemy session；
+  两个 DRAFT 只消费冻结 DTO 并生成内存 `PlanPatch`，不得创建 session。
+- 全应用共享一个 `DailyPlanAgentCoordinator`（或契约等价的关闭 seam）持有单 Runtime，避免多个页面/浏览器标签
+  各自创建 Runtime 绕过 busy。页面通过 `DailyPlanAgentController` 与冻结 `AgentPanelSnapshot` 展示状态，
+  不把 Widget、Repository 或 Session 传入应用层。
+- 每次日期/计划选择都递增 selection generation；controller 只有在 generation、operation ID 和完整 context stamp
+  全部精确匹配时才发布结果。因此 A→B→A 也不能让第一次 A 的迟到 assistant 或 Patch 回填当前面板。
+- 面板只展示运行/取消、失败、assistant、字段级 `PlanPatch` 与丢弃；不回填每日计划正文，也不提供
+  adopt/save/confirm 或任何隐藏 WRITE 路径。
+
 F003 固定 SHA 的双轴 Review 和远端 CI `headSha` 已通过。
 每日计划/班级/日历的 Agent 专用窄 Service 投影属于当前获授权的 F004。
 未来 WRITE 属于独立里程碑，至少需恢复可信用户身份、引入显式
@@ -164,8 +183,10 @@ F003 固定 SHA 的双轴 Review 和远端 CI `headSha` 已通过。
 
 R1 基础修复的本地门禁已经通过，当前共同下一步是：
 
-1. F007 固定 GREEN、精确 Quality 与 Issue #48 证据均已闭合；下一步激活 F008 的文档/spec/tasks 与稳定 RED。
-2. F008 必须独立完成 `RED → 最小 GREEN → 双轴 Review → 固定 SHA Quality → Issue`；F009 等待 F008 闭合。
+1. F007 固定 GREEN、精确 Quality 与 Issue #48 证据均已闭合；F008 文档/spec/tasks seam 已冻结，下一步只固定
+   三个 F008 RED 文件及其可重复失败矩阵。
+2. F008 稳定 RED 固定前不得实施 GREEN；之后仍须独立完成 `最小 GREEN → 双轴 Review → 固定 SHA Quality → Issue`。
+   F009 的零持久化全矩阵、Linux 浏览器 mock 与安全配置真实模型验收继续等待 F008 全部门禁闭合。
 3. NiceGUI 多用户预备功能保持低优先级，不与 Agent Foundation 隐式捆绑。
 4. F006 最终实现/重构候选 `99167ef…` 的 Linux 本地证据为 Python 3.14.7、`pip check`/严格依赖审计通过、变更文件 Ruff 0 错误、全新 SQLite Alembic head `a6c4d8e2f9b1`、Foundation `73 passed` 与全量 `551 passed`；证据 SHA `049b520…` 的远端 Quality `32644290676` 全部成功。Windows、Word、MySQL 和真实 AI 仍是独立人工门禁。
 5. F007 最终候选 `51443a3…` 的本地证据为 Foundation `110 passed`、全量 `551 passed`、双轴 Review 0/0；证据 SHA `2fb4e6f…` 的远端 Quality `32648599591` 全部成功。具体 Provider、Tool 和每日计划 UI 仍属于 F008，零持久化全矩阵与真实模型验收仍属于 F009。

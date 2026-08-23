@@ -1,6 +1,6 @@
 # Agent Foundation 冻结规格
 
-- 状态：F005-F007 固定 GREEN；当前激活 F008，F009 仅在 F008 门禁闭合后进入
+- 状态：F005-F007 固定 GREEN；F008 seam 已冻结、稳定 RED 待固定；F009 仅在 F008 门禁闭合后进入
 - 分支：`feat/agent-foundation`
 - 安全同步 RED 基线：`5de2e49bee19749f611b50747a31be9464b92d7b`
 - Issue：[#48](https://github.com/ywyz/kindergartenManager/issues/48)
@@ -73,7 +73,74 @@ F007 只扩展应用层 `AgentRuntime` 的 operation 生命周期，不接入具
 F007 RED 测试只穿过上述公开 seam，使用事件协调的确定性 Provider/Tool adapter，不读取 Runtime 私有字段，
 不使用固定 `sleep` 推测调度，不预建 F008 组合装配或页面控件。
 
-## 6. F002-F007 RED/GREEN 检查点
+### 5.2 F008 固定公共 seam
+
+F008 只接入具体 adapter/executor/composition/UI；不修改 F003-F007 的关闭契约和生命周期语义。
+
+#### 5.2.1 OpenAI-compatible Provider adapter
+
+- 公共生产 seam 固定为 `app.integration.ai_client.agent_provider` 中的 `FOUNDATION_TOOL_WIRE_NAMES`、
+  `OpenAICompatibleAgentProvider` 和净化异常 `AgentProviderAdapterError`。构造函数显式注入
+  `api_base_url`、`api_key`、`model_name`、可测试 HTTP `client`；唯一操作是
+  `complete(ProviderTurnRequest) -> ProviderTurnResult`。
+- Adapter 只调用 OpenAI-compatible Chat Completions。以下 canonical/wire 名是完整、显式、静态双射；
+  禁止通用字符替换、反射、fallback alias 或动态 Tool discovery：
+
+| Canonical | Wire |
+|---|---|
+| `daily_plan.read_current` | `daily_plan__read_current` |
+| `daily_plan.read_context` | `daily_plan__read_context` |
+| `calendar.read_evaluation` | `calendar__read_evaluation` |
+| `settings.read_class_areas` | `settings__read_class_areas` |
+| `daily_plan.draft_section_patch` | `daily_plan__draft_section_patch` |
+| `daily_plan.draft_reflection_patch` | `daily_plan__draft_reflection_patch` |
+
+- 每个 request 恰有一个 adapter 生成的固定 system policy/context message；其 `content` 是规范 JSON，顶层
+  key 恰好为 `policy_version`、`operation_id`、`turn_id`、`scope`、`facts`、`base_fingerprint`。
+  `scope` 恰好含 `daily_plan_id`、`plan_date`，未使用 locator 为 `null`；`facts` 只含已校验应用 DTO 的
+  JSON 值。任何 wire payload 都不得含 `context_id`、`actor`、`tenant_id`、`user_id`、`api_key`、未知配置
+  或任意应用对象。
+- 不受信的 wire `tool_call.id` 用 `uuid5(request.operation_id, raw_wire_id)` 归一为本地 `call_id`；下一次
+  request 中的 assistant Tool call 与对应 tool result 必须都使用同一个归一 UUID 字符串。原始 wire ID
+  不得作为 Runtime 的权威 ID。
+- request 参数与 response 的消费形状逐字段按关闭 allowlist 构造/解析。`choices` 必须恰好一项；消费的
+  choice/message/tool_call/function、finish reason、content、arguments、request-id 错型/额外/超限、
+  Tool/permission 不匹配、非法 JSON 或 HTTP/client 异常必须 fail-closed 并净化。标准顶层 envelope 元数据
+  `id`/`object`/`created`/`model`/`usage` 可以忽略，但原始正文、异常、SDK 类型和未消费元数据不得进入
+  Runtime DTO、repr 或日志。
+- 明确不发送 `store`、`parallel_tool_calls`，也不在 HTTP 400 后删除参数做兼容性降级重试。每次
+  `complete` 最多发起一次 wire request。
+
+#### 5.2.2 六个关闭 Tool executor
+
+- `FoundationToolExecutor(session_factory, registry, holiday_lookup=...)` 通过
+  `execute(call, context) -> ToolExecutionResult` 静态分派恰好 `FOUNDATION_TOOL_NAMES` 六项；不提供 register、
+  fallback 或动态路由。
+- 四个 READ 输入均为空关闭对象，只从已经验证的 `AgentContext` 取得 actor/scope；每次 READ 各自创建并关闭
+  一个短 SQLAlchemy session。按 plan id 的日历读取在同一个短 session 内先用 actor-scoped context 投影解析
+  日期。成功、缺失、拒绝和异常都不得把 Session/ORM/Repository 带出边界。
+- 两个 DRAFT 创建零 session，只调用权威 `build_plan_patch_from_arguments`；输出必须逐字段等于规范
+  `PlanPatch`，section/reflection 路径面保持隔离。
+- 未知 Tool、WRITE、permission/operation/turn/call 绑定错误及额外 actor/scope 参数必须在打开 session 或
+  调用 service 前拒绝；Service 异常只能返回稳定净化错误。
+
+#### 5.2.3 组合装配与每日计划 UI
+
+- 全应用共享一个 `DailyPlanAgentCoordinator`（或契约等价的关闭 seam），它持有唯一 `AgentRuntime`，统一
+  admission/run/exact-stamp cancel；多个 controller、页面或浏览器标签不得通过各自 Runtime 绕过
+  `agent.busy`。
+- 当前 operation 的 Provider 配置从应用已有安全 AI 配置/解密边界短命组装；operation 结束后释放 Key 引用。
+  coordinator、controller、snapshot 和页面不得缓存或显示明文凭据。
+- `DailyPlanAgentController` 只接收受信 actor 与当前 selection，发布冻结 `AgentPanelSnapshot`；不得把 Widget、
+  Repository、Session 传入应用层。Snapshot 只表达 idle/running/cancelled/failed/assistant/draft 与 discard
+  后状态，并从 repr 隐藏 assistant/Patch 正文。
+- `DatePanel` 的每次日期/plan selection event 都单调递增 selection generation，并立即失效旧 snapshot/草稿。
+  结果必须同时匹配当前 generation、operation ID 和完整 `AgentContextStamp` 才能发布；A→B 和 A→B→A
+  都不得接收第一次 A 的迟到 assistant 或 Patch。
+- UI 只显示固定零写入说明、意图输入、运行、取消、失败、assistant、字段级 PlanPatch 与丢弃。丢弃只清除
+  内存结果；不得回填每日计划正文，也不得存在 adopt/save/confirm、“总是允许”或隐藏 WRITE handler。
+
+## 6. F002-F008 RED/GREEN 检查点
 
 切片公共行为测试放在 `specs/agent-foundation/tests/`；从 F005 GREEN 起由 Quality 独立步骤执行，仍不混入常规 `pytest tests/` 套件。
 F002 原始 SHA `ad13a6aa3e44ff98b2604d4a008649cd66185d80` 和安全同步基线
@@ -134,9 +201,37 @@ host cancellation 和异常终态 current-context/TTL 复核；修复为 `664972
 `2fb4e6f414853dfb892b2cba0e6c84adbd655187` 的远端 Quality `32648599591` 精确匹配成功。具体 Provider adapter、
 六 Tool executor、组合装配、UI 和持久化均不属于 F007。
 
+### 6.1 F008 稳定 RED 文件、矩阵与门禁
+
+F008 RED 只能新增到以下三个文件：
+
+1. `specs/agent-foundation/tests/test_f008_provider_adapter_red.py`
+   - 精确静态 canonical/wire 双射和未知 alias 拒绝；
+   - 固定 system JSON 的关闭 key/scope/facts，actor/tenant/user/context_id/Key 不上 wire；
+   - operation namespace UUID5、本地 call ID、assistant/tool 历史 ID 自洽；
+   - 关闭 request/消费响应形状、单 choice、错型/超限/异常净化、顶层 envelope 元数据不留存；不发送
+     `store`/`parallel_tool_calls`，
+     HTTP 400 恰好一次请求且不降级重试。
+2. `specs/agent-foundation/tests/test_f008_tool_executor_red.py`
+   - 恰好六路静态分派；未知/WRITE/权限/绑定/额外 actor 参数在 service/session 前拒绝；
+   - seeded SQLite 下四种 tenant+user READ 投影、plan-id 日期解析、缺失和异常净化；
+   - 每次 READ 恰好打开/关闭一个独立短 session，两个 DRAFT 零 session；
+   - DRAFT 等于权威 Patch，非法 path/before/fingerprint/target 拒绝，DB/UI/preview/audit/export 零变化。
+3. `specs/agent-foundation/tests/test_f008_composition_ui_red.py`
+   - 应用级单 coordinator 对多个 controller/标签的全局 busy，短命凭据组装且零 Key 泄漏；
+   - controller/snapshot 的 running/cancelled/failed/assistant/draft/discard 状态；
+   - selection generation + exact stamp 覆盖 A→B 与 A→B→A 的迟到 assistant/Patch 丢弃；
+   - 每日计划正文、DB、版本、preview、audit/export 零变化，页面不存在 adopt/save/confirm/WRITE 控件或 handler。
+
+RED commit 必须满足：全目录 collection clean；旧 110 项继续 GREEN；上述三个文件连续两次执行得到完全相同的
+collected/passed/failed 分布；新增失败只因 F008 public seam 尚不存在或尚未满足。禁止 skip/xfail、放宽旧测试、
+固定 sleep、读取私有字段、真实网络/真实凭据或预做 F009。固定 RED 后才允许最小 GREEN；GREEN 后按 findings
+建立 Review RED 并修正，直到 Standards `0`、Spec `0`，再提交/push 固定 SHA、核对 Quality 精确 `headSha`
+并回写 Issue #48。完成前不得进入 F009。
+
 ## 7. 当前授权与停止边界
 
 本分支从 `0880f64c419e4fc27c45f4a7207e547077736056` 获得 F007 → F008 → F009 连续授权，但必须逐切片闭合
 `RED → 最小 GREEN → 双轴 Review → 固定 SHA Quality → Issue 证据`，不得横向并行实现。F007 已闭合，
-当前只激活 F008 的文档、seam 与稳定 RED；RED 固定前不得实施具体 Provider adapter、六 Tool executor、组合装配或 UI GREEN。全程禁止合并 `main`、关闭 Issue、
+当前只激活 F008 的稳定 RED；上述文档与 public seam 已冻结，但 RED 固定前不得实施具体 Provider adapter、六 Tool executor、组合装配或 UI GREEN。全程禁止合并 `main`、关闭 Issue、
 发布、Agent WRITE、长期记忆、migration 或产品多 Agent。
