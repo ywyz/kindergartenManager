@@ -116,5 +116,5 @@ python -m pytest tests/ -q
   已从精确锁中移除，替换为 `PyJWT 2.13.0`；HS256 token 接口与字段保持不变。
 - `uv lock --check`、`uv pip check` 与 Ruff 均通过；无忽略项执行 pip-audit：
   `No known vulnerabilities found`。
-- 全新 SQLite 从空库迁移到 `a6c4d8e2f9b1 (head)`；目标测试 `7 passed`，全量 pytest：
-  `531 passed`。
+- 全新 SQLite 从空库迁移到 `a6c4d8e2f9b1 (head)`；目标测试 `8 passed`（含旧
+  `python-jose` HS256 token 跨库兼容），全量 pytest：`532 passed`。
