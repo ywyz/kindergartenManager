@@ -1,14 +1,18 @@
 # Python 依赖安全基线
 
-> 快照日期：2026-08-23。本文记录默认分支依赖策略、Dependabot #11–#37
+> 快照日期：2026-08-23。本文记录默认分支依赖策略、Dependabot #11–#38
 > 的修复边界和质量门禁。后续升级必须重新解析依赖并回读 GitHub 告警。
 
-## 1. 27 项 Dependabot 告警
+## 1. 28 项 Dependabot 告警
 
 GitHub 将 27 项开放告警归因到历史 `uv.lock` 中的漏洞版本。仅删除锁文件并刷新
 `requirements.txt` 后，旧锁快照仍保留在依赖图中；本次恢复 `pyproject.toml` 并重新
 生成安全的 `uv.lock`，用于让依赖图以新快照覆盖旧版本。告警是否转为 `fixed` 仍须在
 变更进入默认分支、依赖图完成刷新后回读，不能作为误报直接关闭。
+
+#11–#37 已在 `main@863a238` 的新锁快照中转为 `fixed`。该锁随后暴露了此前未被
+依赖图追踪的 `ecdsa` 告警 #38；它没有上游修复版本，必须移除依赖链，不能通过升级或
+dismiss 闭环。
 
 | 依赖族 | 告警 | 安全下限 |
 |---|---:|---:|
@@ -18,6 +22,7 @@ GitHub 将 27 项开放告警归因到历史 `uv.lock` 中的漏洞版本。仅�
 | `python-multipart` | #23–#26（4 项） | `0.0.31` |
 | `python-engineio` | #29、#30（2 项） | `4.13.2` |
 | `python-socketio` | #31（1 项） | `5.16.2` |
+| `ecdsa` | #38（1 项） | 无修复版本；移除 `python-jose` 依赖链 |
 
 `requirements.txt` 采用不低于上表、并已联合验证的版本：aiohttp 3.14.3、
 cryptography 50.0.0、Starlette 1.6.0、python-multipart 0.0.32、
@@ -29,7 +34,10 @@ python-engineio 4.13.5 和 python-socketio 5.16.4。NiceGUI 3.16.0 与 FastAPI
 - Issue：[#49](https://github.com/ywyz/kindergartenManager/issues/49)。
 - 稳定 RED：`ab1a621625fabc43e42aadbda1e189d2a2f0185e`，修复前连续三次得到
   同一组六族失败。
-- `tests/test_dependency_security_floor.py` 固定最低安全版本，避免未来解析回落。
+- #38 稳定 RED：`4c9bd2c2a8c80d459411a451988da11b8c592aed`，连续三次得到
+  `PyJWT` 安全下限缺失、锁中存在 `ecdsa` / `python-jose` 的同一失败。
+- `tests/test_dependency_security_floor.py` 固定最低安全版本，并禁止精确锁重新引入
+  无修复的 `ecdsa` / `python-jose` 运行时依赖链。
 - `.github/workflows/quality.yml` 在常规 push 和 pull request 上使用 Python 3.14.7，
   执行安装、`pip check`、`pip-audit`、变更 Python 文件 Ruff、全新 SQLite 迁移和全量 pytest。
 - `main@225fe13` 已有 47 条 Ruff 历史告警，本安全 PR 不跨范围机械修改业务代码；门禁对
@@ -45,14 +53,15 @@ python-engineio 4.13.5 和 python-socketio 5.16.4。NiceGUI 3.16.0 与 FastAPI
 - 新版本发布不会自动使锁文件过期；升级时必须显式执行 `uv lock --upgrade`，并提交
   `pyproject.toml` 与 `uv.lock` 的一致变更。
 - 本地通过不等于 GitHub 告警已关闭。只有变更进入默认分支且依赖图重新计算后，
-  才能回读 27 项告警的最终 `fixed` 状态。
+  才能回读告警的最终 `fixed` 状态。
 
-## 4. 已知无修复例外
+## 4. 无修复依赖处理
 
-`python-jose` 传递依赖 `ecdsa==0.19.2` 仍对应 `PYSEC-2026-1325`、
-`GHSA-wj6h-64fc-37mp` / `CVE-2024-23342`。当前没有上游修复版本；消除该风险需要
-独立评估并替换 JWT 库，不属于 #49 的 27 项 Dependabot 修复范围。质量门禁只对这个
-明确编号使用 `--ignore-vuln`，其他可检测漏洞仍会使构建失败。
+`python-jose` 传递依赖 `ecdsa==0.19.2` 对应 `PYSEC-2026-1325`、
+`GHSA-wj6h-64fc-37mp` / `CVE-2024-23342`，且没有上游修复版本。应用只使用 HS256，
+但保留未使用的漏洞包仍不是可接受闭环，因此以 `PyJWT>=2.13.0` 替换 `python-jose`，
+重新生成的锁文件不得包含 `ecdsa` 或 `python-jose`。Quality 不再保留该漏洞的
+`pip-audit` 忽略项；完成状态以默认分支依赖图将 #38 回读为 `fixed` 为准。
 
 ## 5. 本地复验
 
@@ -65,8 +74,8 @@ uv sync --locked --all-groups
 uv pip check
 python -m pip install -r requirements.txt ruff==0.15.22 pip-audit==2.10.1
 python -m pip check
-python -m pip_audit -r requirements.txt --strict --ignore-vuln PYSEC-2026-1325
-ruff check tests/test_dependency_security_floor.py
+python -m pip_audit -r requirements.txt --strict
+ruff check app/auth/jwt.py tests/test_jwt.py tests/test_dependency_security_floor.py
 quality_db_dir="$(mktemp -d)"
 trap 'rm -rf -- "$quality_db_dir"' EXIT
 quality_database_url="sqlite+aiosqlite:///$quality_db_dir/quality.sqlite3"
@@ -97,3 +106,15 @@ python -m pytest tests/ -q
 - 对已安装锁定环境执行 pip-audit：`No known vulnerabilities found, 1 ignored`；唯一忽略项
   仍为第 4 节记录的 `PYSEC-2026-1325`。
 - 全新 SQLite 从空库迁移到 `a6c4d8e2f9b1 (head)`；全量 pytest：`530 passed`。
+
+2026-08-23 的 #38 GREEN 复验记录：
+
+- 基线：`main@863a2388c2a828078e85c30d5943faf16650f1bb`；稳定 RED：
+  `4c9bd2c2a8c80d459411a451988da11b8c592aed`。
+- 环境：Python 3.14.7、uv 0.11.30；锁文件解析 78 个包，隔离环境安装 75 个包。
+- `python-jose 3.5.0`、`ecdsa 0.19.2`、`rsa 4.9.1`、`pyasn1 0.6.4` 和 `six 1.17.0`
+  已从精确锁中移除，替换为 `PyJWT 2.13.0`；HS256 token 接口与字段保持不变。
+- `uv lock --check`、`uv pip check` 与 Ruff 均通过；无忽略项执行 pip-audit：
+  `No known vulnerabilities found`。
+- 全新 SQLite 从空库迁移到 `a6c4d8e2f9b1 (head)`；目标测试 `8 passed`（含旧
+  `python-jose` HS256 token 跨库兼容），全量 pytest：`532 passed`。

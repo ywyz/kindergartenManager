@@ -26,7 +26,7 @@
 | 语言 | Python 3.12+（开发环境 3.14） |
 | 前后端 | NiceGUI（底层 FastAPI / Starlette） |
 | 数据库 | MySQL 8（async：SQLAlchemy 2 + aiomysql）；迁移：Alembic |
-| 鉴权 | JWT（python-jose）+ Argon2（argon2-cffi）+ RBAC |
+| 鉴权 | JWT（PyJWT）+ Argon2（argon2-cffi）+ RBAC |
 | 加密 | Fernet（cryptography）—— AI Key 入库加密 |
 | AI | OpenAI 兼容 Chat Completions（httpx + tenacity 重试） |
 | 文档导出 | python-docx |

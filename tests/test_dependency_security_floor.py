@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import re
+import tomllib
 from pathlib import Path
 
 
 REQUIREMENTS_PATH = Path(__file__).parents[1] / "requirements.txt"
+UV_LOCK_PATH = Path(__file__).parents[1] / "uv.lock"
 REQUIRED_SECURITY_FLOORS = {
     "aiohttp": "3.14.3",
     "cryptography": "50.0.0",
     "python-engineio": "4.13.2",
     "python-multipart": "0.0.31",
     "python-socketio": "5.16.2",
+    "pyjwt": "2.13.0",
     "starlette": "1.3.1",
 }
 REQUIREMENT_PATTERN = re.compile(
@@ -35,7 +38,7 @@ def _minimum_versions() -> dict[str, str]:
 
 
 def test_requirements_cover_frozen_dependabot_security_floors() -> None:
-    """All six vulnerable families must resolve no lower than their patched release."""
+    """Vulnerable families must resolve no lower than their patched release."""
     minimums = _minimum_versions()
     failures = []
 
@@ -49,3 +52,18 @@ def test_requirements_cover_frozen_dependabot_security_floors() -> None:
             )
 
     assert not failures, "Unsafe dependency floors:\n" + "\n".join(failures)
+
+
+def test_lock_excludes_unpatched_python_ecdsa_runtime_dependency() -> None:
+    """The exact runtime graph must not contain the unpatched python-ecdsa chain."""
+    lock_data = tomllib.loads(UV_LOCK_PATH.read_text(encoding="utf-8"))
+    locked_names = {package["name"].lower() for package in lock_data["package"]}
+    prohibited = sorted({"ecdsa", "python-jose"} & locked_names)
+
+    failures = []
+    if prohibited:
+        failures.append("prohibited locked packages: " + ", ".join(prohibited))
+    if "pyjwt" not in locked_names:
+        failures.append("replacement package missing: pyjwt")
+
+    assert not failures, "Unsafe JWT dependency graph:\n" + "\n".join(failures)
