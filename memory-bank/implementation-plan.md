@@ -60,7 +60,7 @@
 - `pytest-asyncio`
 - `cryptography`（用于 AI Key 加密）
 
-使用 `python3.12 -m venv .venv` 创建虚拟环境，激活后执行 `pip install -r requirements.txt`。
+使用 `python3.14 -m venv .venv` 创建 Python 3.14.7 虚拟环境，激活后执行 `pip install -r requirements.txt`。
 
 **验证**
 - `pip list | grep nicegui` 有输出。
@@ -447,7 +447,7 @@
 
 每个子系统包含：
 - `app/main.py`（FastAPI 入口）
-- `Dockerfile`（基于 python:3.12-slim）
+- `Dockerfile`（基于 python:3.14.7-slim）
 - `requirements.txt`（fastapi, uvicorn, 及各自专属依赖）
 
 **验证**

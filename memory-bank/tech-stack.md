@@ -36,7 +36,7 @@
 ## 最小可落地版本（建议直接按此启动）
 
 ### 1) 运行时与框架
-- Python 3.14（生产环境实际版本，开发环境与云端一致）
+- Python 3.14.7（生产、开发、Docker 与 GitHub Release 构建统一版本）
 - NiceGUI（UI）
 - FastAPI（由 NiceGUI 生态直接复用）
 - Uvicorn（ASGI 服务器）

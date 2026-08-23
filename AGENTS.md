@@ -8,7 +8,7 @@ For code discovery, prefer the `codebase-memory` graph in this order: `search_gr
 
 ## Project Structure & Module Organization
 
-This is a Python 3.12+ monorepo for a NiceGUI app, FastAPI-style APIs, and gradually separated services.
+This is a Python 3.14.7 monorepo for a NiceGUI app, FastAPI-style APIs, and gradually separated services.
 
 - `app/ui/`: NiceGUI pages and reusable UI components.
 - `app/api/`: read-only REST API routes, schemas, auth, and dependencies.
@@ -25,7 +25,7 @@ This is a Python 3.12+ monorepo for a NiceGUI app, FastAPI-style APIs, and gradu
 ## Build, Test, and Development Commands
 
 ```bash
-python3 -m venv .venv
+python3.14 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m app.main
 .venv/bin/pytest tests/ -q

@@ -13,8 +13,11 @@
 
 ## 2. 环境
 
+项目运行时基线固定为 Python 3.14.7；仓库根目录的 `.python-version`、Docker 镜像和
+GitHub Release 构建必须保持一致。
+
 ```bash
-python3 -m venv .venv
+python3.14 -m venv .venv
 .venv/bin/pip install --upgrade pip
 .venv/bin/pip install -r requirements.txt
 ```
@@ -26,6 +29,20 @@ python3 -m venv .venv
 ```
 
 默认访问 `http://localhost:8080`。未设置 `DATABASE_URL` 时使用用户数据目录中的 SQLite。
+
+### 2.1 依赖安全基线
+
+当前基线、Dependabot 告警映射和更新策略见 [DEPENDENCIES.md](DEPENDENCIES.md)。
+修改 `requirements.txt` 后至少执行：
+
+```bash
+.venv/bin/pip install --upgrade -r requirements.txt
+.venv/bin/pip check
+.venv/bin/python -m pytest tests/ -q
+```
+
+`>=` 表示安全下限，不是可重现锁文件。报告依赖验证时要记录实际解析版本；本地安装通过不代表
+Dependabot 已关闭，只有相关改动进入 GitHub 默认分支并等待依赖图重算后才能回读。
 
 ## 3. 分层与依赖
 

@@ -3,6 +3,21 @@
 本文件记录项目的重要变更。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本采用语义化版本与 `vX.Y.Z-betaN` 预发布标签。
 
+## [Unreleased]
+
+### 安全（Security）
+
+- 将开发、Docker 和 GitHub Release 构建的 Python 运行时统一升级并固定到 3.14.7，
+  新增运行时配置一致性回归测试。
+- 将 NiceGUI 安全/兼容基线升级到 `nicegui>=3.16.0`，并将 FastAPI 基线提升到
+  `fastapi>=0.141.1`，使其与最新 Starlette 系列兼容解析。
+- 根据 2026-08-22 的 GitHub Dependabot 开放告警和 PyPI 最新稳定版，升级
+  `cryptography>=50.0.0`、`aiohttp>=3.14.3`、`python-socketio>=5.16.4`、
+  `python-engineio>=4.13.5`、`starlette>=1.6.0` 和 `python-multipart>=0.0.32`。
+- 新增依赖安全基线、告警映射、验证命令和 GitHub 回读规则文档。
+- 新增安全下限回归测试，防止 Dependabot 相关包被无意降级。`pip-audit` 另外发现
+  `python-jose` 的无修复版本 `ecdsa` 传递风险，已在依赖文档中单独记录，本次不替换 JWT 实现。
+
 ## [3.1.0-beta1] - 2026-06-20
 
 ### 新增（Added）

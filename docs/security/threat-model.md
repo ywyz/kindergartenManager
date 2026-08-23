@@ -98,7 +98,8 @@
 ### 4.9 供应链与发布
 
 - 威胁：宽松依赖解析、被篡改 Action/镜像、未验证安装包。
-- 当前控制：依赖安全下限、tag 构建、GitHub Release。
+- 当前控制：`requirements.txt` 显式安全下限、Dependabot、tag 构建、GitHub Release；
+  2026-08-22 的基线和告警映射见 [DEPENDENCIES.md](../DEPENDENCIES.md)。
 - 必须补强：锁定依赖/哈希、常规质量 CI、Action 固定 SHA 或治理策略、产物校验值、目标平台安装验收。
 
 ### 4.10 Agent prompt/Tool injection 与权限扩大（计划）

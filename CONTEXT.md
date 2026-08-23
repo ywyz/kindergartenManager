@@ -32,7 +32,7 @@
 
 ## 3. 当前产品定位
 
-KindergartenManager 是一个 Python 3.12+、NiceGUI 前后端一体化的幼儿园教学管理应用。当前 `main` 是一个可打包、可本地运行、也可用 Docker 部署的模块化单体，主要能力包括：
+KindergartenManager 是一个 Python 3.14.7、NiceGUI 前后端一体化的幼儿园教学管理应用。当前 `main` 是一个可打包、可本地运行、也可用 Docker 部署的模块化单体，主要能力包括：
 
 - 每日活动计划：日期/学期、教案拆分、年龄适配、活动生成、差异比对、Word 导出。
 - 游戏观察：图片、视觉 AI、观察记录、历史与 Word 导出。

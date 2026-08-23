@@ -1,6 +1,6 @@
 # KindergartenManager 幼儿园教学管理系统
 
-KindergartenManager 是一个 Python 3.12+ / NiceGUI 教学管理应用。当前主线是模块化单体：默认使用本地 SQLite，也可连接 MySQL；支持文本/视觉 AI、固定 Word 模板导出，以及按租户隔离的只读 REST API。
+KindergartenManager 是一个 Python 3.14.7 / NiceGUI 教学管理应用。当前主线是模块化单体：默认使用本地 SQLite，也可连接 MySQL；支持文本/视觉 AI、固定 Word 模板导出，以及按租户隔离的只读 REST API。
 
 > 当前身份边界：UI 为固定身份的单用户模式，没有有效登录保护。PyInstaller 模式只监听本机；源码或 Docker 模式若暴露到网络，必须先增加可信网络边界或恢复认证。
 
@@ -29,7 +29,7 @@ KindergartenManager 是一个 Python 3.12+ / NiceGUI 教学管理应用。当前
 ## 快速开始
 
 ```bash
-python3 -m venv .venv
+python3.14 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m app.main
 ```
@@ -43,6 +43,10 @@ python3 -m venv .venv
 5. 直接进入 `/home`。
 
 建议先打开 `/settings` 配置学期、班级和教师，再打开 `/setup` 配置 AI 接口。
+
+当前 Web 框架安全基线为 NiceGUI 3.16.0 + FastAPI 0.141.1 + Starlette 1.6.0。
+其他 Dependabot 相关 Python 依赖下限、官方来源和验证方法见
+[docs/DEPENDENCIES.md](docs/DEPENDENCIES.md)。
 
 ## 自动测试与迁移
 
@@ -134,6 +138,7 @@ NiceGUI UI / FastAPI-style API
 9. [docs/MANUAL_TESTING.md](docs/MANUAL_TESTING.md) — 当前人工验收矩阵。
 10. [docs/USER_MANUAL.md](docs/USER_MANUAL.md) — 用户手册。
 11. [docs/API.md](docs/API.md) — 对外只读 API。
+12. [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) — Python 依赖安全基线与 Dependabot 处理规则。
 
 `memory-bank/` 保存模块设计和历史进度。若与当前代码或上述事实文档冲突，以当前代码、迁移、测试证据和 `CONTEXT.md` 为准。
 
