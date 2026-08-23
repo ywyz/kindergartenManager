@@ -782,3 +782,40 @@ async def test_runtime_normalizes_refusal_and_executor_failure_codes():
     assert "provider detail" not in repr(refused_outcome)
     assert failed_outcome.error_code == "agent.tool_failed"
     assert "executor-secret" not in repr(failed_outcome)
+
+
+@pytest.mark.parametrize(
+    ("tool_name", "mutable_field"),
+    (
+        ("daily_plan.read_current", "sections"),
+        ("daily_plan.read_context", "section_states"),
+        ("calendar.read_evaluation", "holiday_name"),
+        ("settings.read_class_areas", "indoor_areas"),
+    ),
+)
+@pytest.mark.asyncio
+async def test_runtime_rejects_mutable_or_mistyped_registered_read_dto_fields(
+    tool_name: str,
+    mutable_field: str,
+):
+    runtime = _runtime_module()
+    context = _context()
+    call = _tool_call(runtime, call_id=26, tool_name=tool_name)
+    valid = _read_value(call, context)
+    malformed = replace(valid, **{mutable_field: []})
+    provider = ScriptedProvider(
+        [
+            _provider_result(runtime, tool_calls=(call,), finish_reason="tool_calls"),
+            _provider_result(runtime, content="不应到达"),
+        ]
+    )
+    agent = _agent_runtime(
+        runtime,
+        provider,
+        ScriptedExecutor(read_value=malformed),
+    )
+
+    outcome = await agent.run_turn(context=context, intent="检查 READ DTO 深冻结")
+
+    assert outcome.error_code == "agent.tool_schema_invalid"
+    assert len(provider.requests) == 1
