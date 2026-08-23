@@ -102,7 +102,7 @@ R0 事实基线与图谱
 
 ## 7. R3：Agent Foundation 规格与分支决策
 
-状态：`自动验证`（F002 安全同步 RED 基线已固定并推送；Issue #48 已授权且仅授权 F003；contracts/关闭 registry 的 4 个契约测试已本地 GREEN）。
+状态：`自动验证`（F002 安全同步 RED 基线、F003 固定 GREEN 均已验证；F004 已单独授权并进入 GREEN 候选）。
 
 已确认：[ADR-0005](ADR/ADR-0005-controlled-ai-agent-runtime.md) 和
 [Agent Runtime 设计](design/agent-runtime.md) 已经固定首期上限，即每日活动计划的单 Agent、
@@ -113,7 +113,7 @@ R0 事实基线与图谱
 - 功能分支固定为 `feat/agent-foundation`；F002 原始 RED SHA 为 `ad13a6aa3e44ff98b2604d4a008649cd66185d80`。
 - `main@cfeadefd7dfa056c1b3757876658493110d8cf84` 通过双亲 merge commit 同步到 `5de2e49bee19749f611b50747a31be9464b92d7b`；该远端 SHA 的 Quality 已通过。
 - [冻结规格与停止边界](../specs/agent-foundation/spec.md)、[任务顺序](../specs/agent-foundation/tasks.md) 和 [Issue #48](https://github.com/ywyz/kindergartenManager/issues/48) 已建立。
-- `specs/agent-foundation/tests/` 的 F003 4 项已 GREEN；F004 新增 4 项 Context/READ 投影稳定 RED。
+- `specs/agent-foundation/tests/` 的 F003 4 项继续 GREEN；F004 RED 固定为 `8297fce…`，最小实现后总计 `8 passed`。
 - 当前继续单用户；NiceGUI 多用户/RBAC 代码仅作为低优先级预备资产，不进入 Foundation 范围。
 - 是否仍保持模块化单体？服务拆分必须有独立 ADR 和运营理由。
 - 聚合事务和 tenant/user 投影修复后，每日计划、班级设置和日历的窄 Service 投影如何建立，使 Agent Tool 不直接调用 Repository？
@@ -122,7 +122,7 @@ R0 事实基线与图谱
 
 ## 8. R4A：受控 Agent Foundation READ/DRAFT
 
-状态：`实现中`（F003 GREEN；F004 已授权并进入 RED；F005 及以后未授权）。
+状态：`自动验证`（F003 GREEN；F004 GREEN 候选待固定 SHA Review/CI；F005 及以后未授权）。
 
 实现范围严格限定为：
 

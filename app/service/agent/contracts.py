@@ -1,7 +1,10 @@
-"""Closed contracts for the first Agent Foundation slice."""
+"""Closed contracts for the authorized Agent Foundation slices."""
 
 from dataclasses import dataclass
+from datetime import date, datetime
 from enum import Enum
+from typing import TypeAlias
+from uuid import UUID
 
 
 class Permission(str, Enum):
@@ -18,6 +21,134 @@ class ToolDescriptor:
 
     name: str
     permission: Permission
+
+
+@dataclass(frozen=True, slots=True)
+class TrustedActor:
+    """Tenant and user identity supplied by the trusted local UI context."""
+
+    tenant_id: int
+    user_id: int
+
+    def __post_init__(self) -> None:
+        if self.tenant_id <= 0 or self.user_id <= 0:
+            raise ValueError("actor_ids_must_be_positive")
+
+
+@dataclass(frozen=True, slots=True)
+class DailyPlanScope:
+    """Exactly one current-plan locator; actor identity is deliberately absent."""
+
+    plan_id: int | None = None
+    plan_date: date | None = None
+
+    def __post_init__(self) -> None:
+        if (self.plan_id is None) == (self.plan_date is None):
+            raise ValueError("scope_requires_exactly_one_locator")
+        if self.plan_id is not None and self.plan_id <= 0:
+            raise ValueError("plan_id_must_be_positive")
+
+
+@dataclass(frozen=True, slots=True)
+class PlanSection:
+    """One allowlisted, bounded daily-plan section."""
+
+    field_path: str
+    content: str
+    truncated: bool
+
+
+@dataclass(frozen=True, slots=True)
+class SectionState:
+    """Whether an allowlisted daily-plan section currently has content."""
+
+    field_path: str
+    has_content: bool
+
+
+@dataclass(frozen=True, slots=True)
+class DailyPlanProjection:
+    """Frozen, allowlisted current-plan projection with no actor or ORM object."""
+
+    plan_id: int
+    plan_date: date
+    week_number: int
+    weekday_cn: str
+    grade: str
+    class_name: str
+    sections: tuple[PlanSection, ...]
+    updated_at_utc: datetime
+    content_sha256: str
+
+
+@dataclass(frozen=True, slots=True)
+class DailyPlanContextProjection:
+    """Plan metadata and section presence without the section bodies."""
+
+    plan_id: int
+    plan_date: date
+    week_number: int
+    weekday_cn: str
+    grade: str
+    class_name: str
+    semester_name: str | None
+    section_states: tuple[SectionState, ...]
+
+
+class CalendarDayType(str, Enum):
+    """Locally normalized calendar result for the closed READ surface."""
+
+    WORKDAY = "workday"
+    WEEKEND = "weekend"
+    HOLIDAY = "holiday"
+    ADJUSTED_WORKDAY = "adjusted_workday"
+    UNKNOWN = "unknown"
+
+
+@dataclass(frozen=True, slots=True)
+class CalendarEvaluationProjection:
+    """Semester and holiday evaluation with an explicit degraded state."""
+
+    target_date: date
+    within_semester: bool | None
+    day_type: CalendarDayType
+    holiday_name: str | None
+    degradation_code: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class ClassAreasProjection:
+    """Allowlisted class-area facts; teacher identity is intentionally omitted."""
+
+    grade: str
+    class_name: str
+    indoor_areas: str
+    outdoor_content: str
+
+
+ContextFact: TypeAlias = (
+    DailyPlanProjection
+    | DailyPlanContextProjection
+    | CalendarEvaluationProjection
+    | ClassAreasProjection
+)
+
+
+@dataclass(frozen=True, slots=True)
+class AgentContext:
+    """Short-lived, frozen facts for one operation and turn."""
+
+    context_id: UUID
+    operation_id: UUID
+    turn_id: UUID
+    created_at_utc: datetime
+    expires_at_utc: datetime
+    locale: str
+    actor: TrustedActor
+    active_scope: DailyPlanScope
+    facts: tuple[ContextFact, ...]
+    base_fingerprint: str
+    allowed_permissions: frozenset[Permission]
 
 
 FOUNDATION_ALLOWED_PERMISSIONS = frozenset({Permission.READ, Permission.DRAFT})

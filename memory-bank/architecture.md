@@ -372,3 +372,26 @@ frozen exe 启动
 ### 测试
 
 `tests/test_course_review_activity_repository.py`、`test_course_review_activity_client.py`、`test_course_review_activity_service.py`、`test_course_review_activity_exporter.py`、`test_course_review_activity_ui_helpers.py`、`test_export_repository.py`、`test_app_shell_menu.py`、`test_migrations_smoke.py`。课程审议相关回归 **60 passed**；全量回归 **529 passed**；用户手动验收通过。
+
+## 13. 受控 Agent Foundation F004 READ 投影
+
+F004 在既有 F003 contracts/关闭 registry 之后，只建立应用层 READ seam 与短期冻结 Context；
+不实现 Tool、Provider、Runtime、PlanPatch、UI 或任何持久化。
+
+### 核心模块
+
+| 文件 | 职责 |
+|------|------|
+| `app/service/agent/contracts.py` | 冻结 actor/scope、每日计划、日历、班级区域和 `AgentContext` DTO；不含 ORM、Session 或供应商类型 |
+| `app/service/agent/read_service.py` | `AgentReadService` 绑定受信 tenant+user，提供当前计划、计划上下文、日历和班级区域四个白名单投影 |
+| `app/service/agent/context.py` | 按固定顺序组装短生命周期 facts，并基于 actor/scope/facts 计算稳定 SHA-256 fingerprint |
+| `app/repository/daily_plan_repository.py` | 新增按 `tenant_id + user_id + plan_id` 的 UI 详情读取，跨 actor 返回 `None` |
+
+每日计划正文按关闭字段集合投影且单字段最多 4096 字符；班级投影排除教师姓名；节假日 API
+不可用时显式返回 `unknown` 与稳定降级码。所有 DTO 均冻结，只存在内存，不改变数据库 schema。
+
+### 测试
+
+`specs/agent-foundation/tests/test_read_projections_red.py` 通过真实内存 SQLite 和确定性节假日 adapter
+覆盖白名单、tenant/user 负向读取、裁剪/冻结、日历降级和稳定 fingerprint。F004 RED 固定为
+`8297fce…`；GREEN 候选下 Foundation 总计 **8 passed**。

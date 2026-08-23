@@ -102,6 +102,22 @@ async def get_daily_plan_by_id_for_tenant(
     return result.scalar_one_or_none()
 
 
+async def get_daily_plan_by_id_for_user(
+    session: AsyncSession,
+    tenant_id: int,
+    user_id: int,
+    plan_id: int,
+) -> DailyPlan | None:
+    """Read a daily plan through the UI tenant + user projection."""
+    stmt = select(DailyPlan).where(
+        DailyPlan.id == plan_id,
+        DailyPlan.tenant_id == tenant_id,
+        DailyPlan.user_id == user_id,
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
 async def _list_daily_plans(
     session: AsyncSession,
     tenant_id: int,
