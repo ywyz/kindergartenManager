@@ -78,6 +78,7 @@ def _raise_adapter_failure(
     stage: str,
     *,
     http_status: int | None = None,
+    transport_reason: str | None = None,
 ) -> NoReturn:
     try:
         logger.warning(
@@ -85,11 +86,44 @@ def _raise_adapter_failure(
             extra={
                 "agent_provider_stage": stage,
                 "http_status": http_status,
+                "transport_reason": transport_reason,
             },
         )
     except Exception:
         pass
     raise AgentProviderAdapterError
+
+
+def _classify_transport_failure(error: Exception) -> str:
+    if isinstance(error, httpx.ConnectTimeout):
+        return "connect_timeout"
+    if isinstance(error, httpx.ReadTimeout):
+        return "read_timeout"
+    if isinstance(error, httpx.WriteTimeout):
+        return "write_timeout"
+    if isinstance(error, httpx.PoolTimeout):
+        return "pool_timeout"
+    if isinstance(error, httpx.TimeoutException):
+        return "timeout_other"
+    if isinstance(error, httpx.ConnectError):
+        return "connect_error"
+    if isinstance(error, httpx.ReadError):
+        return "read_error"
+    if isinstance(error, httpx.WriteError):
+        return "write_error"
+    if isinstance(error, httpx.CloseError):
+        return "close_error"
+    if isinstance(error, httpx.NetworkError):
+        return "network_other"
+    if isinstance(error, httpx.ProtocolError):
+        return "protocol_error"
+    if isinstance(error, httpx.ProxyError):
+        return "proxy_error"
+    if isinstance(error, httpx.UnsupportedProtocol):
+        return "unsupported_protocol"
+    if isinstance(error, httpx.TransportError):
+        return "transport_other"
+    return "unexpected_error"
 
 
 class OpenAICompatibleAgentProvider(AgentProviderPort):
@@ -134,13 +168,21 @@ class OpenAICompatibleAgentProvider(AgentProviderPort):
             raise AgentProviderAdapterError
 
         response: httpx.Response | None = None
-        request_failed = False
+        transport_error: Exception | None = None
         try:
             response = await self._post_once(payload)
-        except Exception:
-            request_failed = True
-        if request_failed or response is None:
-            _raise_adapter_failure("transport")
+        except Exception as error:
+            transport_error = error
+        if transport_error is not None:
+            _raise_adapter_failure(
+                "transport",
+                transport_reason=_classify_transport_failure(transport_error),
+            )
+        if response is None:
+            _raise_adapter_failure(
+                "transport",
+                transport_reason="unexpected_error",
+            )
         if not response.is_success:
             _raise_adapter_failure(
                 "http_status",
