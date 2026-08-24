@@ -113,8 +113,11 @@ F008 只接入具体 adapter/executor/composition/UI；不修改 F003-F007 的�
   `max_completion_tokens`。`repetition_truncation` 必须归一为现有 `length`，不得误标为 completed。也不在
   HTTP 400 后删除参数做兼容性降级重试；每次 `complete` 最多发起一次 wire request。
 - Provider 失败日志只能记录固定阶段枚举；adapter 允许 `transport/http_status/json_decode/response_parse`，
-  Runtime 允许 `provider_port_failure/result_type/text_finish_reason/tool_finish_reason`。附加值仅允许 HTTP
-  状态码或关闭 `finish_reason`；URL、header、正文、异常、request id、模型输出和凭据均禁止进入日志。
+  Runtime 允许 `provider_port_failure/result_type/text_finish_reason/tool_finish_reason`。`transport` 的附加原因
+  只能由本地异常类型映射为关闭枚举 `connect_timeout/read_timeout/write_timeout/pool_timeout/timeout_other/`
+  `connect_error/read_error/write_error/close_error/network_other/protocol_error/proxy_error/unsupported_protocol/`
+  `transport_other/unexpected_error`；其他附加值仅允许 HTTP 状态码或关闭 `finish_reason`。URL、header、正文、
+  原始异常类型或消息、request id、模型输出和凭据均禁止进入日志。
 - Alembic 启动迁移不得禁用迁移前已加载的 Provider adapter/Runtime logger。
 
 #### 5.2.2 六个关闭 Tool executor

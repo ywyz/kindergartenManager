@@ -264,8 +264,11 @@ HTTP 400 或兼容性错误不得触发“删除参数再试”的降级重试�
 
 Provider 失败诊断只允许进程日志记录固定阶段枚举：adapter 的 `transport`、`http_status`、`json_decode`、
 `response_parse`，以及 Runtime 的 `provider_port_failure`、`result_type`、`text_finish_reason`、
-`tool_finish_reason`。只有 `http_status` 数字和关闭 `finish_reason` 值可随阶段记录；不得记录 URL、headers、
-请求/响应正文、异常对象、request id、模型输出或凭据。诊断日志失败不能改变 fail-closed 结果。
+`tool_finish_reason`。`transport` 只允许本地映射出的关闭原因 `connect_timeout/read_timeout/write_timeout/`
+`pool_timeout/timeout_other/connect_error/read_error/write_error/close_error/network_other/protocol_error/`
+`proxy_error/unsupported_protocol/transport_other/unexpected_error`；此外只有 `http_status` 数字和关闭
+`finish_reason` 值可随阶段记录。不得记录 URL、headers、请求/响应正文、原始异常类型或消息、request id、
+模型输出或凭据。诊断日志失败不能改变 fail-closed 结果。
 启动迁移不得禁用迁移前已加载的 adapter/Runtime logger，否则真实部署无法保留上述安全诊断阶段。
 
 ## 7. Runtime 状态与上限

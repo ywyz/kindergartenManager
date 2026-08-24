@@ -146,6 +146,8 @@ Word：Microsoft Word / LibreOffice / 未执行
   Context 或 Tool 参数。
 - [ ] 文本为 `SUCCEEDED`，可选 DRAFT 为 `DRAFT_READY`；页面正文、全部业务表、version/preview/audit、
   exports 均不变。
+- [ ] 如失败，仅摘录固定 adapter/Runtime 阶段，以及可选 HTTP 状态码、关闭 `finish_reason` 或关闭
+  `transport_reason`；不得记录原始异常类型或消息及其他敏感上下文，同一 `tested_code_sha` 不重试。
 
 ### 11.4 证据闭合
 

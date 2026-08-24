@@ -925,12 +925,17 @@ async def test_http_400_is_sanitized_and_never_retried_with_a_degraded_payload(
 
 
 @pytest.mark.parametrize(
-    ("failure_mode", "expected_stage", "expected_status"),
+    (
+        "failure_mode",
+        "expected_stage",
+        "expected_status",
+        "expected_transport_reason",
+    ),
     [
-        ("transport", "transport", None),
-        ("http_status", "http_status", 429),
-        ("json_decode", "json_decode", None),
-        ("response_parse", "response_parse", None),
+        ("transport", "transport", None, "connect_error"),
+        ("http_status", "http_status", 429, None),
+        ("json_decode", "json_decode", None, None),
+        ("response_parse", "response_parse", None, None),
     ],
 )
 @pytest.mark.asyncio
@@ -938,6 +943,7 @@ async def test_adapter_failure_logs_only_one_sanitized_stage(
     failure_mode: str,
     expected_stage: str,
     expected_status: int | None,
+    expected_transport_reason: str | None,
     caplog: pytest.LogCaptureFixture,
 ):
     module = _adapter_module()
@@ -973,6 +979,68 @@ async def test_adapter_failure_logs_only_one_sanitized_stage(
     assert len(records) == 1
     assert records[0].agent_provider_stage == expected_stage
     assert records[0].http_status == expected_status
+    assert records[0].transport_reason == expected_transport_reason
+    _assert_no_sensitive_text(
+        values=(API_KEY, raw_detail),
+        objects=(raised.value,),
+        log_records=tuple(records),
+    )
+
+
+@pytest.mark.parametrize(
+    ("error_type", "expected_transport_reason"),
+    [
+        (httpx.ConnectTimeout, "connect_timeout"),
+        (httpx.ReadTimeout, "read_timeout"),
+        (httpx.WriteTimeout, "write_timeout"),
+        (httpx.PoolTimeout, "pool_timeout"),
+        (httpx.TimeoutException, "timeout_other"),
+        (httpx.ConnectError, "connect_error"),
+        (httpx.ReadError, "read_error"),
+        (httpx.WriteError, "write_error"),
+        (httpx.CloseError, "close_error"),
+        (httpx.NetworkError, "network_other"),
+        (httpx.LocalProtocolError, "protocol_error"),
+        (httpx.RemoteProtocolError, "protocol_error"),
+        (httpx.ProxyError, "proxy_error"),
+        (httpx.UnsupportedProtocol, "unsupported_protocol"),
+        (httpx.TransportError, "transport_other"),
+        (RuntimeError, "unexpected_error"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_transport_failure_reason_is_closed_and_sanitized(
+    error_type: type[Exception],
+    expected_transport_reason: str,
+    caplog: pytest.LogCaptureFixture,
+):
+    module = _adapter_module()
+    runtime = import_module("app.service.agent.runtime")
+    raw_detail = "provider-private transport detail"
+    provider_logger = logging.getLogger(module.__name__)
+    provider_logger.addHandler(caplog.handler)
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if issubclass(error_type, httpx.RequestError):
+            raise error_type(f"{raw_detail}: {API_KEY}", request=request)
+        raise error_type(f"{raw_detail}: {API_KEY}")
+
+    try:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises(module.AgentProviderAdapterError) as raised:
+                await _provider(module, client).complete(_request(runtime))
+    finally:
+        provider_logger.removeHandler(caplog.handler)
+
+    records = [
+        record
+        for record in caplog.records
+        if record.getMessage() == "Agent Provider 调用失败"
+    ]
+    assert len(records) == 1
+    assert records[0].agent_provider_stage == "transport"
+    assert records[0].http_status is None
+    assert records[0].transport_reason == expected_transport_reason
     _assert_no_sensitive_text(
         values=(API_KEY, raw_detail),
         objects=(raised.value,),
