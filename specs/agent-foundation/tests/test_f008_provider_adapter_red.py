@@ -314,11 +314,12 @@ async def test_request_is_one_exact_generic_chat_completions_post():
         "messages",
         "tools",
         "tool_choice",
-        "max_tokens",
+        "max_completion_tokens",
     }
     assert body["model"] == MODEL_NAME
     assert body["tool_choice"] == "auto"
-    assert body["max_tokens"] == 321
+    assert body["max_completion_tokens"] == 321
+    assert "max_tokens" not in body
     assert "store" not in body
     assert "parallel_tool_calls" not in body
     assert body["messages"] == [
