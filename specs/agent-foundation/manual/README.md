@@ -61,7 +61,8 @@ python specs/agent-foundation/manual/f009_seed.py run-app \
 ```
 
 mock 只接受固定 holiday GET 与 `POST /v1/chat/completions`。Chat 请求必须携带固定虚构 Bearer、固定模型、
-恰好六个按既定顺序的双下划线 wire Tool，且 payload 只能有 `model/messages/tools/tool_choice/max_tokens`；
+恰好六个按既定顺序的双下划线 wire Tool，且 payload 只能有
+`model/messages/tools/tool_choice/max_completion_tokens`；
 `store`、`parallel_tool_calls`、错误路径或未知意图全部 fail closed。服务端日志只有递增计数和预定义场景名，
 不会记录 Authorization、system Context、正文或 Tool 参数。
 

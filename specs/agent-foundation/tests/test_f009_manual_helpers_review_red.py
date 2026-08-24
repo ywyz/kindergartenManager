@@ -63,7 +63,7 @@ def _mock_payload(mock, intent: str) -> dict[str, object]:
         "turn_id": "22222222-2222-2222-2222-222222222222",
     }
     return {
-        "max_tokens": 4096,
+        "max_completion_tokens": 4096,
         "messages": [
             {"role": "system", "content": json.dumps(system)},
             {"role": "user", "content": intent},

@@ -58,8 +58,10 @@ F008 只实现 `OpenAICompatibleAgentProvider` 的 Chat Completions adapter，�
   fail-closed。顶层、choice 和 message 中未消费的 OpenAI-compatible 可选元数据可以忽略，以兼容新增响应
   属性；`refusal`、deprecated `function_call`、与 finish reason 冲突的 `tool_calls` 等有语义字段非空时仍须
   fail-closed。任何未消费元数据均不得留存或进入 DTO/repr/log。
-- 不发送 `store` 或 `parallel_tool_calls`。兼容性差异返回 HTTP 400 时不得删减安全参数再隐式重试；错误直接
-  归一为稳定 `AgentProviderAdapterError`，由 Runtime 现有异常边界处理。
+- 不发送 `store`、`parallel_tool_calls` 或已弃用的 `max_tokens`；完成长度上限只用
+  `max_completion_tokens`。`repetition_truncation` 归一为现有 `length`，不得把截断正文标为 completed。
+  兼容性差异返回 HTTP 400 时不得删减安全参数再隐式重试；错误直接归一为稳定
+  `AgentProviderAdapterError`，由 Runtime 现有异常边界处理。
 - `api_base_url`、`api_key`、`model_name` 和 HTTP client 只作为显式构造依赖；明文 Key/短命配置只存活于当前
   operation，不进入 wire message、Tool 参数、结果、repr 或日志，也不在 coordinator/页面全局缓存。
 

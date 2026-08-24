@@ -384,12 +384,18 @@ def _prepare(
     if not hmac.compare_digest(authorization, f"Bearer {MOCK_API_KEY}"):
         raise MockRejected
     body = _mapping(payload)
-    if set(body) != {"max_tokens", "messages", "model", "tool_choice", "tools"}:
+    if set(body) != {
+        "max_completion_tokens",
+        "messages",
+        "model",
+        "tool_choice",
+        "tools",
+    }:
         raise MockRejected
     if (
         body.get("model") != MOCK_MODEL
         or body.get("tool_choice") != "auto"
-        or body.get("max_tokens") != 4096
+        or body.get("max_completion_tokens") != 4096
     ):
         raise MockRejected
     if body.get("tools") != _TOOLS:
@@ -529,7 +535,7 @@ def _self_test() -> None:
         "turn_id": "22222222-2222-2222-2222-222222222222",
     }
     payload = {
-        "max_tokens": 4096,
+        "max_completion_tokens": 4096,
         "messages": [
             {"role": "system", "content": json.dumps(system)},
             {"role": "user", "content": "F009_DRAFT"},

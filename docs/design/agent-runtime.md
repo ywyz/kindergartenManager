@@ -256,8 +256,10 @@ fail-closed 为净化后的 `AgentProviderAdapterError`。顶层、choice 和 me
 `tool_calls` 等有语义字段非空时仍须 fail-closed。所有未消费元数据均不得留存或进入应用 DTO、repr、日志。
 
 wire request 参数同样由固定 allowlist 构造，不透传任意 client option；明确不发送 `store` 或
-`parallel_tool_calls`。HTTP 400 或兼容性错误不得触发“删除参数再试”的降级重试，防止同一 operation 隐式
-产生第二次请求或改变安全语义。明文 Key 和 adapter 配置只在当前 operation 的短命 composition 内存在，
+`parallel_tool_calls`，完成长度上限只使用当前 Chat Completions 字段 `max_completion_tokens`，不得发送已弃用
+的 `max_tokens`。Provider 的 `repetition_truncation` 归一为现有 `length`，保证被截断正文不会误标为正常完成。
+HTTP 400 或兼容性错误不得触发“删除参数再试”的降级重试，防止同一 operation 隐式产生第二次请求或改变
+安全语义。明文 Key 和 adapter 配置只在当前 operation 的短命 composition 内存在，
 不进入 wire message、Tool 参数、Runtime DTO、结果、repr、日志、coordinator 或页面持久状态。
 
 ## 7. Runtime 状态与上限

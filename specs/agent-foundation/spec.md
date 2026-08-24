@@ -109,8 +109,9 @@ F008 只接入具体 adapter/executor/composition/UI；不修改 F003-F007 的�
   OpenAI-compatible 顶层、choice 和 message 中未消费的可选元数据可以忽略，以兼容供应商新增响应属性；
   `refusal`、deprecated `function_call` 或与 finish reason 冲突的 `tool_calls` 等有语义字段只要非空就必须
   fail-closed。原始正文、异常、SDK 类型和任何未消费元数据均不得进入 Runtime DTO、repr 或日志。
-- 明确不发送 `store`、`parallel_tool_calls`，也不在 HTTP 400 后删除参数做兼容性降级重试。每次
-  `complete` 最多发起一次 wire request。
+- 明确不发送 `store`、`parallel_tool_calls` 或已弃用的 `max_tokens`；完成长度上限只用
+  `max_completion_tokens`。`repetition_truncation` 必须归一为现有 `length`，不得误标为 completed。也不在
+  HTTP 400 后删除参数做兼容性降级重试；每次 `complete` 最多发起一次 wire request。
 
 #### 5.2.2 六个关闭 Tool executor
 
