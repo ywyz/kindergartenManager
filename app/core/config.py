@@ -276,6 +276,11 @@ def _create_posix_file(path: Path, payload: bytes) -> None:
     except BaseException as exc:
         failure = exc
     finally:
+        if not completed and identity is None and fd is not None:
+            try:
+                identity = _regular_fd_identity(fd, path)
+            except BaseException:
+                cleanup_failure = True
         if fd is not None:
             try:
                 os.close(fd)

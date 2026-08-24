@@ -140,6 +140,19 @@ def require_isolated_worktree(
     return root
 
 
+def _activate_worktree_imports(root: Path) -> None:
+    """Make the verified fixed-SHA root authoritative for delayed app imports."""
+    verified = str(root.resolve())
+    sys.path[:] = [
+        verified,
+        *(
+            entry
+            for entry in sys.path
+            if str(Path(entry or Path.cwd()).resolve()) != verified
+        ),
+    ]
+
+
 def _secure_run_dir(path: Path) -> None:
     metadata = _lstat(path)
     if metadata is None or not stat.S_ISDIR(metadata.st_mode):
@@ -263,11 +276,12 @@ async def _seed_rows(*, mock: bool) -> None:
 
 def _seed(args: argparse.Namespace) -> None:
     mock = args.mode == "mock"
-    require_isolated_worktree(
+    root = require_isolated_worktree(
         args.tested_sha,
         secrets_absent=True,
         lock_absent=True,
     )
+    _activate_worktree_imports(root)
     database = _database_path(args.database, exists=False)
     _reserve_database(database)
     _synthetic_env(database, mock=mock)
@@ -394,11 +408,12 @@ def _preflight(args: argparse.Namespace) -> None:
 
 def _run_app(args: argparse.Namespace) -> None:
     mock = args.mode == "mock"
-    require_isolated_worktree(
+    root = require_isolated_worktree(
         args.tested_sha,
         secrets_absent=mock,
         lock_absent=False,
     )
+    _activate_worktree_imports(root)
     database = _database_path(args.database, exists=True)
     if not _port_free(APP_PORT) or mock and not _port_listening(MOCK_PORT):
         raise ManualHelperError("required loopback port state is not ready")
