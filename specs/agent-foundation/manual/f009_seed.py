@@ -209,25 +209,26 @@ def _synthetic_env(database: Path, *, mock: bool) -> None:
 
 
 async def _seed_rows(*, mock: bool) -> None:
-    from sqlalchemy import select
-
-    from app.core.bootstrap import ensure_default_user
+    from app.auth.password import hash_password
     from app.core.database import AsyncSessionLocal
-    from app.core.models.user import User
+    from app.core.models.user import User, UserRole
     from app.repository.ai_key_repository import save_ai_key
     from app.repository.class_repository import upsert_class_config
     from app.repository.daily_plan_repository import save_daily_plan
     from app.repository.semester_repository import upsert_active_semester
 
     async with AsyncSessionLocal() as session:
-        await ensure_default_user(session)
-        user = (
-            await session.execute(
-                select(User).where(User.tenant_id == 1, User.username == "admin")
+        session.add(
+            User(
+                id=1,
+                tenant_id=1,
+                username="admin",
+                hashed_password=hash_password("f009-synthetic-not-used"),
+                role=UserRole.sys_admin,
+                is_active=True,
+                display_name="F009合成管理员",
             )
-        ).scalar_one()
-        if user.id != 1:
-            raise ManualHelperError("synthetic default user id is not 1")
+        )
         await upsert_class_config(
             session,
             1,
