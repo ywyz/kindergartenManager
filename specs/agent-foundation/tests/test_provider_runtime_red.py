@@ -6,6 +6,7 @@ from dataclasses import FrozenInstanceError, dataclass, field, fields, replace
 from datetime import date, datetime, timedelta, timezone
 from importlib import import_module
 import inspect
+import logging
 from typing import Any
 from uuid import UUID
 
@@ -795,6 +796,65 @@ async def test_runtime_normalizes_refusal_and_executor_failure_codes():
     assert "provider detail" not in repr(refused_outcome)
     assert failed_outcome.error_code == "agent.tool_failed"
     assert "executor-secret" not in repr(failed_outcome)
+
+
+@pytest.mark.asyncio
+async def test_runtime_provider_rejections_log_only_safe_stages(
+    caplog: pytest.LogCaptureFixture,
+):
+    runtime = _runtime_module()
+    runtime_logger = logging.getLogger(runtime.__name__)
+    runtime_logger.addHandler(caplog.handler)
+    private_detail = "provider-private runtime detail"
+    call = _tool_call(runtime, call_id=26)
+    cases = (
+        (
+            ScriptedProvider([RuntimeError(private_detail)]),
+            "provider_port_failure",
+            None,
+        ),
+        (ScriptedProvider([object()]), "result_type", None),
+        (
+            ScriptedProvider(
+                [_provider_result(runtime, content="截断正文", finish_reason="length")]
+            ),
+            "text_finish_reason",
+            "length",
+        ),
+        (
+            ScriptedProvider(
+                [
+                    _provider_result(
+                        runtime,
+                        tool_calls=(call,),
+                        finish_reason="completed",
+                    )
+                ]
+            ),
+            "tool_finish_reason",
+            "completed",
+        ),
+    )
+
+    try:
+        for provider, _expected_stage, _expected_reason in cases:
+            outcome = await _agent_runtime(runtime, provider).run_turn(
+                context=_context(),
+                intent="固定合成意图",
+            )
+            assert outcome.error_code == "agent.provider_failed"
+    finally:
+        runtime_logger.removeHandler(caplog.handler)
+
+    records = [
+        record
+        for record in caplog.records
+        if record.getMessage() == "Agent Runtime 拒绝 Provider 结果"
+    ]
+    assert [
+        (record.agent_provider_stage, record.finish_reason) for record in records
+    ] == [(stage, reason) for _provider, stage, reason in cases]
+    assert private_detail not in repr(records)
 
 
 @pytest.mark.parametrize(
