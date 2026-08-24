@@ -772,13 +772,14 @@ def test_interrupted_initial_identity_check_removes_empty_file_and_propagates(
     )
     real_regular_fd_identity = config_mod._regular_fd_identity
     interruption = KeyboardInterrupt("fictional interrupted identity check")
-    identity_calls = 0
+    target_identity_calls = 0
 
     def interrupt_first_identity_check(fd: int, path: Path):
-        nonlocal identity_calls
-        identity_calls += 1
-        if identity_calls == 1:
-            raise interruption
+        nonlocal target_identity_calls
+        if path == secrets_path:
+            target_identity_calls += 1
+            if target_identity_calls == 1:
+                raise interruption
         return real_regular_fd_identity(fd, path)
 
     monkeypatch.setattr(
@@ -791,7 +792,7 @@ def test_interrupted_initial_identity_check_removes_empty_file_and_propagates(
         _make_settings()
 
     assert captured.value is interruption
-    assert identity_calls == 2
+    assert target_identity_calls == 2
     _assert_failure_is_sanitized(
         captured.value,
         caplog,
