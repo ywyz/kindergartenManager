@@ -751,6 +751,56 @@ def test_interrupted_initial_posix_write_removes_partial_file_and_propagates(
     assert not secrets_path.exists()
 
 
+def test_interrupted_initial_identity_check_removes_empty_file_and_propagates(
+    tmp_path,
+    monkeypatch,
+    caplog,
+):
+    """首次创建后的 identity 检查被中断时也必须清理最终路径。"""
+    if os.name != "posix":
+        _assert_non_posix_regular_file_contract(tmp_path, monkeypatch)
+        return
+
+    from app.core import config as config_mod
+
+    secrets_path = tmp_path / ".kindergarten_secrets"
+    monkeypatch.setattr("app.core.config._secrets_file_path", lambda: secrets_path)
+    generated_values = iter((_GENERATED_ENCRYPTION_SENTINEL, _GENERATED_JWT_SENTINEL))
+    monkeypatch.setattr(
+        "app.core.config.secrets.token_urlsafe",
+        lambda _size: next(generated_values),
+    )
+    real_regular_fd_identity = config_mod._regular_fd_identity
+    interruption = KeyboardInterrupt("fictional interrupted identity check")
+    identity_calls = 0
+
+    def interrupt_first_identity_check(fd: int, path: Path):
+        nonlocal identity_calls
+        identity_calls += 1
+        if identity_calls == 1:
+            raise interruption
+        return real_regular_fd_identity(fd, path)
+
+    monkeypatch.setattr(
+        "app.core.config._regular_fd_identity",
+        interrupt_first_identity_check,
+    )
+    caplog.set_level(logging.INFO, logger="app.config")
+
+    with pytest.raises(KeyboardInterrupt) as captured:
+        _make_settings()
+
+    assert captured.value is interruption
+    assert identity_calls == 2
+    _assert_failure_is_sanitized(
+        captured.value,
+        caplog,
+        _GENERATED_ENCRYPTION_SENTINEL,
+        _GENERATED_JWT_SENTINEL,
+    )
+    assert not secrets_path.exists()
+
+
 def test_existing_single_key_digest_survives_missing_key_write_failure(
     tmp_path,
     monkeypatch,
