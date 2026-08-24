@@ -390,11 +390,11 @@ def _parse_response(
     if type(choices) is not list or len(choices) != 1:
         raise _InvalidWire
     choice = choices[0]
-    if not isinstance(choice, Mapping) or set(choice) != {
+    if not isinstance(choice, Mapping) or not {
         "index",
         "message",
         "finish_reason",
-    }:
+    }.issubset(choice):
         raise _InvalidWire
     if type(choice["index"]) is not int or choice["index"] != 0:
         raise _InvalidWire
@@ -404,11 +404,13 @@ def _parse_response(
     message = choice["message"]
     if not isinstance(message, Mapping) or message.get("role") != "assistant":
         raise _InvalidWire
+    if message.get("refusal") is not None or message.get("function_call") is not None:
+        raise _InvalidWire
 
     if finish_reason is ProviderFinishReason.TOOL_CALLS:
         content, tool_calls = _parse_tool_message(message, request)
     else:
-        if set(message) != {"role", "content"}:
+        if "content" not in message or message.get("tool_calls") is not None:
             raise _InvalidWire
         content = message["content"]
         if type(content) is not str or len(content) > request.response_limit:
@@ -428,9 +430,9 @@ def _parse_tool_message(
     message: Mapping[object, object],
     request: ProviderTurnRequest,
 ) -> tuple[str | None, tuple[ProviderToolCall, ...]]:
-    if set(message) != {"role", "content", "tool_calls"}:
+    if "tool_calls" not in message:
         raise _InvalidWire
-    content = message["content"]
+    content = message.get("content")
     if content is not None and (
         type(content) is not str or len(content) > request.response_limit
     ):
