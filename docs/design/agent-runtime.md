@@ -250,9 +250,10 @@ Provider 返回的每个原始 wire `tool_call.id` 视为不可信字符串，�
 `uuid5(request.operation_id, raw_wire_id)`，生成应用 `ProviderToolCall.call_id`。在下一次 Chat Completions request 中重放 assistant Tool call
 和对应 tool result 时，两侧必须使用同一个归一 UUID 字符串；原始 ID 不再作为权威关联值。canonical/wire
 Tool 名、permission、arguments、finish reason、request id、choices 数量和所有字符串/集合上限均关闭解析。
-`choices` 必须恰好一项，消费的 choice/message/tool_call/function 形状错型、额外或超限时 fail-closed 为净化后的
-`AgentProviderAdapterError`。标准顶层 envelope 元数据 `id`/`object`/`created`/`model`/`usage` 可忽略，但
-不得留存或进入应用 DTO、repr、日志。
+`choices` 必须恰好一项；必需 choice/message 字段和 tool_call/function 的精确形状错型、额外或超限时
+fail-closed 为净化后的 `AgentProviderAdapterError`。顶层、choice 和 message 中未消费的 OpenAI-compatible
+可选元数据可忽略，以兼容新增响应属性；`refusal`、deprecated `function_call`、与 finish reason 冲突的
+`tool_calls` 等有语义字段非空时仍须 fail-closed。所有未消费元数据均不得留存或进入应用 DTO、repr、日志。
 
 wire request 参数同样由固定 allowlist 构造，不透传任意 client option；明确不发送 `store` 或
 `parallel_tool_calls`。HTTP 400 或兼容性错误不得触发“删除参数再试”的降级重试，防止同一 operation 隐式

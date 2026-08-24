@@ -561,6 +561,42 @@ async def test_openai_envelope_metadata_is_ignored_without_entering_runtime_dtos
     _assert_no_sensitive_text(values=(private_reasoning,), objects=(result,))
 
 
+@pytest.mark.asyncio
+async def test_tool_finish_ignores_unconsumed_metadata_but_keeps_closed_tool_shape():
+    module = _adapter_module()
+    runtime = import_module("app.service.agent.runtime")
+    private_reasoning = "provider-private tool reasoning must stay outside runtime DTOs"
+    response_body = _response(
+        content=None,
+        finish_reason="tool_calls",
+        tool_calls=[
+            _wire_call(
+                raw_id="metadata-compatible-tool-call",
+                alias="settings__read_class_areas",
+            )
+        ],
+    )
+    choice = response_body["choices"][0]
+    choice["logprobs"] = None
+    choice["future_optional_choice_metadata"] = {"opaque": True}
+    message = choice["message"]
+    message["refusal"] = None
+    message["annotations"] = []
+    message["reasoning_content"] = private_reasoning
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=response_body)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await _provider(module, client).complete(_request(runtime))
+
+    assert result.assistant_content is None
+    assert result.finish_reason is runtime.ProviderFinishReason.TOOL_CALLS
+    assert len(result.tool_calls) == 1
+    assert result.tool_calls[0].tool_name == "settings.read_class_areas"
+    _assert_no_sensitive_text(values=(private_reasoning,), objects=(result,))
+
+
 def _invalid_cases() -> list[pytest.ParamSpec]:
     valid_choice = _choice()
     return [
@@ -587,6 +623,48 @@ def _invalid_cases() -> list[pytest.ParamSpec]:
             _response(finish_reason="new-provider-reason"),
             {},
             id="unknown-finish-reason",
+        ),
+        pytest.param(
+            _response(finish_reason=[]),
+            {},
+            id="finish-reason-wrong-type",
+        ),
+        pytest.param(
+            {
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": "拒绝字段不能作为普通正文忽略",
+                            "refusal": "provider refusal",
+                        },
+                        "finish_reason": "stop",
+                    }
+                ]
+            },
+            {},
+            id="non-null-refusal",
+        ),
+        pytest.param(
+            {
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": "旧函数调用不能被忽略",
+                            "function_call": {
+                                "name": "settings__read_class_areas",
+                                "arguments": "{}",
+                            },
+                        },
+                        "finish_reason": "stop",
+                    }
+                ]
+            },
+            {},
+            id="deprecated-function-call",
         ),
         pytest.param(
             _response(
@@ -673,6 +751,95 @@ def _invalid_cases() -> list[pytest.ParamSpec]:
             ),
             {},
             id="canonical-dotted-name-on-wire",
+        ),
+        pytest.param(
+            _response(
+                content=None,
+                finish_reason="tool_calls",
+                tool_calls=["tool-call-not-object"],
+            ),
+            {},
+            id="tool-call-wrong-type",
+        ),
+        pytest.param(
+            _response(
+                content=None,
+                finish_reason="tool_calls",
+                tool_calls=[
+                    {
+                        "id": "tool-call-missing-function",
+                        "type": "function",
+                    }
+                ],
+            ),
+            {},
+            id="tool-call-shape-missing",
+        ),
+        pytest.param(
+            _response(
+                content=None,
+                finish_reason="tool_calls",
+                tool_calls=[
+                    {
+                        **_wire_call(
+                            raw_id="tool-call-extra-field",
+                            alias="settings__read_class_areas",
+                        ),
+                        "unexpected": True,
+                    }
+                ],
+            ),
+            {},
+            id="tool-call-shape-open",
+        ),
+        pytest.param(
+            _response(
+                content=None,
+                finish_reason="tool_calls",
+                tool_calls=[
+                    {
+                        "id": "function-wrong-type",
+                        "type": "function",
+                        "function": [],
+                    }
+                ],
+            ),
+            {},
+            id="tool-function-wrong-type",
+        ),
+        pytest.param(
+            _response(
+                content=None,
+                finish_reason="tool_calls",
+                tool_calls=[
+                    {
+                        "id": "function-shape-missing",
+                        "type": "function",
+                        "function": {"name": "settings__read_class_areas"},
+                    }
+                ],
+            ),
+            {},
+            id="tool-function-shape-missing",
+        ),
+        pytest.param(
+            _response(
+                content=None,
+                finish_reason="tool_calls",
+                tool_calls=[
+                    {
+                        "id": "function-shape-open",
+                        "type": "function",
+                        "function": {
+                            "name": "settings__read_class_areas",
+                            "arguments": "{}",
+                            "unexpected": True,
+                        },
+                    }
+                ],
+            ),
+            {},
+            id="tool-function-shape-open",
         ),
         pytest.param(
             _response(),

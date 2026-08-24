@@ -53,9 +53,11 @@ F008 只实现 `OpenAICompatibleAgentProvider` 的 Chat Completions adapter，�
 - wire request 只由本地 allowlist 逐字段构造；固定 system policy/context 消息是规范 JSON，顶层 key 恰好为
   `policy_version`、`operation_id`、`turn_id`、`scope`、`facts`、`base_fingerprint`；`scope` 恰好为
   `daily_plan_id`/`plan_date`，未使用 locator 为 `null`。它不包含 actor、`context_id`、凭据或任意对象。
-  Adapter 同样按关闭 allowlist 解析 response：`choices` 必须恰好一项，消费的 choice/message/tool_call/function、
-  finish reason、content、arguments 与 request-id 形状错型、超限或漂移时 fail-closed。标准顶层 envelope
-  元数据 `id`/`object`/`created`/`model`/`usage` 可以忽略但不得留存或进入 DTO/repr/log。
+  Adapter 同样按关闭 allowlist 解析 response：`choices` 必须恰好一项；必需 choice/message 字段和
+  tool_call/function 的精确形状、finish reason、content、arguments 与 request-id 错型、超限或漂移时
+  fail-closed。顶层、choice 和 message 中未消费的 OpenAI-compatible 可选元数据可以忽略，以兼容新增响应
+  属性；`refusal`、deprecated `function_call`、与 finish reason 冲突的 `tool_calls` 等有语义字段非空时仍须
+  fail-closed。任何未消费元数据均不得留存或进入 DTO/repr/log。
 - 不发送 `store` 或 `parallel_tool_calls`。兼容性差异返回 HTTP 400 时不得删减安全参数再隐式重试；错误直接
   归一为稳定 `AgentProviderAdapterError`，由 Runtime 现有异常边界处理。
 - `api_base_url`、`api_key`、`model_name` 和 HTTP client 只作为显式构造依赖；明文 Key/短命配置只存活于当前

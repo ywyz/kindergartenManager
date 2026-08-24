@@ -103,11 +103,12 @@ F008 只接入具体 adapter/executor/composition/UI；不修改 F003-F007 的�
 - 不受信的 wire `tool_call.id` 用 `uuid5(request.operation_id, raw_wire_id)` 归一为本地 `call_id`；下一次
   request 中的 assistant Tool call 与对应 tool result 必须都使用同一个归一 UUID 字符串。原始 wire ID
   不得作为 Runtime 的权威 ID。
-- request 参数与 response 的消费形状逐字段按关闭 allowlist 构造/解析。`choices` 必须恰好一项；消费的
-  choice/message/tool_call/function、finish reason、content、arguments、request-id 错型/额外/超限、
-  Tool/permission 不匹配、非法 JSON 或 HTTP/client 异常必须 fail-closed 并净化。标准顶层 envelope 元数据
-  `id`/`object`/`created`/`model`/`usage` 可以忽略，但原始正文、异常、SDK 类型和未消费元数据不得进入
-  Runtime DTO、repr 或日志。
+- request 参数与 response 的消费字段逐项按关闭 allowlist 构造/解析。`choices` 必须恰好一项；必需的
+  choice/message 字段以及 tool_call/function 的精确形状、finish reason、content、arguments、request-id
+  错型/额外/超限、Tool/permission 不匹配、非法 JSON 或 HTTP/client 异常必须 fail-closed 并净化。
+  OpenAI-compatible 顶层、choice 和 message 中未消费的可选元数据可以忽略，以兼容供应商新增响应属性；
+  `refusal`、deprecated `function_call` 或与 finish reason 冲突的 `tool_calls` 等有语义字段只要非空就必须
+  fail-closed。原始正文、异常、SDK 类型和任何未消费元数据均不得进入 Runtime DTO、repr 或日志。
 - 明确不发送 `store`、`parallel_tool_calls`，也不在 HTTP 400 后删除参数做兼容性降级重试。每次
   `complete` 最多发起一次 wire request。
 
