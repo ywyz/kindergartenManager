@@ -1187,6 +1187,6 @@ asyncio.run(main())
     )
 
     assert completed.returncode == 0
-    assert completed.stdout.strip() == expected_code
+    assert completed.stdout.splitlines()[-1] == expected_code
     assert secret not in completed.stdout
     assert secret not in completed.stderr

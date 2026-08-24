@@ -62,6 +62,9 @@ F008 只实现 `OpenAICompatibleAgentProvider` 的 Chat Completions adapter，�
   `max_completion_tokens`。`repetition_truncation` 归一为现有 `length`，不得把截断正文标为 completed。
   兼容性差异返回 HTTP 400 时不得删减安全参数再隐式重试；错误直接归一为稳定
   `AgentProviderAdapterError`，由 Runtime 现有异常边界处理。
+- Provider 失败诊断只记录固定 adapter/Runtime 阶段枚举；附加值最多是 HTTP 状态码或关闭
+  `finish_reason`。URL、header、请求/响应正文、异常对象、request id、模型输出和凭据均不得进入日志；日志
+  失败也不能改变 fail-closed 结果。
 - `api_base_url`、`api_key`、`model_name` 和 HTTP client 只作为显式构造依赖；明文 Key/短命配置只存活于当前
   operation，不进入 wire message、Tool 参数、结果、repr 或日志，也不在 coordinator/页面全局缓存。
 

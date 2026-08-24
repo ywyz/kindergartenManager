@@ -799,12 +799,20 @@ async def test_runtime_normalizes_refusal_and_executor_failure_codes():
 
 
 @pytest.mark.asyncio
-async def test_runtime_provider_rejections_log_only_safe_stages(
-    caplog: pytest.LogCaptureFixture,
-):
+async def test_runtime_provider_rejections_log_only_safe_stages():
     runtime = _runtime_module()
     runtime_logger = logging.getLogger(runtime.__name__)
-    runtime_logger.addHandler(caplog.handler)
+    captured_records: list[logging.LogRecord] = []
+
+    class CaptureHandler(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            captured_records.append(record)
+
+    capture_handler = CaptureHandler()
+    runtime_logger.addHandler(capture_handler)
+    assert runtime.logger is runtime_logger
+    assert not runtime_logger.disabled
+    assert runtime_logger.isEnabledFor(logging.WARNING)
     private_detail = "provider-private runtime detail"
     call = _tool_call(runtime, call_id=26)
     cases = (
@@ -844,11 +852,11 @@ async def test_runtime_provider_rejections_log_only_safe_stages(
             )
             assert outcome.error_code == "agent.provider_failed"
     finally:
-        runtime_logger.removeHandler(caplog.handler)
+        runtime_logger.removeHandler(capture_handler)
 
     records = [
         record
-        for record in caplog.records
+        for record in captured_records
         if record.getMessage() == "Agent Runtime 拒绝 Provider 结果"
     ]
     assert [

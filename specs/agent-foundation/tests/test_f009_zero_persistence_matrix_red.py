@@ -212,6 +212,28 @@ def _is_forbidden_agent_schema_name(table_name: str) -> bool:
     return any(f"_{term}_" in padded for term in FORBIDDEN_AGENT_SCHEMA_TERMS)
 
 
+def test_startup_migration_preserves_preloaded_agent_loggers(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.integration.ai_client import agent_provider
+    from app.service.agent import runtime
+
+    database_url = f"sqlite+aiosqlite:///{(tmp_path / 'logging.db').as_posix()}"
+    monkeypatch.setattr(settings, "DATABASE_URL", database_url)
+    loggers = (
+        logging.getLogger(agent_provider.__name__),
+        logging.getLogger(runtime.__name__),
+    )
+    for logger in loggers:
+        monkeypatch.setattr(logger, "disabled", False)
+
+    alembic_config = Config(str(REPOSITORY_ROOT / "alembic.ini"))
+    command.upgrade(alembic_config, "head")
+
+    assert all(not logger.disabled for logger in loggers)
+
+
 @pytest_asyncio.fixture
 async def effect_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     state_root = tmp_path / "application-state"
