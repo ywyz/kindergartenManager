@@ -923,6 +923,57 @@ async def test_http_400_is_sanitized_and_never_retried_with_a_degraded_payload(
     )
 
 
+@pytest.mark.parametrize(
+    ("failure_mode", "expected_stage", "expected_status"),
+    [
+        ("transport", "transport", None),
+        ("http_status", "http_status", 429),
+        ("json_decode", "json_decode", None),
+        ("response_parse", "response_parse", None),
+    ],
+)
+@pytest.mark.asyncio
+async def test_adapter_failure_logs_only_one_sanitized_stage(
+    failure_mode: str,
+    expected_stage: str,
+    expected_status: int | None,
+    caplog: pytest.LogCaptureFixture,
+):
+    module = _adapter_module()
+    runtime = import_module("app.service.agent.runtime")
+    raw_detail = "provider-private failure detail"
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if failure_mode == "transport":
+            raise httpx.ConnectError(f"{raw_detail}: {API_KEY}", request=request)
+        if failure_mode == "http_status":
+            return httpx.Response(
+                429,
+                json={"error": {"message": f"{raw_detail}: {API_KEY}"}},
+            )
+        if failure_mode == "json_decode":
+            return httpx.Response(200, content=f"{{{raw_detail}: {API_KEY}".encode())
+        return httpx.Response(200, json={"choices": []})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(module.AgentProviderAdapterError) as raised:
+            await _provider(module, client).complete(_request(runtime))
+
+    records = [
+        record
+        for record in caplog.records
+        if record.getMessage() == "Agent Provider 调用失败"
+    ]
+    assert len(records) == 1
+    assert records[0].agent_provider_stage == expected_stage
+    assert records[0].http_status == expected_status
+    _assert_no_sensitive_text(
+        values=(API_KEY, raw_detail),
+        objects=(raised.value,),
+        log_records=tuple(records),
+    )
+
+
 @pytest.mark.asyncio
 async def test_host_cancellation_propagates_through_the_http_boundary():
     module = _adapter_module()
