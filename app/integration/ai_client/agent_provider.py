@@ -50,6 +50,7 @@ _FINISH_REASONS = MappingProxyType(
         "stop": ProviderFinishReason.COMPLETED,
         "tool_calls": ProviderFinishReason.TOOL_CALLS,
         "length": ProviderFinishReason.LENGTH,
+        "repetition_truncation": ProviderFinishReason.LENGTH,
         "content_filter": ProviderFinishReason.REFUSED,
     }
 )
