@@ -5,10 +5,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 import json
 from types import MappingProxyType
+from typing import NoReturn
 from uuid import UUID, uuid5
 
 import httpx
 
+from app.core.logging import get_logger
 from app.service.agent.canonical import canonical_json
 from app.service.agent.contracts import (
     FOUNDATION_TOOL_DESCRIPTORS,
@@ -58,6 +60,8 @@ _MAX_WIRE_TOOL_CALL_ID_LENGTH = 128
 _MAX_WIRE_ARGUMENTS_LENGTH = 64 * 1024
 _ERROR_CODE = "agent.provider_adapter_failed"
 
+logger = get_logger(__name__)
+
 
 class AgentProviderAdapterError(RuntimeError):
     """Sanitized failure at the concrete Provider boundary."""
@@ -68,6 +72,24 @@ class AgentProviderAdapterError(RuntimeError):
 
 class _InvalidWire(Exception):
     """Private marker whose instances never cross the adapter boundary."""
+
+
+def _raise_adapter_failure(
+    stage: str,
+    *,
+    http_status: int | None = None,
+) -> NoReturn:
+    try:
+        logger.warning(
+            "Agent Provider 调用失败",
+            extra={
+                "agent_provider_stage": stage,
+                "http_status": http_status,
+            },
+        )
+    except Exception:
+        pass
+    raise AgentProviderAdapterError
 
 
 class OpenAICompatibleAgentProvider(AgentProviderPort):
@@ -117,8 +139,13 @@ class OpenAICompatibleAgentProvider(AgentProviderPort):
             response = await self._post_once(payload)
         except Exception:
             request_failed = True
-        if request_failed or response is None or not response.is_success:
-            raise AgentProviderAdapterError
+        if request_failed or response is None:
+            _raise_adapter_failure("transport")
+        if not response.is_success:
+            _raise_adapter_failure(
+                "http_status",
+                http_status=response.status_code,
+            )
 
         body: object | None = None
         json_failed = False
@@ -127,7 +154,7 @@ class OpenAICompatibleAgentProvider(AgentProviderPort):
         except Exception:
             json_failed = True
         if json_failed:
-            raise AgentProviderAdapterError
+            _raise_adapter_failure("json_decode")
 
         result: ProviderTurnResult | None = None
         parse_failed = False
@@ -140,7 +167,7 @@ class OpenAICompatibleAgentProvider(AgentProviderPort):
         except Exception:
             parse_failed = True
         if parse_failed or result is None:
-            raise AgentProviderAdapterError
+            _raise_adapter_failure("response_parse")
         return result
 
     async def _post_once(self, payload: dict[str, object]) -> httpx.Response:

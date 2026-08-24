@@ -4,6 +4,7 @@ import asyncio
 from datetime import date, datetime, timedelta, timezone
 from importlib import import_module
 import json
+import logging
 import re
 from typing import Any
 from uuid import UUID, uuid5
@@ -942,6 +943,8 @@ async def test_adapter_failure_logs_only_one_sanitized_stage(
     module = _adapter_module()
     runtime = import_module("app.service.agent.runtime")
     raw_detail = "provider-private failure detail"
+    provider_logger = logging.getLogger(module.__name__)
+    provider_logger.addHandler(caplog.handler)
 
     async def handler(request: httpx.Request) -> httpx.Response:
         if failure_mode == "transport":
@@ -955,9 +958,12 @@ async def test_adapter_failure_logs_only_one_sanitized_stage(
             return httpx.Response(200, content=f"{{{raw_detail}: {API_KEY}".encode())
         return httpx.Response(200, json={"choices": []})
 
-    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        with pytest.raises(module.AgentProviderAdapterError) as raised:
-            await _provider(module, client).complete(_request(runtime))
+    try:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises(module.AgentProviderAdapterError) as raised:
+                await _provider(module, client).complete(_request(runtime))
+    finally:
+        provider_logger.removeHandler(caplog.handler)
 
     records = [
         record
