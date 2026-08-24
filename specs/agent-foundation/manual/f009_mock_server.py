@@ -405,10 +405,10 @@ def _prepare(
     intent = user.get("content")
     if type(intent) is not str:
         raise MockRejected
-    markers = [marker for marker in _SCENARIOS if marker in intent]
-    if len(markers) != 1:
+    selected = _SCENARIOS.get(intent)
+    if selected is None:
         raise MockRejected
-    scenario, content, slow = _SCENARIOS[markers[0]]
+    scenario, content, slow = selected
     if len(messages) == 4:
         if scenario != "draft":
             raise MockRejected
