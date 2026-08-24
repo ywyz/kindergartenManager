@@ -9,6 +9,7 @@ from types import MappingProxyType
 from typing import Any, Callable, Protocol, cast, runtime_checkable
 from uuid import UUID
 
+from app.core.logging import get_logger
 from app.service.agent.contracts import (
     AgentContext,
     DailyPlanScope,
@@ -31,6 +32,8 @@ from app.service.agent.registry import AgentToolRegistry, AgentToolRejected
 LOCAL_POLICY_VERSION = "agent-foundation-v1"
 MAX_PROVIDER_REQUEST_ID_LENGTH = 128
 MAX_TOOL_ERROR_CODE_LENGTH = 128
+
+logger = get_logger(__name__)
 
 
 class ProviderRole(str, Enum):
@@ -56,6 +59,25 @@ class ToolExecutionStatus(str, Enum):
     OK = "ok"
     REJECTED = "rejected"
     FAILED = "failed"
+
+
+def _log_provider_rejection(
+    stage: str,
+    *,
+    finish_reason: ProviderFinishReason | None = None,
+) -> None:
+    try:
+        logger.warning(
+            "Agent Runtime 拒绝 Provider 结果",
+            extra={
+                "agent_provider_stage": stage,
+                "finish_reason": (
+                    finish_reason.value if finish_reason is not None else None
+                ),
+            },
+        )
+    except Exception:
+        pass
 
 
 class AgentTurnStatus(str, Enum):
@@ -599,6 +621,7 @@ class AgentRuntime:
                 )
                 if gate_error is not None:
                     return _stopped_outcome(gate_error)
+                _log_provider_rejection("provider_port_failure")
                 return _failure("agent.provider_failed")
             gate_error = self._gate_error(
                 context=context,
@@ -608,6 +631,7 @@ class AgentRuntime:
             if gate_error is not None:
                 return _stopped_outcome(gate_error)
             if type(result) is not ProviderTurnResult:
+                _log_provider_rejection("result_type")
                 return _failure("agent.provider_failed")
             if (
                 result.assistant_content is not None
@@ -617,6 +641,10 @@ class AgentRuntime:
 
             if not result.tool_calls:
                 if result.finish_reason is not ProviderFinishReason.COMPLETED:
+                    _log_provider_rejection(
+                        "text_finish_reason",
+                        finish_reason=result.finish_reason,
+                    )
                     return _failure("agent.provider_failed")
                 gate_error = self._gate_error(
                     context=context,
@@ -637,6 +665,10 @@ class AgentRuntime:
                 )
 
             if result.finish_reason is not ProviderFinishReason.TOOL_CALLS:
+                _log_provider_rejection(
+                    "tool_finish_reason",
+                    finish_reason=result.finish_reason,
+                )
                 return _failure("agent.provider_failed")
             total_tool_calls += len(result.tool_calls)
             if total_tool_calls > self._limits.max_tool_calls:
