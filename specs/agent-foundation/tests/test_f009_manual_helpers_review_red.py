@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import importlib.util
+import json
 from pathlib import Path
 import sys
 import types
@@ -23,6 +24,54 @@ def _load_seed_helper():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def _load_mock_helper(monkeypatch):
+    seed = _load_seed_helper()
+    monkeypatch.setitem(sys.modules, "f009_seed", seed)
+    path = Path(__file__).parents[1] / "manual" / "f009_mock_server.py"
+    spec = importlib.util.spec_from_file_location("f009_manual_mock_review", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _mock_payload(mock, intent: str) -> dict[str, object]:
+    sections = [
+        {"content": "synthetic", "field_path": path, "truncated": False}
+        for path in mock._PATHS
+    ]
+    system = {
+        "base_fingerprint": "a" * 64,
+        "facts": [
+            {
+                "class_name": "synthetic",
+                "content_sha256": "b" * 64,
+                "grade": "大班",
+                "plan_date": "2026-09-07",
+                "plan_id": 1,
+                "sections": sections,
+                "updated_at_utc": "2026-09-01T00:00:00+00:00",
+                "week_number": 2,
+                "weekday_cn": "周一",
+            }
+        ],
+        "operation_id": "11111111-1111-1111-1111-111111111111",
+        "policy_version": "agent-foundation-v1",
+        "scope": {"daily_plan_id": None, "plan_date": "2026-09-07"},
+        "turn_id": "22222222-2222-2222-2222-222222222222",
+    }
+    return {
+        "max_tokens": 4096,
+        "messages": [
+            {"role": "system", "content": json.dumps(system)},
+            {"role": "user", "content": intent},
+        ],
+        "model": mock.MOCK_MODEL,
+        "tool_choice": "auto",
+        "tools": mock._TOOLS,
+    }
 
 
 @pytest.mark.parametrize("handler_name", ("_seed", "_run_app"))
@@ -175,3 +224,21 @@ def test_manual_seed_adds_explicit_synthetic_user_without_bootstrap(monkeypatch)
     assert len(added_users) == 1
     assert added_users[0].id == 1
     assert repository_calls.count("commit") == 1
+
+
+@pytest.mark.parametrize(
+    "intent",
+    (
+        "UNRECOGNIZED PREFIX F009_TEXT",
+        "F009_TEXT UNRECOGNIZED SUFFIX",
+    ),
+)
+def test_closed_mock_rejects_marker_embedded_in_unknown_intent(monkeypatch, intent):
+    mock = _load_mock_helper(monkeypatch)
+
+    with pytest.raises(mock.MockRejected):
+        mock._prepare(
+            _mock_payload(mock, intent),
+            f"Bearer {mock.MOCK_API_KEY}",
+            0.01,
+        )
