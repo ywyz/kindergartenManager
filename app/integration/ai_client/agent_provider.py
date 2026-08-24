@@ -186,7 +186,7 @@ def _build_payload(
         "messages": messages,
         "tools": tools,
         "tool_choice": "auto",
-        "max_tokens": request.response_limit,
+        "max_completion_tokens": request.response_limit,
     }
 
 
