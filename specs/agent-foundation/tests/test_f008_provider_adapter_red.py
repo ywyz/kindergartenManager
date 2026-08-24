@@ -534,6 +534,33 @@ async def test_text_finish_reasons_are_normalized(
     assert result.tool_calls == ()
 
 
+@pytest.mark.asyncio
+async def test_openai_envelope_metadata_is_ignored_without_entering_runtime_dtos():
+    module = _adapter_module()
+    runtime = import_module("app.service.agent.runtime")
+    private_reasoning = "provider-private reasoning must stay outside runtime DTOs"
+    response_body = _response(content="兼容响应已读取。")
+    choice = response_body["choices"][0]
+    choice["logprobs"] = None
+    choice["future_optional_choice_metadata"] = {"opaque": True}
+    message = choice["message"]
+    message["refusal"] = None
+    message["annotations"] = []
+    message["tool_calls"] = None
+    message["reasoning_content"] = private_reasoning
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=response_body)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await _provider(module, client).complete(_request(runtime))
+
+    assert result.assistant_content == "兼容响应已读取。"
+    assert result.finish_reason is runtime.ProviderFinishReason.COMPLETED
+    assert result.tool_calls == ()
+    _assert_no_sensitive_text(values=(private_reasoning,), objects=(result,))
+
+
 def _invalid_cases() -> list[pytest.ParamSpec]:
     valid_choice = _choice()
     return [
@@ -560,6 +587,19 @@ def _invalid_cases() -> list[pytest.ParamSpec]:
             _response(finish_reason="new-provider-reason"),
             {},
             id="unknown-finish-reason",
+        ),
+        pytest.param(
+            _response(
+                finish_reason="stop",
+                tool_calls=[
+                    _wire_call(
+                        raw_id="conflicting-tool-call",
+                        alias="settings__read_class_areas",
+                    )
+                ],
+            ),
+            {},
+            id="tool-calls-conflict-with-stop",
         ),
         pytest.param(
             _response(
