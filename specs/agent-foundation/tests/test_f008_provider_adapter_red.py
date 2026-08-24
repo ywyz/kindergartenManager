@@ -508,6 +508,7 @@ async def test_normalized_tool_id_is_self_consistent_in_the_next_wire_round():
     [
         ("stop", "COMPLETED"),
         ("length", "LENGTH"),
+        ("repetition_truncation", "LENGTH"),
         ("content_filter", "REFUSED"),
     ],
 )
