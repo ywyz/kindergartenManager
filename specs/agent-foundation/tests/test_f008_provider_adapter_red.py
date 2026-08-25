@@ -365,6 +365,88 @@ async def test_adapter_defers_transport_timeout_to_the_bounded_runtime():
 
 
 @pytest.mark.asyncio
+async def test_default_adapter_client_also_defers_transport_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    module = _adapter_module()
+    runtime = import_module("app.service.agent.runtime")
+    captured_timeouts: list[dict[str, float | None]] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        captured_timeouts.append(request.extensions["timeout"])
+        return httpx.Response(200, json=_response())
+
+    provider = module.OpenAICompatibleAgentProvider(
+        api_base_url=API_BASE_URL,
+        api_key=API_KEY,
+        model_name=MODEL_NAME,
+    )
+    internal_client = httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        timeout=httpx.Timeout(0.001),
+    )
+    monkeypatch.setattr(module.httpx, "AsyncClient", lambda: internal_client)
+
+    result = await provider.complete(_request(runtime))
+
+    assert result.finish_reason is runtime.ProviderFinishReason.COMPLETED
+    assert internal_client.is_closed
+    assert captured_timeouts == [
+        {"connect": None, "read": None, "write": None, "pool": None}
+    ]
+
+
+@pytest.mark.asyncio
+async def test_runtime_timeout_cancels_the_real_http_adapter_operation():
+    module = _adapter_module()
+    runtime = import_module("app.service.agent.runtime")
+    context = _context()
+    entered = asyncio.Event()
+    handler_cancelled = asyncio.Event()
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            handler_cancelled.set()
+            raise
+
+    class RejectUnexpectedTool:
+        async def execute(self, _call: object, _context: object) -> object:
+            raise AssertionError("provider timeout must precede tool execution")
+
+    class StaticContextState:
+        def current_stamp(self) -> object:
+            return runtime.AgentContextStamp.from_context(context)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        provider = _provider(module, client)
+        agent = runtime.AgentRuntime(
+            provider=provider,
+            executor=RejectUnexpectedTool(),
+            registry=build_foundation_registry(),
+            context_state=StaticContextState(),
+            limits=runtime.RuntimeLimits(
+                max_provider_duration_ms=20,
+                max_total_duration_ms=500,
+            ),
+            clock=lambda: context.created_at_utc,
+        )
+        outcome = await asyncio.wait_for(
+            agent.run_turn(context=context, intent="验证 Runtime HTTP 超时"),
+            1,
+        )
+
+    assert entered.is_set()
+    assert handler_cancelled.is_set()
+    assert outcome.status is runtime.AgentTurnStatus.FAILED
+    assert outcome.error_code == "agent.timeout"
+    assert outcome.assistant_content is None
+    assert outcome.patches == ()
+
+
+@pytest.mark.asyncio
 async def test_system_context_is_closed_and_omits_actor_identity_and_credentials():
     module = _adapter_module()
     runtime = import_module("app.service.agent.runtime")
