@@ -1,5 +1,7 @@
 # 自制教玩具子系统 — 测试计划
 
+> **历史快照**：本文记录对应开发阶段的测试计划，不代表当前检出代码或当前通过状态。当前事实以 [`../../CONTEXT.md`](../../CONTEXT.md)、[`../../docs/ROADMAP.md`](../../docs/ROADMAP.md) 和当前代码/测试为准。
+
 > 测试框架：`pytest` + `pytest-asyncio`。数据库测试使用 `tests/conftest.py`
 > 的 SQLite 内存库 fixture；AI 与 Word 导出使用 mock 或真实模板隔离验证。
 

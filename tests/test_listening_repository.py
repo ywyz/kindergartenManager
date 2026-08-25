@@ -21,8 +21,8 @@ async def test_save_and_get_record(async_session):
     assert rec.id is not None
     assert rec.child_name == "小明"
 
-    assert (await get_record_by_id(async_session, 1, rec.id)).id == rec.id
-    assert await get_record_by_id(async_session, 99, rec.id) is None
+    assert (await get_record_by_id(async_session, 1, 1, rec.id)).id == rec.id
+    assert await get_record_by_id(async_session, 99, 1, rec.id) is None
 
 
 @pytest.mark.asyncio
@@ -61,12 +61,12 @@ async def test_update_and_delete_record(async_session):
                             obs_year=2026, obs_month=4, child_name="小明")
 
     assert await update_record(async_session, 1, 1, rec.id, child_name="小明明") is True
-    assert (await get_record_by_id(async_session, 1, rec.id)).child_name == "小明明"
+    assert (await get_record_by_id(async_session, 1, 1, rec.id)).child_name == "小明明"
 
     # 错误用户无法删除
     assert await delete_record(async_session, 1, 99, rec.id) is False
     assert await delete_record(async_session, 1, 1, rec.id) is True
-    assert await get_record_by_id(async_session, 1, rec.id) is None
+    assert await get_record_by_id(async_session, 1, 1, rec.id) is None
 
 
 # ─── 领域表 listening_domain ───────────────────────────────────────────────
@@ -82,7 +82,7 @@ async def test_save_and_list_domains(async_session):
                           domain=d, obs_year=2026, obs_month=4,
                           date_1=date(2026, 4, 8), goals=f"{d}目标")
 
-    doms = await list_domains_by_record(async_session, 1, 10)
+    doms = await list_domains_by_record(async_session, 1, 1, 10)
     assert len(doms) == 5
     assert {d.domain for d in doms} == {"健康", "语言", "社会", "艺术", "科学"}
     assert doms[0].date_1 == date(2026, 4, 8)
@@ -99,7 +99,7 @@ async def test_update_domain(async_session):
                             domain="健康", goals="原目标")
     assert await update_domain(async_session, 1, 1, dom.id, evaluation="新评价") is True
 
-    doms = await list_domains_by_record(async_session, 1, 10)
+    doms = await list_domains_by_record(async_session, 1, 1, 10)
     assert doms[0].evaluation == "新评价"
 
 
@@ -123,17 +123,17 @@ async def test_indicator_result_crud(async_session):
 
     assert r1.stars == 3  # 默认 3 星
 
-    health = await list_indicator_results(async_session, 1, 10, domain="健康")
+    health = await list_indicator_results(async_session, 1, 1, 10, domain="健康")
     assert len(health) == 2
-    all_res = await list_indicator_results(async_session, 1, 10)
+    all_res = await list_indicator_results(async_session, 1, 1, 10)
     assert len(all_res) == 3
 
     assert await update_indicator_stars(async_session, 1, 1, r1.id, 2) is True
-    refreshed = await list_indicator_results(async_session, 1, 10, domain="健康")
+    refreshed = await list_indicator_results(async_session, 1, 1, 10, domain="健康")
     assert refreshed[0].stars == 2
 
-    await delete_indicator_results_by_record(async_session, 1, 10)
-    assert await list_indicator_results(async_session, 1, 10) == []
+    await delete_indicator_results_by_record(async_session, 1, 1, 10)
+    assert await list_indicator_results(async_session, 1, 1, 10) == []
 
 
 @pytest.mark.asyncio
@@ -150,10 +150,10 @@ async def test_delete_domains_by_record(async_session):
     await save_domain(async_session, tenant_id=1, user_id=1, record_id=11, domain="健康")
 
     # 错误租户不删除
-    await delete_domains_by_record(async_session, 99, 10)
-    assert len(await list_domains_by_record(async_session, 1, 10)) == 2
+    await delete_domains_by_record(async_session, 99, 1, 10)
+    assert len(await list_domains_by_record(async_session, 1, 1, 10)) == 2
 
-    await delete_domains_by_record(async_session, 1, 10)
-    assert await list_domains_by_record(async_session, 1, 10) == []
+    await delete_domains_by_record(async_session, 1, 1, 10)
+    assert await list_domains_by_record(async_session, 1, 1, 10) == []
     # 其它记录不受影响
-    assert len(await list_domains_by_record(async_session, 1, 11)) == 1
+    assert len(await list_domains_by_record(async_session, 1, 1, 11)) == 1

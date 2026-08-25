@@ -76,3 +76,6 @@ jobs:
 
       - name: Test
         run: python -m pytest tests/ -q
+
+      - name: Agent Foundation
+        run: python -m pytest specs/agent-foundation/tests -q

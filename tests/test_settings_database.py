@@ -9,7 +9,6 @@
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from app.core.env_writer import read_dot_env, write_dot_env
 

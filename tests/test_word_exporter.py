@@ -13,7 +13,6 @@
 from datetime import date
 from io import BytesIO
 
-import pytest
 from docx import Document
 from docx.shared import RGBColor
 

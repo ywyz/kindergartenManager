@@ -15,7 +15,7 @@
 - 查看历史版本列表，支持一键回滚
 """
 
-from nicegui import app, ui
+from nicegui import ui
 
 from app.core.database import AsyncSessionLocal
 from app.core.exceptions import AiCallError, AiParseError, ConfigError

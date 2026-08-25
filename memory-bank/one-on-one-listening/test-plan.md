@@ -1,5 +1,7 @@
 # 一对一倾听观察子系统 — 测试计划
 
+> **历史快照**：本文记录 `dev3.1` 阶段的测试计划，不代表当前检出代码或当前通过状态。当前事实以 [`../../CONTEXT.md`](../../CONTEXT.md)、[`../../docs/ROADMAP.md`](../../docs/ROADMAP.md) 和当前代码/测试为准。
+
 > 配套：[design.md](design.md)、[dev-plan.md](dev-plan.md)。
 > 框架：`pytest` + `pytest-asyncio`；数据库用 `aiosqlite` 内存库 fixture（见 `tests/conftest.py`）；
 > AI/图片/Word 用 mock/桩隔离。运行：`pytest tests/ -v`，单文件 `pytest tests/test_listening_*.py -v`。

@@ -47,8 +47,8 @@ def build_sync_url(database_url: str | None) -> str:
 def run_startup_migrations() -> None:
     """在应用启动时自动执行 alembic upgrade head。
 
-    迁移失败时记录错误日志但不阻断启动，允许应用以降级模式运行（
-    例如数据库暂时不可达时仍能加载页面并展示友好提示）。
+    桌面、开发与服务器模式统一 fail-closed：迁移失败时记录异常并重新抛出，
+    防止应用在未知或过期 schema 上继续接受业务操作。
     """
     try:
         from alembic import command
@@ -69,4 +69,5 @@ def run_startup_migrations() -> None:
         command.upgrade(alembic_cfg, "head")
         logger.info("数据库迁移完成")
     except Exception:
-        logger.exception("数据库迁移失败，应用将继续启动（数据库功能可能不可用）")
+        logger.exception("数据库迁移失败，应用启动已中止")
+        raise

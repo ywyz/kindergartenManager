@@ -9,7 +9,6 @@ from typing import Any
 from docx import Document
 from docx.oxml.ns import qn
 from docx.shared import Pt
-from docx.table import Table
 from docx.text.paragraph import Paragraph
 
 from app.core.logging import get_logger
@@ -75,14 +74,6 @@ def _write_paragraph(paragraph: Paragraph, text: str) -> None:
         if idx:
             paragraph.add_run().add_break()
         _set_font(paragraph.add_run(line), size_pt=12)
-
-
-def _iter_body_blocks(doc: Document):
-    for child in doc._element.body.iterchildren():
-        if child.tag.endswith("}p"):
-            yield Paragraph(child, doc)
-        elif child.tag.endswith("}tbl"):
-            yield Table(child, doc)
 
 
 def _trim_sample_content(doc: Document) -> None:

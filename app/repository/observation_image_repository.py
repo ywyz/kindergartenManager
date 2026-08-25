@@ -22,7 +22,7 @@ async def add_image(
     width: int | None = None,
     height: int | None = None,
 ) -> GameObservationImage:
-    """新增一张观察图片记录，返回带 id 的对象。"""
+    """新增一张观察图片并 flush，提交由最外层 use-case 负责。"""
     img = GameObservationImage(
         tenant_id=tenant_id,
         user_id=user_id,
@@ -37,14 +37,14 @@ async def add_image(
         height=height,
     )
     session.add(img)
-    await session.commit()
-    await session.refresh(img)
+    await session.flush()
     return img
 
 
 async def list_images_by_observation(
     session: AsyncSession,
     tenant_id: int,
+    user_id: int,
     observation_id: int,
 ) -> list[GameObservationImage]:
     """查询某观察记录下的所有图片，按 image_index 升序排列。"""
@@ -52,6 +52,7 @@ async def list_images_by_observation(
         select(GameObservationImage)
         .where(
             GameObservationImage.tenant_id == tenant_id,
+            GameObservationImage.user_id == user_id,
             GameObservationImage.observation_id == observation_id,
         )
         .order_by(GameObservationImage.image_index.asc())
@@ -62,12 +63,14 @@ async def list_images_by_observation(
 async def get_image(
     session: AsyncSession,
     tenant_id: int,
+    user_id: int,
     image_id: int,
 ) -> GameObservationImage | None:
     """按 id 查询单张图片，强制 tenant_id 过滤。"""
     result = await session.execute(
         select(GameObservationImage).where(
             GameObservationImage.tenant_id == tenant_id,
+            GameObservationImage.user_id == user_id,
             GameObservationImage.id == image_id,
         )
     )
@@ -77,13 +80,15 @@ async def get_image(
 async def delete_images_by_observation(
     session: AsyncSession,
     tenant_id: int,
+    user_id: int,
     observation_id: int,
 ) -> None:
     """删除某观察记录下的所有图片（tenant 隔离）。"""
     await session.execute(
         delete(GameObservationImage).where(
             GameObservationImage.tenant_id == tenant_id,
+            GameObservationImage.user_id == user_id,
             GameObservationImage.observation_id == observation_id,
         )
     )
-    await session.commit()
+    await session.flush()

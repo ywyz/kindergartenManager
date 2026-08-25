@@ -1,0 +1,1099 @@
+"""F006 public RED tests for the provider port and bounded serial runtime."""
+
+import ast
+import asyncio
+from dataclasses import FrozenInstanceError, dataclass, field, fields, replace
+from datetime import date, datetime, timedelta, timezone
+from importlib import import_module
+import inspect
+import logging
+from typing import Any
+from uuid import UUID
+
+import pytest
+
+from app.service.agent.contracts import (
+    FOUNDATION_ALLOWED_PERMISSIONS,
+    AgentContext,
+    CalendarDayType,
+    CalendarEvaluationProjection,
+    ClassAreasProjection,
+    DailyPlanContextProjection,
+    DailyPlanProjection,
+    DailyPlanScope,
+    Permission,
+    PlanSection,
+    SectionState,
+    TrustedActor,
+)
+
+
+OPERATION_ID = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+TURN_ID = UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+PLAN_DATE = date(2026, 9, 7)
+BASE_FINGERPRINT = "d" * 64
+PLAN_SECTION_PATHS = (
+    "activity_goal",
+    "activity_prep",
+    "activity_key",
+    "activity_difficult",
+    "activity_process_original",
+    "activity_process_adapted",
+    "morning_activity",
+    "indoor_area",
+    "outdoor_activity",
+    "morning_talk_topic",
+    "morning_talk_questions",
+    "daily_reflection",
+)
+
+
+def _runtime_module():
+    return import_module("app.service.agent.runtime")
+
+
+def _context() -> AgentContext:
+    sections = tuple(
+        PlanSection(
+            field_path=field_path,
+            content="认识秋天" if field_path == "activity_goal" else "",
+            truncated=False,
+        )
+        for field_path in PLAN_SECTION_PATHS
+    )
+    projection = DailyPlanProjection(
+        plan_id=7,
+        plan_date=PLAN_DATE,
+        week_number=2,
+        weekday_cn="周一",
+        grade="大班",
+        class_name="星星班",
+        sections=sections,
+        updated_at_utc=datetime(2026, 9, 6, 8, 30, tzinfo=timezone.utc),
+        content_sha256="e" * 64,
+    )
+    created_at = datetime(2026, 9, 6, 9, 0, tzinfo=timezone.utc)
+    return AgentContext(
+        context_id=UUID("cccccccc-cccc-4ccc-8ccc-cccccccccccc"),
+        operation_id=OPERATION_ID,
+        turn_id=TURN_ID,
+        created_at_utc=created_at,
+        expires_at_utc=created_at + timedelta(minutes=5),
+        locale="zh-CN",
+        actor=TrustedActor(tenant_id=1, user_id=10),
+        active_scope=DailyPlanScope(daily_plan_id=7),
+        facts=(projection,),
+        base_fingerprint=BASE_FINGERPRINT,
+        allowed_permissions=FOUNDATION_ALLOWED_PERMISSIONS,
+    )
+
+
+def _provider_result(
+    runtime: Any,
+    *,
+    content: str | None = None,
+    tool_calls: tuple[object, ...] = (),
+    finish_reason: str = "completed",
+    provider_request_id: str = "fictional-request-id",
+):
+    return runtime.ProviderTurnResult(
+        assistant_content=content,
+        tool_calls=tool_calls,
+        finish_reason=runtime.ProviderFinishReason(finish_reason),
+        provider_request_id=provider_request_id,
+    )
+
+
+def _tool_call(
+    runtime: Any,
+    *,
+    call_id: int,
+    tool_name: str = "settings.read_class_areas",
+    permission: Permission = Permission.READ,
+    arguments: dict[str, object] | None = None,
+    operation_id: UUID = OPERATION_ID,
+    turn_id: UUID = TURN_ID,
+):
+    return runtime.ProviderToolCall(
+        call_id=UUID(int=call_id),
+        operation_id=operation_id,
+        turn_id=turn_id,
+        tool_name=tool_name,
+        permission=permission,
+        arguments={} if arguments is None else arguments,
+    )
+
+
+def _draft_arguments() -> dict[str, object]:
+    return {
+        "operation_id": str(OPERATION_ID),
+        "turn_id": str(TURN_ID),
+        "target": {"daily_plan_id": 7, "plan_date": PLAN_DATE.isoformat()},
+        "base_fingerprint": BASE_FINGERPRINT,
+        "operations": [
+            {
+                "field_path": "activity_goal",
+                "before_value": "认识秋天",
+                "after_value": "探索秋天",
+            }
+        ],
+        "warnings": ["请教师复核"],
+    }
+
+
+def _plan_patch(context: AgentContext):
+    patch = import_module("app.service.agent.patch")
+    proposal = patch.DraftPatchProposal(
+        operation_id=context.operation_id,
+        turn_id=context.turn_id,
+        tool_name="daily_plan.draft_section_patch",
+        target=patch.PlanPatchTarget(daily_plan_id=7, plan_date=PLAN_DATE),
+        base_fingerprint=context.base_fingerprint,
+        operations=(
+            patch.DraftPatchOperation(
+                field_path="activity_goal",
+                before_value="认识秋天",
+                after_value="探索秋天",
+            ),
+        ),
+        warnings=("请教师复核",),
+    )
+    return patch.build_plan_patch(context=context, proposal=proposal)
+
+
+@dataclass
+class ScriptedProvider:
+    responses: list[object]
+    requests: list[object] = field(default_factory=list)
+
+    async def complete(self, request: object) -> object:
+        self.requests.append(request)
+        response = self.responses.pop(0)
+        if isinstance(response, BaseException):
+            raise response
+        return response
+
+
+@dataclass
+class StaticContextState:
+    stamp: object
+
+    def current_stamp(self) -> object:
+        return self.stamp
+
+
+def _read_value(call: object, context: AgentContext) -> object:
+    projection = next(
+        fact for fact in context.facts if isinstance(fact, DailyPlanProjection)
+    )
+    if call.tool_name == "daily_plan.read_current":
+        return projection
+    if call.tool_name == "daily_plan.read_context":
+        return DailyPlanContextProjection(
+            plan_id=projection.plan_id,
+            plan_date=projection.plan_date,
+            week_number=projection.week_number,
+            weekday_cn=projection.weekday_cn,
+            grade=projection.grade,
+            class_name=projection.class_name,
+            semester_name="2026 秋季",
+            section_states=tuple(
+                SectionState(
+                    field_path=section.field_path,
+                    has_content=bool(section.content),
+                )
+                for section in projection.sections
+            ),
+        )
+    if call.tool_name == "calendar.read_evaluation":
+        return CalendarEvaluationProjection(
+            target_date=projection.plan_date,
+            within_semester=True,
+            day_type=CalendarDayType.WORKDAY,
+            holiday_name=None,
+            degradation_code=None,
+        )
+    return ClassAreasProjection(
+        grade=projection.grade,
+        class_name=projection.class_name,
+        indoor_areas="建构区",
+        outdoor_content="平衡木",
+    )
+
+
+@dataclass
+class ScriptedExecutor:
+    draft_patch: object | None = None
+    read_value: object | None = None
+    calls: list[object] = field(default_factory=list)
+    active: int = 0
+    max_active: int = 0
+    corrupt_binding: bool = False
+
+    async def execute(self, call: object, context: AgentContext) -> object:
+        runtime = _runtime_module()
+        self.active += 1
+        self.max_active = max(self.max_active, self.active)
+        self.calls.append(call)
+        await asyncio.sleep(0)
+        self.active -= 1
+        value = self.draft_patch
+        if call.permission is Permission.READ:
+            value = (
+                self.read_value
+                if self.read_value is not None
+                else _read_value(call, context)
+            )
+        return runtime.ToolExecutionResult(
+            call_id=UUID(int=999) if self.corrupt_binding else call.call_id,
+            operation_id=context.operation_id,
+            turn_id=context.turn_id,
+            tool_name=call.tool_name,
+            permission=call.permission,
+            status=runtime.ToolExecutionStatus.OK,
+            value=value,
+            error_code=None,
+        )
+
+
+def _agent_runtime(
+    runtime: Any,
+    provider: object,
+    executor: object | None = None,
+    *,
+    limits: object | None = None,
+):
+    registry = import_module("app.service.agent.registry").build_foundation_registry()
+    context = _context()
+    return runtime.AgentRuntime(
+        provider=provider,
+        executor=executor or ScriptedExecutor(),
+        registry=registry,
+        context_state=StaticContextState(
+            runtime.AgentContextStamp.from_context(context)
+        ),
+        clock=lambda: context.created_at_utc,
+        limits=limits or runtime.RuntimeLimits(),
+    )
+
+
+def test_provider_contracts_are_frozen_application_owned_and_closed():
+    runtime = _runtime_module()
+    registry = import_module("app.service.agent.registry").build_foundation_registry()
+    context = _context()
+    message = runtime.ProviderMessage(
+        role=runtime.ProviderRole.USER, content="查看计划"
+    )
+    request = runtime.ProviderTurnRequest(
+        operation_id=context.operation_id,
+        local_policy_version="agent-foundation-v1",
+        context=context,
+        messages=(message,),
+        tools=registry.descriptors(),
+        response_limit=4096,
+    )
+
+    assert {item.name for item in fields(request)} == {
+        "operation_id",
+        "local_policy_version",
+        "context",
+        "messages",
+        "tools",
+        "response_limit",
+    }
+    assert isinstance(ScriptedProvider([]), runtime.AgentProviderPort)
+    assert all(
+        tool.input_schema.additional_properties is False for tool in request.tools
+    )
+    assert tuple(tool.output_schema.kind.value for tool in request.tools) == (
+        "daily_plan_projection",
+        "daily_plan_context_projection",
+        "calendar_evaluation_projection",
+        "class_areas_projection",
+        "plan_patch",
+        "plan_patch",
+    )
+    draft_schema = request.tools[4].input_schema
+    assert draft_schema.required_fields == frozenset(
+        {"operation_id", "turn_id", "target", "base_fingerprint", "operations"}
+    )
+    assert draft_schema.optional_fields == frozenset({"warnings"})
+    assert "查看计划" not in repr(message)
+    with pytest.raises(FrozenInstanceError):
+        request.response_limit = 1
+
+
+def test_provider_and_runtime_modules_do_not_leak_sdk_ui_or_persistence_types():
+    runtime = _runtime_module()
+    tree = ast.parse(inspect.getsource(runtime))
+    imported_modules = {
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    } | {
+        node.module
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+    }
+
+    assert not any(
+        module == "httpx"
+        or module.startswith("openai")
+        or module == "nicegui"
+        or module.startswith("app.ui")
+        or module.startswith("app.core.database")
+        or module.startswith("app.repository")
+        for module in imported_modules
+    )
+
+
+@pytest.mark.asyncio
+async def test_runtime_returns_bounded_plain_text_without_calling_tools():
+    runtime = _runtime_module()
+    provider = ScriptedProvider([_provider_result(runtime, content="当前计划已读取。")])
+    executor = ScriptedExecutor()
+    agent = _agent_runtime(runtime, provider, executor)
+
+    outcome = await agent.run_turn(context=_context(), intent="请概括当前计划")
+
+    assert outcome.status is runtime.AgentTurnStatus.SUCCEEDED
+    assert outcome.assistant_content == "当前计划已读取。"
+    assert outcome.patches == ()
+    assert outcome.error_code is None
+    assert executor.calls == []
+    request = provider.requests[0]
+    assert request.context is _context() or request.context == _context()
+    assert request.operation_id == OPERATION_ID
+    assert request.local_policy_version == "agent-foundation-v1"
+    assert tuple(message.role for message in request.messages) == (
+        runtime.ProviderRole.USER,
+    )
+    assert tuple(tool.name for tool in request.tools) == (
+        "daily_plan.read_current",
+        "daily_plan.read_context",
+        "calendar.read_evaluation",
+        "settings.read_class_areas",
+        "daily_plan.draft_section_patch",
+        "daily_plan.draft_reflection_patch",
+    )
+
+
+@pytest.mark.asyncio
+async def test_runtime_executes_provider_tool_calls_serially_in_stable_order():
+    runtime = _runtime_module()
+    calls = (
+        _tool_call(runtime, call_id=1),
+        _tool_call(runtime, call_id=2, tool_name="daily_plan.read_current"),
+    )
+    provider = ScriptedProvider(
+        [
+            _provider_result(runtime, tool_calls=calls, finish_reason="tool_calls"),
+            _provider_result(runtime, content="读取完成。"),
+        ]
+    )
+    executor = ScriptedExecutor()
+    agent = _agent_runtime(runtime, provider, executor)
+
+    outcome = await agent.run_turn(context=_context(), intent="读取上下文")
+
+    assert outcome.status is runtime.AgentTurnStatus.SUCCEEDED
+    assert tuple(call.call_id for call in executor.calls) == (UUID(int=1), UUID(int=2))
+    assert executor.max_active == 1
+    assert tuple(message.role for message in provider.requests[1].messages) == (
+        runtime.ProviderRole.USER,
+        runtime.ProviderRole.ASSISTANT,
+        runtime.ProviderRole.TOOL,
+    )
+
+
+@pytest.mark.asyncio
+async def test_runtime_returns_only_a_f005_bound_plan_patch_from_draft_result():
+    runtime = _runtime_module()
+    context = _context()
+    call = _tool_call(
+        runtime,
+        call_id=3,
+        tool_name="daily_plan.draft_section_patch",
+        permission=Permission.DRAFT,
+        arguments=_draft_arguments(),
+    )
+    provider = ScriptedProvider(
+        [
+            _provider_result(runtime, tool_calls=(call,), finish_reason="tool_calls"),
+            _provider_result(runtime, content="草案已生成。"),
+        ]
+    )
+    patch = _plan_patch(context)
+    agent = _agent_runtime(runtime, provider, ScriptedExecutor(draft_patch=patch))
+
+    outcome = await agent.run_turn(context=context, intent="调整活动目标")
+
+    assert outcome.status is runtime.AgentTurnStatus.DRAFT_READY
+    assert outcome.patches == (patch,)
+    assert outcome.patches[0].operation_id == context.operation_id
+    assert outcome.patches[0].turn_id == context.turn_id
+    assert outcome.patches[0].base_fingerprint == context.base_fingerprint
+
+
+@dataclass
+class BlockingProvider:
+    entered: asyncio.Event
+    release: asyncio.Event
+
+    async def complete(self, _request: object) -> object:
+        runtime = _runtime_module()
+        self.entered.set()
+        await self.release.wait()
+        return _provider_result(runtime, content="完成")
+
+
+@pytest.mark.asyncio
+async def test_runtime_rejects_a_second_concurrent_operation_as_busy():
+    runtime = _runtime_module()
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    agent = _agent_runtime(runtime, BlockingProvider(entered, release))
+
+    first = asyncio.create_task(agent.run_turn(context=_context(), intent="第一个请求"))
+    await entered.wait()
+    second = await agent.run_turn(context=_context(), intent="第二个请求")
+    release.set()
+    first_outcome = await first
+
+    assert second.status is runtime.AgentTurnStatus.FAILED
+    assert second.error_code == "agent.busy"
+    assert first_outcome.status is runtime.AgentTurnStatus.SUCCEEDED
+
+
+@pytest.mark.parametrize(
+    ("call_change", "expected_code"),
+    (
+        ({"tool_name": "daily_plan.delete"}, "agent.tool_not_allowed"),
+        ({"permission": Permission.WRITE}, "agent.tool_not_allowed"),
+        ({"permission": Permission.DRAFT}, "agent.tool_not_allowed"),
+        ({"arguments": {"unexpected": True}}, "agent.tool_schema_invalid"),
+        (
+            {"operation_id": UUID("11111111-1111-4111-8111-111111111111")},
+            "agent.tool_schema_invalid",
+        ),
+        (
+            {"turn_id": UUID("22222222-2222-4222-8222-222222222222")},
+            "agent.tool_schema_invalid",
+        ),
+    ),
+)
+@pytest.mark.asyncio
+async def test_runtime_rejects_untrusted_tool_call_expansion(
+    call_change: dict[str, object],
+    expected_code: str,
+):
+    runtime = _runtime_module()
+    call = replace(_tool_call(runtime, call_id=4), **call_change)
+    provider = ScriptedProvider(
+        [_provider_result(runtime, tool_calls=(call,), finish_reason="tool_calls")]
+    )
+    agent = _agent_runtime(runtime, provider)
+
+    outcome = await agent.run_turn(context=_context(), intent="尝试扩大工具")
+
+    assert outcome.status is runtime.AgentTurnStatus.FAILED
+    assert outcome.error_code == expected_code
+
+
+@pytest.mark.asyncio
+async def test_runtime_enforces_tool_call_and_message_window_limits():
+    runtime = _runtime_module()
+    two_calls = (
+        _tool_call(runtime, call_id=5),
+        _tool_call(runtime, call_id=6),
+    )
+    tool_limited = _agent_runtime(
+        runtime,
+        ScriptedProvider(
+            [
+                _provider_result(
+                    runtime, tool_calls=two_calls, finish_reason="tool_calls"
+                )
+            ]
+        ),
+        limits=runtime.RuntimeLimits(max_tool_calls=1),
+    )
+    message_limited = _agent_runtime(
+        runtime,
+        ScriptedProvider(
+            [
+                _provider_result(
+                    runtime,
+                    tool_calls=(_tool_call(runtime, call_id=7),),
+                    finish_reason="tool_calls",
+                )
+            ]
+        ),
+        limits=runtime.RuntimeLimits(max_messages=2),
+    )
+
+    tool_outcome = await tool_limited.run_turn(context=_context(), intent="多次调用")
+    message_outcome = await message_limited.run_turn(
+        context=_context(), intent="扩大消息窗口"
+    )
+
+    assert tool_outcome.error_code == "agent.limit_exceeded"
+    assert message_outcome.error_code == "agent.limit_exceeded"
+
+
+@pytest.mark.asyncio
+async def test_runtime_rejects_oversized_or_structurally_invalid_provider_results():
+    runtime = _runtime_module()
+    oversized = _agent_runtime(
+        runtime,
+        ScriptedProvider([_provider_result(runtime, content="字" * 11)]),
+        limits=runtime.RuntimeLimits(max_response_chars=10),
+    )
+    invalid = _agent_runtime(runtime, ScriptedProvider([{"content": "伪造"}]))
+
+    oversized_outcome = await oversized.run_turn(context=_context(), intent="检查长度")
+    invalid_outcome = await invalid.run_turn(context=_context(), intent="检查结构")
+
+    assert oversized_outcome.error_code == "agent.response_too_large"
+    assert invalid_outcome.error_code == "agent.provider_failed"
+
+
+@pytest.mark.asyncio
+async def test_runtime_sanitizes_provider_failure_and_rejects_misbound_tool_result():
+    runtime = _runtime_module()
+    provider_failure = _agent_runtime(
+        runtime,
+        ScriptedProvider([RuntimeError("secret-provider-payload")]),
+    )
+    call = _tool_call(runtime, call_id=8)
+    result_failure = _agent_runtime(
+        runtime,
+        ScriptedProvider(
+            [_provider_result(runtime, tool_calls=(call,), finish_reason="tool_calls")]
+        ),
+        ScriptedExecutor(corrupt_binding=True),
+    )
+
+    provider_outcome = await provider_failure.run_turn(
+        context=_context(), intent="触发失败"
+    )
+    result_outcome = await result_failure.run_turn(
+        context=_context(), intent="触发绑定失败"
+    )
+
+    assert provider_outcome.error_code == "agent.provider_failed"
+    assert "secret-provider-payload" not in repr(provider_outcome)
+    assert result_outcome.error_code == "agent.tool_schema_invalid"
+
+
+@pytest.mark.parametrize(
+    "arguments_change",
+    (
+        {"operations": "not-an-operation-list"},
+        {
+            "operations": [
+                {
+                    "field_path": "activity_goal",
+                    "before_value": "认识秋天",
+                    "after_value": "探索秋天",
+                    "extra": "not-closed",
+                }
+            ]
+        },
+        {
+            "operations": [
+                {
+                    "field_path": "/activity_goal",
+                    "before_value": "认识秋天",
+                    "after_value": "探索秋天",
+                }
+            ]
+        },
+        {
+            "operations": [
+                {
+                    "field_path": "activity_goal",
+                    "before_value": "认识秋天",
+                    "after_value": "后" * 4097,
+                }
+            ]
+        },
+    ),
+)
+@pytest.mark.asyncio
+async def test_runtime_rejects_nested_draft_schema_before_execution(
+    arguments_change: dict[str, object],
+):
+    runtime = _runtime_module()
+    context = _context()
+    arguments = _draft_arguments()
+    arguments.update(arguments_change)
+    call = _tool_call(
+        runtime,
+        call_id=20,
+        tool_name="daily_plan.draft_section_patch",
+        permission=Permission.DRAFT,
+        arguments=arguments,
+    )
+    provider = ScriptedProvider(
+        [
+            _provider_result(runtime, tool_calls=(call,), finish_reason="tool_calls"),
+            _provider_result(runtime, content="不应到达"),
+        ]
+    )
+    executor = ScriptedExecutor(draft_patch=_plan_patch(context))
+    agent = _agent_runtime(runtime, provider, executor)
+
+    outcome = await agent.run_turn(context=context, intent="尝试扩大嵌套参数")
+
+    assert outcome.error_code == "agent.tool_schema_invalid"
+    assert executor.calls == []
+    assert len(provider.requests) == 1
+
+
+@pytest.mark.parametrize("tamper", ("target", "canonical_sha256"))
+@pytest.mark.asyncio
+async def test_runtime_revalidates_complete_plan_patch_integrity(tamper: str):
+    runtime = _runtime_module()
+    patch_module = import_module("app.service.agent.patch")
+    context = _context()
+    valid = _plan_patch(context)
+    changed = (
+        {
+            "target": patch_module.PlanPatchTarget(
+                daily_plan_id=8,
+                plan_date=PLAN_DATE,
+            )
+        }
+        if tamper == "target"
+        else {"canonical_sha256": "0" * 64}
+    )
+    call = _tool_call(
+        runtime,
+        call_id=21,
+        tool_name="daily_plan.draft_section_patch",
+        permission=Permission.DRAFT,
+        arguments=_draft_arguments(),
+    )
+    provider = ScriptedProvider(
+        [
+            _provider_result(runtime, tool_calls=(call,), finish_reason="tool_calls"),
+            _provider_result(runtime, content="不应到达"),
+        ]
+    )
+    agent = _agent_runtime(
+        runtime,
+        provider,
+        ScriptedExecutor(draft_patch=replace(valid, **changed)),
+    )
+
+    outcome = await agent.run_turn(context=context, intent="检查草案完整性")
+
+    assert outcome.error_code == "agent.tool_schema_invalid"
+    assert len(provider.requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_runtime_rejects_unregistered_read_output_before_provider_reentry():
+    runtime = _runtime_module()
+    call = _tool_call(runtime, call_id=22)
+    provider = ScriptedProvider(
+        [
+            _provider_result(runtime, tool_calls=(call,), finish_reason="tool_calls"),
+            _provider_result(runtime, content="不应到达"),
+        ]
+    )
+    executor = ScriptedExecutor(read_value={"session": object()})
+    agent = _agent_runtime(runtime, provider, executor)
+
+    outcome = await agent.run_turn(context=_context(), intent="检查输出关闭边界")
+
+    assert outcome.error_code == "agent.tool_schema_invalid"
+    assert len(provider.requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_runtime_bounds_registered_tool_output_size():
+    runtime = _runtime_module()
+    call = _tool_call(runtime, call_id=23)
+    oversized = ClassAreasProjection(
+        grade="大班",
+        class_name="星星班",
+        indoor_areas="敏" * 500,
+        outdoor_content="平衡木",
+    )
+    provider = ScriptedProvider(
+        [_provider_result(runtime, tool_calls=(call,), finish_reason="tool_calls")]
+    )
+    agent = _agent_runtime(
+        runtime,
+        provider,
+        ScriptedExecutor(read_value=oversized),
+        limits=runtime.RuntimeLimits(max_tool_result_chars=100),
+    )
+
+    outcome = await agent.run_turn(context=_context(), intent="检查工具输出长度")
+
+    assert outcome.error_code == "agent.limit_exceeded"
+
+
+def test_tool_result_payload_is_deeply_frozen_and_request_id_is_bounded():
+    runtime = _runtime_module()
+    source = {"items": []}
+    result = runtime.ToolExecutionResult(
+        call_id=UUID(int=24),
+        operation_id=OPERATION_ID,
+        turn_id=TURN_ID,
+        tool_name="settings.read_class_areas",
+        permission=Permission.READ,
+        status=runtime.ToolExecutionStatus.OK,
+        value=source,
+        error_code=None,
+    )
+
+    source["items"].append("mutated-after-construction")
+
+    assert result.value["items"] == ()
+    with pytest.raises(TypeError):
+        result.value["new"] = True
+    with pytest.raises(ValueError, match="provider_request_id_too_large"):
+        _provider_result(runtime, provider_request_id="r" * 129)
+
+
+@pytest.mark.asyncio
+async def test_runtime_normalizes_refusal_and_executor_failure_codes():
+    runtime = _runtime_module()
+    refused = _agent_runtime(
+        runtime,
+        ScriptedProvider(
+            [
+                _provider_result(
+                    runtime, content="provider detail", finish_reason="refused"
+                )
+            ]
+        ),
+    )
+
+    @dataclass
+    class FailingExecutor:
+        async def execute(self, _call: object, _context: AgentContext) -> object:
+            raise RuntimeError("executor-secret")
+
+    call = _tool_call(runtime, call_id=25)
+    failed = _agent_runtime(
+        runtime,
+        ScriptedProvider(
+            [_provider_result(runtime, tool_calls=(call,), finish_reason="tool_calls")]
+        ),
+        FailingExecutor(),
+    )
+
+    refused_outcome = await refused.run_turn(context=_context(), intent="拒绝路径")
+    failed_outcome = await failed.run_turn(context=_context(), intent="执行失败路径")
+
+    assert refused_outcome.error_code == "agent.provider_failed"
+    assert "provider detail" not in repr(refused_outcome)
+    assert failed_outcome.error_code == "agent.tool_failed"
+    assert "executor-secret" not in repr(failed_outcome)
+
+
+@pytest.mark.asyncio
+async def test_runtime_provider_rejections_log_only_safe_stages():
+    runtime = _runtime_module()
+    runtime_logger = logging.getLogger(runtime.__name__)
+    captured_records: list[logging.LogRecord] = []
+
+    class CaptureHandler(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            captured_records.append(record)
+
+    capture_handler = CaptureHandler()
+    runtime_logger.addHandler(capture_handler)
+    assert runtime.logger is runtime_logger
+    assert not runtime_logger.disabled
+    assert runtime_logger.isEnabledFor(logging.WARNING)
+    private_detail = "provider-private runtime detail"
+    call = _tool_call(runtime, call_id=26)
+    cases = (
+        (
+            ScriptedProvider([RuntimeError(private_detail)]),
+            "provider_port_failure",
+            None,
+        ),
+        (ScriptedProvider([object()]), "result_type", None),
+        (
+            ScriptedProvider(
+                [_provider_result(runtime, content="截断正文", finish_reason="length")]
+            ),
+            "text_finish_reason",
+            "length",
+        ),
+        (
+            ScriptedProvider(
+                [
+                    _provider_result(
+                        runtime,
+                        tool_calls=(call,),
+                        finish_reason="completed",
+                    )
+                ]
+            ),
+            "tool_finish_reason",
+            "completed",
+        ),
+    )
+
+    try:
+        for provider, _expected_stage, _expected_reason in cases:
+            outcome = await _agent_runtime(runtime, provider).run_turn(
+                context=_context(),
+                intent="固定合成意图",
+            )
+            assert outcome.error_code == "agent.provider_failed"
+    finally:
+        runtime_logger.removeHandler(capture_handler)
+
+    records = [
+        record
+        for record in captured_records
+        if record.getMessage() == "Agent Runtime 拒绝 Provider 结果"
+    ]
+    assert [
+        (record.agent_provider_stage, record.finish_reason) for record in records
+    ] == [(stage, reason) for _provider, stage, reason in cases]
+    assert private_detail not in repr(records)
+
+
+@pytest.mark.parametrize(
+    ("tool_name", "mutable_field"),
+    (
+        ("daily_plan.read_current", "sections"),
+        ("daily_plan.read_context", "section_states"),
+        ("calendar.read_evaluation", "holiday_name"),
+        ("settings.read_class_areas", "indoor_areas"),
+    ),
+)
+@pytest.mark.asyncio
+async def test_runtime_rejects_mutable_or_mistyped_registered_read_dto_fields(
+    tool_name: str,
+    mutable_field: str,
+):
+    runtime = _runtime_module()
+    context = _context()
+    call = _tool_call(runtime, call_id=26, tool_name=tool_name)
+    valid = _read_value(call, context)
+    malformed = replace(valid, **{mutable_field: []})
+    provider = ScriptedProvider(
+        [
+            _provider_result(runtime, tool_calls=(call,), finish_reason="tool_calls"),
+            _provider_result(runtime, content="不应到达"),
+        ]
+    )
+    agent = _agent_runtime(
+        runtime,
+        provider,
+        ScriptedExecutor(read_value=malformed),
+    )
+
+    outcome = await agent.run_turn(context=context, intent="检查 READ DTO 深冻结")
+
+    assert outcome.error_code == "agent.tool_schema_invalid"
+    assert len(provider.requests) == 1
+
+
+class MutableText(str):
+    def __new__(cls, value: str):
+        instance = super().__new__(cls, value)
+        instance.mutable_state = []
+        return instance
+
+
+class MutableTuple(tuple):
+    def __new__(cls, values: tuple[object, ...]):
+        instance = super().__new__(cls, values)
+        instance.mutable_state = []
+        return instance
+
+
+@pytest.mark.parametrize("escape_kind", ("text_subclass", "tuple_subclass"))
+@pytest.mark.asyncio
+async def test_runtime_rejects_stateful_builtin_subclasses_in_read_dtos(
+    escape_kind: str,
+):
+    runtime = _runtime_module()
+    context = _context()
+    if escape_kind == "text_subclass":
+        call = _tool_call(runtime, call_id=27)
+        valid = _read_value(call, context)
+        malformed = replace(valid, indoor_areas=MutableText("建构区"))
+    else:
+        call = _tool_call(runtime, call_id=28, tool_name="daily_plan.read_current")
+        valid = _read_value(call, context)
+        malformed = replace(valid, sections=MutableTuple(valid.sections))
+    provider = ScriptedProvider(
+        [
+            _provider_result(runtime, tool_calls=(call,), finish_reason="tool_calls"),
+            _provider_result(runtime, content="不应到达"),
+        ]
+    )
+    agent = _agent_runtime(
+        runtime,
+        provider,
+        ScriptedExecutor(read_value=malformed),
+    )
+
+    outcome = await agent.run_turn(context=context, intent="检查内建类型子类逃逸")
+
+    assert outcome.error_code == "agent.tool_schema_invalid"
+    assert len(provider.requests) == 1
+
+
+def test_provider_contracts_reject_stateful_text_subclasses():
+    runtime = _runtime_module()
+
+    with pytest.raises(ValueError, match="provider_message_invalid"):
+        runtime.ProviderMessage(
+            role=runtime.ProviderRole.USER,
+            content=MutableText("不可保留可变子类"),
+        )
+    with pytest.raises(ValueError, match="provider_result_invalid"):
+        runtime.ProviderTurnResult(
+            assistant_content="完成",
+            finish_reason=runtime.ProviderFinishReason.COMPLETED,
+            provider_request_id=MutableText("mutable-request-id"),
+        )
+
+
+@pytest.mark.parametrize(
+    ("tool_name", "field_name", "out_of_bounds"),
+    (
+        ("daily_plan.read_current", "plan_id", 2**63),
+        ("daily_plan.read_current", "week_number", 54),
+        ("daily_plan.read_current", "grade", "年" * 257),
+        ("daily_plan.read_context", "semester_name", "学" * 257),
+        ("calendar.read_evaluation", "holiday_name", "节" * 257),
+        ("settings.read_class_areas", "class_name", "班" * 257),
+    ),
+)
+@pytest.mark.asyncio
+async def test_runtime_rejects_read_dto_field_bound_expansion(
+    tool_name: str,
+    field_name: str,
+    out_of_bounds: object,
+):
+    runtime = _runtime_module()
+    context = _context()
+    call = _tool_call(runtime, call_id=29, tool_name=tool_name)
+    malformed = replace(
+        _read_value(call, context),
+        **{field_name: out_of_bounds},
+    )
+    provider = ScriptedProvider(
+        [
+            _provider_result(runtime, tool_calls=(call,), finish_reason="tool_calls"),
+            _provider_result(runtime, content="不应到达"),
+        ]
+    )
+    agent = _agent_runtime(
+        runtime,
+        provider,
+        ScriptedExecutor(read_value=malformed),
+    )
+
+    outcome = await agent.run_turn(context=context, intent="检查 READ DTO 字段上限")
+
+    assert outcome.error_code == "agent.tool_schema_invalid"
+    assert len(provider.requests) == 1
+
+
+@dataclass
+class MutableExecutorPayload:
+    items: list[str]
+
+
+def test_tool_result_does_not_retain_arbitrary_mutable_dataclasses():
+    runtime = _runtime_module()
+    source = MutableExecutorPayload(items=[])
+    result = runtime.ToolExecutionResult(
+        call_id=UUID(int=30),
+        operation_id=OPERATION_ID,
+        turn_id=TURN_ID,
+        tool_name="settings.read_class_areas",
+        permission=Permission.READ,
+        status=runtime.ToolExecutionStatus.OK,
+        value=source,
+        error_code=None,
+    )
+    before = repr(result.value)
+
+    source.items.append("mutated-after-construction")
+
+    assert result.value is not source
+    assert repr(result.value) == before
+
+
+@pytest.mark.parametrize(
+    "context_change",
+    (
+        {
+            "actor": TrustedActor(
+                tenant_id=2**63,
+                user_id=True,
+            )
+        },
+        {"active_scope": DailyPlanScope(daily_plan_id=2**63)},
+        {"locale": MutableText("zh-CN")},
+        {"facts": MutableTuple(_context().facts)},
+    ),
+)
+@pytest.mark.asyncio
+async def test_runtime_revalidates_complete_context_before_provider(
+    context_change: dict[str, object],
+):
+    runtime = _runtime_module()
+    provider = ScriptedProvider([_provider_result(runtime, content="不应到达")])
+    agent = _agent_runtime(runtime, provider)
+
+    outcome = await agent.run_turn(
+        context=replace(_context(), **context_change),
+        intent="检查完整 Context",
+    )
+
+    assert outcome.error_code == "agent.tool_schema_invalid"
+    assert provider.requests == []
+
+
+@pytest.mark.asyncio
+async def test_runtime_rejects_tool_result_error_metadata_expansion():
+    runtime = _runtime_module()
+    call = _tool_call(runtime, call_id=31)
+
+    @dataclass
+    class ErrorMetadataExecutor:
+        async def execute(self, received: object, context: AgentContext) -> object:
+            return runtime.ToolExecutionResult(
+                call_id=received.call_id,
+                operation_id=context.operation_id,
+                turn_id=context.turn_id,
+                tool_name=received.tool_name,
+                permission=received.permission,
+                status=runtime.ToolExecutionStatus.OK,
+                value=_read_value(received, context),
+                error_code="error-detail" * 10_000,
+            )
+
+    provider = ScriptedProvider(
+        [
+            _provider_result(runtime, tool_calls=(call,), finish_reason="tool_calls"),
+            _provider_result(runtime, content="不应到达"),
+        ]
+    )
+    agent = _agent_runtime(runtime, provider, ErrorMetadataExecutor())
+
+    outcome = await agent.run_turn(
+        context=_context(), intent="检查 ToolResult metadata"
+    )
+
+    assert outcome.error_code == "agent.tool_schema_invalid"
+    assert len(provider.requests) == 1

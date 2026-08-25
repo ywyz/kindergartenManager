@@ -6,7 +6,8 @@
 页面路由：
     /       — 重定向到 /home
     /home   — 主页
-    /setup  — AI 配置
+    /setup  — 兼容入口，重定向到 /settings
+    /settings — 统一配置中心
 """
 import multiprocessing
 import sys
@@ -15,8 +16,8 @@ from nicegui import app, ui
 
 # 导入页面模块以注册 @ui.page 路由（必须在 ui.run 前执行）
 from app.ui.pages import home  # noqa: F401
-from app.ui.pages import login  # noqa: F401
-from app.ui.pages import settings  # noqa: F401
+from app.ui.pages import root  # noqa: F401
+from app.ui.pages import settings as settings_page  # noqa: F401
 from app.ui.pages import daily_plan  # noqa: F401
 from app.ui.pages import prompt_mgmt  # noqa: F401
 from app.ui.pages import game_observation  # noqa: F401
@@ -26,7 +27,6 @@ from app.ui.pages import course_review_activity  # noqa: F401
 from app.ui.pages import setup  # noqa: F401
 
 from app.api import create_api_router
-from app.auth.middleware import AuthMiddleware
 from app.core.bootstrap import run_bootstrap
 from app.core.config import settings
 from app.core.logging import get_logger
@@ -49,7 +49,7 @@ def _on_global_exception(exc: Exception) -> None:
 
 
 def main() -> None:
-    # 启动前同步执行数据库迁移（失败记录日志但不阻断启动）
+    # 启动前同步执行数据库迁移；失败时 fail-closed，中止进程。
     run_startup_migrations()
 
     # 启动后引导默认用户（单用户模式）
@@ -57,9 +57,8 @@ def main() -> None:
 
     # 全局异常日志
     app.on_exception(_on_global_exception)
-    # 路由守卫：单用户模式仅做根路径重定向
-    app.add_middleware(AuthMiddleware)
-    # 对外只读 REST API（二期）：/api/v1，API Key + 可选 HMAC 签名鉴权
+    # AuthMiddleware 是未来低优先级多用户能力的保留实现，当前单用户产品不挂载。
+    # 对外只读 REST API：/api/v1，供未来外部系统集成（API Key + 可选 HMAC）。
     app.include_router(create_api_router())
 
     # 打包版（PyInstaller frozen）自动打开浏览器；开发/服务器模式不弹窗

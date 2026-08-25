@@ -34,7 +34,7 @@ async def save_observation(
     evaluation_analysis: str | None = None,
     support_strategy: str | None = None,
 ) -> GameObservation:
-    """新建观察记录并持久化，返回带 id 的对象。"""
+    """新建观察记录并 flush，提交由最外层 use-case 负责。"""
     obs = GameObservation(
         tenant_id=tenant_id,
         user_id=user_id,
@@ -55,20 +55,21 @@ async def save_observation(
         support_strategy=support_strategy,
     )
     session.add(obs)
-    await session.commit()
-    await session.refresh(obs)
+    await session.flush()
     return obs
 
 
 async def get_observation_by_id(
     session: AsyncSession,
     tenant_id: int,
+    user_id: int,
     observation_id: int,
 ) -> GameObservation | None:
-    """按 id 查询观察记录，强制 tenant_id 过滤。"""
+    """UI 单条观察投影，强制 tenant_id + user_id 过滤。"""
     result = await session.execute(
         select(GameObservation).where(
             GameObservation.tenant_id == tenant_id,
+            GameObservation.user_id == user_id,
             GameObservation.id == observation_id,
         )
     )
@@ -126,7 +127,7 @@ async def update_observation(
         )
         .values(**fields)
     )
-    await session.commit()
+    await session.flush()
     return bool(result.rowcount)
 
 
@@ -144,5 +145,5 @@ async def delete_observation(
             GameObservation.id == observation_id,
         )
     )
-    await session.commit()
+    await session.flush()
     return bool(result.rowcount)

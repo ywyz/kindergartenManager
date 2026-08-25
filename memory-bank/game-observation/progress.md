@@ -1,6 +1,8 @@
 # 游戏观察子系统 — 开发与测试进度
 
-> 配套：[design.md](design.md)、[dev-plan.md](dev-plan.md)、[test-plan.md](test-plan.md)
+> **历史快照**：本文记录对应 SHA/阶段的进度证据，包括当时的登录流程；不代表当前检出代码或当前测试状态。当前事实以 [`../../CONTEXT.md`](../../CONTEXT.md)、[`../../docs/ROADMAP.md`](../../docs/ROADMAP.md) 和当前代码/测试为准。
+
+> 配套：[design.md](design.md)。当前仓库没有单独保留该模块的 dev-plan/test-plan 文件。
 
 ---
 

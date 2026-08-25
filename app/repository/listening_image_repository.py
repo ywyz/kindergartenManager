@@ -24,7 +24,7 @@ async def add_image(
     height: int | None = None,
     image_description: str | None = None,
 ) -> ListeningImage:
-    """新增一张倾听绘画图片记录，返回带 id 的对象。"""
+    """新增一张倾听图片并 flush，提交由最外层 use-case 负责。"""
     img = ListeningImage(
         tenant_id=tenant_id,
         user_id=user_id,
@@ -41,20 +41,21 @@ async def add_image(
         image_description=image_description,
     )
     session.add(img)
-    await session.commit()
-    await session.refresh(img)
+    await session.flush()
     return img
 
 
 async def list_images_by_record(
     session: AsyncSession,
     tenant_id: int,
+    user_id: int,
     record_id: int,
     domain: str | None = None,
 ) -> list[ListeningImage]:
     """查询某记录下的图片（可选按领域过滤），按领域 + image_index 升序。"""
     filters = [
         ListeningImage.tenant_id == tenant_id,
+        ListeningImage.user_id == user_id,
         ListeningImage.record_id == record_id,
     ]
     if domain is not None:
@@ -70,12 +71,14 @@ async def list_images_by_record(
 async def get_image(
     session: AsyncSession,
     tenant_id: int,
+    user_id: int,
     image_id: int,
 ) -> ListeningImage | None:
     """按 id 查询单张图片，强制 tenant_id 过滤。"""
     result = await session.execute(
         select(ListeningImage).where(
             ListeningImage.tenant_id == tenant_id,
+            ListeningImage.user_id == user_id,
             ListeningImage.id == image_id,
         )
     )
@@ -85,13 +88,15 @@ async def get_image(
 async def delete_images_by_record(
     session: AsyncSession,
     tenant_id: int,
+    user_id: int,
     record_id: int,
 ) -> None:
     """删除某记录下的所有图片（tenant 隔离）。"""
     await session.execute(
         delete(ListeningImage).where(
             ListeningImage.tenant_id == tenant_id,
+            ListeningImage.user_id == user_id,
             ListeningImage.record_id == record_id,
         )
     )
-    await session.commit()
+    await session.flush()

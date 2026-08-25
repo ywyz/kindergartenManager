@@ -11,9 +11,7 @@
   8. 模板缺失时降级从零构表，不报错，返回可打开的 bytes
 """
 import io
-from pathlib import Path
 
-import pytest
 from docx import Document
 from docx.oxml.ns import qn
 
@@ -138,19 +136,7 @@ def test_one_image_in_r5():
     result = export_observation(_make_obs(), [_TINY_JPEG])
     doc = _parse(result)
     row5_cell = doc.tables[0].rows[5].cells[1]
-    # 统计所有 <a:blip> 图片引用（实际插入图片后会有此元素）
-    blips = row5_cell._element.findall(
-        ".//{http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing}blip"
-    ) or row5_cell._element.findall(
-        ".//{http://schemas.openxmlformats.org/drawingml/2006/main}blip"
-    )
-    # 用 drawing 元素数量作为图片数量（每个图片对应一个 drawing）
-    drawings = row5_cell._element.findall(
-        ".//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}drawing"
-    ) or row5_cell._element.findall(
-        ".//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}pict"
-    )
-    # 兼容：用 inline/anchor 元素判断
+    # 用 inline/anchor 元素判断图片数量。
     ns_wp = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
     inline_elems = row5_cell._element.findall(f".//{{{ns_wp}}}inline")
     anchor_elems = row5_cell._element.findall(f".//{{{ns_wp}}}anchor")

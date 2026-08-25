@@ -1,23 +1,22 @@
-# 幼儿园教学管理系统
+# KindergartenManager 幼儿园教学管理系统
 
-> 「幼儿园信息管理系统」的子系统 —— 首期聚焦**教学管理 · 每日活动计划**的撰写、AI 辅助生成、Word 导出与云端存档。
+KindergartenManager 是一个 Python 3.14.7 / NiceGUI 教学管理应用。当前主线是模块化单体：默认使用本地 SQLite，也可连接 MySQL；支持文本/视觉 AI、固定 Word 模板导出，以及按租户隔离的只读 REST API。
 
-基于 **Python 3.12+ / NiceGUI** 前后端一体化，**MySQL 8** 云端存储，接入 **OpenAI 兼容**大模型，实现从「教案输入 → AI 拆分 → 表单回填 → 年龄适配 → 差异比对 → 一日活动生成 → Word 导出 → 云端存档」的完整闭环，并对外提供只读 REST API 供主系统集成。
+> 仓库状态：当前维护审查基线为 `dev4.0@0657c3a`，最近产品主线为 `main@225fe139`；未提交的审查改动不等于主线发布。
 
----
+> 当前身份边界：UI 为固定身份的单用户模式，没有有效登录保护。PyInstaller 模式只监听本机；源码或 Docker 模式若暴露到网络，必须先增加可信网络边界或恢复认证。
 
-## 功能特性
+## 当前能力
 
-- **账号与权限**：账号密码登录 + JWT + RBAC（教师 / 教研管理员 / 系统管理员）。
-- **账号管理（阶段二）**：系统管理员账号初始化脚本、账号创建、启停、重置密码、筛选分页。
-- **学期与日期**：学期起止配置，自动计算第几周、周几、工作日 / 法定节假日（带缓存与降级）。
-- **教案 AI 拆分**：粘贴整篇教案，一键拆分为活动目标 / 准备 / 重点 / 难点 / 过程并回填表单。
-- **年龄适配与差异比对**：按年龄段改写「活动过程」，原文与改写文逐句比对，导出时差异标红。
-- **一日活动一键生成**：结合教学周、是否临近节假日、班级区域等上下文，并发生成晨间活动 / 晨间谈话 / 区域游戏 / 户外游戏。
-- **提示词管理**：7 类任务的提示词多版本保存、启停与回滚。
-- **Word 导出**：严格按模板 `templates/teacherplan.docx` 填充单元格，差异内容红字标注（宋体）。
-- **对外只读 REST API**：`/api/v1` 暴露教学计划数据，API Key + 可选 HMAC 签名鉴权（详见 [docs/API.md](docs/API.md)）。
-- **安全**：AI Key 应用层加密入库 + 脱敏展示；密码 Argon2；关键操作审计日志；全局异常结构化记录。
+- 每日活动计划：学期/日期、教案拆分、年龄适配、活动生成、差异比对、Word 导出。
+- 游戏观察：图片上传、视觉 AI、可编辑观察记录、历史和 Word 导出。
+- 一对一倾听：五领域、指标、图片、历史、编辑、合并/分领域/批量导出。
+- 自制教玩具：AI 生成、编辑、保存、历史和 Word 导出。
+- 课程审议：教案拆分、审议调整、修订稿、历史、删除和 Word 导出。
+- 配置中心：学期、班级、教师、文本/视觉 AI Key、提示词版本。
+- 只读 API：`/api/v1`，用于未来与其他系统集成；API Key 必填，HMAC 可选，业务查询强制 `tenant_id`。
+
+当前并未完成微服务拆分；`services/` 只是未来规划。实际运行单元为一个 NiceGUI 应用进程，外加可选 Caddy/MySQL。
 
 ## 技术栈
 
@@ -32,115 +31,132 @@
 | 文档导出 | python-docx |
 | 测试 | pytest + pytest-asyncio（SQLite 内存库隔离） |
 
-## 安装
+## 已确认的下一能力：受控 AI Agent（尚未实现）
 
-### Windows（推荐：安装向导）
+项目已接受 [ADR-0005](docs/ADR/ADR-0005-controlled-ai-agent-runtime.md)，下一功能方向是在每日活动
+计划页面增加一个受控单 Agent。首阶段只有 4 个 READ Tool 和 2 个 DRAFT Tool：它可以读取当前计划、
+班级/学期/日历的最小投影并生成字段级 `PlanPatch`，但不会修改表单正文、写数据库、保存对话或调用
+文件、URL、SQL、MCP/插件。
 
-1. 从 [Releases](https://github.com/ywyz/kindergartenManager/releases) 下载 `KindergartenManager-Setup-*.exe`
-2. 双击运行安装向导
-3. 从开始菜单或桌面启动，浏览器自动打开 http://localhost:8080
-4. 访问 http://localhost:8080/setup 创建管理员账号
+这仍是设计状态，不属于上方“当前能力”。实现前必须先确认分支基线、补齐 Service 读取投影，并建立
+稳定 RED。未来 Agent WRITE、多 Agent、长期记忆和无人值守 Workflow 均未获授权。
 
-**零配置**：首次启动自动使用内嵌 SQLite，无需配置数据库。
-
-### Ubuntu/Debian（推荐：.deb 安装包）
+## 快速开始
 
 ```bash
-sudo dpkg -i kindergarten-manager_*.deb
-# 服务自动启动，访问 http://localhost:8080/setup
+python3.14 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m app.main
 ```
 
-配置文件：`/etc/kindergarten-manager/env`（首次安装自动生成随机密钥）
+浏览器访问 `http://localhost:8080`。首次运行会：
+
+1. 解析 `.env` 与环境变量。
+2. 在未设置 `DATABASE_URL` 时使用用户数据目录中的 SQLite。
+3. 尝试执行 `alembic upgrade head`。
+4. 创建固定的默认管理员记录。
+5. 直接进入 `/home`。
+
+统一在 `/settings` 配置学期、班级、教师和 AI 接口。旧 `/setup` 只保留为跳转到 `/settings` 的兼容入口。
+
+当前 Web 框架安全基线为 NiceGUI 3.16.0 + FastAPI 0.141.1 + Starlette 1.6.0。
+其他 Dependabot 相关 Python 依赖下限、官方来源和验证方法见
+[docs/DEPENDENCIES.md](docs/DEPENDENCIES.md)。
+
+## 自动测试与迁移
 
 ```bash
-systemctl status kindergarten-manager   # 查看服务状态
-journalctl -u kindergarten-manager -f   # 实时日志
+.venv/bin/python -m pytest tests/ -q
+.venv/bin/alembic upgrade head
 ```
 
-### Docker（服务器部署）
+当前 Alembic head：`a6c4d8e2f9b1`。
+
+仓库历史曾记录多次通过结果，但这些数字属于对应旧 SHA。本 README 不把历史数字当作当前验证；交付时应记录本次命令、SHA、平台和结果。
+
+## 配置
+
+| 变量 | 默认/边界 |
+|---|---|
+| `DATABASE_URL` | 留空使用 SQLite；MySQL 例：`mysql+aiomysql://...` |
+| `ENCRYPTION_KEY` | 留空自动生成并持久化；服务器应显式提供 |
+| `JWT_SECRET` | 留空自动生成；当前主要用于 NiceGUI storage secret |
+| `PORT` | `8080` |
+| `HOLIDAY_API_URL` | timor.tech；失败允许提示后降级 |
+| `API_KEYS` | `key:tenant_id` 列表；留空时业务 API 关闭 |
+| `API_SIGNING_SECRET` | 非空时业务 API 强制 HMAC |
+| `API_SIGNATURE_MAX_SKEW` | 默认 300 秒 |
+| `IMAGE_STORAGE_BACKEND` | 默认 `mysql_blob` |
+| `IMAGE_MAX_BYTES` | 默认 1 MiB |
+
+不要提交 `.env`、`.kindergarten_secrets`、数据库、真实照片、导出文件或密钥。
+
+## 部署方式
+
+### Windows / Linux 打包版
+
+Tag 发布工作流可构建 Windows 安装包/便携包、Debian 包/Linux 便携包。发布资产是否可用必须以对应 tag/SHA 的工作流和目标平台人工验收为准。
+
+### Docker
 
 ```bash
-# 克隆仓库后
 docker compose up -d
 ```
 
-或使用镜像：
-```bash
-docker pull ghcr.io/ywyz/kindergartenmanager:latest
-```
+当前 Compose 包含 Caddy、主应用和 MySQL。示例默认密码只适合本地试验；部署前必须在 `.env` 中覆盖，并限制 UI 网络访问。
 
-### 源码运行（开发/自定义部署）
+开发 override：
 
 ```bash
-# 1. 克隆并进入项目
-cd kindergartenManager
-
-# 2. 创建虚拟环境并安装依赖
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-
-# 3. 配置环境变量（可选，留空使用 SQLite 零配置）
-cp .env.example .env
-# 如需 MySQL：编辑 .env，填写 DATABASE_URL / ENCRYPTION_KEY / JWT_SECRET
-
-# 4. 启动应用（默认 http://0.0.0.0:8080）
-.venv/bin/python -m app.main
-# 首次启动自动执行数据库迁移，访问 /setup 创建管理员账号
-
-# 5. 运行测试
-.venv/bin/pytest tests/ -q
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 
-> ⚠️ **生产环境**：请在 `.env` 中显式配置 `ENCRYPTION_KEY` 和 `JWT_SECRET`，避免重启后密钥变化导致数据无法解密。
+## 架构速览
 
-## 环境变量
-
-| 变量 | 必填 | 说明 |
-|------|------|------|
-| `DATABASE_URL` | 否 | 留空使用内嵌 SQLite；MySQL：`mysql+aiomysql://user:pass@host:3306/db` |
-| `ENCRYPTION_KEY` | 推荐 | AI Key 加密密钥；留空自动生成并持久化到 `.kindergarten_secrets` |
-| `JWT_SECRET` | 推荐 | JWT 签名密钥；留空自动生成并持久化 |
-| `JWT_EXPIRE_MINUTES` | 否 | access token 有效期，默认 60 |
-| `HOLIDAY_API_URL` | 否 | 中国法定节假日 API，默认 timor.tech |
-| `LOG_LEVEL` | 否 | 日志级别，默认 INFO |
-| `API_KEYS` | 否 | 对外 API 鉴权，`"key:tenant_id"` 逗号分隔；为空则接口关闭 |
-| `API_SIGNING_SECRET` | 否 | 对外 API HMAC 签名密钥；非空时强制校验签名 |
-| `BOOTSTRAP_ADMIN_ENABLED` | 否 | 允许脚本方式初始化管理员，默认 false |
-| `BOOTSTRAP_ADMIN_PASSWORD` | 否 | 脚本方式初始化时的管理员密码 |
-
-## 目录结构
-
-```
-app/
-  ui/            NiceGUI 页面与组件
-  api/           对外只读 REST API（二期）
-  service/       业务逻辑（拆分编排、年龄适配、差异、日期、生成、登录）
-  repository/    数据访问层（强制 tenant_id 过滤）
-  integration/   ai_client / holiday_client / word_export
-  auth/          JWT、密码、RBAC、路由守卫中间件
-  core/          配置、日志、数据库、异常、加密、审计、ORM 模型
-  jobs/          定时任务（预留）
-alembic/         数据库迁移
-tests/           pytest 测试
-templates/       Word 模板（teacherplan.docx）
-docs/            开发者文档与 API 参考
-memory-bank/     项目文档（PRD、技术栈、计划、架构、进度）
+```text
+NiceGUI UI / FastAPI-style API
+            │
+         service
+        ├─ planned controlled Agent ── Agent Provider
+        └───┬─────────┘
+            │
+        ┌───┴─────────┐
+   repository     integration
+        │        AI / Holiday / Image / Word
+   SQLite/MySQL
 ```
 
-## 文档
+目录职责：
 
-- 产品需求：[memory-bank/PRD.md](memory-bank/PRD.md)
-- 技术选型：[memory-bank/tech-stack.md](memory-bank/tech-stack.md)
-- 架构说明：[memory-bank/architecture.md](memory-bank/architecture.md)
-- 开发者指南：[docs/DEVELOPER.md](docs/DEVELOPER.md)
-- 手动测试文档：[docs/MANUAL_TESTING.md](docs/MANUAL_TESTING.md)
-- 对外 API 参考：[docs/API.md](docs/API.md)
+- `app/ui/`：页面与组件。
+- `app/api/`：只读 API 契约与鉴权。
+- `app/service/`：业务编排。
+- `app/repository/`：数据库访问和租户过滤。
+- `app/integration/`：AI、节假日、图片和 Word 适配器。
+- `app/core/`：配置、数据库、模型、迁移启动、日志、审计和加密。
+- `alembic/`：唯一 schema 演进路径。
+- `templates/`：固定 Word 模板。
+- `tests/`：pytest 自动测试。
 
-## 里程碑
+## 文档导航
 
-| 里程碑 | 内容 | 状态 |
-|--------|------|------|
-| M1 | 原型联调（登录 + 日期 + AI 拆分） | ✅ |
-| M2 | 首期闭环可用（完整教案流程 + Word 导出 + 云端存档） | ✅ |
-| M3 | 稳定性与安全加固（异常处理 / 路由守卫 / 审计） | ✅ |
-| M5（二期） | 对外 REST API + 数据库只读视图 | 🚧 API 已落地 |
+建议按顺序阅读：
+
+1. [CONTEXT.md](CONTEXT.md) — 当前事实、边界、分支与风险。
+2. [docs/ROADMAP.md](docs/ROADMAP.md) — 里程碑与门禁。
+3. [docs/ADR/README.md](docs/ADR/README.md) — 架构决策。
+4. [docs/design/system-architecture.md](docs/design/system-architecture.md) — 实际系统架构。
+5. [docs/design/agent-runtime.md](docs/design/agent-runtime.md) — 受控 AI Agent 契约与实现门禁。
+6. [docs/design/data-model.md](docs/design/data-model.md) — 数据模型与迁移不变量。
+7. [docs/security/threat-model.md](docs/security/threat-model.md) — 威胁模型。
+8. [docs/DEVELOPER.md](docs/DEVELOPER.md) — 开发者指南。
+9. [docs/MANUAL_TESTING.md](docs/MANUAL_TESTING.md) — 当前人工验收矩阵。
+10. [docs/USER_MANUAL.md](docs/USER_MANUAL.md) — 用户手册。
+11. [docs/API.md](docs/API.md) — 对外只读 API。
+12. [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) — Python 依赖安全基线与 Dependabot 处理规则。
+
+`memory-bank/` 保存模块设计和历史进度。若与当前代码或上述事实文档冲突，以当前代码、迁移、测试证据和 `CONTEXT.md` 为准。
+
+## 当前开发门禁
+
+聚合保存的首批原子性修复、tenant/user 投影区分、设置页 AI adapter、启动迁移 fail-closed 和常规质量 CI 已通过本地自动验证。大型页面用例仍需渐进抽离；READ/DRAFT Agent Foundation 必须在独立分支固定 spec/Issue/稳定 RED 后才能开始 GREEN，不能把 ADR、设计文档或保留分支自动视为主线已交付。

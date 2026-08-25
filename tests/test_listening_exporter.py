@@ -3,7 +3,6 @@ import io
 from datetime import date
 from pathlib import Path
 
-import pytest
 from docx import Document
 from docx.oxml.ns import qn
 

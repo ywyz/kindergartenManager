@@ -51,7 +51,6 @@ async def test_non_root_passes_through():
     request.url.path = "/daily-plan"
     call_next = AsyncMock(return_value=MagicMock())
 
-    response = await mw.dispatch(request, call_next)
+    await mw.dispatch(request, call_next)
 
     call_next.assert_called_once_with(request)
-

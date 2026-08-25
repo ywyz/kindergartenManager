@@ -15,7 +15,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
-from nicegui import app, ui
+from nicegui import ui
 
 # ─── 纯函数（单测友好）──────────────────────────────────────────────────────
 
@@ -147,9 +147,6 @@ async def app_shell(user: dict, active: str) -> AsyncIterator[None]:
     for item in items:
         groups.setdefault(item["group"], []).append(item)
 
-    def _do_logout() -> None:
-        pass  # 单用户模式：保留接口但无实际操作
-
     # ── 顶栏 ────────────────────────────────────────────────────────────────
     with ui.header().classes("bg-blue-700 text-white items-center px-4 gap-2"):
         ui.button(icon="menu", on_click=lambda: drawer.toggle()).props(
@@ -205,20 +202,12 @@ async def render_shell(user: dict, active: str) -> None:
     for item in items:
         groups.setdefault(item["group"], []).append(item)
 
-    def _do_logout() -> None:
-        app.storage.user.clear()
-        ui.navigate.to("/")
-
     with ui.header().classes("bg-blue-700 text-white items-center px-4 gap-2"):
         ui.button(icon="menu", on_click=lambda: drawer.toggle()).props(
             "flat round dense"
         ).classes("text-white")
         ui.label("幼儿园教学管理系统").classes("text-lg font-bold flex-1")
         ui.label(display_name).classes("text-sm text-blue-100")
-        ui.button(
-            icon="logout",
-            on_click=_do_logout,
-        ).props("flat round dense").tooltip("退出登录").classes("text-white")
 
     with ui.left_drawer(value=True, bordered=True).classes("bg-gray-50") as drawer:
         for group_name, group_items in groups.items():

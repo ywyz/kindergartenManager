@@ -15,6 +15,23 @@ from app.service.listening_service import generate_domain_content, save_record_w
 _FAKE_IMAGE = b"\xff\xd8\xff\xe0" + b"\x00" * 100
 
 
+class _FailOnSecondPutStorage:
+    """在第二张图片写入前失败，模拟聚合中途的存储故障。"""
+
+    def __init__(self) -> None:
+        self._put_count = 0
+
+    def put(self, data: bytes, *, mime_type: str) -> dict:
+        self._put_count += 1
+        if self._put_count == 2:
+            raise RuntimeError("injected image storage failure")
+        return {
+            "storage_backend": "mysql_blob",
+            "blob_content": data,
+            "mime_type": mime_type,
+        }
+
+
 async def _seed_catalog(session, n=2):
     """插入 n 个 健康/小班/下学期 指标，返回其 id 列表（按 sort_order）。"""
     from app.core.models.indicator_catalog import IndicatorCatalog
@@ -171,13 +188,42 @@ async def test_save_record_with_all(async_session):
         async_session, record_data=record_data, domains=domains, storage=BlobImageStorage(),
     )
 
-    assert (await get_record_by_id(async_session, 1, rid)).child_name == "小明"
-    assert len(await list_domains_by_record(async_session, 1, rid)) == 2
-    assert len(await list_images_by_record(async_session, 1, rid)) == 6  # 2 领域 × 3 图
-    assert len(await list_indicator_results(async_session, 1, rid)) == 4  # 2 领域 × 2 指标
-    health_imgs = await list_images_by_record(async_session, 1, rid, domain="健康")
+    assert (await get_record_by_id(async_session, 1, 1, rid)).child_name == "小明"
+    assert len(await list_domains_by_record(async_session, 1, 1, rid)) == 2
+    assert len(await list_images_by_record(async_session, 1, 1, rid)) == 6  # 2 领域 × 3 图
+    assert len(await list_indicator_results(async_session, 1, 1, rid)) == 4  # 2 领域 × 2 指标
+    health_imgs = await list_images_by_record(async_session, 1, 1, rid, domain="健康")
     assert health_imgs[0].image_description == "d1"
     assert health_imgs[0].blob_content == b"\xff\xd8\xffimg"
+
+
+async def test_save_record_with_all_rolls_back_on_mid_aggregate_failure(async_session):
+    """图片存储中途失败时，主记录和所有子记录都不得残留。"""
+    from app.repository.listening_repository import list_records
+
+    ci = CompressedImage(data=b"image", mime_type="image/jpeg", width=10, height=10)
+    record_data = {
+        "tenant_id": 1,
+        "user_id": 1,
+        "obs_year": 2026,
+        "obs_month": 4,
+        "child_name": "原子性测试",
+    }
+    domains = [{
+        "domain": "健康",
+        "compressed_images": [ci, ci],
+        "indicator_results": [],
+    }]
+
+    with pytest.raises(RuntimeError, match="injected image storage failure"):
+        await save_record_with_all(
+            async_session,
+            record_data=record_data,
+            domains=domains,
+            storage=_FailOnSecondPutStorage(),
+        )
+
+    assert await list_records(async_session, tenant_id=1, user_id=1) == []
 
 
 # ─── P8a — 详情装配 / 导出转换 / 覆盖更新 ─────────────────────────────────────
@@ -246,7 +292,7 @@ async def test_load_record_detail(async_session):
     cat_ids = await _seed_catalog_multi(async_session)
     rid, _ = await _save_two_domain_record(async_session, cat_ids)
 
-    detail = await load_record_detail(async_session, 1, rid)
+    detail = await load_record_detail(async_session, 1, 1, rid)
     assert detail is not None
     assert detail["record"]["child_name"] == "小明"
     assert len(detail["domains"]) == 2
@@ -264,7 +310,17 @@ async def test_load_record_detail(async_session):
     assert len(lang["images"]) == 1
 
     # tenant 隔离
-    assert await load_record_detail(async_session, 99, rid) is None
+    assert await load_record_detail(async_session, 99, 1, rid) is None
+
+
+async def test_load_record_detail_rejects_same_tenant_other_user(async_session):
+    """UI 详情投影必须同时匹配 tenant 与当前 user。"""
+    from app.service.listening_service import load_record_detail
+
+    cat_ids = await _seed_catalog_multi(async_session)
+    rid, _ = await _save_two_domain_record(async_session, cat_ids)
+
+    assert await load_record_detail(async_session, 1, 99, rid) is None
 
 
 def test_to_export_payload():
@@ -315,14 +371,45 @@ async def test_update_record_with_all(async_session):
     )
     assert out_rid == rid
 
-    assert (await get_record_by_id(async_session, 1, rid)).child_name == "小明明"
-    assert len(await list_domains_by_record(async_session, 1, rid)) == 1  # 旧 2 领域被替换
-    assert len(await list_images_by_record(async_session, 1, rid)) == 1
-    assert len(await list_indicator_results(async_session, 1, rid)) == 1
+    assert (await get_record_by_id(async_session, 1, 1, rid)).child_name == "小明明"
+    assert len(await list_domains_by_record(async_session, 1, 1, rid)) == 1  # 旧 2 领域被替换
+    assert len(await list_images_by_record(async_session, 1, 1, rid)) == 1
+    assert len(await list_indicator_results(async_session, 1, 1, rid)) == 1
 
-    detail = await load_record_detail(async_session, 1, rid)
+    detail = await load_record_detail(async_session, 1, 1, rid)
     assert detail["domains"][0]["goals"] == "新目标"
     assert detail["domains"][0]["obs_month"] == 5
+
+
+async def test_update_record_with_all_restores_original_on_mid_aggregate_failure(async_session):
+    """覆盖保存中途失败时，原聚合必须完整保留。"""
+    from app.service.listening_service import load_record_detail, update_record_with_all
+
+    cat_ids = await _seed_catalog_multi(async_session)
+    rid, record_data = await _save_two_domain_record(async_session, cat_ids)
+    before = await load_record_detail(async_session, 1, 1, rid)
+
+    ci = CompressedImage(data=b"new-image", mime_type="image/jpeg", width=20, height=10)
+    replacement = [{
+        "domain": "健康",
+        "obs_year": 2026,
+        "obs_month": 5,
+        "goals": "不应提交的新目标",
+        "compressed_images": [ci, ci],
+        "image_descriptions": ["新图1", "新图2"],
+        "indicator_results": [{"catalog_id": cat_ids["健康"][0], "stars": 3}],
+    }]
+
+    with pytest.raises(RuntimeError, match="injected image storage failure"):
+        await update_record_with_all(
+            async_session,
+            record_id=rid,
+            record_data={**record_data, "child_name": "不应提交的新姓名"},
+            domains=replacement,
+            storage=_FailOnSecondPutStorage(),
+        )
+
+    assert await load_record_detail(async_session, 1, 1, rid) == before
 
 
 async def test_update_record_with_all_not_found(async_session):

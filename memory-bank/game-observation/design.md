@@ -1,8 +1,8 @@
 # 游戏观察子系统 — 设计文档
 
-> 本文档为「游戏观察记录」子系统的需求与技术设计说明。配套文档：
-> - 开发计划：[dev-plan.md](dev-plan.md)
-> - 测试计划：[test-plan.md](test-plan.md)
+> **历史快照**：本文记录对应开发阶段的设计，包括当时的登录/多用户方案；这些不代表当前产品已启用。当前事实以 [`../../CONTEXT.md`](../../CONTEXT.md)、[`../../docs/ROADMAP.md`](../../docs/ROADMAP.md) 和当前代码/测试为准。
+
+> 本文档为「游戏观察记录」子系统的需求与技术设计说明。配套历史证据见 [progress.md](progress.md)；当前仓库没有单独保留该模块的 dev-plan/test-plan 文件。
 >
 > 阅读前置：[../PRD.md](../PRD.md)、[../architecture.md](../architecture.md)、[../tech-stack.md](../tech-stack.md) 与
 > `.github/instructions/*.instructions.md`（数据库 / AI / Word 导出约定）。

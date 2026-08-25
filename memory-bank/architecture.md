@@ -1,12 +1,14 @@
 # 幼儿园教学管理系统架构文档（初始化）
 
-## 1. 当前阶段
+> **历史文档说明（2026-08-25）**：本文按开发阶段累积，包含已被后续单用户模式取代的登录描述和旧迁移/测试数字。当前架构事实见 [`../CONTEXT.md`](../CONTEXT.md)、[`../docs/design/system-architecture.md`](../docs/design/system-architecture.md)、[`../docs/design/data-model.md`](../docs/design/data-model.md) 和 [`../docs/ADR/README.md`](../docs/ADR/README.md)。受控 Agent 的 F003-F009 已固定 GREEN，具体 Provider、六 Tool executor、组合装配与每日计划 UI 已实现；F009 零持久化、Linux 浏览器 mock 与应用安全配置真实模型验收均已 PASS，最终 closure SHA 证据见 Issue #48。边界见 [`../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md`](../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md) 与 [`../docs/design/agent-runtime.md`](../docs/design/agent-runtime.md)。下文历史内容不授权 Agent WRITE。当前 Alembic head 为 `a6c4d8e2f9b1`。
+
+## 1. 历史阶段记录
 
 - 项目阶段：M2/M3 已完成；二期 REST API 已落地；v3.0.1 单用户模式重构完成。
 - 架构方向：Docker Compose AIO 编排，Monorepo，渐进式微服务化。
 - 开发策略：先架构后编码；每完成一个步骤同步更新本文件与 progress.md
 
-## 2. 当前模式（v3.0.1+）
+## 2. 历史记录中的 v3.0.1+ 模式
 
 ### 单用户模式
 - 登录功能已移除（后续恢复），根路径 `/` 重定向到 `/home`
@@ -19,7 +21,7 @@
 - MySQL 配置通过独立字段（服务器、端口、用户名、密码、数据库名）保存到 .env
 
 ### 部署架构
-- **生产**：Docker Compose AIO（Caddy + 主系统 + MySQL + 子系统）
+- **历史目标**：Docker Compose AIO（Caddy + 主系统 + MySQL + 规划中的子系统）；当前实际 Compose 没有独立子系统
 - **开发**：本地直接运行（SQLite），或 `docker-compose.dev.yml` 
 - **反向代理**：Caddy 替代 Nginx，支持自动 HTTPS（域名配置后自动申请 Let's Encrypt 证书）
 
@@ -39,8 +41,8 @@
 | 目录 | 职责 |
 |------|------|
 | `app/` | 应用根包，所有业务代码入口 |
-| `app/ui/` | NiceGUI 页面与组件，每个页面独立文件（如 `pages/login.py`、`pages/setup.py`、`components/date_panel.py`）；禁止在此层做权限逻辑 |
-| `app/api/` | 对外只读 REST API（二期）：`/api/v1` 路由、API Key + 可选 HMAC 签名鉴权；供子系统（幼儿园信息管理主系统）读取教学计划数据 |
+| `app/ui/` | NiceGUI 页面与组件；当前根路由为 `pages/root.py`，`pages/setup.py` 只兼容跳转到 `/settings` |
+| `app/api/` | 对外只读 REST API：`/api/v1` 路由、API Key + 可选 HMAC 签名鉴权；供未来其他系统集成 |
 | `app/service/` | 业务逻辑层：教案拆分协调、年龄适配、差异比对、日期计算、登录逻辑等；不直接发 HTTP 请求 |
 | `app/repository/` | 数据访问层：封装所有 SQL 查询，返回模型对象；所有查询必须携带 `tenant_id` 过滤条件 |
 | `app/integration/ai_client/` | OpenAI 兼容接口封装：`httpx` + `tenacity` 重试，强约束 JSON schema，解析失败抛出 `AiParseError` |
@@ -69,7 +71,7 @@
 | `.gitignore` | 忽略 `.env`、`.env.prod`、`.venv/`、`exports/`、`__pycache__/` 等 |
 | `app/core/config.py` | `Settings` 类（pydantic-settings），统一读取所有环境变量；单例 `settings` 供全局使用 |
 | `app/core/logging.py` | `get_logger(name)` — JSON 结构化日志，字段固定为 timestamp/level/logger/message；LOG_LEVEL 由 Settings 控制 |
-| `app/core/database.py` | `AsyncEngine`、`AsyncSessionLocal`（async_sessionmaker）、`Base`（DeclarativeBase）、`get_async_session()` 依赖注入生成器 |
+| `app/core/database.py` | `AsyncEngine`、`AsyncSessionLocal`（async_sessionmaker）、`Base`（DeclarativeBase）；API 会话依赖位于 `app/api/deps.py` |
 | `alembic/env.py` | 已配置读取 `Settings.DATABASE_URL`（迁移用 pymysql 同步驱动）并绑定 `Base.metadata` 支持 autogenerate |
 | `alembic.ini` | Alembic 默认配置，连接串由 env.py 覆盖 |
 
@@ -84,7 +86,7 @@
 
 | 表名 | 迁移版本 | 主要字段 |
 |------|---------|----------|
-| `users` | `5e03413fdeca` | id, tenant_id, username, hashed_password, role, is_active |
+| `user` | `5e03413fdeca` | id, tenant_id, username, hashed_password, role, is_active |
 | `semester_config` | `fd6d29f921b4` | id, tenant_id, user_id, semester_name, start_date, end_date, is_active |
 | `class_config` | `67b4aef28796` | id, tenant_id, user_id, grade, class_name, indoor_areas, outdoor_content |
 | `ai_api_key` | 阶段3迁移 | id, tenant_id, user_id, api_base_url, model_name, api_key_encrypted, is_active |
@@ -100,7 +102,7 @@
 | `app/core/models/user.py` | User ORM 模型 |
 | `app/core/models/semester.py` | SemesterConfig ORM 模型 |
 | `app/core/models/class_config.py` | ClassConfig ORM 模型 |
-| `app/auth/password.py` | Argon2 密码哈希与验证（passlib） |
+| `app/auth/password.py` | Argon2 密码哈希与验证（`argon2-cffi`） |
 | `app/auth/jwt.py` | JWT 生成/验证（PyJWT HS256），payload 含 sub/tenant_id/role/exp |
 | `app/service/auth_service.py` | 登录逻辑（查用户→验密码→签 JWT）；修改密码 |
 | `app/service/date_service.py` | 纯函数：`get_week_number`、`get_weekday_cn`、`is_workday`、`is_within_semester` |
@@ -108,10 +110,9 @@
 | `app/repository/semester_repository.py` | `get_active_semester`、`upsert_active_semester` |
 | `app/repository/class_repository.py` | `get_class_config`、`upsert_class_config` |
 | `app/integration/holiday_client/client.py` | 法定节假日判定；法定节假日缓存 `dict[str, tuple[bool, str\|None, int]]`（含 day_type）；特殊节日缓存 `dict[str, list[str]]`；`is_holiday`、`is_near_holiday`、`get_holiday_name`、`get_special_day_tags`（sync，本地硬编码）、`is_adjusted_workday` |
-| `app/ui/pages/login.py` | 登录页（路由 `/`），token 写入 `app.storage.user` |
+| `app/ui/pages/root.py` | 当前根路由 `/`，跳转 `/home`；历史登录页已移除 |
 | `app/ui/pages/home.py` | 首页（路由 `/home`），快捷导航按钮 |
 | `app/ui/pages/settings.py` | 配置页（路由 `/settings`），学期配置、班级配置、AI 接口配置（含脱敏展示与验证连接） |
-| `app/ui/pages/date_test.py` | 日期测试页（路由 `/date-test`），嵌入 DatePanel |
 
 ## 6. 阶段 3 已实现文件清单
 
@@ -129,13 +130,13 @@
 | 文件 | 变更内容 |
 |------|----------|
 | `app/core/database.py` | `pool_pre_ping=False`（避免远程 DB 额外往返）；新增 `pool_recycle=1800` |
-| `.env` | `DATABASE_URL` 主机改为 IPv4 直连（`47.116.40.89`），规避双栈服务器 IPv6 超时问题 |
+| `.env` | 历史上曾把 `DATABASE_URL` 主机改为 IPv4 直连（地址已脱敏），规避双栈服务器 IPv6 超时问题 |
 
 ### 已知问题与决策记录
 
 | 编号 | 问题 | 决策 |
 |------|------|------|
-| BL-02 | `aliyun.ywyz.tech` 同时有 A/AAAA 记录，aiomysql 优先尝试 IPv6 导致连接超时 2+ 分钟 | `.env` 改用 IPv4 直连；根治方案：删除 DNS AAAA 记录 |
+| BL-02 | 历史数据库域名同时有 A/AAAA 记录，aiomysql 优先尝试不可达 IPv6 导致连接超时 | 当时改用 IPv4 直连；地址与域名现已脱敏 |
 | BL-01 | `get_special_day_tags` 曾计划在线 API，代价大于收益 | 回滚为本地硬编码同步实现 |
 
 ### Holiday Client 接口说明
@@ -184,6 +185,8 @@ type 值：0=工作日，1=周末，2=法定节假日，3=调班工作日。
 
 ## 7. 阶段 8：收尾与稳定性
 
+> 以下表格保留当时的实现记录。当前 `app/main.py` 不挂载 `AuthMiddleware`，`/setup` 只跳转 `/settings`，根路由由 `app/ui/pages/root.py` 提供；不得把本节历史内容当作当前产品行为。
+
 | 文件 | 职责 |
 |------|------|
 | `app/auth/middleware.py` | `AuthMiddleware`（`BaseHTTPMiddleware`）路由守卫：受限页面校验 `app.storage.user` 中 JWT token，无效则清空 storage 重定向 `/`；非页面路由（静态资源/`_nicegui`）放行；白名单 `UNRESTRICTED_PAGE_ROUTES = {"/", "/register", "/setup"}` |
@@ -196,7 +199,7 @@ type 值：0=工作日，1=周末，2=法定节假日，3=调班工作日。
 
 ## 8. 对外只读 REST API
 
-作为「幼儿园信息管理主系统」的子系统，本模块对外提供教学计划数据的**只读** REST API（路由前缀 `/api/v1`）。
+本模块提供教学计划数据的**只读** REST API（路由前缀 `/api/v1`），供未来经授权的其他系统集成。
 
 | 文件 | 职责 |
 |------|------|
@@ -228,6 +231,8 @@ Windows EXE 打包使用内嵌 SQLite，迁移链存在 3 处 MySQL 专属语法
 - PyInstaller 路径一致性：`sys.frozen` 检测 + `os.path.dirname(sys.executable)` 绝对路径
 
 ### 首次运行配置向导
+
+> 本节记录已废弃的四步向导。当前产品没有该向导，所有配置统一进入 `/settings`，旧 `/setup` 只做兼容跳转。
 
 #### 新增模块
 
@@ -367,3 +372,76 @@ frozen exe 启动
 ### 测试
 
 `tests/test_course_review_activity_repository.py`、`test_course_review_activity_client.py`、`test_course_review_activity_service.py`、`test_course_review_activity_exporter.py`、`test_course_review_activity_ui_helpers.py`、`test_export_repository.py`、`test_app_shell_menu.py`、`test_migrations_smoke.py`。课程审议相关回归 **60 passed**；全量回归 **529 passed**；用户手动验收通过。
+
+## 13. 受控 Agent Foundation F004 READ 投影
+
+F004 在既有 F003 contracts/关闭 registry 之后，只建立应用层 READ seam 与短期冻结 Context；
+不实现 Tool、Provider、Runtime、PlanPatch、UI 或任何持久化。
+
+### 核心模块
+
+| 文件 | 职责 |
+|------|------|
+| `app/service/agent/contracts.py` | 冻结 actor/scope、关闭 fact kind、每日计划、日历、班级区域和 `AgentContext` DTO；正文不进入 `repr` |
+| `app/service/agent/canonical.py` | 为投影内容和 Context fingerprint 提供唯一规范 JSON/SHA-256 实现 |
+| `app/service/agent/read_service.py` | `AgentReadService` 绑定受信 tenant+user，提供当前计划、计划上下文、日历和班级区域四个白名单投影 |
+| `app/service/agent/context.py` | 只读取当前 intent 明确请求的 fact kind，按固定顺序组装短生命周期 facts，并计算稳定 fingerprint |
+| `app/repository/daily_plan_repository.py` | 新增按 `tenant_id + user_id + plan_id` 的 UI 详情读取，跨 actor 返回 `None` |
+
+每日计划正文按关闭字段集合投影且单字段最多 4096 字符；班级投影排除教师姓名；节假日 API
+不可用时显式返回 `unknown` 与稳定降级码。所有 DTO 均冻结，只存在内存，不改变数据库 schema。
+
+### 测试
+
+`specs/agent-foundation/tests/test_read_projections_red.py` 通过真实内存 SQLite 和确定性节假日 adapter
+覆盖白名单、tenant/user 负向读取、裁剪/冻结、日历降级、正文 `repr` 关闭、intent 最小 facts 和
+稳定 fingerprint。F004 初始 RED 为 `8297fce…`，Review RED 为 `f1797e6…`；GREEN 候选下
+Foundation 总计 **9 passed**。
+
+## 14. 受控 Agent Foundation F005-F008 内存边界
+
+F005 在 F004 冻结 Context 之上增加纯应用层 `PlanPatch`：字段路径为关闭集合，proposal 必须完整绑定
+operation、turn、daily-plan target 与 base fingerprint；before/after 独立校验后按字段稳定排序，并以唯一
+canonical JSON 计算 SHA-256。成功与拒绝路径都不依赖 UI、数据库或 repository。
+
+F006 只增加供应商中立的 Provider DTO/port、Tool executor port 和有界串行 Runtime。Runtime 重新校验
+六个关闭工具的名称、Permission、嵌套输入/输出与 operation/turn 绑定，拒绝 WRITE/未知/额外参数，限制 Tool 次数、
+消息窗口、intent、响应、ToolResult 和 request-id 大小，完整复核返回 Patch，并把 Provider/Tool 异常压缩为稳定本地错误码。
+
+F007 在同一 Runtime seam 增加完整冻结 context stamp 的精确取消、单 Provider/Tool/总 operation 硬时限、
+UTC TTL 与 current-context 复核、迟到结果丢弃和取消后安全排空。即使 port 吞掉取消或抛出
+`SystemExit`/`KeyboardInterrupt`，公开 turn 也只返回稳定状态，旧 port 排空前继续保持 busy。
+
+F008 在该边界内新增具体 OpenAI-compatible Chat Completions adapter、六路静态 Tool executor、应用级单
+coordinator/controller、日期 generation/current fingerprint 失效和每日计划只读建议面板；仍无 Agent 持久化、
+WRITE、长期记忆或产品多 Agent。
+
+F009 只增加验收证据：自动化矩阵统一覆盖全部表、受保护文件/exports、UI 正文、audit 与 DML/DDL attempt；
+Linux 浏览器 mock 使用临时数据库和虚构加密 Key；真实模型只能使用应用 active `text` 配置，且 POSIX secrets
+文件在读取前/新建时必须为 `0600`。人工验收绑定 `tested_code_sha`，证据提交后的 Review/CI 绑定独立
+`evidence_closure_sha`；任一产品代码变化都使前一组人工证据失效。
+
+### 核心模块
+
+| 文件 | 职责 |
+|------|------|
+| `app/service/agent/patch.py` | 构造关闭字段、稳定排序和 canonical SHA-256 的只读 `PlanPatch` |
+| `app/service/agent/runtime.py` | 应用拥有的 Provider/Executor ports、冻结消息 DTO、busy 与有界串行 loop |
+| `app/integration/ai_client/agent_provider.py` | 关闭 wire allowlist、显式 Tool alias 与净化的 OpenAI-compatible adapter |
+| `app/service/agent/tools.py` | 四 READ 短 session 与两 DRAFT 零 session 的六路静态 executor |
+| `app/service/agent/composition.py` | 应用级单 Runtime、短命凭据、取消/current-state 与页面 controller/snapshot |
+| `app/ui/components/agent_draft.py` | 只读 assistant/字段差异/取消/丢弃面板，无采用或写入入口 |
+
+F005 固定 GREEN 为 `53dd2e8…`，双轴 Review 与精确远端 CI 已通过；F006 稳定 RED 为 `f0ab660…`，
+Review RED 为 `6b083fa…`、`8831b3f…`、`79e005a…`、`51f5e5f…`；最终本地实现/重构候选
+`99167ef…` 的双轴 Review 为 Standards `0`、Spec `0`，Foundation **73 passed**、全量 **551 passed**；证据
+SHA `049b520…` 的远端 Quality `32644290676` 精确匹配成功。F007 初始 RED `55b8702…`、Review RED
+`08ada78…` 与 `ddca78d…` 最终收敛到候选 `51443a3…`，Foundation **110 passed**、全量 **551 passed**、
+Standards `0`、Spec `0`；证据 SHA `2fb4e6f…` 的远端 Quality `32648599591` 精确匹配成功。F008 最终
+RED `b3cad08…`、Review RED `b3c45d2…` 与 `b0647a9…` 收敛到候选 `f1f5e63…`，Foundation **180 passed**、
+全量 **551 passed**、Standards `0`、Spec `0`；远端 Quality `32651221452` 的 `headSha` 精确匹配成功。
+F009 稳定 RED `34e12f2…` 与后续 Review RED 固定零持久化、POSIX secrets、人工 helper、Provider 兼容和
+关闭诊断；最终 `tested_code_sha=a50c6f6…` 为 Foundation **261 passed**、全量 **567 passed**、Standards
+`0`、Spec `0`，远端 Quality `32808246590` 精确匹配成功。Linux Chrome mock 与应用安全配置真实模型均
+PASS；两者 UI/全逻辑 snapshot compare 均为 `equal=true`，完整脱敏证据位于
+`specs/agent-foundation/evidence/`，最终 closure SHA 的 Review/Quality/Issue 证据见 Issue #48。

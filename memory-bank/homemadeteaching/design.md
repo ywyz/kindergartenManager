@@ -1,5 +1,7 @@
 # 自制教玩具子系统 — 设计文档
 
+> **历史快照**：本文记录对应开发阶段的设计，不代表当前检出代码、迁移或测试状态。当前事实以 [`../../CONTEXT.md`](../../CONTEXT.md)、[`../../docs/ROADMAP.md`](../../docs/ROADMAP.md) 和当前代码/测试为准。
+
 > 本文档记录「自制教玩具」子系统的需求与技术设计。配套文档：
 > - 开发计划：[dev-plan.md](dev-plan.md)
 > - 测试计划：[test-plan.md](test-plan.md)

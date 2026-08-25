@@ -1,5 +1,7 @@
 # 课程审议记录子系统 — 测试计划
 
+> **历史快照**：本文记录对应开发阶段的测试计划，不代表当前检出代码或当前通过状态。当前事实以 [`../../CONTEXT.md`](../../CONTEXT.md)、[`../../docs/ROADMAP.md`](../../docs/ROADMAP.md) 和当前代码/测试为准。
+
 > 测试框架：`pytest` + `pytest-asyncio`。数据库测试使用 SQLite 内存库；AI 调用使用 `httpx.MockTransport` 或 mock。
 
 ## 测试文件

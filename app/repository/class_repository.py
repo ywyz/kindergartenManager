@@ -66,13 +66,13 @@ async def upsert_class_config(
     return record
 
 
-async def list_class_configs(
+async def list_class_configs_for_tenant(
     session: AsyncSession,
     tenant_id: int,
     *,
     user_id: int | None = None,
 ) -> list[ClassConfig]:
-    """按租户（可选用户）查询班级配置列表，按更新时间降序。"""
+    """API tenant 投影；可在当前 tenant 内按 user_id 进一步筛选。"""
     conditions = [ClassConfig.tenant_id == tenant_id]
     if user_id is not None:
         conditions.append(ClassConfig.user_id == user_id)

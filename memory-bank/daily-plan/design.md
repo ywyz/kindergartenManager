@@ -1,5 +1,7 @@
 # 一日活动计划子系统 — 设计文档
 
+> **历史快照**：本文记录对应开发阶段的设计，不代表当前检出代码、迁移或身份边界。当前事实以 [`../../CONTEXT.md`](../../CONTEXT.md)、[`../../docs/ROADMAP.md`](../../docs/ROADMAP.md) 和当前代码/测试为准。
+
 > 本文档为「一日活动计划」子系统（教案拆分 / 年龄适配 / 提示词管理 / Word 导出 / 一日活动生成）的架构设计说明。
 >
 > 阅读前置：[../PRD.md](../PRD.md)、[../architecture.md](../architecture.md)、[../tech-stack.md](../tech-stack.md)

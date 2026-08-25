@@ -1,148 +1,239 @@
-# 开发者指南
+# KindergartenManager 开发者指南
 
-面向参与本系统开发与维护的工程师。阅读顺序建议：本文 → [memory-bank/PRD.md](../memory-bank/PRD.md) → [memory-bank/architecture.md](../memory-bank/architecture.md) → [memory-bank/progress.md](../memory-bank/progress.md)。
+## 1. 开发基线
 
----
+开始前阅读：
 
-## 1. 环境搭建
+1. `AGENTS.md`
+2. `CONTEXT.md`
+3. `docs/ROADMAP.md`
+4. 相关 ADR、设计、测试计划和代码
+
+当前检出 `feat/agent-foundation`，其 F007 固定证据从授权基线 `0880f64…` 严格串行形成；最近远端产品主线为
+`origin/main@cfeadef…`。产品仍是单用户 NiceGUI 模块化单体，不是已完成的多用户系统或微服务系统。
+
+## 2. 环境
+
+项目运行时基线固定为 Python 3.14.7；仓库根目录的 `.python-version`、Docker 镜像和
+GitHub Release 构建必须保持一致。
 
 ```bash
-python3 -m venv .venv
+python3.14 -m venv .venv
+.venv/bin/pip install --upgrade pip
 .venv/bin/pip install -r requirements.txt
-cp .env.example .env          # 填写连接串与密钥
+```
+
+启动：
+
+```bash
+.venv/bin/python -m app.main
+```
+
+默认访问 `http://localhost:8080`。未设置 `DATABASE_URL` 时使用用户数据目录中的 SQLite。
+
+### 2.1 依赖安全基线
+
+当前基线、Dependabot 告警映射和更新策略见 [DEPENDENCIES.md](DEPENDENCIES.md)。
+修改 `requirements.txt` 后至少执行：
+
+```bash
+.venv/bin/pip install --upgrade -r requirements.txt
+.venv/bin/pip check
+.venv/bin/python -m pytest tests/ -q
+```
+
+`>=` 表示安全下限，不是可重现锁文件。报告依赖验证时要记录实际解析版本；本地安装通过不代表
+Dependabot 已关闭，只有相关改动进入 GitHub 默认分支并等待依赖图重算后才能回读。
+
+## 3. 分层与依赖
+
+目标依赖方向：
+
+```text
+ui/api/jobs → service → repository → core/database
+                    └→ integration → external systems/files
+```
+
+- UI：输入、展示和短生命周期交互状态。
+- API：HTTP 契约、principal 和 schema。
+- Service：用例编排、审计、跨 repository/integration 的业务意图。
+- Repository：SQLAlchemy 与租户过滤。
+- Integration：AI HTTP、节假日、图片、Word。
+- Core：设置、数据库、模型、日志、异常、加密和启动。
+
+现有部分页面直接操作 session/repository。新增代码不要扩散；触碰大型页面时优先抽 service/view-model seam。
+
+## 4. 当前身份模型
+
+UI 固定使用：
+
+```python
+{"sub": "1", "tenant_id": 1, "role": "sys_admin", "username": "admin"}
+```
+
+`sub` 在页面中转换为 `user_id`。JWT、密码、RBAC 页面和中间件仍作为低优先级多用户预备资产保留，但当前 `app/main.py` 不注册相关页面或挂载认证中间件。
+
+API 身份独立：`X-Api-Key` 映射到 tenant；配置 `API_SIGNING_SECRET` 后要求 `X-Timestamp` + `X-Signature`。
+
+恢复多用户不是局部开关，必须连同管理员初始化、路由守卫、会话、所有模块越权测试和人工验收一起设计。
+
+## 5. 数据库与迁移
+
+当前 Alembic head：`a6c4d8e2f9b1`。
+
+```bash
+.venv/bin/alembic current
+.venv/bin/alembic heads
 .venv/bin/alembic upgrade head
-.venv/bin/python -m app.main  # http://0.0.0.0:8080
 ```
 
-- 开发环境 Python 3.14（最低 3.12）。密码哈希使用 `argon2-cffi`（已替换 passlib，兼容 3.13+）。
-- VS Code 调试：使用「运行应用 (python -m app.main)」配置（`module: app.main` + `cwd: ${workspaceFolder}`），不要以文件路径方式启动，否则 `ModuleNotFoundError: No module named 'app'`。
-
-## 2. 分层架构与约定
-
-```
-ui  →  service  →  repository  →  models(ORM)
-            ↘ integration（ai_client / holiday_client / word_export）
-auth / core 为横切支撑
-```
-
-- **UI 层**：仅交互与展示，**不写权限逻辑**（统一在 `app/auth/`）。
-- **Service 层**：业务编排；**禁止直接发 HTTP 请求**（AI 调用一律走 `app/integration/ai_client/`）。
-- **Repository 层**：封装 SQL；**所有查询强制携带 `tenant_id` 过滤**；分页用 `limit`/`offset`，禁止全量加载后切片。
-- **Integration 层**：外部依赖封装，含超时、重试、降级。
-
-### 数据隔离（强制）
-
-所有业务表必须包含：`tenant_id`、`user_id`、`created_at`、`updated_at`。查询必须按 `tenant_id` 过滤，避免跨租户泄露。
-
-### 鉴权与角色
-
-- 账号密码 + JWT（HS256，`app/auth/jwt.py`）+ RBAC：`teacher` / `teaching_admin` / `sys_admin`。
-- 页面访问由 `app/auth/middleware.py` 的 `AuthMiddleware` 统一守卫：未登录访问受限页面重定向到 `/`；白名单 `UNRESTRICTED_PAGE_ROUTES = {"/"}`。`/api/*` 等非页面路由放行（由 API Key 鉴权）。
-- 用户注册策略（首期）：不开放公开自助注册，仅 `sys_admin` 可在 `/user-admin` 页面创建账号。
-- 账号管理第二阶段：支持系统管理员初始化脚本、账号启停、重置密码、列表筛选与分页。
-- 页面内仍保留 `_get_current_user()` 作为纵深防御。
-
-### 管理员初始化脚本
-
-- 入口：`python -m app.jobs.bootstrap_admin`
-- 默认关闭：仅当 `BOOTSTRAP_ADMIN_ENABLED=true` 且 `BOOTSTRAP_ADMIN_PASSWORD` 非空时才执行。
-- 幂等：同租户下若已存在同名 `sys_admin`，脚本输出跳过信息并退出 0。
-- 安全：脚本仅记录账号标识，不记录明文密码。
-
-### 敏感信息
-
-- AI API Key：`app/core/crypto.py`（Fernet）加密入库，页面脱敏展示（`sk-****` + 末 4 位）。
-- 密码：Argon2，禁止 MD5/SHA1。
-- 明文密钥、密码禁止写入任何日志。
-
-### 异常体系
-
-`app/core/exceptions.py`：`AuthError` / `CryptoError` / `ConfigError` / `AiCallError` / `AiParseError`（均带 `.message`）。页面捕获业务异常展示 `e.message`，不暴露堆栈；未预期异常由 `app/main.py` 的 `app.on_exception(_on_global_exception)` 记录完整 traceback。
-
-### 审计日志
-
-`app/core/audit.py` 的 `log_audit(action, *, tenant_id, user_id, **detail)`，结构化记录。已接入审计点：`login_success` / `change_password` / `ai_split` / `ai_generate` / `export_word`。审计调用内部包裹 try/except，**绝不影响主流程**。
-
-## 3. 数据库与迁移
-
-- ORM：SQLAlchemy 2（`Mapped` / `mapped_column`），`AsyncSession`。
-- 主键在 SQLite 测试下需 `BigInteger().with_variant(Integer, "sqlite")` 以支持自增。
-- **禁止**应用启动时 `create_all()`；所有 schema 变更走 Alembic：
+新增迁移：
 
 ```bash
 .venv/bin/alembic revision --autogenerate -m "描述"
-# 人工检查生成的迁移（autogenerate 不能识别全部约束）
-.venv/bin/alembic upgrade head
 ```
 
-- 当前 head：`d60766786069`。表清单：`users` / `semester_config` / `class_config` / `ai_api_key` / `daily_plan` / `prompt_template` / `export_records`。
-- 连接串含 `@`、`%` 等特殊字符需 URL 编码；`alembic/env.py` 已对 `%` 做 `%%` 转义。
+生成后人工检查。禁止：
 
-## 4. AI 集成约定
+- 以 `Base.metadata.create_all()` 作为正式建库路径。
+- 修改已发布旧迁移来隐藏新 schema。
+- 只验证 SQLite 就宣称 MySQL enum/BLOB/ALTER 通过。
+- 在日志中输出含凭据的完整数据库 URL。
 
-- 统一入口 `app/integration/ai_client/base.py::call_ai`（httpx 超时 60s + tenacity 指数退避重试 3 次）。
-- 返回值强约束 JSON schema，解析失败抛 `AiParseError` 并记录日志。
-- 拆分 / 适配 / 一日活动生成分别封装在 `lesson_plan_client.py` / `adapt_client.py` / `generate_client.py`，各自内置默认 system prompt；数据库激活的提示词优先覆盖默认。
+所有业务查询必须执行 tenant 隔离；user-owned 数据还应验证 user。API tenant 投影与 UI tenant + user 投影要使用不同的窄查询入口。逻辑外键聚合写入/删除必须由 service/use-case 持有事务；repository 内部不得提前 commit，并要用失败注入测试证明回滚。
 
-## 5. Word 导出约定
+## 6. AI 集成
 
-- 主方案 `python-docx`，打开 `templates/teacherplan.docx`（19 行 2 列单表）按单元格填充，禁止自行重排结构。
-- 差异段落字体设为红色 `RGBColor(255, 0, 0)`；中文需显式指定字体（宋体），否则乱码。
-- 模板缺失时降级 `_export_from_scratch` 从零建表。
+- 原始 HTTP 只在 `app/integration/ai_client/`。
+- Service 负责读取 active prompt/profile、业务上下文、审计和结果采用。
+- Key 从 repository 取出后短暂解密；明文不写日志。
+- 每个任务定义结构化输出、超时、重试、无效 JSON 和长度边界。
+- 失败不覆盖教师原输入；教师可编辑 AI 结果。
+- 视觉任务发送最少必要的幼儿数据。
 
-## 6. 测试规范
+自动测试使用 `httpx.MockTransport` 或 mock 边界，不调用真实 AI；F009 人工真实模型验收遵守下述独立门禁。
+
+### 6.1 受控 Agent Foundation（F005-F009 已固定 GREEN）
+
+实现前必须阅读 [ADR-0005](ADR/ADR-0005-controlled-ai-agent-runtime.md) 和
+[Agent Runtime 设计](design/agent-runtime.md)。规划依赖方向为：
+
+当前存在 contracts/关闭 registry、tenant+user READ 投影、按 intent 白名单构建的冻结 Context，
+以及已固定的纯内存、关闭字段路径和规范 SHA-256 PlanPatch。F006 已固定 GREEN，新增应用拥有的冻结
+Provider DTO/port、Tool executor port 与有界串行 Runtime；Tool 输入嵌套结构和输出 DTO 均为关闭集合，
+Runtime 对 ID、周次、metadata、ToolResult 与 provider request-id 设置本地上限，拒绝有状态内建类型子类，
+逐字段复核 Provider-visible `AgentContext`，复制冻结的 Tool DTO 而不保留 executor 对象，并完整复核返回的
+F005 Patch。F007 已固定 GREEN，Runtime 还使用完整冻结 stamp 做精确取消，以本地硬时限约束单次
+Provider、单 Tool 和总 operation，在每个终态重新检查 UTC TTL/current-context，并在吞取消 port 真正排空前
+保持 busy、丢弃迟到正文/Patch/异常。F008 已固定具体 OpenAI-compatible adapter、六路静态 executor、
+应用级单 coordinator/controller、日期/current-fingerprint 失效和每日计划只读建议面板；持久化、WRITE、
+长期记忆与产品多 Agent 仍未实现。F009 已在 `tested_code_sha=a50c6f6…` 完成自动矩阵、Linux Chrome mock
+和应用安全配置真实模型验收；closure SHA 的 Review/Quality/Issue 证据见 Issue #48。
+
+```text
+ui/components/agent_draft
+  → service/agent/AgentRuntime
+      ├→ ClosedToolRegistry → 窄 Service 投影 → repository
+      └→ AgentProviderPort → integration/ai_client/agent_provider
+```
+
+开发硬约束：
+
+- 首期只有精确登记的 4 READ + 2 DRAFT；不新建 WRITE、采用、保存、会话历史或长期记忆路径。
+- UI 只提交受限 intent 和当前选择；不传 Session、ORM、Repository、Widget 或自由拼接上下文。
+- Tool 只调用窄 Service/use-case；Provider Adapter 只解析文本/Tool call，不执行 Tool。
+- actor 从受信 UI Context 建立；Provider 参数和自然语言中的 tenant/user/Permission 一律不受信。
+- `AgentContext`、消息窗口、`ToolResult` 和 `PlanPatch` 只存在内存，不进入数据库、备份或日志正文。
+- 首期不引入 Agent 迁移。不使用 `updated_at` 或内容哈希代替将来 WRITE 所需的显式 revision。
+
+测试先用确定性 Scripted Provider 建立 RED。F006 覆盖纯文本、串行 Tool loop、未知/WRITE Tool、
+额外参数、绑定错误、超长、busy、Tool/消息上限和异常净化；F007 已覆盖超时、取消、scope/fingerprint
+变化、迟到丢弃、host cancellation、drain 竞态及 BaseException 净化；F008 已覆盖具体 wire adapter、六路
+executor、跨页面 busy、selection/fingerprint、连接生命周期和 mutation 发布窗口。F009 已以完整矩阵和
+Linux 浏览器/真实模型验收证明本固定代码 SHA 的业务数据与 UI 正文零变化。
+
+F009 开发与验收硬约束：
+
+- 自动矩阵使用动态全表逻辑快照、受保护文件/exports 摘要、调用方 UI 正文、独立 `audit` logger 捕获和
+  seed 后 DML/DDL 记录；不以事务 rollback、SQLite 物理文件 hash 或少数业务表替代。
+- composition timeout 只通过可选 `runtime_limits` 公开注入做确定性测试，默认生产上限保持不变；并发用
+  `asyncio.Event` 协调，不读取 Runtime 私有状态或固定 sleep。
+- Linux mock 只用临时 SQLite 和虚构 Key，Key 仍经应用 repository 加密保存；不得读取真实配置或修改仓库
+  `.env`。真实模型则只走 controller→coordinator→repository active `text` 配置/解密链，不得导出 Key、
+  直接构造 Provider、环境变量注入真实 Key、探测 `/models`、切换凭据或重试。
+- POSIX `.kindergarten_secrets` 从创建瞬间为 `0600`；已有普通文件在首次读取前纠权，即使环境变量覆盖 Key；
+  symlink/非普通文件或纠权/安全写入失败须 fail-closed。没有安全配置时真实验收零请求，F009 保持未完成。
+- 先固定 `tested_code_sha` 并在该 SHA 执行 Linux mock 与真实模型；证据文件共同引用该 SHA。提交证据得到
+  `evidence_closure_sha` 后，最终双轴 Review、Quality 和 Issue 绑定 closure SHA。验收后若产品代码变化，
+  两类人工验收全部重做。
+
+## 7. Word 与图片
+
+- exporter 复制并填充 `templates/` 中固定 DOCX。
+- 维护中文字体、图片方向/尺寸、差异红字和指标打勾位置。
+- 输出写到运行时 exports 目录，并记录 `export_records`。
+- 模板结构测试不能替代真实 Word/Office 人工验收。
+- 上传图片做大小、解码和 MIME 校验；测试只用合成图片。
+
+## 8. 只读 API
+
+端点见 `docs/API.md`。修改 API 时至少覆盖：
+
+- 未配置 Key、错误 Key。
+- HMAC 缺失、错误、过期和正确签名。
+- tenant 越权和不存在 ID。
+- limit/offset/过滤和响应 schema。
+- 响应不包含密码、Key 密文或内部路径。
+
+## 9. 测试
 
 ```bash
-.venv/bin/pytest tests/ -q            # 全量
-.venv/bin/pytest tests/test_xxx.py -v # 单文件
+.venv/bin/python -m pytest tests/ -q
 ```
 
-- `pytest.ini` 设 `asyncio_mode = auto`，异步测试无需逐个标注。
-- `tests/conftest.py` 提供 `async_session` fixture（SQLite 内存库，每测试函数建表/拆表）。
-- AI / Word / DB 调用使用 mock / fixture 隔离；每个 service 函数必须有单元测试。
-- API 路由测试用 `httpx.ASGITransport` 构建独立 FastAPI app，`dependency_overrides[get_db]` 注入内存库会话，`monkeypatch` 覆盖 `settings.API_KEYS`。
-- 当前基线：**242 passed, 0 warnings**。
+按风险运行子集后仍需在交付前跑全量。报告格式至少包含：
 
-## 7. 对外 REST API 开发
+- SHA、平台、Python 版本。
+- 命令、通过/失败/跳过数量。
+- 使用 SQLite、MySQL 还是 mock。
+- 未执行的人工/平台门禁。
 
-- 路由集中在 `app/api/routes.py`，鉴权依赖 `app/api/auth.py::get_api_principal`，响应模型在 `app/api/schemas.py`（不暴露密钥/密码）。
-- 鉴权返回 `ApiPrincipal(tenant_id=...)`，端点以该 `tenant_id` 作为查询隔离条件。新增端点务必沿用此模式，禁止从查询参数直接取 `tenant_id`。
-- 详见 [API.md](API.md)。
+仓库历史测试数只属于当时 SHA，不得复制为当前结果。
 
-## 8. 部署（生产）
+## 10. 手动验证
 
-- 云服务器直装 + systemd 托管 `python -m app.main`，前置 Nginx 反向代理（TLS、限流、来源限制）。
-- 启用对外 API：在 `.env` 配置 `API_KEYS`（建议同时配置 `API_SIGNING_SECRET`），并在反向代理层限制 `/api/` 来源 IP。
-- 备份：定期备份 MySQL 与 `exports/` 导出文件。
+使用 `docs/MANUAL_TESTING.md`。以下证据必须分开：
 
-## 9. 常见陷阱
+- 浏览器主流程。
+- SQLite 与 MySQL。
+- 真实 AI 与 mock AI。
+- Word/Office 模板保真。
+- Windows 安装包、Linux 包、Docker。
 
-1. NiceGUI 底层 async，UI 状态更新需正确传递；`DatePanel` 回调若为 async 须 `await`。
-2. SQLite 测试与 MySQL 类型差异：主键用 `with_variant`。
-3. python-docx 中文字体须显式指定，否则乱码。
-4. Alembic autogenerate 不识别全部约束，迁移后人工核对 SQL。
-5. 远程 MySQL 域名若有 AAAA 记录可能导致 IPv6 连接超时；必要时连接串直接用 IPv4。
+## 11. 图谱
 
-## 10. 手动验证步骤（账号管理第二阶段）
+- codebase-memory：结构、调用、热点、影响分析；共享 artifact 位于 `.codebase-memory/`。
+- Graphify：代码与文档的语义关系、社区和报告；输出位于 `graphify-out/`。
+- 图谱是辅助证据。遇到文档/代码冲突，回到当前源文件、迁移和测试。
+- 更新图谱后检查来源覆盖、缺失/悬空端点、自环、重复和折叠边。
 
-完整测试清单见 [MANUAL_TESTING.md](MANUAL_TESTING.md)。
+## 12. 常见陷阱
 
-1. 初始化系统管理员
-    - 设置环境变量：`BOOTSTRAP_ADMIN_ENABLED=true`、`BOOTSTRAP_ADMIN_PASSWORD=<强密码>`，可选设置 tenant 和用户名。
-    - 执行：`.venv/bin/python -m app.jobs.bootstrap_admin`
-    - 预期：首次创建成功；重复执行提示已存在并跳过。
-2. 登录与入口可见性
-    - 使用系统管理员登录，主页可见“账号管理”。
-    - 使用教师账号登录，主页不可见“账号管理”；直接访问 `/user-admin` 显示无权限。
-3. 创建账号
-    - 在 `/user-admin` 创建 teacher / teaching_admin 账号。
-    - 预期：创建成功后列表刷新可见；重复用户名提示失败。
-4. 启停账号
-    - 在账号列表对某教师执行停用。
-    - 预期：该账号登录失败；重新启用后可再次登录。
-5. 重置密码
-    - 在账号列表对某账号执行重置密码。
-    - 预期：旧密码登录失败，新密码登录成功。
-6. 筛选与分页
-    - 输入用户名关键字筛选，并切换页码。
-    - 预期：结果总数、当前页数据与分页按钮状态正确。
+1. 把保留的 auth 代码误写为当前登录已启用。
+2. 把 `services/README.md` 的目录示例误写为已部署微服务。
+3. 把进程存在误写为迁移成功；当前启动迁移失败会 fail-closed，仍须核对迁移日志与 head。
+4. 用历史测试数字代替当前执行。
+5. 只按资源 ID 更新/删除，不带 tenant/user。
+6. 在大型 NiceGUI 页面继续堆业务规则。
+7. 把 Linux CI 或 DOCX XML 测试当作 Windows/Word 人工通过。
+8. 把功能分支上的 F009 验收误写成已合并/已发布，或为了快速接入让 Provider 直连 Repository/动态 Tool。
+9. 在 Agent Foundation 中预留 WRITE、“始终允许”、持久化对话或 MCP/插件入口。
+
+## 13. 提交前检查
+
+- [ ] 只修改授权范围内的文件。
+- [ ] 新行为有测试，迁移有升级验证。
+- [ ] 租户、密钥、图片和日志边界已检查。
+- [ ] `CONTEXT.md`/Roadmap/ADR/模块文档按事实同步。
+- [ ] `git diff --check` 通过。
+- [ ] 当前 SHA 的验证结果已记录，未执行项明确列出。

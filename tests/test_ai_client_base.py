@@ -126,8 +126,6 @@ async def test_call_ai_http_500_raises_ai_call_error():
     import unittest.mock as mock
     from app.integration.ai_client import base as ai_base
 
-    original_make_retry = ai_base._make_retry_decorator
-
     def _fast_retry():
         from tenacity import retry, stop_after_attempt, wait_none
         return retry(stop=stop_after_attempt(3), wait=wait_none(), reraise=True)

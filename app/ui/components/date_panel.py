@@ -17,7 +17,10 @@
     await panel.render()
 """
 
+import asyncio
+from dataclasses import dataclass
 from datetime import date as date_type
+from inspect import isawaitable
 
 from nicegui import ui
 
@@ -36,6 +39,49 @@ from app.service.date_service import (
 )
 
 
+@dataclass(frozen=True, slots=True)
+class DateSelection:
+    """One immutable date selection, ordered by a local generation."""
+
+    generation: int
+    selected_date: date_type | None
+
+    def __post_init__(self) -> None:
+        if type(self.generation) is not int or self.generation <= 0:
+            raise ValueError("date_selection_invalid")
+        if self.selected_date is not None and type(self.selected_date) is not date_type:
+            raise ValueError("date_selection_invalid")
+
+
+class DateSelectionGuard:
+    """Issue selections and reject work belonging to an older generation."""
+
+    def __init__(self) -> None:
+        self._generation = 0
+        self._current: DateSelection | None = None
+
+    @property
+    def current(self) -> DateSelection | None:
+        """Return the latest immutable selection, if one has been issued."""
+        return self._current
+
+    def select(self, selected_date: date_type | None) -> DateSelection:
+        """Advance the generation and return the new current selection."""
+        if selected_date is not None and type(selected_date) is not date_type:
+            raise ValueError("date_selection_invalid")
+        self._generation += 1
+        token = DateSelection(
+            generation=self._generation,
+            selected_date=selected_date,
+        )
+        self._current = token
+        return token
+
+    def is_current(self, token: object) -> bool:
+        """Return whether ``token`` is the exact current generation and date."""
+        return type(token) is DateSelection and token == self._current
+
+
 class DatePanel:
     """
     日期选择面板，可嵌入任意 NiceGUI 页面。
@@ -52,11 +98,14 @@ class DatePanel:
         semester_start: date_type | None = None,
         semester_end: date_type | None = None,
         on_date_change=None,
+        on_date_selected=None,
     ) -> None:
         self.semester_start = semester_start
         self.semester_end = semester_end
         self.on_date_change = on_date_change
+        self.on_date_selected = on_date_selected
         self.selected_date: date_type | None = None
+        self._selection_guard = DateSelectionGuard()
 
         # UI 元素引用（render 后有效）
         self._date_input: ui.input | None = None
@@ -77,9 +126,13 @@ class DatePanel:
 
                 with self._date_input:
                     with ui.menu().props("no-parent-event") as date_menu:
-                        with ui.date(on_change=lambda e: self._on_picker_change(e.value)):
+                        with ui.date(
+                            on_change=lambda e: self._on_picker_change(e.value)
+                        ):
                             with ui.row().classes("justify-end"):
-                                ui.button("确定", on_click=date_menu.close).props("flat")
+                                ui.button("确定", on_click=date_menu.close).props(
+                                    "flat"
+                                )
                     ui.button(icon="event", on_click=date_menu.open).props("flat round")
 
                 ui.button(
@@ -99,51 +152,83 @@ class DatePanel:
 
         return card
 
-    def _set_date(self, date_str: str) -> None:
+    @staticmethod
+    def _parse_selected_date(date_str: str | None) -> date_type | None:
+        if not date_str:
+            return None
+        try:
+            return date_type.fromisoformat(date_str)
+        except (TypeError, ValueError):
+            return None
+
+    def _begin_selection(self, date_str: str | None) -> DateSelection:
+        """Synchronously invalidate older work before starting async lookups."""
+        selected_date = self._parse_selected_date(date_str)
+        token = self._selection_guard.select(selected_date)
+        self.selected_date = selected_date
+        self._clear_display_if_rendered()
+
+        if self.on_date_selected:
+            result = self.on_date_selected(token)
+            if isawaitable(result):
+                asyncio.ensure_future(result)
+        return token
+
+    def _clear_display_if_rendered(self) -> None:
+        if self._week_label is not None:
+            self._week_label.text = ""
+        if self._holiday_label is not None:
+            self._holiday_label.visible = False
+            self._holiday_label.text = ""
+        if self._tag_row is not None:
+            self._tag_row.clear()
+
+    def _set_date(self, date_str: str | None) -> None:
         """外部或内部直接设置日期值，触发联动更新（同步入口）。"""
         if self._date_input:
             self._date_input.value = date_str
-        ui.run_javascript(f"")  # 触发 NiceGUI 刷新
-        # 通过异步任务处理联动
-        import asyncio
-        asyncio.ensure_future(self._update_info(date_str))
+        token = self._begin_selection(date_str)
+        asyncio.ensure_future(self._update_info(date_str, token))
 
-    def _on_picker_change(self, date_str: str) -> None:
+    def _on_picker_change(self, date_str: str | None) -> None:
         """日期选择器选值回调（同步，启动异步联动）。"""
         if self._date_input:
             self._date_input.value = date_str
-        import asyncio
-        asyncio.ensure_future(self._update_info(date_str))
+        token = self._begin_selection(date_str)
+        asyncio.ensure_future(self._update_info(date_str, token))
 
-    async def _update_info(self, date_str: str) -> None:
+    async def _update_info(
+        self,
+        date_str: str | None,
+        token: DateSelection,
+    ) -> None:
         """根据选定日期更新所有联动显示（异步）。"""
         # render() 之后这些字段必定非 None
         assert self._week_label is not None
         assert self._holiday_label is not None
         assert self._tag_row is not None
 
-        # 清空旧状态
-        self._week_label.text = ""
-        self._holiday_label.visible = False
-        self._holiday_label.text = ""
-        self._tag_row.clear()
+        if not self._selection_guard.is_current(token):
+            return
+
+        self._clear_display_if_rendered()
 
         if not date_str:
-            self.selected_date = None
-            if self.on_date_change:
-                import asyncio
+            if self.on_date_change and self._selection_guard.is_current(token):
                 result = self.on_date_change(None)
-                if asyncio.iscoroutine(result):
+                if isawaitable(result):
                     await result
             return
 
         try:
             target = date_type.fromisoformat(date_str)
-        except ValueError:
-            self._week_label.text = "日期格式错误"
+        except (TypeError, ValueError):
+            if self._selection_guard.is_current(token):
+                self._week_label.text = "日期格式错误"
             return
 
-        self.selected_date = target
+        if target != token.selected_date or not self._selection_guard.is_current(token):
+            return
 
         # ── 周次 / 星期 / 学期信息 ──────────────────────────────────────────
         weekday_cn = get_weekday_cn(target)
@@ -160,15 +245,25 @@ class DatePanel:
             if not is_within_semester(self.semester_start, self.semester_end, target):
                 week_info_parts.append("⚠ 不在学期范围内")
 
+        if not self._selection_guard.is_current(token):
+            return
         self._week_label.text = "  ".join(week_info_parts)
 
         # ── 工作日 / 节假日状态 ─────────────────────────────────────────────
         workday = is_workday(target)
 
         holiday_result = await is_holiday(target)
+        if not self._selection_guard.is_current(token):
+            return
         near_result = await is_near_holiday(target)
+        if not self._selection_guard.is_current(token):
+            return
         holiday_name = await get_holiday_name(target)
+        if not self._selection_guard.is_current(token):
+            return
         adjusted_result = await is_adjusted_workday(target)
+        if not self._selection_guard.is_current(token):
+            return
 
         if holiday_result is None and near_result is None:
             # API 不可用
@@ -215,8 +310,7 @@ class DatePanel:
                 ui.badge(tag, color="blue").classes("text-xs")
 
         # ── 回调（支持 sync 和 async 回调） ───────────────────────────────────────
-        if self.on_date_change:
-            import asyncio
+        if self.on_date_change and self._selection_guard.is_current(token):
             result = self.on_date_change(target)
-            if asyncio.iscoroutine(result):
+            if isawaitable(result):
                 await result

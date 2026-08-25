@@ -140,7 +140,6 @@ async def test_game_observation_insertable(async_session):
 @pytest.mark.asyncio
 async def test_game_observation_tenant_required(async_session):
     """GameObservation.tenant_id 非空约束生效。"""
-    from sqlalchemy.exc import IntegrityError
 
     from app.core.models.game_observation import GameObservation
 

@@ -1,5 +1,7 @@
 # 幼儿园教学管理系统推荐技术栈（简单且健壮）
 
+> **历史选型说明（2026-08-22）**：本文包含渐进式微服务规划。当前实际架构是 NiceGUI 模块化单体，默认 SQLite、可选 MySQL；以 [`../docs/design/system-architecture.md`](../docs/design/system-architecture.md) 和 ADR 为准。
+
 ## 结论（首推）
 采用 **Python 单体应用**：
 - 前后端：NiceGUI（基于 FastAPI）
@@ -34,7 +36,7 @@
 ## 最小可落地版本（建议直接按此启动）
 
 ### 1) 运行时与框架
-- Python 3.14（生产环境实际版本，开发环境与云端一致）
+- Python 3.14.7（生产、开发、Docker 与 GitHub Release 构建统一版本）
 - NiceGUI（UI）
 - FastAPI（由 NiceGUI 生态直接复用）
 - Uvicorn（ASGI 服务器）
@@ -92,7 +94,7 @@ tests/
 - NiceGUI 单体应用，教学管理核心闭环。
 - 默认 SQLite，可选 MySQL。单用户模式。
 
-### 阶段 2（当前）— Docker Compose AIO + 子系统拆分
+### 阶段 2（历史规划）— Docker Compose AIO + 子系统拆分
 - Docker Compose 编排：主系统 + Caddy + 可选 MySQL。
 - 渐进式拆分 `app/integration/` 为独立 FastAPI 子系统容器。
 - 子系统顺序：holiday-service → ai-service → word-service。
@@ -110,4 +112,4 @@ tests/
 - 消息队列/事件总线：当前收益不足。
 
 ## 一句话建议
-Docker Compose AIO 编排 Python 微服务（NiceGUI 主系统 + FastAPI 子系统 + Caddy），Monorepo 渐进式拆分，是当前阶段最优路线。
+历史上曾规划 Docker Compose AIO 编排 Python 微服务（NiceGUI 主系统 + FastAPI 子系统 + Caddy）并渐进式拆分；当前实际基线仍是模块化单体，是否拆分须由独立 ADR 和运维需求决定。

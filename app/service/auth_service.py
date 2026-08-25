@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.jwt import create_access_token
 from app.auth.password import hash_password, verify_password
 from app.core.audit import log_audit
-from app.core.exceptions import AppError, AuthError
+from app.core.exceptions import AuthError
 from app.core.models.user import UserRole
 from app.repository.user_repository import (
     create_pending_user,
