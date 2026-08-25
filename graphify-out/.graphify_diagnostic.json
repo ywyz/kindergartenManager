@@ -1,86 +1,98 @@
 {
-  "node_count": 2051,
+  "node_count": 3191,
   "unverified_node_count": 0,
-  "raw_edge_count": 5211,
+  "raw_edge_count": 7334,
   "non_object_edges": 0,
   "missing_endpoint_edges": 0,
-  "dangling_endpoint_edges": 467,
+  "dangling_endpoint_edges": 0,
   "self_loop_edges": 0,
-  "valid_candidate_edges": 4744,
-  "exact_duplicate_edges": 28,
-  "directed_unique_endpoint_pairs": 4596,
-  "directed_same_endpoint_collapsed_edges": 148,
-  "undirected_unique_endpoint_pairs": 4573,
-  "undirected_same_endpoint_collapsed_edges": 171,
-  "same_endpoint_group_count": 128,
-  "relation_variant_groups": 116,
+  "valid_candidate_edges": 7334,
+  "exact_duplicate_edges": 0,
+  "directed_unique_endpoint_pairs": 7334,
+  "directed_same_endpoint_collapsed_edges": 0,
+  "undirected_unique_endpoint_pairs": 7334,
+  "undirected_same_endpoint_collapsed_edges": 0,
+  "same_endpoint_group_count": 0,
+  "relation_variant_groups": 0,
   "source_file_variant_groups": 0,
-  "source_location_variant_groups": 4,
-  "context_variant_groups": 4,
+  "source_location_variant_groups": 0,
+  "context_variant_groups": 0,
   "post_build_graph_type": "Graph",
-  "post_build_node_count": 2051,
-  "post_build_edge_count": 4574,
+  "post_build_node_count": 3191,
+  "post_build_edge_count": 7334,
   "post_build_error": "",
   "producer_suppression": {
     "path": "/home/admin/.local/share/uv/tools/graphifyy/lib/python3.14/site-packages/graphify/extract.py",
-    "total_sites": 10,
+    "total_sites": 12,
     "sites": [
       {
-        "line": 1047,
+        "line": 1154,
         "name": "seen_ids",
         "tuple_arity": 0,
         "sample": "seen_ids = {n[\"id\"] for n in nodes}"
       },
       {
-        "line": 1197,
+        "line": 1420,
         "name": "seen_ids",
         "tuple_arity": 0,
         "sample": "seen_ids = {n[\"id\"] for n in nodes}"
       },
       {
-        "line": 1199,
+        "line": 1422,
         "name": "seen_doc_refs",
         "tuple_arity": 0,
         "sample": "seen_doc_refs: set[str] = set()"
       },
       {
-        "line": 1622,
+        "line": 1782,
         "name": "seen_ids",
         "tuple_arity": 0,
         "sample": "seen_ids: set[str] = {n[\"id\"] for n in nodes}"
       },
       {
-        "line": 2091,
+        "line": 1929,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids = {n.get(\"id\") for n in nodes}"
+      },
+      {
+        "line": 2460,
         "name": "seen_keys",
         "tuple_arity": 0,
         "sample": "seen_keys: set[tuple] = set()"
       },
       {
-        "line": 3014,
+        "line": 2629,
+        "name": "seen_keys",
+        "tuple_arity": 0,
+        "sample": "seen_keys: set[tuple] = set()"
+      },
+      {
+        "line": 4035,
         "name": "seen_ids",
         "tuple_arity": 0,
         "sample": "seen_ids: set[str] = set()"
       },
       {
-        "line": 3122,
+        "line": 4143,
         "name": "seen_ids",
         "tuple_arity": 0,
         "sample": "seen_ids: set[str] = set()"
       },
       {
-        "line": 3201,
+        "line": 4222,
         "name": "seen_ids",
         "tuple_arity": 0,
         "sample": "seen_ids: set[str] = set()"
       },
       {
-        "line": 3696,
+        "line": 4737,
         "name": "seen_ids",
         "tuple_arity": 0,
         "sample": "seen_ids: set[str] = set()"
       },
       {
-        "line": 3697,
+        "line": 4738,
         "name": "seen_edges",
         "tuple_arity": 4,
         "sample": "seen_edges: set[tuple[str, str, str, str | None]] = set()"
@@ -88,106 +100,5 @@
     ],
     "error": ""
   },
-  "examples": [
-    {
-      "source": "app_repository_ai_key_repository_save_ai_key",
-      "target": "app_core_models_ai_key_aiapikey",
-      "edge_count": 3,
-      "relations": [
-        "calls",
-        "references"
-      ],
-      "source_files": [
-        "app/repository/ai_key_repository.py"
-      ],
-      "source_locations": [
-        "L19",
-        "L57"
-      ],
-      "contexts": [
-        "call",
-        "return_type"
-      ]
-    },
-    {
-      "source": "app_repository_class_repository_upsert_class_config",
-      "target": "app_core_models_class_config_classconfig",
-      "edge_count": 3,
-      "relations": [
-        "calls",
-        "references"
-      ],
-      "source_files": [
-        "app/repository/class_repository.py"
-      ],
-      "source_locations": [
-        "L28",
-        "L55"
-      ],
-      "contexts": [
-        "call",
-        "return_type"
-      ]
-    },
-    {
-      "source": "app_repository_course_review_activity_repository_create_course_review_activity",
-      "target": "app_core_models_course_review_activity_coursereviewactivity",
-      "edge_count": 3,
-      "relations": [
-        "calls",
-        "references"
-      ],
-      "source_files": [
-        "app/repository/course_review_activity_repository.py"
-      ],
-      "source_locations": [
-        "L37",
-        "L9"
-      ],
-      "contexts": [
-        "call",
-        "return_type"
-      ]
-    },
-    {
-      "source": "app_repository_daily_plan_repository_save_daily_plan",
-      "target": "app_core_models_daily_plan_dailyplan",
-      "edge_count": 3,
-      "relations": [
-        "calls",
-        "references"
-      ],
-      "source_files": [
-        "app/repository/daily_plan_repository.py"
-      ],
-      "source_locations": [
-        "L11",
-        "L60"
-      ],
-      "contexts": [
-        "call",
-        "return_type"
-      ]
-    },
-    {
-      "source": "app_repository_export_repository_save_export_record",
-      "target": "app_core_models_export_record_exportrecord",
-      "edge_count": 3,
-      "relations": [
-        "calls",
-        "references"
-      ],
-      "source_files": [
-        "app/repository/export_repository.py"
-      ],
-      "source_locations": [
-        "L36",
-        "L7"
-      ],
-      "contexts": [
-        "call",
-        "return_type"
-      ]
-    }
-  ]
+  "examples": []
 }

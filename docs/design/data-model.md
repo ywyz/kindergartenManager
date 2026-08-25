@@ -184,10 +184,12 @@ Repository 必须满足：
 - 历史记录保存配置快照，不在读取时用当前设置覆盖。
 - 提示词和 AI Key 用 active + 历史行管理；切换 active 应在事务中完成。
 
-## 13. Agent Foundation 的数据边界（计划）
+## 13. Agent Foundation 的数据边界
 
 当前 16 张 ORM 表中没有 Agent 表，当前 Alembic head 也不包含 Agent 迁移。
 [ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md) 确定 Agent Foundation 不改变这一事实。
+F009 自动矩阵动态反射了包含 Alembic 版本表在内的 17 张实际 SQLite 表，并证明成功、失败、取消、超时、
+stale、越权、断开和重启路径均不增加或修改 Agent 持久化状态；两类人工验收的前后逻辑摘要也完全相等。
 
 以下对象只能作为当前 operation 的内存 DTO：
 

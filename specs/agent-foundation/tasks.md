@@ -1,7 +1,8 @@
 # Agent Foundation 任务冻结
 
-权威范围见 [spec.md](spec.md)。下列任务有严格依赖关系；F005、F006 已固定 GREEN，F007-F009 已获连续授权，
-但只能在前置切片的 Review、精确 SHA Quality 与 Issue 证据闭合后依序进入。
+权威范围见 [spec.md](spec.md)。下列任务有严格依赖关系；F005-F009 已按前置切片的 Review、精确 SHA
+Quality 与 Issue 证据顺序执行。F009 的代码与人工验收共同绑定固定 `tested_code_sha`，最终证据提交另以
+`evidence_closure_sha` 做 Review/Quality/Issue 收口。
 
 | ID | 任务 | 前置 | 当前状态 |
 |---|---|---|---|
@@ -14,7 +15,7 @@
 | F006 | 实现 Provider port 与有界 Runtime | F005 | GREEN（RED `f0ab660…`；Review RED `6b083fa…`、`8831b3f…`、`79e005a…`、`51f5e5f…`；实现/重构 `99167ef…`；证据 `049b520…`；Review 0/0；本地 `73 + 551 passed`；CI `32644290676`） |
 | F007 | 实现取消/超时/context current-state/迟到丢弃 | F006 | GREEN（RED `55b8702…`；Review RED `08ada78…`、`ddca78d…`；候选 `51443a3…`；证据 `2fb4e6f…`；Review 0/0；本地 `110 + 551 passed`；CI `32648599591`） |
 | F008 | OpenAI-compatible Provider adapter、六个关闭 Tool executor、组合装配与每日计划 Agent UI | F007 固定 GREEN + Review/CI/Issue | GREEN（RED `b3cad08…`；Review RED `b3c45d2…`、`b0647a9…`；候选 `f1f5e63…`；Review 0/0；本地 `180 + 551 passed`；CI `32651221452`） |
-| F009 | 零持久化全矩阵、Linux 浏览器 mock 与安全配置真实模型验收 | F008 固定 GREEN + Review/CI/Issue | 已授权；公共验收 seam 冻结，下一门禁为稳定 RED |
+| F009 | 零持久化全矩阵、Linux 浏览器 mock 与安全配置真实模型验收 | F008 固定 GREEN + Review/CI/Issue | 验收闭合（RED `34e12f2…`；最小 GREEN `6f6fac4…`；Review RED/修正见 Issue #48；`tested_code_sha=a50c6f6…`；Review 0/0；本地 `261 + 567 passed`；CI `32808246590`；mock/真实模型均 PASS；closure SHA 证据见 Issue #48） |
 
 F008 内部依赖顺序冻结为：
 
@@ -62,5 +63,6 @@ F009 内部依赖顺序冻结为：
    静态门禁后推送 closure SHA，等待
    Quality `headSha` 精确匹配且 success，核对远端分支并回写 Issue #48。
 
-当前只允许提交本次 F009 文档冻结并建立稳定 RED；GREEN、人工验收与证据文件必须按上述顺序。全程禁止
-migration、WRITE、长期记忆、产品多 Agent、合并 main、关闭 Issue 或发布。
+上述 F009 顺序已经执行；最终只以包含证据、状态文档与图谱更新的 `evidence_closure_sha` 做双轴 Review、
+精确 Quality、远端分支和 Issue #48 证据收口。全程仍禁止 migration、WRITE、长期记忆、产品多 Agent、
+合并 main、关闭 Issue 或发布。

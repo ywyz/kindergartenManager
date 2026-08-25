@@ -1,6 +1,7 @@
 # Agent Foundation 冻结规格
 
-- 状态：F005-F008 固定 GREEN；F009 公共验收契约冻结，下一门禁为稳定 RED
+- 状态：F005-F009 固定 GREEN；F009 自动矩阵、Linux Chrome mock 与应用安全配置真实模型验收均已 PASS，
+  `evidence_closure_sha` 的最终 Review/Quality/Issue 证据见 Issue #48
 - 分支：`feat/agent-foundation`
 - 安全同步 RED 基线：`5de2e49bee19749f611b50747a31be9464b92d7b`
 - Issue：[#48](https://github.com/ywyz/kindergartenManager/issues/48)
@@ -337,9 +338,22 @@ GREEN 后先执行双轴 Review；findings 必须先建立 Review RED 再修正�
 `headSha` Quality 成功并回写 Issue #48。
 任一真实模型安全前置缺失都保持 F009 未完成，不得以 mock、环境变量注入或旧 SHA 证据替代。
 
+F009 稳定 RED `34e12f2…` 连续两次保持 Foundation `214 passed / 3 failed`，三个失败只指向公开
+`runtime_limits` 透传；secrets 矩阵保持 `13 passed / 11 failed`，失败只指向创建/首次读取权限、非普通文件、
+纠权/安全写入失败等关闭行为。最小 GREEN `6f6fac4…` 后，Review findings 均先以 RED 固定，再关闭并发初始化、
+FIFO、BaseException 残片、worktree/import、合成 user seed、mock 意图和诊断/Provider 兼容边界。
+
+最终 `tested_code_sha` 为 `a50c6f6b9aa941996052c59a301a7a40bdbd706f`：Foundation `261 passed`、
+常规全量 `567 passed`，Standards `0`、Spec `0`；Quality `32808246590` 的 `headSha` 精确匹配并成功。
+[Linux Chrome mock 证据](evidence/f009-linux-browser-mock.md) 与
+[应用安全配置真实模型证据](evidence/f009-real-model.md) 均绑定该 SHA 并为 PASS：mock 前后全逻辑摘要同为
+`81601b80…`；真实模型只经应用安全配置执行一次 Controller 请求，终态 `SUCCEEDED`、Patch `0`，前后全逻辑
+摘要同为 `bdb45487…`；两者 UI digest 均保持 `f60b310f…` 且 compare 为 `equal=true`。最终证据、状态文档与
+图谱共同形成独立 `evidence_closure_sha`，其 Review/Quality/远端/Issue 证据记录在 Issue #48，不造成自引用。
+
 ## 7. 当前授权与停止边界
 
 本分支从 `0880f64c419e4fc27c45f4a7207e547077736056` 获得 F007 → F008 → F009 连续授权，但必须逐切片闭合
-`RED → 最小 GREEN → 双轴 Review → 固定 SHA Quality → Issue 证据`，不得横向并行实现。F008 已闭合，
-当前冻结 F009 公共验收 seam，下一门禁只建立并固定稳定 RED；其 GREEN 与人工验收必须等待 RED commit。
+`RED → 最小 GREEN → 双轴 Review → 固定 SHA Quality → Issue 证据`，不得横向并行实现。F007-F009 已按该
+顺序执行；F009 的人工证据绑定固定 `tested_code_sha`，最终 closure 证据绑定独立 `evidence_closure_sha`。
 全程禁止合并 `main`、关闭 Issue、发布、Agent WRITE、长期记忆、migration 或产品多 Agent。

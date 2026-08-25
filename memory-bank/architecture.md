@@ -1,6 +1,6 @@
 # 幼儿园教学管理系统架构文档（初始化）
 
-> **历史文档说明（2026-08-24）**：本文按开发阶段累积，包含已被后续单用户模式取代的登录描述和旧迁移/测试数字。当前架构事实见 [`../CONTEXT.md`](../CONTEXT.md)、[`../docs/design/system-architecture.md`](../docs/design/system-architecture.md)、[`../docs/design/data-model.md`](../docs/design/data-model.md) 和 [`../docs/ADR/README.md`](../docs/ADR/README.md)。受控 Agent 的 F003-F008 已固定 GREEN，具体 Provider、六 Tool executor、组合装配与每日计划 UI 已实现；F009 零持久化、Linux 浏览器 mock 与安全配置真实模型验收尚未闭合。边界见 [`../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md`](../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md) 与 [`../docs/design/agent-runtime.md`](../docs/design/agent-runtime.md)。下文历史内容不授权 Agent WRITE。当前 Alembic head 为 `a6c4d8e2f9b1`。
+> **历史文档说明（2026-08-25）**：本文按开发阶段累积，包含已被后续单用户模式取代的登录描述和旧迁移/测试数字。当前架构事实见 [`../CONTEXT.md`](../CONTEXT.md)、[`../docs/design/system-architecture.md`](../docs/design/system-architecture.md)、[`../docs/design/data-model.md`](../docs/design/data-model.md) 和 [`../docs/ADR/README.md`](../docs/ADR/README.md)。受控 Agent 的 F003-F009 已固定 GREEN，具体 Provider、六 Tool executor、组合装配与每日计划 UI 已实现；F009 零持久化、Linux 浏览器 mock 与应用安全配置真实模型验收均已 PASS，最终 closure SHA 证据见 Issue #48。边界见 [`../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md`](../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md) 与 [`../docs/design/agent-runtime.md`](../docs/design/agent-runtime.md)。下文历史内容不授权 Agent WRITE。当前 Alembic head 为 `a6c4d8e2f9b1`。
 
 ## 1. 历史阶段记录
 
@@ -440,4 +440,8 @@ SHA `049b520…` 的远端 Quality `32644290676` 精确匹配成功。F007 初�
 Standards `0`、Spec `0`；证据 SHA `2fb4e6f…` 的远端 Quality `32648599591` 精确匹配成功。F008 最终
 RED `b3cad08…`、Review RED `b3c45d2…` 与 `b0647a9…` 收敛到候选 `f1f5e63…`，Foundation **180 passed**、
 全量 **551 passed**、Standards `0`、Spec `0`；远端 Quality `32651221452` 的 `headSha` 精确匹配成功。
-F009 公共验收 seam 已冻结，下一门禁为稳定 RED；尚不得宣称整个 Agent Foundation 验收完成。
+F009 稳定 RED `34e12f2…` 与后续 Review RED 固定零持久化、POSIX secrets、人工 helper、Provider 兼容和
+关闭诊断；最终 `tested_code_sha=a50c6f6…` 为 Foundation **261 passed**、全量 **567 passed**、Standards
+`0`、Spec `0`，远端 Quality `32808246590` 精确匹配成功。Linux Chrome mock 与应用安全配置真实模型均
+PASS；两者 UI/全逻辑 snapshot compare 均为 `equal=true`，完整脱敏证据位于
+`specs/agent-foundation/evidence/`，最终 closure SHA 的 Review/Quality/Issue 证据见 Issue #48。

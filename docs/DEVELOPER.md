@@ -113,7 +113,7 @@ API 身份独立：`X-Api-Key` 映射到 tenant；配置 `API_SIGNING_SECRET` �
 
 自动测试使用 `httpx.MockTransport` 或 mock 边界，不调用真实 AI；F009 人工真实模型验收遵守下述独立门禁。
 
-### 6.1 受控 Agent Foundation（F005-F008 已固定，F009 验收中）
+### 6.1 受控 Agent Foundation（F005-F009 已固定 GREEN）
 
 实现前必须阅读 [ADR-0005](ADR/ADR-0005-controlled-ai-agent-runtime.md) 和
 [Agent Runtime 设计](design/agent-runtime.md)。规划依赖方向为：
@@ -127,7 +127,8 @@ F005 Patch。F007 已固定 GREEN，Runtime 还使用完整冻结 stamp 做精�
 Provider、单 Tool 和总 operation，在每个终态重新检查 UTC TTL/current-context，并在吞取消 port 真正排空前
 保持 busy、丢弃迟到正文/Patch/异常。F008 已固定具体 OpenAI-compatible adapter、六路静态 executor、
 应用级单 coordinator/controller、日期/current-fingerprint 失效和每日计划只读建议面板；持久化、WRITE、
-长期记忆与产品多 Agent 仍未实现，F009 验收尚未闭合。
+长期记忆与产品多 Agent 仍未实现。F009 已在 `tested_code_sha=a50c6f6…` 完成自动矩阵、Linux Chrome mock
+和应用安全配置真实模型验收；closure SHA 的 Review/Quality/Issue 证据见 Issue #48。
 
 ```text
 ui/components/agent_draft
@@ -148,8 +149,8 @@ ui/components/agent_draft
 测试先用确定性 Scripted Provider 建立 RED。F006 覆盖纯文本、串行 Tool loop、未知/WRITE Tool、
 额外参数、绑定错误、超长、busy、Tool/消息上限和异常净化；F007 已覆盖超时、取消、scope/fingerprint
 变化、迟到丢弃、host cancellation、drain 竞态及 BaseException 净化；F008 已覆盖具体 wire adapter、六路
-executor、跨页面 busy、selection/fingerprint、连接生命周期和 mutation 发布窗口。F009 才以完整矩阵和
-Linux 浏览器/真实模型验收最终证明业务数据与 UI 正文零变化。
+executor、跨页面 busy、selection/fingerprint、连接生命周期和 mutation 发布窗口。F009 已以完整矩阵和
+Linux 浏览器/真实模型验收证明本固定代码 SHA 的业务数据与 UI 正文零变化。
 
 F009 开发与验收硬约束：
 
@@ -225,7 +226,7 @@ F009 开发与验收硬约束：
 5. 只按资源 ID 更新/删除，不带 tenant/user。
 6. 在大型 NiceGUI 页面继续堆业务规则。
 7. 把 Linux CI 或 DOCX XML 测试当作 Windows/Word 人工通过。
-8. 把 F008 已实现误写成 F009 整体验收已完成，或为了快速接入让 Provider 直连 Repository/动态 Tool。
+8. 把功能分支上的 F009 验收误写成已合并/已发布，或为了快速接入让 Provider 直连 Repository/动态 Tool。
 9. 在 Agent Foundation 中预留 WRITE、“始终允许”、持久化对话或 MCP/插件入口。
 
 ## 13. 提交前检查

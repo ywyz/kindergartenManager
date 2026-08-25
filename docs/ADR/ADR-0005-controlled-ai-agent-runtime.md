@@ -171,7 +171,12 @@ F009 不改变上述产品能力，只以三个独立门禁证明边界：
 
 F008 已按本顺序固定 GREEN：最终 RED `b3cad08…`，Review RED `b3c45d2…`、`b0647a9…`，最终候选
 `f1f5e63…`；Foundation `180 passed`、全量 `551 passed`、双轴 Review 0/0，Quality `32651221452`
-精确匹配成功。F009 公共验收 seam 已冻结，下一门禁是稳定 RED；不扩张本 ADR 的 WRITE、记忆或多 Agent 边界。
+精确匹配成功。F009 稳定 RED `34e12f2…` 与后续 Review RED 固定零持久化、secrets、人工 helper、
+Provider 兼容与关闭诊断边界；最终 `tested_code_sha=a50c6f6…` 为 Foundation `261 passed`、全量
+`567 passed`、双轴 Review 0/0，Quality `32808246590` 精确匹配成功。Linux Chrome mock 与应用安全配置
+真实模型证据均绑定该 SHA 并为 PASS；真实模型只执行一次 Controller 请求，终态 `SUCCEEDED`、Patch `0`，
+两类验收的逻辑 snapshot compare 均为 `equal=true`。最终 `evidence_closure_sha` 的 Review/Quality/Issue
+证据见 Issue #48。本验收没有扩张本 ADR 的 WRITE、记忆或多 Agent 边界。
 
 ## 后果
 

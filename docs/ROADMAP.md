@@ -102,12 +102,12 @@ R0 事实基线与图谱
 
 ## 7. R3：Agent Foundation 规格与分支决策
 
-状态：`验收中`（F005-F008 固定 GREEN；F009 公共验收 seam 已冻结，下一门禁为稳定 RED）。
+状态：`完成（功能分支）`（F005-F009 固定 GREEN；F009 自动矩阵与两类人工验收均 PASS；未合并、未发布）。
 
 已确认：[ADR-0005](ADR/ADR-0005-controlled-ai-agent-runtime.md) 和
 [Agent Runtime 设计](design/agent-runtime.md) 已经固定首期上限，即每日活动计划的单 Agent、
-4 个 READ、2 个 DRAFT、零持久化和零长期记忆。F003-F008 的实现、Review 与精确 SHA Quality 已闭合；
-整个 Foundation 仍须通过 F009 自动化与两类人工验收。
+4 个 READ、2 个 DRAFT、零持久化和零长期记忆。F003-F009 的实现、Review、精确 SHA Quality 与 F009
+自动化/人工验收均已闭合；最终 closure SHA 的证据位置为 Issue #48。
 
 当前结果：
 
@@ -124,12 +124,13 @@ R0 事实基线与图谱
 - F004 已建立每日计划、班级设置和日历的 tenant+user 窄 Service 投影；F008 executor 只调用这些投影，
   Provider 不接触 Repository。
 
-当前执行边界：F008 固定 SHA Review/CI 已闭合；F009 文档/spec/tasks 公共 seam 已冻结，下一步只建立稳定
-RED。零持久化全矩阵、Linux 浏览器 mock 和仅使用应用安全配置凭据的真实模型验收必须在 F009 RED 固定后执行。
+当前执行边界：F009 已按稳定 RED、最小 GREEN、Review RED、固定 `tested_code_sha`、Linux Chrome mock、
+应用安全配置真实模型、独立 `evidence_closure_sha` 顺序闭合。当前仍不授权合并、关闭 Issue、发布、WRITE、
+长期记忆或产品多 Agent。
 
 ## 8. R4A：受控 Agent Foundation READ/DRAFT
 
-状态：`验收中`（F005-F008 固定 GREEN；F009 公共 seam 已冻结、稳定 RED 待固定）。
+状态：`完成（功能分支）`（F005-F009 固定 GREEN；F009 两类人工验收均 PASS；未合并、未发布）。
 
 实现范围严格限定为：
 
@@ -169,8 +170,8 @@ F008 RED 最终固定为 `b3cad08…`：`175 collected / 110 passed / 65 failed`
 全部 GREEN。最小 GREEN 为 `80a20de…`；Review RED `b3c45d2…` 与 `b0647a9…` 依次固定装配期取消、
 fingerprint/selection 失效、同 controller 重入、连接生命周期、mutation 发布窗口和 host cancellation。
 最终候选 `f1f5e63…` 为 Foundation `180 passed`、全量 `551 passed`、Standards `0`、Spec `0`、scope creep `0`；
-Quality `32651221452` 的 `headSha` 精确匹配并成功。F008 已固定 GREEN；F009 公共验收 seam 已冻结，
-下一门禁为稳定 RED。
+Quality `32651221452` 的 `headSha` 精确匹配并成功。F008 固定 GREEN 后，F009 公共验收 seam 随即冻结并
+按顺序进入稳定 RED。
 
 F009 验收分为三个不能互相替代的门禁：
 
@@ -196,6 +197,16 @@ F009 验收分为三个不能互相替代的门禁：
 `evidence_closure_sha` 后，仍需最终双轴 Review 0/0、完整本地门禁与 closure `headSha` Quality 精确成功并
 回写 Issue #48，才可把 R4A 标为完成。
 
+F009 已完成上述门禁。稳定 RED `34e12f2…` 固定公开 `runtime_limits` 与 POSIX secrets 安全行为；最小
+GREEN `6f6fac4…` 后的 Review findings 均经新 RED/修正闭合。最终
+`tested_code_sha=a50c6f6b9aa941996052c59a301a7a40bdbd706f` 为 Foundation `261 passed`、常规
+`567 passed`、Standards `0`、Spec `0`，Quality `32808246590` 精确匹配成功。
+[Linux Chrome mock](../specs/agent-foundation/evidence/f009-linux-browser-mock.md) 与
+[应用安全配置真实模型](../specs/agent-foundation/evidence/f009-real-model.md) 均绑定该 SHA 并明确 PASS；前者
+全逻辑 snapshot 前后为 `81601b80…`，后者唯一一次 Controller 请求 `SUCCEEDED`、Patch `0`，snapshot 前后为
+`bdb45487…`，两者 UI digest 均为 `f60b310f…` 且 compare 为 `equal=true`。最终 closure SHA 的
+Review/Quality/远端/Issue 证据见 Issue #48。
+
 完成证据必须包含：未知/WRITE Tool、额外参数、prompt injection、跨 tenant/user、取消、超时和
 过期结果的负向测试，以及所有路径对业务数据、页面正文、版本、preview、audit 和导出“零变化”的证明。
 
@@ -203,7 +214,7 @@ F009 验收分为三个不能互相替代的门禁：
 
 ```text
 文档/spec → Issue/任务 → RED → 最小 GREEN → Review → 当前 SHA 自动验证
-→ 目标平台人工验收 → 合并 → 发布（如获授权）
+→ 目标平台人工验收 → 合并/发布（分别获授权后）
 ```
 
 不得提前实现后续切片；不得把 Review、合并、推送或发布视为自动授权。

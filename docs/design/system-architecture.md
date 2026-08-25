@@ -33,10 +33,11 @@ NiceGUI 页面与组件  ───────────────┐
 
 当前代码是模块化单体。`services/` 没有可运行的 ai/word/holiday 微服务；任何服务拆分都属于未来架构变更，需独立 ADR、契约和运维理由。
 
-### 2.1 已确认但尚未实现的 Agent 视图
+### 2.1 已实现并验收的 Agent 视图（功能分支）
 
-[ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md) 已确认下一能力的架构上限。下图是目标设计，
-不是当前运行拓扑：
+[ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md) 已确认该能力的架构上限。下图已在
+`feat/agent-foundation` 实现并完成 F009 验收；它仍是主应用内的模块化单体调用链，不代表已经合入 `main`、
+拆分为微服务或发布：
 
 ```text
 NiceGUI 每日计划 Agent 面板

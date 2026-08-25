@@ -1,8 +1,8 @@
 # KindergartenManager 受控 AI Agent Runtime 设计
 
-> 状态：已确认设计；F003-F008 已固定 GREEN；F009 公共验收 seam 已冻结，下一门禁为稳定 RED。本文落实
-> [ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md)，不代表完整 Agent 已进入当前产品。本轮只授权在功能分支
-> 依序提交并推送 F007-F009；合并、关闭 Issue 或发布仍未授权。
+> 状态：已确认设计；F003-F009 已固定 GREEN，F009 自动矩阵与两类人工验收均已 PASS；最终 closure
+> Review/Quality/Issue 证据见 Issue #48。本文落实 [ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md)，
+> 只代表每日计划 READ/DRAFT Agent Foundation 已在功能分支验收，不代表已经合并、发布或开放 WRITE。
 
 ## 1. 目标与非目标
 
@@ -414,7 +414,7 @@ worktree 连续两次均为 `175 collected / 110 passed / 65 failed`，旧 110 �
 `80a20de…` 经双轴 Review 后，以 Review RED `b3c45d2…`、`b0647a9…` 固定取消、current fingerprint、
 selection、重入、连接生命周期与 mutation 发布窗口；最终候选 `f1f5e63…` 为 Foundation `180 passed`、
 全量 `551 passed`、Standards `0`、Spec `0`，Quality `32651221452` 精确匹配成功。F008 已固定 GREEN，
-F009 公共验收 seam 已冻结，下一门禁为稳定 RED。
+并按顺序进入 F009。
 
 ### F009 零持久化与目标平台验收
 
@@ -456,14 +456,25 @@ Linux mock 与真实模型证据文件分别为 `specs/agent-foundation/evidence
 `f009-real-model.md`；两者绑定同一 `tested_code_sha`，真实模型必须明确 `PASS`。提交证据后形成独立
 `evidence_closure_sha`，最终 Review/Quality/Issue 绑定 closure SHA。自动矩阵、人工验收与远端 Quality 互不替代。
 
+F009 稳定 RED `34e12f2…` 固定公开 `runtime_limits` 透传与 POSIX secrets 创建/首次读取、非普通文件和失败
+行为；最小 GREEN `6f6fac4…` 后的每项安全、helper、Provider 兼容与诊断 finding 均先以 Review RED 证明再
+修正。最终 `tested_code_sha=a50c6f6b9aa941996052c59a301a7a40bdbd706f` 保持 Foundation `261 passed`、
+常规全量 `567 passed`、Standards `0`、Spec `0`，Quality `32808246590` 的 `headSha` 精确匹配并成功。
+
+Linux Chrome mock 只接受 7 次关闭 wire request，覆盖 text、两轮 DRAFT、cancel、A→B→A 与 disconnect；
+前后 UI/全逻辑摘要分别保持 `f60b310f…` / `81601b80…`。真实模型使用另一个全新隔离实例，由用户通过
+`/settings` 保存恰好一个 active `text` 配置；唯一一次 Controller 请求为 `SUCCEEDED`、Patch `0`，前后
+UI/全逻辑摘要分别保持 `f60b310f…` / `bdb45487…`。两者 compare 均为 `equal=true`，完整脱敏证据见上述
+两个 evidence 文件；最终 `evidence_closure_sha` 的 Review/Quality/远端/Issue 证据见 Issue #48。
+
 ## 12. 实现前置门禁
 
 1. 为功能实现确认固定分支和 SHA；当前维护审查分支不自动构成 GREEN 授权。
 2. 先修复聚合事务的部分提交风险与 tenant/user 投影边界；当前 SHA 的依赖、迁移和全量测试可重复，常规质量 CI 已建立或明确豁免。
 3. 对 Agent 页面采用回环/可信网络限制；Agent 不被当作恢复 UI 认证的替代品。
 4. 为每日计划、班级和日历补只读 Service 投影，Agent Tool 不直接调用 Repository；投影明确区分 API tenant 与 UI tenant + user 语义。
-5. F008 已固定 GREEN；冻结 F009 自动矩阵、secrets 权限与两类人工验收 seam。设计完成不自动授权 GREEN，
-   只有 F009 稳定 RED commit 才开放最小 GREEN。
+5. F008 已固定 GREEN；F009 随后按稳定 RED、最小 GREEN、Review RED、固定 `tested_code_sha`、两类人工验收
+   和独立 `evidence_closure_sha` 顺序闭合。任何后续产品代码变化都会使本组人工证据失效。
 6. Graphify/codebase-memory 更新只证明覆盖，不替代测试、Review 和人工验收。
 
 ## 13. 未来 WRITE 的额外前置条件

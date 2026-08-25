@@ -91,8 +91,10 @@ The accepted Agent design is documented in `docs/ADR/ADR-0005-controlled-ai-agen
 `docs/design/agent-runtime.md`. F003 contracts/closed registry, F004 actor-scoped READ projections/frozen Context,
 and F005 canonical PlanPatch, F006 Provider port/bounded serial Runtime, F007 cancellation/timeout/stale-result handling,
 and F008 OpenAI-compatible adapter/six closed executors/application composition/daily-plan UI are fixed GREEN. F009 is
-the current acceptance slice: zero-persistence full matrix, Linux browser mock, and real-model acceptance only through
-secure application configuration. The Foundation is one application-layer Agent for the
+also fixed GREEN: the zero-persistence full matrix, Linux browser mock, and real-model acceptance through secure
+application configuration all passed at `tested_code_sha=a50c6f6b9aa941996052c59a301a7a40bdbd706f`; closure SHA
+proof is recorded in Issue #48. Any later product/helper/test change invalidates those manual results. The Foundation is
+one application-layer Agent for the
 daily-plan page with exactly four READ tools and two DRAFT tools. DRAFT returns an in-memory, discardable `PlanPatch`
 and must not mutate UI body fields, database rows, versions, previews, audits, or exports.
 

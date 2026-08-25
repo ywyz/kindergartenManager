@@ -97,8 +97,9 @@ Word：Microsoft Word / LibreOffice / 未执行
 
 ## 11. 受控 AI Agent Foundation（F009）
 
-> F003-F008 已实现并固定 GREEN；以下 F009 验收尚未闭合。自动矩阵、Linux 浏览器 mock 与真实模型必须
-> 分开记录，任何一项未执行都不得把 MT-011A/B/C 全部填为通过。
+> F003-F009 已实现并固定 GREEN。以下清单保留为可复现程序；本轮 `tested_code_sha=a50c6f6…` 的自动矩阵、
+> Linux 浏览器 mock 与真实模型已分别记录并通过，closure SHA 的最终证据见 Issue #48。后续任一产品代码变化
+> 都必须重置 MT-011B/C，不能沿用本轮结果。
 
 ### 11.1 通用记录与零写入边界
 
@@ -185,6 +186,6 @@ Word：Microsoft Word / LibreOffice / 未执行
 | MT-008 | API |  |  |  |
 | MT-009 | 安全与网络 |  |  |  |
 | MT-010 | 平台打包/升级 |  |  |  |
-| MT-011A | Agent 自动零持久化矩阵 |  |  | 必须绑定 tested code SHA |
-| MT-011B | Agent Linux 浏览器 mock |  |  | 必须绑定 tested code SHA |
-| MT-011C | Agent 安全配置真实模型 |  |  | BLOCKED/未执行均不等于通过 |
+| MT-011A | Agent 自动零持久化矩阵 | 通过 | `a50c6f6…`：Foundation `261 passed`；Quality `32808246590` | 全表/文件/UI/audit/DML-DDL 统一矩阵 |
+| MT-011B | Agent Linux 浏览器 mock | 通过 | `specs/agent-foundation/evidence/f009-linux-browser-mock.md` | `tested_code_sha=a50c6f6…`；snapshot `81601b80…` |
+| MT-011C | Agent 安全配置真实模型 | 通过 | `specs/agent-foundation/evidence/f009-real-model.md` | `tested_code_sha=a50c6f6…`；一次请求 SUCCEEDED；snapshot `bdb45487…` |
