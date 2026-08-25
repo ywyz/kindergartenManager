@@ -219,9 +219,19 @@ class OpenAICompatibleAgentProvider(AgentProviderPort):
             "Content-Type": "application/json",
         }
         if self._client is not None:
-            return await self._client.post(endpoint, headers=headers, json=payload)
+            return await self._client.post(
+                endpoint,
+                headers=headers,
+                json=payload,
+                timeout=None,
+            )
         async with httpx.AsyncClient() as client:
-            return await client.post(endpoint, headers=headers, json=payload)
+            return await client.post(
+                endpoint,
+                headers=headers,
+                json=payload,
+                timeout=None,
+            )
 
 
 def _build_payload(
