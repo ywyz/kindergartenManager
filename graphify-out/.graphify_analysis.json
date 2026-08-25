@@ -3872,44 +3872,44 @@
       "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
     },
     {
-      "source": "test_each_read_tool_returns_one_closed_projection_from_one_short_session()",
-      "target": "CalendarEvaluationProjection",
+      "source": "CalendarEvaluationProjection",
+      "target": "test_each_read_tool_returns_one_closed_projection_from_one_short_session()",
       "source_files": [
-        "specs/agent-foundation/tests/test_f008_tool_executor_red.py",
-        "app/service/agent/contracts.py"
+        "app/service/agent/contracts.py",
+        "specs/agent-foundation/tests/test_f008_tool_executor_red.py"
       ],
       "confidence": "INFERRED",
       "relation": "uses",
       "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
     },
     {
-      "source": "test_controller_builds_fresh_actor_scoped_context_and_short_lived_credentials()",
-      "target": "DailyPlanProjection",
+      "source": "DailyPlanProjection",
+      "target": "_projection()",
       "source_files": [
-        "specs/agent-foundation/tests/test_f008_composition_ui_red.py",
-        "app/service/agent/contracts.py"
+        "app/service/agent/contracts.py",
+        "specs/agent-foundation/tests/test_f009_zero_persistence_matrix_red.py"
       ],
       "confidence": "INFERRED",
       "relation": "uses",
       "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
     },
     {
-      "source": "test_each_read_tool_returns_one_closed_projection_from_one_short_session()",
-      "target": "DailyPlanProjection",
+      "source": "DailyPlanProjection",
+      "target": "test_controller_builds_fresh_actor_scoped_context_and_short_lived_credentials()",
       "source_files": [
-        "specs/agent-foundation/tests/test_f008_tool_executor_red.py",
-        "app/service/agent/contracts.py"
+        "app/service/agent/contracts.py",
+        "specs/agent-foundation/tests/test_f008_composition_ui_red.py"
       ],
       "confidence": "INFERRED",
       "relation": "uses",
       "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
     },
     {
-      "source": "_projection()",
-      "target": "DailyPlanProjection",
+      "source": "DailyPlanProjection",
+      "target": "test_each_read_tool_returns_one_closed_projection_from_one_short_session()",
       "source_files": [
-        "specs/agent-foundation/tests/test_f009_zero_persistence_matrix_red.py",
-        "app/service/agent/contracts.py"
+        "app/service/agent/contracts.py",
+        "specs/agent-foundation/tests/test_f008_tool_executor_red.py"
       ],
       "confidence": "INFERRED",
       "relation": "uses",
@@ -3919,38 +3919,38 @@
   "questions": [
     {
       "type": "bridge_node",
-      "question": "Why does `TrustedActor` connect `composition.py` to `pages/daily_plan.py`, `test_f009_zero_persistence_matrix_red.py`, `AgentReadService`, `test_f008_composition_ui_red.py`, `test_runtime_lifecycle_red.py`, `runtime.py`, `contracts.py`, `read_service.py`, `test_provider_runtime_red.py`, `test_f008_tool_executor_red.py`, `test_plan_patch_red.py`, `test_f008_provider_adapter_red.py`?",
-      "why": "High betweenness centrality (0.032) - this node is a cross-community bridge."
+      "question": "Why does `TrustedActor` connect `Agent Composition UI` to `Application Pages`, `Zero Persistence Matrix`, `Agent Context Projection`, `Composition UI Verification`, `Runtime Lifecycle Safety`, `Agent Runtime Controls`, `Agent Contracts`, `Plan Draft Projection`, `Provider Runtime Verification`, `Closed Tool Executor Verification`, `Plan Patch Verification`, `Provider Adapter Verification`?",
+      "why": "High betweenness centrality (0.031) - this node is a cross-community bridge."
     },
     {
       "type": "bridge_node",
-      "question": "Why does `save_daily_plan()` connect `f009_seed.py` to `pages/daily_plan.py`, `daily_plan_repository.py`?",
+      "question": "Why does `save_daily_plan()` connect `Browser Mock Helpers` to `Application Pages`, `Daily Plan Repository`?",
+      "why": "High betweenness centrality (0.030) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `One-on-One Listening Subsystem` connect `Listening Image Repository` to `Image Processing Errors`, `Listening Document Export`, `Export Record Repository`, `Indicator Catalog Repository`, `Workday Calendar Service`, `Listening Record Services`, `Listening Content Services`, `Listening AI Verification`, `Listening Activity Page`, `Application Architecture Overview`, `Migration Integration Verification`?",
       "why": "High betweenness centrality (0.021) - this node is a cross-community bridge."
     },
     {
       "type": "verify_inferred",
-      "question": "Are the 28 inferred relationships involving `AgentContext` (e.g. with `AgentContextBuilder` and `build_plan_patch()`) actually correct?",
+      "question": "Are the 28 inferred relationships involving `AgentContext` (e.g. with `build_plan_patch()` and `build_plan_patch_from_arguments()`) actually correct?",
       "why": "`AgentContext` has 28 INFERRED edges - model-reasoned connections that need verification."
     },
     {
       "type": "verify_inferred",
-      "question": "Are the 20 inferred relationships involving `TrustedActor` (e.g. with `_ActiveOperation` and `create_daily_plan_agent_controller()`) actually correct?",
+      "question": "Are the 20 inferred relationships involving `TrustedActor` (e.g. with `create_daily_plan_agent_controller()` and `_context()`) actually correct?",
       "why": "`TrustedActor` has 20 INFERRED edges - model-reasoned connections that need verification."
     },
     {
       "type": "verify_inferred",
-      "question": "Are the 34 inferred relationships involving `Permission` (e.g. with `_validate_tool()` and `AgentToolRegistry`) actually correct?",
+      "question": "Are the 34 inferred relationships involving `Permission` (e.g. with `_call()` and `test_rejected_calls_fail_before_opening_a_session()`) actually correct?",
       "why": "`Permission` has 34 INFERRED edges - model-reasoned connections that need verification."
     },
     {
       "type": "verify_inferred",
       "question": "Are the 12 inferred relationships involving `AiParseError` (e.g. with `test_adapt_empty_original_raises_parse_error()` and `test_adapt_missing_adapted_process_raises_parse_error()`) actually correct?",
       "why": "`AiParseError` has 12 INFERRED edges - model-reasoned connections that need verification."
-    },
-    {
-      "type": "verify_inferred",
-      "question": "Are the 10 inferred relationships involving `DailyPlanScope` (e.g. with `_ActiveOperation` and `DailyPlanAgentController`) actually correct?",
-      "why": "`DailyPlanScope` has 10 INFERRED edges - model-reasoned connections that need verification."
     }
   ]
 }

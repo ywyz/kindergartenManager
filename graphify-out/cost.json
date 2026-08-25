@@ -45,6 +45,14 @@
       "files": 312,
       "backend": "luna_worker",
       "fallback_note": "openai-compatible and deepseek semantic response bodies stalled and were interrupted"
+    },
+    {
+      "date": "2026-08-25T07:34:25+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 204,
+      "backend": "luna_worker",
+      "fallback_note": "graphify label OpenAI-compatible and DeepSeek each timed out after 45 seconds in the response body (exit 124)"
     }
   ],
   "total_input_tokens": 0,
