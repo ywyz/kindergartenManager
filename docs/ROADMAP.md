@@ -1,6 +1,6 @@
 # KindergartenManager 产品与工程路线图
 
-> 当前快照：2026-08-24；Agent 安全同步 RED 基线 `5de2e49bee19749f611b50747a31be9464b92d7b`；最近远端产品主线 `main@cfeadefd7dfa056c1b3757876658493110d8cf84`。
+> 当前快照：2026-08-25；Agent 安全同步 RED 基线 `5de2e49bee19749f611b50747a31be9464b92d7b`；最近远端产品主线 `main@cfeadefd7dfa056c1b3757876658493110d8cf84`。
 
 ## 1. 状态语义
 
