@@ -343,6 +343,28 @@ async def test_request_is_one_exact_generic_chat_completions_post():
 
 
 @pytest.mark.asyncio
+async def test_adapter_defers_transport_timeout_to_the_bounded_runtime():
+    module = _adapter_module()
+    runtime = import_module("app.service.agent.runtime")
+    captured_timeouts: list[dict[str, float | None]] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        captured_timeouts.append(request.extensions["timeout"])
+        return httpx.Response(200, json=_response())
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        timeout=httpx.Timeout(0.001),
+    ) as client:
+        result = await _provider(module, client).complete(_request(runtime))
+
+    assert result.finish_reason is runtime.ProviderFinishReason.COMPLETED
+    assert captured_timeouts == [
+        {"connect": None, "read": None, "write": None, "pool": None}
+    ]
+
+
+@pytest.mark.asyncio
 async def test_system_context_is_closed_and_omits_actor_identity_and_credentials():
     module = _adapter_module()
     runtime = import_module("app.service.agent.runtime")

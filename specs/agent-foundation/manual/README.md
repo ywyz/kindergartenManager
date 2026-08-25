@@ -138,6 +138,8 @@ assistant/Patch 正文、request ID、HTTP/HAR、system Context 或 Tool 参数�
 失败诊断只可从本地进程日志摘录固定 adapter/Runtime 阶段枚举，以及可选 HTTP 状态码、关闭
 `finish_reason` 或本地映射出的关闭 `transport_reason`；不得复制原始 app 日志。任何 URL、header、正文、
 原始异常类型或消息、request id、模型输出或凭据都不能进入证据。失败后仍不得在同一 `tested_code_sha` 重试。
+若关闭原因是 `read_timeout` 等 transport timeout，必须先以新 RED 证明 HTTP client 默认时限抢先于 Runtime，
+再让 adapter 把应用级 Provider 时限唯一交给 Runtime；不得在原 SHA 重试或临时延长浏览器等待时间冒充修复。
 
 两份证据分别写入既定 evidence 文件并绑定同一 `tested_code_sha`；不要把本目录 helper、原始日志或产品代码在
 验收后继续修改。任何这类变更都会产生新 tested SHA，必须重做 mock 与真实模型验收。

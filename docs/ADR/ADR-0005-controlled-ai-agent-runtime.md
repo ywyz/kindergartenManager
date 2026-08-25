@@ -62,6 +62,9 @@ F008 只实现 `OpenAICompatibleAgentProvider` 的 Chat Completions adapter，�
   `max_completion_tokens`。`repetition_truncation` 归一为现有 `length`，不得把截断正文标为 completed。
   兼容性差异返回 HTTP 400 时不得删减安全参数再隐式重试；错误直接归一为稳定
   `AgentProviderAdapterError`，由 Runtime 现有异常边界处理。
+- adapter 不设置独立 connect/read/write/pool timeout，并覆盖注入 HTTP client 的较短默认值；应用级
+  Provider 时限唯一由现有 `AgentRuntime.max_provider_duration_ms` 裁决，Runtime/host/page/scope 取消继续传播
+  到 HTTP operation。该策略不增加 ProviderFactory 参数或另一套时限配置。
 - Provider 失败诊断只记录固定 adapter/Runtime 阶段枚举；`transport` 附加原因只能由本地异常类型映射为
   `connect_timeout/read_timeout/write_timeout/pool_timeout/timeout_other/connect_error/read_error/write_error/`
   `close_error/network_other/protocol_error/proxy_error/unsupported_protocol/transport_other/unexpected_error`，其他

@@ -148,6 +148,8 @@ Word：Microsoft Word / LibreOffice / 未执行
   exports 均不变。
 - [ ] 如失败，仅摘录固定 adapter/Runtime 阶段，以及可选 HTTP 状态码、关闭 `finish_reason` 或关闭
   `transport_reason`；不得记录原始异常类型或消息及其他敏感上下文，同一 `tested_code_sha` 不重试。
+- [ ] adapter 不使用独立 HTTP transport timeout 抢先于 Runtime；真实模型等待只受既有 Provider/total
+  Runtime 上限与 host/page/scope 取消约束，不通过浏览器延时或同 SHA 重试放宽门禁。
 
 ### 11.4 证据闭合
 

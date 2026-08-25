@@ -112,6 +112,9 @@ F008 只接入具体 adapter/executor/composition/UI；不修改 F003-F007 的�
 - 明确不发送 `store`、`parallel_tool_calls` 或已弃用的 `max_tokens`；完成长度上限只用
   `max_completion_tokens`。`repetition_truncation` 必须归一为现有 `length`，不得误标为 completed。也不在
   HTTP 400 后删除参数做兼容性降级重试；每次 `complete` 最多发起一次 wire request。
+- adapter 不设置独立的 connect/read/write/pool timeout，也必须覆盖注入 client 的较短默认值；应用级
+  Provider 时限只由既有 `AgentRuntime.max_provider_duration_ms` 裁决。Runtime timeout、host cancel、scope
+  invalidation 或 disconnect 的取消必须继续传播到 HTTP operation，不能由 adapter 捕获或转成另一请求。
 - Provider 失败日志只能记录固定阶段枚举；adapter 允许 `transport/http_status/json_decode/response_parse`，
   Runtime 允许 `provider_port_failure/result_type/text_finish_reason/tool_finish_reason`。`transport` 的附加原因
   只能由本地异常类型映射为关闭枚举 `connect_timeout/read_timeout/write_timeout/pool_timeout/timeout_other/`

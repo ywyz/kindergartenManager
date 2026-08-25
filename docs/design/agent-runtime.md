@@ -262,6 +262,11 @@ HTTP 400 或兼容性错误不得触发“删除参数再试”的降级重试�
 安全语义。明文 Key 和 adapter 配置只在当前 operation 的短命 composition 内存在，
 不进入 wire message、Tool 参数、Runtime DTO、结果、repr、日志、coordinator 或页面持久状态。
 
+HTTP adapter 不拥有第二套 connect/read/write/pool timeout，并在每次 request 上覆盖注入 client 的较短默认
+timeout。应用级 Provider 时限只由 `AgentRuntime.max_provider_duration_ms` 负责；其 timeout 与 host/page/scope
+取消继续传播到 HTTP operation。这样 transport 默认值不会抢先于 Runtime 结束 operation，也不引入重试或
+新的 composition 参数。
+
 Provider 失败诊断只允许进程日志记录固定阶段枚举：adapter 的 `transport`、`http_status`、`json_decode`、
 `response_parse`，以及 Runtime 的 `provider_port_failure`、`result_type`、`text_finish_reason`、
 `tool_finish_reason`。`transport` 只允许本地映射出的关闭原因 `connect_timeout/read_timeout/write_timeout/`
