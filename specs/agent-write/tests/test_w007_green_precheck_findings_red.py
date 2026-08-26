@@ -97,6 +97,7 @@ class _BlockingRecordingWriter:
     block_call_number: int = 1
     cancellation_cleanup: bool = False
     cancellation_outcome: str = "reraise"
+    before_issue_return: Callable[[], None] | None = None
     apply_error_code: str | None = None
     reconcile_error_code: str | None = None
     issue_patch_ids: list[UUID] = field(default_factory=list)
@@ -143,7 +144,7 @@ class _BlockingRecordingWriter:
         confirmation_id = UUID(int=900 + issue_number)
         self._revision_by_confirmation[confirmation_id] = expected_revision
         await self._block("issue", issue_number)
-        return PendingPlanPatchConfirmation(
+        pending = PendingPlanPatchConfirmation(
             confirmation_id=confirmation_id,
             expires_at_utc=NOW + timedelta(minutes=4),
             daily_plan_id=patch.target.daily_plan_id,
@@ -152,6 +153,9 @@ class _BlockingRecordingWriter:
             patch_sha256=patch.canonical_sha256,
             field_paths=tuple(operation.field_path for operation in patch.operations),
         )
+        if self.before_issue_return is not None:
+            self.before_issue_return()
+        return pending
 
     async def apply(
         self,
@@ -784,4 +788,90 @@ async def test_concurrent_shutdown_callers_share_completion_barrier(
         "cleanup_completed": True,
         "patch_capability_owner_retained": False,
         "confirmation_capability_owner_retained": False,
+    }
+
+
+@pytest.mark.asyncio
+async def test_owner_cancel_before_shield_delivery_closes_same_key_issue_joiner() -> (
+    None
+):
+    """A queued owner cancellation dominates an already-built PENDING result."""
+    flow, writer, _agent, patch_a, _patch_b = await _two_patch_flow(
+        block_phase="issue",
+    )
+    ui_session = trusted_ui_session()
+    loop = asyncio.get_running_loop()
+    pending_built = asyncio.Event()
+    owner_tasks: list[asyncio.Task[object]] = []
+
+    def cancel_owner_before_shield_delivery() -> None:
+        pending_built.set()
+        assert len(owner_tasks) == 1
+        loop.call_soon(owner_tasks[0].cancel)
+
+    writer.before_issue_return = cancel_owner_before_shield_delivery
+    owner_task = asyncio.create_task(
+        flow.issue(
+            ui_session,
+            patch_a.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+    )
+    owner_tasks.append(owner_task)
+    await writer.entered.wait()
+
+    joiner_started = asyncio.Event()
+
+    async def join_same_issue_flight() -> object:
+        joiner_started.set()
+        return await flow.issue(
+            ui_session,
+            patch_a.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+
+    joiner_task = asyncio.create_task(join_same_issue_flight())
+    await joiner_started.wait()
+    await _event_loop_checkpoint()
+    writer.release.set()
+
+    owner_outcome = await _task_outcome(owner_task)
+    joiner_outcome = await _task_outcome(joiner_task)
+    controller_after_cancel = flow.snapshot
+    repeated_issue = await flow.issue(
+        ui_session,
+        patch_a.patch_id,
+        expected_plan_id=PLAN_ID,
+        expected_revision=1,
+    )
+    joiner_snapshot = joiner_outcome[1]
+
+    assert {
+        "valid_pending_was_built": pending_built.is_set(),
+        "owner_outcome": owner_outcome[0],
+        "joiner_outcome": joiner_outcome[0],
+        "joiner_status": getattr(joiner_snapshot, "status", None),
+        "joiner_error": getattr(joiner_snapshot, "error_code", None),
+        "controller_status": controller_after_cancel.status,
+        "controller_error": controller_after_cancel.error_code,
+        "repeated_status": repeated_issue.status,
+        "repeated_error": repeated_issue.error_code,
+        "writer_issue_call_count": len(writer.issue_patch_ids),
+        "joiner_matches_controller": joiner_snapshot == controller_after_cancel,
+        "repeat_matches_controller": repeated_issue == controller_after_cancel,
+    } == {
+        "valid_pending_was_built": True,
+        "owner_outcome": "cancelled",
+        "joiner_outcome": "result",
+        "joiner_status": PatchConfirmationStatus.STALE,
+        "joiner_error": "target_mismatch",
+        "controller_status": PatchConfirmationStatus.STALE,
+        "controller_error": "target_mismatch",
+        "repeated_status": PatchConfirmationStatus.STALE,
+        "repeated_error": "target_mismatch",
+        "writer_issue_call_count": 1,
+        "joiner_matches_controller": True,
+        "repeat_matches_controller": True,
     }
