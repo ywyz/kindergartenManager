@@ -38,6 +38,13 @@ SECOND_REVIEW_GATE_FACT = (
     "二轮 fixed-SHA Review 为 Standards M1、Spec M1/L1，finding RED 已由 "
     "`40f25b7` 固定；本轮修复候选已转 GREEN，下一门是第三轮 fixed-SHA 双轴 Review"
 )
+THIRD_REVIEW_FIXED_GATE_FACT = (
+    "本轮修复已固定在当前 SHA，当前门是第三轮 fixed-SHA 双轴 Review"
+)
+THIRD_REVIEW_GATE_FACT_FILES = (
+    "docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md",
+    "specs/agent-write/spec.md",
+)
 STALE_CURRENT_FACTS = {
     "AGENTS.md": (
         "The current authorized slice ends after",
@@ -50,6 +57,7 @@ STALE_CURRENT_FACTS = {
     "docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md": (
         "W007 当前只有稳定 RED",
         "W007 GREEN commit →",
+        "固定本修正候选 commit",
     ),
     "docs/design/data-model.md": (
         "稳定 RED 并正在 GREEN 实现",
@@ -63,6 +71,7 @@ STALE_CURRENT_FACTS = {
     "specs/agent-write/spec.md": (
         "须先形成 GREEN commit",
         "W007 候选必须依序经过：最小 GREEN commit",
+        "固定本修正候选 commit",
     ),
 }
 STALE_DELIVERY_GATE_FACTS = {
@@ -238,6 +247,11 @@ def test_w007_current_facts_name_the_committed_green_review_gate() -> None:
         for relative_path, text in normalized_docs.items()
         if CURRENT_GATE_FACT not in text
     ]
+    missing_third_review_gate_fact = [
+        relative_path
+        for relative_path in THIRD_REVIEW_GATE_FACT_FILES
+        if THIRD_REVIEW_FIXED_GATE_FACT not in normalized_docs[relative_path]
+    ]
     stale_claims = {
         relative_path: [
             stale
@@ -252,8 +266,10 @@ def test_w007_current_facts_name_the_committed_green_review_gate() -> None:
         if claims
     }
 
-    assert missing_gate_fact == [], (
-        f"current W007 gate fact missing from: {missing_gate_fact}"
+    assert missing_gate_fact == [] and missing_third_review_gate_fact == [], (
+        "current W007 gate fact missing from: "
+        f"committed_green={missing_gate_fact}, "
+        f"third_review={missing_third_review_gate_fact}"
     )
     assert stale_claims == {}, f"contradictory W007 current facts remain: {stale_claims}"
 

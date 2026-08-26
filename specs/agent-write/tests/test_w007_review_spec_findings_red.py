@@ -623,6 +623,102 @@ async def test_cancel_pending_patch_rerenders_all_current_patch_views(
     }
 
 
+@pytest.mark.asyncio
+async def test_cancelled_patch_stays_closed_after_another_patch_is_cancelled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    confirmation_ui = __import__(
+        "app.ui.components.agent_write_confirmation",
+        fromlist=["DailyPlanPatchConfirmationPanel"],
+    )
+    flow_api = __import__(
+        "app.service.agent.confirmation_flow",
+        fromlist=["create_daily_plan_patch_confirmation_controller"],
+    )
+    patch_a = build_patch(
+        operation_id=OPERATION_ID,
+        turn_id=TURN_ID,
+        after_goal="取消后必须保持关闭的草案 A",
+    )
+    patch_b = build_patch(
+        operation_id=SECOND_OPERATION_ID,
+        turn_id=TURN_ID,
+        after_goal="随后准备并取消的草案 B",
+    )
+    agent = _agent_controller(patch_a, patch_b)
+    agent.scope_changed(PLAN_DATE)
+    turn = await agent.run("同一 generation 依次取消 A/B 两份草案")
+    patch_view_a, patch_view_b = turn.patches
+    writer = _RecordingWriter()
+    flow = flow_api.create_daily_plan_patch_confirmation_controller(
+        agent_controller=agent,
+        write_service=writer,
+    )
+    target = DailyPlanUiTarget(
+        selection=DateSelection(generation=1, selected_date=PLAN_DATE),
+        plan_id=PLAN_ID,
+        revision=1,
+        form_generation=0,
+    )
+    session = trusted_ui_session()
+
+    async def authorize() -> object:
+        return session
+
+    async def on_applied(_snapshot: object, _target: object) -> None:
+        raise AssertionError("this scenario only prepares and cancels confirmations")
+
+    fake_ui = _FakeUi()
+    monkeypatch.setattr(confirmation_ui, "ui", fake_ui)
+    panel = confirmation_ui.DailyPlanPatchConfirmationPanel(
+        flow,
+        authorize_confirmation=authorize,
+        capture_target=lambda: target,
+        is_current_target=lambda candidate: candidate == target,
+        on_applied=on_applied,
+    )
+
+    panel.render_patch_actions(patch_view_a)
+    view_a = fake_ui.latest_column()
+    panel.render_patch_actions(patch_view_b)
+    view_b = fake_ui.latest_column()
+    await _press(fake_ui.latest_button("准备确认", within=view_a))
+    cancel_a = fake_ui.latest_button("取消确认", within=view_a)
+    assert callable(cancel_a.on_click)
+    assert cancel_a.on_click() is None
+
+    await _press(fake_ui.latest_button("准备确认", within=view_b))
+    cancel_b = fake_ui.latest_button("取消确认", within=view_b)
+    assert callable(cancel_b.on_click)
+    assert cancel_b.on_click() is None
+
+    labels_a_after_b_cancel = fake_ui.active_label_texts(within=view_a)
+    usable_prepare_a = fake_ui.active_buttons(
+        "准备确认",
+        within=view_a,
+        enabled=True,
+    )
+    for button in usable_prepare_a:
+        await _press(button)
+
+    assert {
+        "known_closed_copy_visible_on_a": any(
+            "已取消" in label or "已关闭" in label
+            for label in labels_a_after_b_cancel
+        ),
+        "must_regenerate_copy_visible_on_a": any(
+            "重新生成草案" in label for label in labels_a_after_b_cancel
+        ),
+        "usable_prepare_count_on_a": len(usable_prepare_a),
+        "patches_issued_after_old_a_probe": writer.issue_patch_ids,
+    } == {
+        "known_closed_copy_visible_on_a": True,
+        "must_regenerate_copy_visible_on_a": True,
+        "usable_prepare_count_on_a": 0,
+        "patches_issued_after_old_a_probe": [patch_a.patch_id, patch_b.patch_id],
+    }
+
+
 def test_agent_notice_distinguishes_read_only_from_explicit_local_adoption(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
