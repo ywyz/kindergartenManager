@@ -1246,3 +1246,73 @@ async def test_cancelled_issue_joiner_does_not_log_later_base_exception() -> Non
         "writer_issue_count": 1,
         "loop_events": (),
     }
+
+
+@pytest.mark.asyncio
+async def test_joiner_cancellation_cannot_erase_owner_cancellation_settlement() -> None:
+    """Owner identity remains bound to its flight until every waiter settles."""
+    flow, writer, _agent, patch_a, _patch_b = await _two_patch_flow(
+        block_phase="issue",
+    )
+    ui_session = trusted_ui_session()
+    loop = asyncio.get_running_loop()
+    owner_tasks: list[asyncio.Task[object]] = []
+    joiner_tasks: list[asyncio.Task[object]] = []
+
+    def cancel_joiner_then_owner_before_delivery() -> None:
+        assert len(owner_tasks) == 1
+        assert len(joiner_tasks) == 1
+        loop.call_soon(joiner_tasks[0].cancel)
+        loop.call_soon(owner_tasks[0].cancel)
+
+    writer.before_issue_return = cancel_joiner_then_owner_before_delivery
+    owner_task = asyncio.create_task(
+        flow.issue(
+            ui_session,
+            patch_a.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+    )
+    owner_tasks.append(owner_task)
+    await writer.entered.wait()
+
+    joiner_task = asyncio.create_task(
+        flow.issue(
+            ui_session,
+            patch_a.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+    )
+    joiner_tasks.append(joiner_task)
+    await _event_loop_checkpoint()
+    writer.release.set()
+
+    joiner_outcome = await _task_outcome(joiner_task)
+    owner_outcome = await _task_outcome(owner_task)
+    controller_after_cancel = flow.snapshot
+    repeated_issue = await flow.issue(
+        ui_session,
+        patch_a.patch_id,
+        expected_plan_id=PLAN_ID,
+        expected_revision=1,
+    )
+
+    assert {
+        "joiner_outcome": joiner_outcome[0],
+        "owner_outcome": owner_outcome[0],
+        "controller_status": controller_after_cancel.status,
+        "controller_error": controller_after_cancel.error_code,
+        "repeated_status": repeated_issue.status,
+        "repeated_error": repeated_issue.error_code,
+        "writer_issue_count": len(writer.issue_patch_ids),
+    } == {
+        "joiner_outcome": "cancelled",
+        "owner_outcome": "cancelled",
+        "controller_status": PatchConfirmationStatus.STALE,
+        "controller_error": "target_mismatch",
+        "repeated_status": PatchConfirmationStatus.STALE,
+        "repeated_error": "target_mismatch",
+        "writer_issue_count": 1,
+    }
