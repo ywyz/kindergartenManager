@@ -61,6 +61,45 @@ class _Ticket(Generic[PayloadT]):
     payload: PayloadT
 
 
+class UiOperationGuard:
+    """页面局部的单调代次与 per-slot exact-owner guard。"""
+
+    __slots__ = ("_generation", "_owners")
+
+    def __init__(self) -> None:
+        self._generation = 0
+        self._owners: dict[str, object] = {}
+
+    def capture_generation(self) -> int:
+        """同步捕获当前代次。"""
+        return self._generation
+
+    def advance(self, *_event_args: object) -> None:
+        """同步推进代次，使先前捕获的目标失效。"""
+        self._generation += 1
+
+    def is_current(self, generation: int) -> bool:
+        """仅当捕获值仍是当前代次时返回 True。"""
+        return generation == self._generation
+
+    def claim(self, slot: str) -> object | None:
+        """占用空闲 slot；忙碌时关闭拒绝，不排队也不重试。"""
+        if slot in self._owners:
+            return None
+        owner = object()
+        self._owners[slot] = owner
+        return owner
+
+    def owns(self, slot: str, owner: object) -> bool:
+        """按对象 identity 校验 slot 的精确 owner。"""
+        return slot in self._owners and self._owners[slot] is owner
+
+    def release(self, slot: str, owner: object) -> None:
+        """仅由精确 owner 释放 slot；迟到 owner 不得释放新操作。"""
+        if self.owns(slot, owner):
+            del self._owners[slot]
+
+
 class BoundUiOperationScope:
     """页面内短命的会话、代次与 single-flight 操作编排。"""
 

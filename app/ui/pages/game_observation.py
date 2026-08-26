@@ -42,6 +42,7 @@ from app.service.observation_service import (
     save_observation_with_images,
 )
 from app.ui.auth_context import require_bound_ui_session, require_current_ui_session
+from app.ui.bound_operation import UiOperationGuard
 from app.ui.components.app_shell import get_display_name, render_shell
 from app.ui.helpers import validate_image_count
 
@@ -312,21 +313,7 @@ async def game_observation_page() -> None:
                 "support_strategy": strategy_area.value,
             }
 
-        action_owners: dict[str, object] = {}
-
-        def _claim_action(name: str) -> object | None:
-            if name in action_owners:
-                return None
-            owner = object()
-            action_owners[name] = owner
-            return owner
-
-        def _owns_action(name: str, owner: object) -> bool:
-            return action_owners.get(name) is owner
-
-        def _release_action(name: str, owner: object) -> None:
-            if _owns_action(name, owner):
-                action_owners.pop(name, None)
+        action_guard = UiOperationGuard()
 
         # ── 操作按钮 ────────────────────────────────────────────────
         with ui.row().classes("w-full gap-3 justify-end"):
@@ -345,10 +332,10 @@ async def game_observation_page() -> None:
             ctx: dict,
         ) -> None:
             if not await _require_bound_session():
-                _release_action("generate", action_owner)
+                action_guard.release("generate", action_owner)
                 return
             if generation != state["generation"]:
-                _release_action("generate", action_owner)
+                action_guard.release("generate", action_owner)
                 return
             generate_btn.props("loading=true")
             error_label.classes(add="hidden")
@@ -400,15 +387,15 @@ async def game_observation_page() -> None:
                 logger.error("生成观察记录失败 error_type=%s", type(e).__name__)
                 show_error(f"生成失败：{type(e).__name__}")
             finally:
-                if _owns_action("generate", action_owner):
+                if action_guard.owns("generate", action_owner):
                     try:
                         if await _require_bound_session():
                             generate_btn.props(remove="loading")
                     finally:
-                        _release_action("generate", action_owner)
+                        action_guard.release("generate", action_owner)
 
         def trigger_generate() -> object | None:
-            owner = _claim_action("generate")
+            owner = action_guard.claim("generate")
             if owner is None:
                 return None
             payload = _current_observation_payload()
@@ -434,10 +421,10 @@ async def game_observation_page() -> None:
             compressed: tuple,
         ) -> None:
             if not await _require_bound_session():
-                _release_action("save", action_owner)
+                action_guard.release("save", action_owner)
                 return
             if generation != state["generation"]:
-                _release_action("save", action_owner)
+                action_guard.release("save", action_owner)
                 return
             save_btn.props("loading=true")
             try:
@@ -485,15 +472,15 @@ async def game_observation_page() -> None:
                 logger.error("保存观察记录失败 error_type=%s", type(e).__name__)
                 show_error(f"保存失败：{type(e).__name__}")
             finally:
-                if _owns_action("save", action_owner):
+                if action_guard.owns("save", action_owner):
                     try:
                         if await _require_bound_session():
                             save_btn.props(remove="loading")
                     finally:
-                        _release_action("save", action_owner)
+                        action_guard.release("save", action_owner)
 
         def trigger_save() -> object | None:
-            owner = _claim_action("save")
+            owner = action_guard.claim("save")
             if owner is None:
                 return None
             return do_save(
@@ -513,10 +500,10 @@ async def game_observation_page() -> None:
             observation_id: int | None,
         ) -> None:
             if not await _require_bound_session():
-                _release_action("export", action_owner)
+                action_guard.release("export", action_owner)
                 return
             if generation != state["generation"]:
-                _release_action("export", action_owner)
+                action_guard.release("export", action_owner)
                 return
             export_btn.props("loading=true")
             try:
@@ -564,15 +551,15 @@ async def game_observation_page() -> None:
                 logger.error("导出观察记录失败 error_type=%s", type(e).__name__)
                 show_error(f"导出失败：{type(e).__name__}")
             finally:
-                if _owns_action("export", action_owner):
+                if action_guard.owns("export", action_owner):
                     try:
                         if await _require_bound_session():
                             export_btn.props(remove="loading")
                     finally:
-                        _release_action("export", action_owner)
+                        action_guard.release("export", action_owner)
 
         def trigger_export() -> object | None:
-            owner = _claim_action("export")
+            owner = action_guard.claim("export")
             if owner is None:
                 return None
             obs = _current_observation_payload()

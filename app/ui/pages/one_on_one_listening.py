@@ -64,6 +64,7 @@ from app.service.listening_service import (
     update_record_with_all,
 )
 from app.ui.auth_context import require_bound_ui_session, require_current_ui_session
+from app.ui.bound_operation import UiOperationGuard
 from app.ui.components.app_shell import get_display_name, render_shell
 from app.ui.helpers import validate_image_count
 
@@ -257,7 +258,7 @@ async def one_on_one_listening_page() -> None:
     history_generation = [0]
     bulk_generation = [0]
     suppress_form_events = [0]
-    action_owners: dict[str, object] = {}
+    action_guard = UiOperationGuard()
 
     def _form_is_current(generation: int) -> bool:
         return generation == form_generation[0]
@@ -288,16 +289,6 @@ async def one_on_one_listening_page() -> None:
         finally:
             suppress_form_events[0] -= 1
 
-    def _claim_action(slot: str) -> object | None:
-        if slot in action_owners:
-            return None
-        owner = object()
-        action_owners[slot] = owner
-        return owner
-
-    def _owns_action(slot: str, owner: object) -> bool:
-        return action_owners.get(slot) is owner
-
     async def _run_claimed_action(
         slot: str,
         owner: object,
@@ -306,8 +297,7 @@ async def one_on_one_listening_page() -> None:
         try:
             await operation
         finally:
-            if _owns_action(slot, owner):
-                action_owners.pop(slot, None)
+            action_guard.release(slot, owner)
 
     with ui.column().classes("w-full max-w-5xl mx-auto p-6 gap-4"):
         ui.label("一对一倾听观察记录").classes("text-2xl font-bold text-indigo-700")
@@ -690,7 +680,7 @@ async def one_on_one_listening_page() -> None:
                 show_error(f"生成失败：{type(ex).__name__}")
             finally:
                 if (
-                    _owns_action("listening.generate", owner)
+                    action_guard.owns("listening.generate", owner)
                     and await _require_bound_session()
                 ):
                     s["gen_btn"].props(remove="loading")
@@ -706,7 +696,7 @@ async def one_on_one_listening_page() -> None:
                 "child_name": str(child_name_input.value or ""),
                 "child_age": str(child_age_input.value or ""),
             }
-            owner = _claim_action("listening.generate")
+            owner = action_guard.claim("listening.generate")
             if owner is None:
                 return None
             return _run_claimed_action(
@@ -765,7 +755,7 @@ async def one_on_one_listening_page() -> None:
                 show_error(f"自动选取失败：{type(ex).__name__}")
             finally:
                 if (
-                    _owns_action("listening.workdays", owner)
+                    action_guard.owns("listening.workdays", owner)
                     and await _require_bound_session()
                 ):
                     s["pick_btn"].props(remove="loading")
@@ -774,7 +764,7 @@ async def one_on_one_listening_page() -> None:
             generation = form_generation[0]
             year = int(s["year"].value or year_input.value or cur_year)
             month = int(s["month"].value or month_select.value or cur_month)
-            owner = _claim_action("listening.workdays")
+            owner = action_guard.claim("listening.workdays")
             if owner is None:
                 return None
             return _run_claimed_action(
@@ -841,7 +831,7 @@ async def one_on_one_listening_page() -> None:
             show_error(f"自动选取失败：{type(ex).__name__}")
         finally:
             if (
-                _owns_action("listening.workdays", owner)
+                action_guard.owns("listening.workdays", owner)
                 and await _require_bound_session()
             ):
                 autopick_btn.props(remove="loading")
@@ -858,7 +848,7 @@ async def one_on_one_listening_page() -> None:
             for domain, state in domain_states.items()
         ]
         frozen_targets = tuple(targets)
-        owner = _claim_action("listening.workdays")
+        owner = action_guard.claim("listening.workdays")
         if owner is None:
             return None
         return _run_claimed_action(
@@ -979,7 +969,7 @@ async def one_on_one_listening_page() -> None:
             show_info("全部领域生成完成，请检查后保存", ok=True)
         finally:
             if (
-                _owns_action("listening.generate", owner)
+                action_guard.owns("listening.generate", owner)
                 and await _require_bound_session()
             ):
                 generate_all_btn.props(remove="loading")
@@ -1000,7 +990,7 @@ async def one_on_one_listening_page() -> None:
             }
             targets.append((domain, state, tuple(state["raw_images"]), context))
         frozen_targets = tuple(targets)
-        owner = _claim_action("listening.generate")
+        owner = action_guard.claim("listening.generate")
         if owner is None:
             return None
         return _run_claimed_action(
@@ -1127,14 +1117,17 @@ async def one_on_one_listening_page() -> None:
             logger.error("保存倾听记录失败 error_type=%s", type(ex).__name__)
             show_error(f"保存失败：{type(ex).__name__}")
         finally:
-            if _owns_action("listening.save", owner) and await _require_bound_session():
+            if (
+                action_guard.owns("listening.save", owner)
+                and await _require_bound_session()
+            ):
                 save_btn.props(remove="loading")
 
     def trigger_save(*_event_args: object):
         generation = form_generation[0]
         record_full, domains = _collect()
         record_id = edit_state.get("record_id")
-        owner = _claim_action("listening.save")
+        owner = action_guard.claim("listening.save")
         if owner is None:
             return None
         return _run_claimed_action(
@@ -1210,7 +1203,7 @@ async def one_on_one_listening_page() -> None:
             show_error(f"导出失败：{type(ex).__name__}")
         finally:
             if (
-                _owns_action("listening.export", owner)
+                action_guard.owns("listening.export", owner)
                 and await _require_bound_session()
             ):
                 export_combined_btn.props(remove="loading")
@@ -1274,7 +1267,7 @@ async def one_on_one_listening_page() -> None:
             show_error(f"导出失败：{type(ex).__name__}")
         finally:
             if (
-                _owns_action("listening.export", owner)
+                action_guard.owns("listening.export", owner)
                 and await _require_bound_session()
             ):
                 export_split_btn.props(remove="loading")
@@ -1287,7 +1280,7 @@ async def one_on_one_listening_page() -> None:
         year = int(year_input.value or cur_year)
         month = int(month_select.value or cur_month)
         record_id = edit_state.get("record_id")
-        owner = _claim_action("listening.export")
+        owner = action_guard.claim("listening.export")
         if owner is None:
             return None
         return _run_claimed_action(
@@ -1313,7 +1306,7 @@ async def one_on_one_listening_page() -> None:
         year = int(year_input.value or cur_year)
         month = int(month_select.value or cur_month)
         record_id = edit_state.get("record_id")
-        owner = _claim_action("listening.export")
+        owner = action_guard.claim("listening.export")
         if owner is None:
             return None
         return _run_claimed_action(
@@ -1672,7 +1665,7 @@ async def one_on_one_listening_page() -> None:
         month: int,
     ):
         generation = history_generation[0]
-        owner = _claim_action("listening.history-export")
+        owner = action_guard.claim("listening.history-export")
         if owner is None:
             return None
         return _run_claimed_action(
@@ -1688,7 +1681,7 @@ async def one_on_one_listening_page() -> None:
         month: int,
     ):
         generation = history_generation[0]
-        owner = _claim_action("listening.history-export")
+        owner = action_guard.claim("listening.history-export")
         if owner is None:
             return None
         return _run_claimed_action(
@@ -1746,7 +1739,7 @@ async def one_on_one_listening_page() -> None:
 
     def trigger_delete_listening_record(rid: int):
         generation = history_generation[0]
-        owner = _claim_action("listening.history-write")
+        owner = action_guard.claim("listening.history-write")
         if owner is None:
             return None
         return _run_claimed_action(
@@ -1948,7 +1941,7 @@ async def one_on_one_listening_page() -> None:
             show_error(f"批量导出失败：{type(ex).__name__}")
         finally:
             if (
-                _owns_action("listening.history-export", owner)
+                action_guard.owns("listening.history-export", owner)
                 and await _require_bound_session()
             ):
                 batch_export_btn.props(remove="loading")
@@ -1958,7 +1951,7 @@ async def one_on_one_listening_page() -> None:
         ids = tuple(sorted(selected_ids))
         year = int(filter_year.value) if filter_year.value else cur_year
         month = int(filter_month.value) or cur_month
-        owner = _claim_action("listening.history-export")
+        owner = action_guard.claim("listening.history-export")
         if owner is None:
             return None
         return _run_claimed_action(
