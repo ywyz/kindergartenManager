@@ -349,8 +349,8 @@ Agent Foundation 不新增业务表或 Alembic migration。以下对象只存在
 允许的持久化仍只有现有业务用例明确写入的数据。READ/DRAFT 不写 `daily_plan`、版本、preview、audit、
 备份、导出或日志正文。可以记录无正文的运行诊断计数，但不得把它描述为业务审计或长期记忆。
 
-未来 WRITE 需要新 ADR/spec 确认 `daily_plan` revision 和不可变 `agent_action_audit`，并使用新的 Alembic
-revision；当前不得预留空表或猜测迁移编号。
+独立 ADR/spec 已为后续 WRITE GREEN 冻结 `daily_plan` revision 和不可变 `agent_write_audit`，并要求新的
+Alembic revision；W004 不得预留空表或猜测迁移编号。
 
 ## 10. Prompt injection 与 Tool 安全
 

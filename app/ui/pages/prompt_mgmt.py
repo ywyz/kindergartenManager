@@ -16,6 +16,7 @@
 """
 
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 
 from nicegui import ui
 
@@ -63,6 +64,26 @@ from app.ui.components.app_shell import render_shell
 logger = get_logger(__name__)
 
 SessionGuard = Callable[[], Awaitable[TrustedUiSession | None]]
+
+
+@dataclass(frozen=True, slots=True, repr=False)
+class _PromptTestPayload:
+    prompt: str
+    test_text: str
+    grade: str
+
+
+async def _run_owned_action(
+    owner_ref: list[object | None],
+    owner: object,
+    operation: Awaitable[None],
+) -> None:
+    try:
+        await operation
+    finally:
+        if owner_ref[0] is owner:
+            owner_ref[0] = None
+
 
 # 每种任务类型的展示名称与内置默认提示词
 _TASK_CONFIG = {
@@ -265,6 +286,10 @@ async def _build_task_panel(
         return
 
     initial_content = active.content if active else ""
+    content_generation = [0]
+    test_generation = [0]
+    prompt_write_owner: list[object | None] = [None]
+    prompt_test_owner: list[object | None] = [None]
 
     with ui.card().classes("w-full"):
         ui.label(label).classes("text-base font-semibold text-blue-700 mb-1")
@@ -285,11 +310,16 @@ async def _build_task_panel(
 
         msg_label = ui.label("").classes("text-sm mt-1")
 
-        async def save_version() -> None:
+        def _invalidate_content(*_event_args: object) -> None:
+            content_generation[0] += 1
+            test_generation[0] += 1
+
+        content_area.on_value_change(_invalidate_content)
+
+        async def save_version(generation: int, new_content: str) -> None:
             current = await require_live_session()
-            if current is None:
+            if current is None or generation != content_generation[0]:
                 return
-            new_content = content_area.value.strip()
             if not new_content:
                 msg_label.set_text("⚠ 内容不能为空")
                 msg_label.classes(replace="text-sm mt-1 text-orange-600")
@@ -304,6 +334,21 @@ async def _build_task_panel(
                         task_type,
                         new_content,
                     )
+                current = await require_live_session()
+                if current is None or generation != content_generation[0]:
+                    return
+                async with AsyncSessionLocal() as session:
+                    updated_versions = await list_versions(
+                        session,
+                        current.tenant_id,
+                        current.user_id,
+                        task_type,
+                    )
+                if (
+                    await require_live_session() is None
+                    or generation != content_generation[0]
+                ):
+                    return
                 logger.info(
                     "保存提示词新版本",
                     extra={
@@ -317,20 +362,7 @@ async def _build_task_panel(
                     f"✓ 已保存为 v{new_prompt.version}，刷新页面可查看历史"
                 )
                 msg_label.classes(replace="text-sm mt-1 text-green-600")
-                # 刷新历史列表
-                current = await require_live_session()
-                if current is None:
-                    return
                 history_container.clear()
-                async with AsyncSessionLocal() as session:
-                    updated_versions = await list_versions(
-                        session,
-                        current.tenant_id,
-                        current.user_id,
-                        task_type,
-                    )
-                if await require_live_session() is None:
-                    return
                 _render_history(
                     history_container,
                     updated_versions,
@@ -339,15 +371,34 @@ async def _build_task_panel(
                     task_type,
                     content_area,
                     msg_label,
+                    content_generation,
+                    prompt_write_owner,
                 )
+                content_generation[0] += 1
             except Exception as e:
-                if await require_live_session() is None:
+                if (
+                    await require_live_session() is None
+                    or generation != content_generation[0]
+                ):
                     return
                 logger.error("保存提示词失败 error_type=%s", type(e).__name__)
                 msg_label.set_text(f"✗ 保存失败：{type(e).__name__}")
                 msg_label.classes(replace="text-sm mt-1 text-red-600")
 
-        ui.button("保存为新版本", on_click=save_version).classes(
+        def trigger_save_version() -> object:
+            generation = content_generation[0]
+            new_content = content_area.value.strip()
+            if prompt_write_owner[0] is not None:
+                return None
+            owner = object()
+            prompt_write_owner[0] = owner
+            return _run_owned_action(
+                prompt_write_owner,
+                owner,
+                save_version(generation, new_content),
+            )
+
+        ui.button("保存为新版本", on_click=trigger_save_version).classes(
             "bg-blue-600 text-white mt-2"
         )
 
@@ -382,6 +433,13 @@ async def _build_task_panel(
                     value="中班",
                     label="测试年龄段",
                 ).props("outlined dense")
+
+            def _invalidate_test(*_event_args: object) -> None:
+                test_generation[0] += 1
+
+            test_input.on_value_change(_invalidate_test)
+            if test_grade_select is not None:
+                test_grade_select.on_value_change(_invalidate_test)
 
             test_msg = ui.label("").classes("text-sm")
 
@@ -419,15 +477,22 @@ async def _build_task_panel(
                     .props("rows=7 outlined readonly")
                 )
 
-            async def do_test() -> None:
+            async def do_test(
+                generation: int,
+                payload: _PromptTestPayload,
+                owner: object,
+            ) -> None:
+                current_prompt = payload.prompt
+                test_text = payload.test_text
+                test_grade = payload.grade
                 current = await require_live_session()
-                if current is None:
+                if current is None or generation != test_generation[0]:
                     return
-                if not content_area.value.strip():
+                if not current_prompt:
                     test_msg.classes(replace="text-sm text-orange-500")
                     test_msg.set_text("⚠ 请先在上方输入提示词内容")
                     return
-                if not test_input.value.strip():
+                if not test_text.strip():
                     test_msg.classes(replace="text-sm text-orange-500")
                     test_msg.set_text("⚠ 请输入测试文本")
                     return
@@ -443,6 +508,11 @@ async def _build_task_panel(
                             current.tenant_id,
                             current.user_id,
                         )
+                    if (
+                        await require_live_session() is None
+                        or generation != test_generation[0]
+                    ):
+                        return
                     if ai_key is None:
                         test_msg.classes(replace="text-sm text-orange-500")
                         test_msg.set_text("⚠ 未配置 AI Key，请到【设置】页面配置")
@@ -451,17 +521,19 @@ async def _build_task_panel(
                     api_key_plain = get_decrypted_key(ai_key)
                     base_url = ai_key.api_base_url
                     model = ai_key.model_name
-                    current_prompt = content_area.value.strip()
 
                     if task_type == "split":
                         result = await split_lesson_plan(
-                            raw_text=test_input.value,
+                            raw_text=test_text,
                             api_base_url=base_url,
                             api_key=api_key_plain,
                             model_name=model,
                             system_prompt=current_prompt,
                         )
-                        if await require_live_session() is None:
+                        if (
+                            await require_live_session() is None
+                            or generation != test_generation[0]
+                        ):
                             return
                         test_goal_out.value = result.get("activity_goal", "")
                         test_prep_out.value = result.get("activity_prep", "")
@@ -470,16 +542,18 @@ async def _build_task_panel(
                         test_proc_out.value = result.get("activity_process", "")
 
                     elif task_type == "adapt":
-                        grade = test_grade_select.value if test_grade_select else "中班"
                         adapted = await adapt_activity_process(
-                            original=test_input.value,
-                            grade=grade,
+                            original=test_text,
+                            grade=test_grade,
                             api_base_url=base_url,
                             api_key=api_key_plain,
                             model_name=model,
                             system_prompt=current_prompt,
                         )
-                        if await require_live_session() is None:
+                        if (
+                            await require_live_session() is None
+                            or generation != test_generation[0]
+                        ):
                             return
                         test_result_out.value = adapted
 
@@ -488,13 +562,16 @@ async def _build_task_panel(
                         text = await call_ai_text(
                             messages=[
                                 {"role": "system", "content": current_prompt},
-                                {"role": "user", "content": test_input.value},
+                                {"role": "user", "content": test_text},
                             ],
                             api_base_url=base_url,
                             api_key=api_key_plain,
                             model_name=model,
                         )
-                        if await require_live_session() is None:
+                        if (
+                            await require_live_session() is None
+                            or generation != test_generation[0]
+                        ):
                             return
                         test_result_out.value = text
 
@@ -502,29 +579,62 @@ async def _build_task_panel(
                     test_msg.set_text("✅ 测试完成")
 
                 except AiParseError:
-                    if await require_live_session() is None:
+                    if (
+                        await require_live_session() is None
+                        or generation != test_generation[0]
+                    ):
                         return
                     test_msg.classes(replace="text-sm text-red-500")
                     test_msg.set_text("❌ AI 返回内容解析失败，请稍后重试")
                 except AiCallError:
-                    if await require_live_session() is None:
+                    if (
+                        await require_live_session() is None
+                        or generation != test_generation[0]
+                    ):
                         return
                     test_msg.classes(replace="text-sm text-red-500")
                     test_msg.set_text("❌ AI 调用失败，请检查配置或稍后重试")
                 except ConfigError:
-                    if await require_live_session() is None:
+                    if (
+                        await require_live_session() is None
+                        or generation != test_generation[0]
+                    ):
                         return
                     test_msg.classes(replace="text-sm text-orange-500")
                     test_msg.set_text("⚠ AI 配置不可用，请检查模型配置")
                 except Exception as e:
-                    if await require_live_session() is None:
+                    if (
+                        await require_live_session() is None
+                        or generation != test_generation[0]
+                    ):
                         return
                     test_msg.classes(replace="text-sm text-red-500")
                     test_msg.set_text(f"❌ {type(e).__name__}")
                 finally:
-                    test_btn.props(remove="loading")
+                    if (
+                        prompt_test_owner[0] is owner
+                        and await require_live_session() is not None
+                    ):
+                        test_btn.props(remove="loading")
 
-            test_btn = ui.button("测试当前提示词", on_click=do_test).classes(
+            def trigger_test() -> object:
+                generation = test_generation[0]
+                payload = _PromptTestPayload(
+                    prompt=content_area.value.strip(),
+                    test_text=test_input.value,
+                    grade=(test_grade_select.value if test_grade_select else "中班"),
+                )
+                if prompt_test_owner[0] is not None:
+                    return None
+                owner = object()
+                prompt_test_owner[0] = owner
+                return _run_owned_action(
+                    prompt_test_owner,
+                    owner,
+                    do_test(generation, payload, owner),
+                )
+
+            test_btn = ui.button("测试当前提示词", on_click=trigger_test).classes(
                 "bg-amber-600 text-white"
             )
 
@@ -538,6 +648,8 @@ async def _build_task_panel(
         task_type,
         content_area,
         msg_label,
+        content_generation,
+        prompt_write_owner,
     )
 
 
@@ -549,6 +661,8 @@ def _render_history(
     task_type: str,
     content_area: ui.textarea,
     msg_label: ui.label,
+    content_generation: list[int],
+    prompt_write_owner: list[object | None],
 ) -> None:
     """渲染历史版本列表到指定容器。"""
     if not versions:
@@ -571,9 +685,13 @@ def _render_history(
                     # 捕获当前循环变量
                     _ver = v.version
 
-                    async def rollback(_ver=_ver) -> None:
+                    async def rollback(
+                        generation: int,
+                        owner: object,
+                        _ver=_ver,
+                    ) -> None:
                         current = await require_live_session()
-                        if current is None:
+                        if current is None or generation != content_generation[0]:
                             return
                         try:
                             async with AsyncSessionLocal() as session:
@@ -585,15 +703,8 @@ def _render_history(
                                     _ver,
                                 )
                             current = await require_live_session()
-                            if current is None:
+                            if current is None or generation != content_generation[0]:
                                 return
-                            content_area.value = rolled.content
-                            msg_label.set_text(
-                                f"✓ 已回滚到 v{_ver}，刷新页面可看完整历史"
-                            )
-                            msg_label.classes(replace="text-sm mt-1 text-blue-600")
-                            # 刷新容器
-                            container.clear()
                             async with AsyncSessionLocal() as session:
                                 updated = await list_versions(
                                     session,
@@ -601,8 +712,17 @@ def _render_history(
                                     current.user_id,
                                     task_type,
                                 )
-                            if await require_live_session() is None:
+                            if (
+                                await require_live_session() is None
+                                or generation != content_generation[0]
+                            ):
                                 return
+                            content_area.value = rolled.content
+                            msg_label.set_text(
+                                f"✓ 已回滚到 v{_ver}，刷新页面可看完整历史"
+                            )
+                            msg_label.classes(replace="text-sm mt-1 text-blue-600")
+                            container.clear()
                             _render_history(
                                 container,
                                 updated,
@@ -611,13 +731,31 @@ def _render_history(
                                 task_type,
                                 content_area,
                                 msg_label,
+                                content_generation,
+                                prompt_write_owner,
                             )
+                            content_generation[0] += 1
                         except Exception as e:
-                            if await require_live_session() is None:
+                            if (
+                                await require_live_session() is None
+                                or generation != content_generation[0]
+                            ):
                                 return
                             msg_label.set_text(f"✗ 回滚失败：{type(e).__name__}")
                             msg_label.classes(replace="text-sm mt-1 text-red-600")
 
-                    ui.button("回滚", on_click=rollback).classes(
+                    def trigger_rollback(_ver=_ver):
+                        generation = content_generation[0]
+                        if prompt_write_owner[0] is not None:
+                            return None
+                        owner = object()
+                        prompt_write_owner[0] = owner
+                        return _run_owned_action(
+                            prompt_write_owner,
+                            owner,
+                            rollback(generation, owner, _ver),
+                        )
+
+                    ui.button("回滚", on_click=trigger_rollback).classes(
                         "text-xs bg-gray-200 text-gray-700"
                     ).props("size=sm")

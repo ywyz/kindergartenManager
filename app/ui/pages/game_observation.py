@@ -105,7 +105,10 @@ async def game_observation_page() -> None:
     # 保存当前表单状态（用于跨回调共享）
     state: dict = {
         "images": [],  # list[bytes] — 上传的原始图片
+        "compressed_images": [],
         "observation_id": None,  # 保存后的记录 ID
+        "generation": 0,
+        "upload_generation": 0,
     }
 
     with ui.column().classes("w-full max-w-3xl mx-auto p-6 gap-4"):
@@ -194,25 +197,61 @@ async def game_observation_page() -> None:
             )
             preview_row = ui.row().classes("gap-2 flex-wrap mt-2")
 
-            async def handle_upload(e) -> None:
+            async def handle_upload(
+                files: tuple,
+                generation: int,
+                upload_generation: int,
+                image_count: int,
+            ) -> None:
                 if not await _require_bound_session():
                     return
-                if len(state["images"]) >= 3:
+                if (
+                    generation != state["generation"]
+                    or upload_generation != state["upload_generation"]
+                ):
+                    return
+                if not files:
+                    return
+                if image_count + len(files) > 3:
                     show_error("最多只能上传 3 张图片")
                     return
-                data = await e.file.read()
-                if not await _require_bound_session():
-                    return
-                state["images"].append(data)
+
+                batch_data: list[bytes] = []
+                for file in files:
+                    data = await file.read()
+                    if not await _require_bound_session():
+                        return
+                    if (
+                        generation != state["generation"]
+                        or upload_generation != state["upload_generation"]
+                    ):
+                        return
+                    batch_data.append(data)
+
+                state["images"].extend(batch_data)
+                state["compressed_images"] = []
+                state["observation_id"] = None
+                state["generation"] += 1
                 image_count_label.set_text(f"已上传：{len(state['images'])} 张")
                 with preview_row:
-                    ui.image(
-                        f"data:image/jpeg;base64,{__import__('base64').b64encode(data).decode()}"
-                    ).classes("w-24 h-24 object-cover rounded border")
+                    for data in batch_data:
+                        ui.image(
+                            f"data:image/jpeg;base64,{__import__('base64').b64encode(data).decode()}"
+                        ).classes("w-24 h-24 object-cover rounded border")
+
+            def trigger_upload(e) -> object:
+                files = tuple(e.files)
+                state["upload_generation"] += 1
+                return handle_upload(
+                    files,
+                    state["generation"],
+                    state["upload_generation"],
+                    len(state["images"]),
+                )
 
             ui.upload(
                 label="上传照片",
-                on_upload=handle_upload,
+                on_multi_upload=trigger_upload,
                 auto_upload=True,
                 multiple=True,
             ).props("accept=image/*").classes("w-full")
@@ -235,6 +274,60 @@ async def game_observation_page() -> None:
                 "w-full"
             )
 
+        def _invalidate_form(*_event_args: object) -> None:
+            state["generation"] += 1
+            state["observation_id"] = None
+
+        for control in (
+            obs_date_input,
+            time_range_input,
+            big_env_select,
+            game_area_input,
+            adult_count_input,
+            child_count_input,
+            observer_input,
+            child_names_input,
+            child_age_input,
+            goal_area,
+            record_area,
+            eval_area,
+            strategy_area,
+        ):
+            control.on_value_change(_invalidate_form)
+
+        def _current_observation_payload() -> dict:
+            return {
+                "obs_date": obs_date_input.value,
+                "time_range": time_range_input.value,
+                "big_env": big_env_select.value or "户外",
+                "game_area": game_area_input.value,
+                "adult_count": adult_count_input.value,
+                "child_count": child_count_input.value,
+                "child_names": child_names_input.value,
+                "child_age": child_age_input.value,
+                "observer": observer_input.value,
+                "observation_goal": goal_area.value,
+                "observation_record": record_area.value,
+                "evaluation_analysis": eval_area.value,
+                "support_strategy": strategy_area.value,
+            }
+
+        action_owners: dict[str, object] = {}
+
+        def _claim_action(name: str) -> object | None:
+            if name in action_owners:
+                return None
+            owner = object()
+            action_owners[name] = owner
+            return owner
+
+        def _owns_action(name: str, owner: object) -> bool:
+            return action_owners.get(name) is owner
+
+        def _release_action(name: str, owner: object) -> None:
+            if _owns_action(name, owner):
+                action_owners.pop(name, None)
+
         # ── 操作按钮 ────────────────────────────────────────────────
         with ui.row().classes("w-full gap-3 justify-end"):
             generate_btn = ui.button("生成观察记录", icon="auto_awesome").classes(
@@ -245,89 +338,130 @@ async def game_observation_page() -> None:
                 "bg-orange-500 text-white"
             )
 
-        async def do_generate() -> None:
+        async def do_generate(
+            action_owner: object,
+            generation: int,
+            images: tuple[bytes, ...],
+            ctx: dict,
+        ) -> None:
             if not await _require_bound_session():
+                _release_action("generate", action_owner)
+                return
+            if generation != state["generation"]:
+                _release_action("generate", action_owner)
                 return
             generate_btn.props("loading=true")
             error_label.classes(add="hidden")
             show_info("⏳ AI 正在分析照片，请稍候……")
             try:
-                if not validate_image_count(len(state["images"])):
+                if not validate_image_count(len(images)):
                     show_error("请先上传 1~3 张游戏照片再生成")
                     return
-                big_env = big_env_select.value or "户外"
-                if not validate_big_env(big_env):
+                if not validate_big_env(ctx["big_env"]):
                     show_error("大环境值非法，请选择：户外/室内/公共")
                     return
-
-                ctx = {
-                    "grade": grade_val,
-                    "game_area": game_area_input.value,
-                    "big_env": big_env,
-                    "child_names": child_names_input.value,
-                    "child_age": child_age_input.value,
-                }
                 async with AsyncSessionLocal() as session:
                     result = await generate_observation_content(
                         session=session,
                         tenant_id=tenant_id,
                         user_id=user_id,
-                        images=state["images"],
+                        images=list(images),
                         context=ctx,
                     )
                 if not await _require_bound_session():
+                    return
+                if generation != state["generation"]:
                     return
                 goal_area.value = result.get("observation_goal", "")
                 record_area.value = result.get("observation_record", "")
                 eval_area.value = result.get("evaluation_analysis", "")
                 strategy_area.value = result.get("support_strategy", "")
                 state["compressed_images"] = result.get("compressed_images", [])
+                state["observation_id"] = None
+                state["generation"] += 1
                 show_success("生成成功，请检查并编辑后保存")
             except ConfigError:
                 if not await _require_bound_session():
+                    return
+                if generation != state["generation"]:
                     return
                 show_error("AI 配置不可用，请检查模型配置")
             except (AiCallError, AiParseError):
                 if not await _require_bound_session():
                     return
+                if generation != state["generation"]:
+                    return
                 show_error("AI 调用或解析失败，请稍后重试")
             except Exception as e:
                 if not await _require_bound_session():
                     return
+                if generation != state["generation"]:
+                    return
                 logger.error("生成观察记录失败 error_type=%s", type(e).__name__)
                 show_error(f"生成失败：{type(e).__name__}")
             finally:
-                generate_btn.props(remove="loading")
+                if _owns_action("generate", action_owner):
+                    try:
+                        if await _require_bound_session():
+                            generate_btn.props(remove="loading")
+                    finally:
+                        _release_action("generate", action_owner)
 
-        generate_btn.on("click", do_generate)
+        def trigger_generate() -> object | None:
+            owner = _claim_action("generate")
+            if owner is None:
+                return None
+            payload = _current_observation_payload()
+            return do_generate(
+                owner,
+                state["generation"],
+                tuple(state["images"]),
+                {
+                    "grade": grade_val,
+                    "game_area": payload["game_area"],
+                    "big_env": payload["big_env"],
+                    "child_names": payload["child_names"],
+                    "child_age": payload["child_age"],
+                },
+            )
 
-        async def do_save() -> None:
+        generate_btn.on("click", trigger_generate)
+
+        async def do_save(
+            action_owner: object,
+            generation: int,
+            payload: dict,
+            compressed: tuple,
+        ) -> None:
             if not await _require_bound_session():
+                _release_action("save", action_owner)
+                return
+            if generation != state["generation"]:
+                _release_action("save", action_owner)
                 return
             save_btn.props("loading=true")
             try:
                 obs_data = {
                     "tenant_id": tenant_id,
                     "user_id": user_id,
-                    "obs_date": date.fromisoformat(obs_date_input.value)
-                    if obs_date_input.value
+                    "obs_date": date.fromisoformat(payload["obs_date"])
+                    if payload["obs_date"]
                     else date.today(),
-                    "time_range": time_range_input.value or None,
-                    "big_env": big_env_select.value or "户外",
-                    "game_area": game_area_input.value or None,
+                    "time_range": payload["time_range"] or None,
+                    "big_env": payload["big_env"],
+                    "game_area": payload["game_area"] or None,
                     "grade": grade_val or None,
                     "class_name": class_name_val or None,
-                    "adult_count": int(adult_count_input.value or 1),
-                    "child_count": int(child_count_input.value or 0),
-                    "child_names": child_names_input.value or None,
-                    "child_age": child_age_input.value or None,
-                    "observer": observer_input.value or None,
-                    "observation_goal": goal_area.value or None,
-                    "observation_record": record_area.value or None,
-                    "evaluation_analysis": eval_area.value or None,
-                    "support_strategy": strategy_area.value or None,
+                    "adult_count": int(payload["adult_count"] or 1),
+                    "child_count": int(payload["child_count"] or 0),
+                    "child_names": payload["child_names"] or None,
+                    "child_age": payload["child_age"] or None,
+                    "observer": payload["observer"] or None,
+                    "observation_goal": payload["observation_goal"] or None,
+                    "observation_record": payload["observation_record"] or None,
+                    "evaluation_analysis": payload["evaluation_analysis"] or None,
+                    "support_strategy": payload["support_strategy"] or None,
                 }
-                compressed = state.get("compressed_images", [])
                 storage = get_storage_backend()
                 async with AsyncSessionLocal() as session:
                     obs_id = await save_observation_with_images(
@@ -338,41 +472,54 @@ async def game_observation_page() -> None:
                     )
                 if not await _require_bound_session():
                     return
+                if generation != state["generation"]:
+                    return
                 state["observation_id"] = obs_id
                 show_success(f"保存成功（记录 ID：{obs_id}）")
-                await refresh_history()
+                await trigger_refresh_history()
             except Exception as e:
                 if not await _require_bound_session():
+                    return
+                if generation != state["generation"]:
                     return
                 logger.error("保存观察记录失败 error_type=%s", type(e).__name__)
                 show_error(f"保存失败：{type(e).__name__}")
             finally:
-                save_btn.props(remove="loading")
+                if _owns_action("save", action_owner):
+                    try:
+                        if await _require_bound_session():
+                            save_btn.props(remove="loading")
+                    finally:
+                        _release_action("save", action_owner)
 
-        save_btn.on("click", do_save)
+        def trigger_save() -> object | None:
+            owner = _claim_action("save")
+            if owner is None:
+                return None
+            return do_save(
+                owner,
+                state["generation"],
+                _current_observation_payload(),
+                tuple(state.get("compressed_images", [])),
+            )
 
-        async def do_export() -> None:
+        save_btn.on("click", trigger_save)
+
+        async def do_export(
+            action_owner: object,
+            generation: int,
+            obs: dict,
+            compressed: tuple,
+            observation_id: int | None,
+        ) -> None:
             if not await _require_bound_session():
+                _release_action("export", action_owner)
+                return
+            if generation != state["generation"]:
+                _release_action("export", action_owner)
                 return
             export_btn.props("loading=true")
             try:
-                obs = {
-                    "class_name": class_name_val,
-                    "obs_date": obs_date_input.value,
-                    "time_range": time_range_input.value,
-                    "big_env": big_env_select.value or "户外",
-                    "game_area": game_area_input.value,
-                    "adult_count": adult_count_input.value,
-                    "child_count": child_count_input.value,
-                    "child_names": child_names_input.value,
-                    "child_age": child_age_input.value,
-                    "observer": observer_input.value,
-                    "observation_goal": goal_area.value,
-                    "observation_record": record_area.value,
-                    "evaluation_analysis": eval_area.value,
-                    "support_strategy": strategy_area.value,
-                }
-                compressed = state.get("compressed_images", [])
                 img_bytes = [ci.data for ci in compressed] if compressed else []
 
                 doc_bytes = export_observation(obs, img_bytes)
@@ -381,7 +528,7 @@ async def game_observation_page() -> None:
                     user_id=user_id,
                     grade=grade_val,
                     class_name=class_name_val,
-                    obs_date=obs_date_input.value or str(date.today()),
+                    obs_date=obs["obs_date"] or str(date.today()),
                 )
 
                 async with AsyncSessionLocal() as session:
@@ -392,11 +539,13 @@ async def game_observation_page() -> None:
                         daily_plan_id=None,
                         file_name=file_name,
                         file_path=f"exports/{file_name}",
-                        observation_id=state.get("observation_id"),
+                        observation_id=observation_id,
                     )
                     await session.commit()
 
                 if not await _require_bound_session():
+                    return
+                if generation != state["generation"]:
                     return
                 ui.download(doc_bytes, file_name)
                 log_audit(
@@ -404,29 +553,59 @@ async def game_observation_page() -> None:
                     tenant_id=tenant_id,
                     user_id=user_id,
                     file_name=file_name,
-                    observation_id=state.get("observation_id"),
+                    observation_id=observation_id,
                 )
                 show_success(f"导出成功：{file_name}")
             except Exception as e:
                 if not await _require_bound_session():
                     return
+                if generation != state["generation"]:
+                    return
                 logger.error("导出观察记录失败 error_type=%s", type(e).__name__)
                 show_error(f"导出失败：{type(e).__name__}")
             finally:
-                export_btn.props(remove="loading")
+                if _owns_action("export", action_owner):
+                    try:
+                        if await _require_bound_session():
+                            export_btn.props(remove="loading")
+                    finally:
+                        _release_action("export", action_owner)
 
-        export_btn.on("click", do_export)
+        def trigger_export() -> object | None:
+            owner = _claim_action("export")
+            if owner is None:
+                return None
+            obs = _current_observation_payload()
+            obs["class_name"] = class_name_val
+            return do_export(
+                owner,
+                state["generation"],
+                obs,
+                tuple(state.get("compressed_images", [])),
+                state.get("observation_id"),
+            )
+
+        export_btn.on("click", trigger_export)
 
         # ── 历史记录区块 ────────────────────────────────────────────
         ui.separator().classes("my-4")
         ui.label("历史观察记录").classes("text-lg font-semibold text-gray-700 mt-2")
 
         history_container = ui.column().classes("w-full gap-2")
+        history_generation = [0]
 
-        async def refresh_history() -> None:
+        def _history_is_current(generation: int) -> bool:
+            return generation == history_generation[0]
+
+        def trigger_refresh_history() -> object:
+            history_generation[0] += 1
+            return refresh_history(history_generation[0])
+
+        async def refresh_history(generation: int) -> None:
             if not await _require_bound_session():
                 return
-            history_container.clear()
+            if not _history_is_current(generation):
+                return
             try:
                 async with AsyncSessionLocal() as session:
                     records = await list_observations(
@@ -438,6 +617,9 @@ async def game_observation_page() -> None:
                     )
                 if not await _require_bound_session():
                     return
+                if not _history_is_current(generation):
+                    return
+                history_container.clear()
                 with history_container:
                     if not records:
                         ui.label("暂无观察记录").classes("text-gray-400 text-sm")
@@ -544,7 +726,7 @@ async def game_observation_page() -> None:
                                                             user_id=user_id,
                                                             observation_id=r.id,
                                                         )
-                                                await refresh_history()
+                                                await trigger_refresh_history()
                                             except Exception as ex:
                                                 if not await _require_bound_session():
                                                     return
@@ -558,8 +740,10 @@ async def game_observation_page() -> None:
             except Exception as e:
                 if not await _require_bound_session():
                     return
+                if not _history_is_current(generation):
+                    return
                 logger.error("加载历史记录失败 error_type=%s", type(e).__name__)
                 with history_container:
                     ui.label("加载历史失败").classes("text-red-500 text-sm")
 
-        await refresh_history()
+        await trigger_refresh_history()

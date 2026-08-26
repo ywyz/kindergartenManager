@@ -98,6 +98,7 @@ async def _require_current_sys_admin(
     tenant_id: int,
     admin_user_id: int,
     presented_role: str,
+    lock_actor_for_write: bool = True,
 ) -> None:
     """不要信任页面捕获的旧角色；每个管理员用例都重读当前 active User。"""
     if presented_role != UserRole.sys_admin.value:
@@ -106,7 +107,7 @@ async def _require_current_sys_admin(
         session,
         tenant_id=tenant_id,
         user_id=admin_user_id,
-        for_update=True,
+        for_update=lock_actor_for_write,
     )
     if admin is None or not admin.is_active or admin.role is not UserRole.sys_admin:
         raise AuthError("权限不足，仅系统管理员可执行该操作")
@@ -191,6 +192,7 @@ async def list_users_for_admin(
         tenant_id=tenant_id,
         admin_user_id=admin_user_id,
         presented_role=admin_role,
+        lock_actor_for_write=False,
     )
     if limit <= 0:
         raise ValueError("分页大小必须大于 0")

@@ -8,6 +8,7 @@
 5. 端口配置
 """
 
+from dataclasses import dataclass
 from datetime import date
 
 from nicegui import ui
@@ -32,10 +33,56 @@ from app.ui.auth_context import (
     require_bound_ui_session,
     require_current_ui_session,
 )
+from app.ui.bound_operation import (
+    BoundUiOperationScope,
+    UiOperationEvent,
+    UiOperationPhase,
+    UiOperationStatus,
+)
 from app.ui.components.app_shell import render_shell
 from app.ui.helpers import mask_api_key as _mask_api_key
 
 _GRADES = ["小班", "中班", "大班"]
+
+
+@dataclass(frozen=True, slots=True, repr=False)
+class _SemesterPayload:
+    name: str
+    start: str
+    end: str
+
+
+@dataclass(frozen=True, slots=True, repr=False)
+class _ClassPayload:
+    name: str
+    grade: str
+    teacher_name: str | None
+    indoor_areas: str | None
+    outdoor_content: str | None
+
+
+@dataclass(frozen=True, slots=True, repr=False)
+class _AiKeyPayload:
+    url: str
+    model: str
+    key: str
+    masked_value: str
+
+
+@dataclass(frozen=True, slots=True, repr=False)
+class _DatabasePayload:
+    mode: str
+    host: str
+    port: str
+    username: str
+    password: str
+    database: str
+
+
+@dataclass(frozen=True, slots=True)
+class _SettingsResult:
+    success: bool
+    message: str
 
 
 @ui.page("/settings")
@@ -51,6 +98,16 @@ async def settings_page() -> None:
 
     async def require_live_session() -> TrustedUiSession | None:
         return await require_bound_ui_session(ui_session)
+
+    semester_operations = BoundUiOperationScope(ui_session)
+    class_operations = BoundUiOperationScope(ui_session)
+
+    async def _run_owned(owner_ref: list[object | None], owner: object, operation):
+        try:
+            await operation
+        finally:
+            if owner_ref[0] is owner:
+                owner_ref[0] = None
 
     with ui.column().classes("w-full max-w-2xl mx-auto p-6 gap-6"):
         # ══════════════════════════════════════════════════════════════════════
@@ -93,36 +150,22 @@ async def settings_page() -> None:
 
             semester_msg = ui.label("").classes("text-sm mt-1")
 
-            async def save_semester() -> None:
-                current = await require_live_session()
-                if current is None:
-                    return
-                semester_msg.classes(remove="text-green-600 text-red-500")
-                name = semester_name_input.value.strip()
-                start_str = start_date_input.value.strip()
-                end_str = end_date_input.value.strip()
-
-                if not name:
-                    semester_msg.text = "请输入学期名称"
-                    semester_msg.classes(add="text-red-500")
-                    return
-                if not start_str or not end_str:
-                    semester_msg.text = "请选择开始和结束日期"
-                    semester_msg.classes(add="text-red-500")
-                    return
-
+            async def _save_semester_effect(
+                current: TrustedUiSession,
+                payload: _SemesterPayload,
+            ) -> _SettingsResult:
+                if not payload.name:
+                    return _SettingsResult(False, "请输入学期名称")
+                if not payload.start or not payload.end:
+                    return _SettingsResult(False, "请选择开始和结束日期")
                 try:
-                    start_date = date.fromisoformat(start_str)
-                    end_date = date.fromisoformat(end_str)
+                    start_date = date.fromisoformat(payload.start)
+                    end_date = date.fromisoformat(payload.end)
                 except ValueError:
-                    semester_msg.text = "日期格式错误，请使用 YYYY-MM-DD"
-                    semester_msg.classes(add="text-red-500")
-                    return
+                    return _SettingsResult(False, "日期格式错误，请使用 YYYY-MM-DD")
 
                 if start_date >= end_date:
-                    semester_msg.text = "结束日期必须晚于开始日期"
-                    semester_msg.classes(add="text-red-500")
-                    return
+                    return _SettingsResult(False, "结束日期必须晚于开始日期")
 
                 async with AsyncSessionLocal() as session:
                     async with session.begin():
@@ -130,13 +173,46 @@ async def settings_page() -> None:
                             session,
                             current.tenant_id,
                             current.user_id,
-                            name,
+                            payload.name,
                             start_date,
                             end_date,
                         )
+                return _SettingsResult(True, "学期配置已保存")
 
-                semester_msg.text = "学期配置已保存"
-                semester_msg.classes(add="text-green-600")
+            def _present_semester(
+                event: UiOperationEvent[_SettingsResult],
+            ) -> None:
+                if event.phase is UiOperationPhase.STARTED:
+                    semester_msg.classes(remove="text-green-600 text-red-500")
+                    return
+                outcome = event.outcome
+                if outcome is None or outcome.status is UiOperationStatus.FAILED:
+                    result = _SettingsResult(False, "保存失败，请稍后重试")
+                else:
+                    result = outcome.value
+                    if result is None:
+                        result = _SettingsResult(False, "保存失败，请稍后重试")
+                semester_msg.text = result.message
+                semester_msg.classes(
+                    add="text-green-600" if result.success else "text-red-500"
+                )
+
+            save_semester = semester_operations.bind(
+                slot="semester.save",
+                capture=lambda: _SemesterPayload(
+                    name=semester_name_input.value.strip(),
+                    start=start_date_input.value.strip(),
+                    end=end_date_input.value.strip(),
+                ),
+                effect=_save_semester_effect,
+                present=_present_semester,
+            )
+            for control in (
+                semester_name_input,
+                start_date_input,
+                end_date_input,
+            ):
+                control.on_value_change(semester_operations.invalidate)
 
             ui.button("保存学期配置", on_click=save_semester).classes(
                 "mt-3 bg-blue-600 text-white"
@@ -177,18 +253,12 @@ async def settings_page() -> None:
 
             class_msg = ui.label("").classes("text-sm mt-1")
 
-            async def save_class() -> None:
-                current = await require_live_session()
-                if current is None:
-                    return
-                class_msg.classes(remove="text-green-600 text-red-500")
-                c_name = class_name_input.value.strip()
-                grade = grade_select.value
-
-                if not c_name:
-                    class_msg.text = "请输入班级名称"
-                    class_msg.classes(add="text-red-500")
-                    return
+            async def _save_class_effect(
+                current: TrustedUiSession,
+                payload: _ClassPayload,
+            ) -> _SettingsResult:
+                if not payload.name:
+                    return _SettingsResult(False, "请输入班级名称")
 
                 async with AsyncSessionLocal() as session:
                     async with session.begin():
@@ -196,15 +266,50 @@ async def settings_page() -> None:
                             session,
                             current.tenant_id,
                             current.user_id,
-                            grade=grade,
-                            class_name=c_name,
-                            teacher_name=teacher_name_input.value.strip() or None,
-                            indoor_areas=indoor_areas_input.value.strip() or None,
-                            outdoor_content=outdoor_content_input.value.strip() or None,
+                            grade=payload.grade,
+                            class_name=payload.name,
+                            teacher_name=payload.teacher_name,
+                            indoor_areas=payload.indoor_areas,
+                            outdoor_content=payload.outdoor_content,
                         )
+                return _SettingsResult(True, "班级配置已保存")
 
-                class_msg.text = "班级配置已保存"
-                class_msg.classes(add="text-green-600")
+            def _present_class(event: UiOperationEvent[_SettingsResult]) -> None:
+                if event.phase is UiOperationPhase.STARTED:
+                    class_msg.classes(remove="text-green-600 text-red-500")
+                    return
+                outcome = event.outcome
+                if outcome is None or outcome.status is UiOperationStatus.FAILED:
+                    result = _SettingsResult(False, "保存失败，请稍后重试")
+                else:
+                    result = outcome.value
+                    if result is None:
+                        result = _SettingsResult(False, "保存失败，请稍后重试")
+                class_msg.text = result.message
+                class_msg.classes(
+                    add="text-green-600" if result.success else "text-red-500"
+                )
+
+            save_class = class_operations.bind(
+                slot="class.save",
+                capture=lambda: _ClassPayload(
+                    name=class_name_input.value.strip(),
+                    grade=grade_select.value,
+                    teacher_name=teacher_name_input.value.strip() or None,
+                    indoor_areas=indoor_areas_input.value.strip() or None,
+                    outdoor_content=outdoor_content_input.value.strip() or None,
+                ),
+                effect=_save_class_effect,
+                present=_present_class,
+            )
+            for control in (
+                grade_select,
+                class_name_input,
+                teacher_name_input,
+                indoor_areas_input,
+                outdoor_content_input,
+            ):
+                control.on_value_change(class_operations.invalidate)
 
             ui.button("保存班级配置", on_click=save_class).classes(
                 "mt-3 bg-blue-600 text-white"
@@ -242,15 +347,37 @@ async def settings_page() -> None:
 
             # 记录当前展示给用户的脱敏值，用于判断是否修改过
             _current_masked: list[str] = [""]
+            ai_key_generation = [0]
+            ai_key_owner: list[object | None] = [None]
 
-            async def save_ai_key_handler() -> None:
+            def _invalidate_ai_key(*_event_args: object) -> None:
+                ai_key_generation[0] += 1
+
+            def _ai_key_operation_is_current(
+                generation: int,
+                owner: object,
+            ) -> bool:
+                return generation == ai_key_generation[0] and ai_key_owner[0] is owner
+
+            for control in (ai_url_input, ai_model_input, ai_key_input):
+                control.on_value_change(_invalidate_ai_key)
+
+            async def save_ai_key_handler(
+                generation: int,
+                owner: object,
+                payload: _AiKeyPayload,
+            ) -> None:
+                url = payload.url
+                model = payload.model
+                key_val = payload.key
+                masked_value = payload.masked_value
                 current = await require_live_session()
-                if current is None:
+                if current is None or not _ai_key_operation_is_current(
+                    generation,
+                    owner,
+                ):
                     return
                 ai_msg.classes(remove="text-green-600 text-red-500")
-                url = ai_url_input.value.strip()
-                model = ai_model_input.value.strip()
-                key_val = ai_key_input.value.strip()
 
                 if not url:
                     ai_msg.text = "请输入 API 地址"
@@ -263,7 +390,7 @@ async def settings_page() -> None:
                     return
 
                 # 判断用户是否修改了 Key
-                key_changed = key_val and key_val != _current_masked[0]
+                key_changed = key_val and key_val != masked_value
 
                 if key_changed:
                     # 用户输入了新 Key
@@ -276,6 +403,11 @@ async def settings_page() -> None:
                             current.tenant_id,
                             current.user_id,
                         )
+                    if (
+                        await require_live_session() is None
+                        or not _ai_key_operation_is_current(generation, owner)
+                    ):
+                        return
                     if existing is None:
                         ai_msg.text = "请输入 API Key"
                         ai_msg.classes(add="text-red-500")
@@ -294,6 +426,11 @@ async def settings_page() -> None:
                             current.tenant_id,
                             current.user_id,
                         )
+                    if (
+                        await require_live_session() is None
+                        or not _ai_key_operation_is_current(generation, owner)
+                    ):
+                        return
                     if existing is None:
                         ai_msg.text = "请输入 API Key"
                         ai_msg.classes(add="text-red-500")
@@ -306,7 +443,10 @@ async def settings_page() -> None:
                         return
 
                 current = await require_live_session()
-                if current is None:
+                if current is None or not _ai_key_operation_is_current(
+                    generation,
+                    owner,
+                ):
                     return
                 async with AsyncSessionLocal() as session:
                     await save_ai_key(
@@ -319,15 +459,45 @@ async def settings_page() -> None:
                         key_type="text",
                     )
 
+                if (
+                    await require_live_session() is None
+                    or not _ai_key_operation_is_current(generation, owner)
+                ):
+                    return
                 masked = _mask_api_key(plain_key)
                 _current_masked[0] = masked
                 ai_key_input.value = masked
+                ai_key_generation[0] += 1
                 ai_msg.text = "AI 接口配置已保存"
                 ai_msg.classes(add="text-green-600")
 
-            async def verify_connection() -> None:
+            def trigger_save_ai_key() -> object:
+                generation = ai_key_generation[0]
+                payload = _AiKeyPayload(
+                    url=ai_url_input.value.strip(),
+                    model=ai_model_input.value.strip(),
+                    key=ai_key_input.value.strip(),
+                    masked_value=_current_masked[0],
+                )
+                if ai_key_owner[0] is not None:
+                    return None
+                owner = object()
+                ai_key_owner[0] = owner
+                return _run_owned(
+                    ai_key_owner,
+                    owner,
+                    save_ai_key_handler(generation, owner, payload),
+                )
+
+            async def verify_connection(
+                generation: int,
+                owner: object,
+            ) -> None:
                 current = await require_live_session()
-                if current is None:
+                if current is None or not _ai_key_operation_is_current(
+                    generation,
+                    owner,
+                ):
                     return
                 ai_msg.classes(remove="text-green-600 text-red-500 text-blue-600")
                 ai_msg.text = "连接测试中……"
@@ -339,7 +509,10 @@ async def settings_page() -> None:
                         user_id=current.user_id,
                         key_type="text",
                     )
-                if await require_live_session() is None:
+                if (
+                    await require_live_session() is None
+                    or not _ai_key_operation_is_current(generation, owner)
+                ):
                     return
 
                 if result.code == "not_configured":
@@ -363,11 +536,23 @@ async def settings_page() -> None:
                     ai_msg.text = "连接失败（网络请求异常）"
                     ai_msg.classes(add="text-red-500")
 
+            def trigger_verify_connection() -> object:
+                generation = ai_key_generation[0]
+                if ai_key_owner[0] is not None:
+                    return None
+                owner = object()
+                ai_key_owner[0] = owner
+                return _run_owned(
+                    ai_key_owner,
+                    owner,
+                    verify_connection(generation, owner),
+                )
+
             with ui.row().classes("mt-3 gap-3"):
-                ui.button("保存", on_click=save_ai_key_handler).classes(
+                ui.button("保存", on_click=trigger_save_ai_key).classes(
                     "bg-blue-600 text-white"
                 )
-                ui.button("验证连接", on_click=verify_connection).classes(
+                ui.button("验证连接", on_click=trigger_verify_connection).classes(
                     "bg-gray-100 text-gray-700"
                 )
 
@@ -401,15 +586,44 @@ async def settings_page() -> None:
 
             vision_msg = ui.label("").classes("text-sm mt-1")
             _vision_masked: list[str] = [""]
+            vision_key_generation = [0]
+            vision_key_owner: list[object | None] = [None]
 
-            async def save_vision_key_handler() -> None:
+            def _invalidate_vision_key(*_event_args: object) -> None:
+                vision_key_generation[0] += 1
+
+            def _vision_key_operation_is_current(
+                generation: int,
+                owner: object,
+            ) -> bool:
+                return (
+                    generation == vision_key_generation[0]
+                    and vision_key_owner[0] is owner
+                )
+
+            for control in (
+                vision_url_input,
+                vision_model_input,
+                vision_key_input,
+            ):
+                control.on_value_change(_invalidate_vision_key)
+
+            async def save_vision_key_handler(
+                generation: int,
+                owner: object,
+                payload: _AiKeyPayload,
+            ) -> None:
+                url = payload.url
+                model = payload.model
+                key_val = payload.key
+                masked_value = payload.masked_value
                 current = await require_live_session()
-                if current is None:
+                if current is None or not _vision_key_operation_is_current(
+                    generation,
+                    owner,
+                ):
                     return
                 vision_msg.classes(remove="text-green-600 text-red-500")
-                url = vision_url_input.value.strip()
-                model = vision_model_input.value.strip()
-                key_val = vision_key_input.value.strip()
 
                 if not url:
                     vision_msg.text = "请输入视觉模型 API 地址"
@@ -420,7 +634,7 @@ async def settings_page() -> None:
                     vision_msg.classes(add="text-red-500")
                     return
 
-                key_changed = key_val and key_val != _vision_masked[0]
+                key_changed = key_val and key_val != masked_value
                 if key_changed:
                     plain_key = key_val
                 else:
@@ -431,6 +645,11 @@ async def settings_page() -> None:
                             current.user_id,
                             key_type="vision",
                         )
+                    if (
+                        await require_live_session() is None
+                        or not _vision_key_operation_is_current(generation, owner)
+                    ):
+                        return
                     if existing is None:
                         if not key_val:
                             vision_msg.text = "请输入视觉模型 API Key"
@@ -446,7 +665,10 @@ async def settings_page() -> None:
                             return
 
                 current = await require_live_session()
-                if current is None:
+                if current is None or not _vision_key_operation_is_current(
+                    generation,
+                    owner,
+                ):
                     return
                 async with AsyncSessionLocal() as session:
                     await save_ai_key(
@@ -459,15 +681,45 @@ async def settings_page() -> None:
                         key_type="vision",
                     )
 
+                if (
+                    await require_live_session() is None
+                    or not _vision_key_operation_is_current(generation, owner)
+                ):
+                    return
                 masked = _mask_api_key(plain_key)
                 _vision_masked[0] = masked
                 vision_key_input.value = masked
+                vision_key_generation[0] += 1
                 vision_msg.text = "视觉模型配置已保存"
                 vision_msg.classes(add="text-green-600")
 
-            async def verify_vision_connection() -> None:
+            def trigger_save_vision_key() -> object:
+                generation = vision_key_generation[0]
+                payload = _AiKeyPayload(
+                    url=vision_url_input.value.strip(),
+                    model=vision_model_input.value.strip(),
+                    key=vision_key_input.value.strip(),
+                    masked_value=_vision_masked[0],
+                )
+                if vision_key_owner[0] is not None:
+                    return None
+                owner = object()
+                vision_key_owner[0] = owner
+                return _run_owned(
+                    vision_key_owner,
+                    owner,
+                    save_vision_key_handler(generation, owner, payload),
+                )
+
+            async def verify_vision_connection(
+                generation: int,
+                owner: object,
+            ) -> None:
                 current = await require_live_session()
-                if current is None:
+                if current is None or not _vision_key_operation_is_current(
+                    generation,
+                    owner,
+                ):
                     return
                 vision_msg.classes(remove="text-green-600 text-red-500")
                 vision_msg.text = "连接测试中……"
@@ -479,7 +731,10 @@ async def settings_page() -> None:
                         user_id=current.user_id,
                         key_type="vision",
                     )
-                if await require_live_session() is None:
+                if (
+                    await require_live_session() is None
+                    or not _vision_key_operation_is_current(generation, owner)
+                ):
                     return
 
                 if result.code == "not_configured":
@@ -503,13 +758,26 @@ async def settings_page() -> None:
                     vision_msg.text = "连接失败（网络请求异常）"
                     vision_msg.classes(add="text-red-500")
 
+            def trigger_verify_vision_connection() -> object:
+                generation = vision_key_generation[0]
+                if vision_key_owner[0] is not None:
+                    return None
+                owner = object()
+                vision_key_owner[0] = owner
+                return _run_owned(
+                    vision_key_owner,
+                    owner,
+                    verify_vision_connection(generation, owner),
+                )
+
             with ui.row().classes("mt-3 gap-3"):
-                ui.button("保存视觉模型", on_click=save_vision_key_handler).classes(
+                ui.button("保存视觉模型", on_click=trigger_save_vision_key).classes(
                     "bg-green-600 text-white"
                 )
-                ui.button("验证连接", on_click=verify_vision_connection).classes(
-                    "bg-gray-100 text-gray-700"
-                )
+                ui.button(
+                    "验证连接",
+                    on_click=trigger_verify_vision_connection,
+                ).classes("bg-gray-100 text-gray-700")
 
     # ── 加载已有配置并回填 ──────────────────────────────────────────────────────
     async with AsyncSessionLocal() as session:
@@ -630,27 +898,55 @@ async def settings_page() -> None:
             )
 
             db_status = ui.label("").classes("text-sm mt-2")
+            db_config_generation = [0]
+            db_config_owner: list[object | None] = [None]
 
-            async def _save_db_config() -> None:
-                if await require_live_session() is None:
+            def _invalidate_db_config(*_event_args: object) -> None:
+                db_config_generation[0] += 1
+
+            def _db_config_operation_is_current(
+                generation: int,
+                owner: object,
+            ) -> bool:
+                return (
+                    generation == db_config_generation[0]
+                    and db_config_owner[0] is owner
+                )
+
+            for control in (
+                db_mode_radio,
+                db_host_input,
+                db_port_input,
+                db_user_input,
+                db_pass_input,
+                db_name_input,
+            ):
+                control.on_value_change(_invalidate_db_config)
+
+            async def _save_db_config(
+                generation: int,
+                owner: object,
+                payload: _DatabasePayload,
+            ) -> None:
+                current = await require_live_session()
+                if current is None or not _db_config_operation_is_current(
+                    generation,
+                    owner,
+                ):
                     return
                 db_status.set_text("")
-                if db_mode_radio.value == "sqlite":
+                if payload.mode == "sqlite":
                     new_url = ""
                 else:
-                    host = db_host_input.value.strip()
-                    port = db_port_input.value.strip() or "3306"
-                    user_val = db_user_input.value.strip()
-                    pwd_val = db_pass_input.value
-                    dbname = db_name_input.value.strip()
-
-                    if not host or not user_val or not dbname:
+                    if not payload.host or not payload.username or not payload.database:
                         db_status.set_text("❌ 服务器地址、用户名和数据库名为必填项")
                         db_status.classes(replace="text-red-600 text-sm mt-2")
                         return
 
                     new_url = (
-                        f"mysql+aiomysql://{user_val}:{pwd_val}@{host}:{port}/{dbname}"
+                        "mysql+aiomysql://"
+                        f"{payload.username}:{payload.password}@{payload.host}:"
+                        f"{payload.port}/{payload.database}"
                     )
 
                 try:
@@ -661,7 +957,27 @@ async def settings_page() -> None:
                     db_status.set_text(f"❌ 保存失败：{exc}")
                     db_status.classes(replace="text-red-600 text-sm mt-2")
 
-            ui.button("保存数据库配置", on_click=_save_db_config).classes(
+            def trigger_save_db_config() -> object:
+                generation = db_config_generation[0]
+                payload = _DatabasePayload(
+                    mode=db_mode_radio.value,
+                    host=db_host_input.value.strip(),
+                    port=db_port_input.value.strip() or "3306",
+                    username=db_user_input.value.strip(),
+                    password=db_pass_input.value,
+                    database=db_name_input.value.strip(),
+                )
+                if db_config_owner[0] is not None:
+                    return None
+                owner = object()
+                db_config_owner[0] = owner
+                return _run_owned(
+                    db_config_owner,
+                    owner,
+                    _save_db_config(generation, owner, payload),
+                )
+
+            ui.button("保存数据库配置", on_click=trigger_save_db_config).classes(
                 "mt-2 bg-blue-600 text-white"
             )
 
@@ -681,13 +997,35 @@ async def settings_page() -> None:
             ).classes("w-full")
 
             port_status = ui.label("").classes("text-sm mt-2")
+            port_generation = [0]
+            port_owner: list[object | None] = [None]
 
-            async def _save_port() -> None:
-                if await require_live_session() is None:
+            def _invalidate_port(*_event_args: object) -> None:
+                port_generation[0] += 1
+
+            def _port_operation_is_current(
+                generation: int,
+                owner: object,
+            ) -> bool:
+                return generation == port_generation[0] and port_owner[0] is owner
+
+            for control in (port_input,):
+                control.on_value_change(_invalidate_port)
+
+            async def _save_port(
+                generation: int,
+                owner: object,
+                port_value: object,
+            ) -> None:
+                current = await require_live_session()
+                if current is None or not _port_operation_is_current(
+                    generation,
+                    owner,
+                ):
                     return
                 port_status.set_text("")
                 try:
-                    new_port = int(port_input.value or app_settings.PORT)
+                    new_port = int(port_value or app_settings.PORT)
                 except (ValueError, TypeError):
                     port_status.set_text("❌ 端口号格式错误")
                     port_status.classes(replace="text-red-600 text-sm mt-2")
@@ -706,6 +1044,19 @@ async def settings_page() -> None:
                     port_status.set_text(f"❌ 保存失败：{exc}")
                     port_status.classes(replace="text-red-600 text-sm mt-2")
 
-            ui.button("保存端口配置", on_click=_save_port).classes(
+            def trigger_save_port() -> object:
+                generation = port_generation[0]
+                port_value = port_input.value
+                if port_owner[0] is not None:
+                    return None
+                owner = object()
+                port_owner[0] = owner
+                return _run_owned(
+                    port_owner,
+                    owner,
+                    _save_port(generation, owner, port_value),
+                )
+
+            ui.button("保存端口配置", on_click=trigger_save_port).classes(
                 "mt-2 bg-blue-600 text-white"
             )

@@ -5,6 +5,8 @@
   - 修改密码
 """
 
+from dataclasses import dataclass
+
 from nicegui import ui
 
 from app.core.database import AsyncSessionLocal
@@ -22,6 +24,13 @@ from app.ui.components.app_shell import render_shell
 logger = get_logger(__name__)
 
 
+@dataclass(frozen=True, slots=True, repr=False)
+class _PasswordPayload:
+    old_password: str
+    new_password: str
+    confirmation: str
+
+
 @ui.page("/profile")
 async def profile_page() -> None:
     ui_session = await require_current_ui_session()
@@ -35,6 +44,16 @@ async def profile_page() -> None:
 
     async def require_live_session() -> TrustedUiSession | None:
         return await require_bound_ui_session(ui_session)
+
+    if await require_live_session() is None:
+        return
+
+    async def _run_owned(owner_ref: list[object | None], owner: object, operation):
+        try:
+            await operation
+        finally:
+            if owner_ref[0] is owner:
+                owner_ref[0] = None
 
     with ui.column().classes("w-full max-w-xl mx-auto p-6 gap-6"):
         ui.label("个人资料").classes("text-2xl font-bold text-blue-700")
@@ -66,13 +85,35 @@ async def profile_page() -> None:
             ).classes("w-full")
 
             display_msg = ui.label("").classes("text-sm mt-1")
+            display_name_generation = [0]
+            display_name_owner: list[object | None] = [None]
 
-            async def save_display_name() -> None:
+            def _invalidate_display_name(*_event_args: object) -> None:
+                display_name_generation[0] += 1
+
+            def _display_name_operation_is_current(
+                generation: int,
+                owner: object,
+            ) -> bool:
+                return (
+                    generation == display_name_generation[0]
+                    and display_name_owner[0] is owner
+                )
+
+            display_name_input.on_value_change(_invalidate_display_name)
+
+            async def save_display_name(
+                generation: int,
+                owner: object,
+                new_name: str,
+            ) -> None:
                 current = await require_live_session()
-                if current is None:
+                if current is None or not _display_name_operation_is_current(
+                    generation,
+                    owner,
+                ):
                     return
                 display_msg.classes(remove="text-green-600 text-red-500")
-                new_name = display_name_input.value.strip()
                 try:
                     async with AsyncSessionLocal() as session:
                         await update_profile_display_name(
@@ -81,18 +122,37 @@ async def profile_page() -> None:
                             user_id=current.user_id,
                             display_name=new_name or None,
                         )
-                    if await require_live_session() is None:
+                    if (
+                        await require_live_session() is None
+                        or not _display_name_operation_is_current(generation, owner)
+                    ):
                         return
                     display_msg.set_text("✓ 显示名已保存")
                     display_msg.classes(add="text-green-600")
                 except Exception as e:
-                    if await require_live_session() is None:
+                    if (
+                        await require_live_session() is None
+                        or not _display_name_operation_is_current(generation, owner)
+                    ):
                         return
                     logger.error("保存显示名失败 error_type=%s", type(e).__name__)
                     display_msg.set_text(f"保存失败：{type(e).__name__}")
                     display_msg.classes(add="text-red-500")
 
-            ui.button("保存显示名", on_click=save_display_name).classes(
+            def trigger_save_display_name() -> object:
+                generation = display_name_generation[0]
+                new_name = display_name_input.value.strip()
+                if display_name_owner[0] is not None:
+                    return None
+                owner = object()
+                display_name_owner[0] = owner
+                return _run_owned(
+                    display_name_owner,
+                    owner,
+                    save_display_name(generation, owner, new_name),
+                )
+
+            ui.button("保存显示名", on_click=trigger_save_display_name).classes(
                 "mt-3 bg-blue-600 text-white"
             )
 
@@ -117,15 +177,26 @@ async def profile_page() -> None:
             ).classes("w-full mt-2")
 
             pwd_msg = ui.label("").classes("text-sm mt-1")
+            password_generation = [0]
+            password_owner: list[object | None] = [None]
 
-            async def save_password() -> None:
+            def _invalidate_password(*_event_args: object) -> None:
+                password_generation[0] += 1
+
+            for control in (old_pwd_input, new_pwd_input, new_pwd2_input):
+                control.on_value_change(_invalidate_password)
+
+            async def save_password(
+                generation: int,
+                payload: _PasswordPayload,
+            ) -> None:
+                old_pwd = payload.old_password
+                new_pwd = payload.new_password
+                new_pwd2 = payload.confirmation
                 current = await require_live_session()
-                if current is None:
+                if current is None or generation != password_generation[0]:
                     return
                 pwd_msg.classes(remove="text-green-600 text-red-500")
-                old_pwd = old_pwd_input.value
-                new_pwd = new_pwd_input.value
-                new_pwd2 = new_pwd2_input.value
 
                 if len(new_pwd) < 8:
                     pwd_msg.set_text("新密码不能少于 8 位")
@@ -145,25 +216,52 @@ async def profile_page() -> None:
                             old_password=old_pwd,
                             new_password=new_pwd,
                         )
-                    if await require_live_session() is None:
+                    if (
+                        await require_live_session() is None
+                        or generation != password_generation[0]
+                    ):
                         return
                     pwd_msg.set_text("✓ 密码已修改")
                     pwd_msg.classes(add="text-green-600")
                     old_pwd_input.value = ""
                     new_pwd_input.value = ""
                     new_pwd2_input.value = ""
+                    password_generation[0] += 1
                 except AuthError as e:
-                    if await require_live_session() is None:
+                    if (
+                        await require_live_session() is None
+                        or generation != password_generation[0]
+                    ):
                         return
                     pwd_msg.set_text(e.message)
                     pwd_msg.classes(add="text-red-500")
                 except Exception as e:
-                    if await require_live_session() is None:
+                    if (
+                        await require_live_session() is None
+                        or generation != password_generation[0]
+                    ):
                         return
                     logger.error("修改密码失败 error_type=%s", type(e).__name__)
                     pwd_msg.set_text(f"修改失败：{type(e).__name__}")
                     pwd_msg.classes(add="text-red-500")
 
-            ui.button("修改密码", on_click=save_password).classes(
+            def trigger_save_password() -> object:
+                generation = password_generation[0]
+                payload = _PasswordPayload(
+                    old_password=old_pwd_input.value,
+                    new_password=new_pwd_input.value,
+                    confirmation=new_pwd2_input.value,
+                )
+                if password_owner[0] is not None:
+                    return None
+                owner = object()
+                password_owner[0] = owner
+                return _run_owned(
+                    password_owner,
+                    owner,
+                    save_password(generation, payload),
+                )
+
+            ui.button("修改密码", on_click=trigger_save_password).classes(
                 "mt-3 bg-blue-600 text-white"
             )

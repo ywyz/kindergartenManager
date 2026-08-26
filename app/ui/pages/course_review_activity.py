@@ -217,10 +217,57 @@ async def course_review_activity_page() -> None:
                 "revised_lesson_plan": revised_lesson_plan_input.value or "",
             }
 
-        async def _save_current() -> int | None:
+        form_generation = [0]
+
+        def _invalidate_form(*_event_args: object) -> None:
+            form_generation[0] += 1
+            state["record_id"] = None
+
+        for control in (
+            activity_name_input,
+            child_count_input,
+            activity_time_input,
+            lesson_plan_original_input,
+            activity_goal_input,
+            activity_prep_input,
+            activity_process_input,
+            goal_adjusted_checkbox,
+            goal_adjustment_input,
+            activity_goal_revised_input,
+            prep_adjusted_checkbox,
+            prep_adjustment_input,
+            activity_prep_revised_input,
+            process_adjustment_input,
+            activity_process_revised_input,
+            review_reason_input,
+            revised_lesson_plan_input,
+        ):
+            control.on_value_change(_invalidate_form)
+
+        def _form_is_current(generation: int) -> bool:
+            return generation == form_generation[0]
+
+        action_owners: dict[str, object] = {}
+
+        def _claim_action(name: str) -> object | None:
+            if name in action_owners:
+                return None
+            owner = object()
+            action_owners[name] = owner
+            return owner
+
+        def _owns_action(name: str, owner: object) -> bool:
+            return action_owners.get(name) is owner
+
+        def _release_action(name: str, owner: object) -> None:
+            if _owns_action(name, owner):
+                action_owners.pop(name, None)
+
+        async def _save_current(data: dict, generation: int) -> int | None:
             if not await _require_bound_session():
                 return None
-            data = _current_form_dict()
+            if not _form_is_current(generation):
+                return None
             errors = validate_generation_context(context) + validate_course_review_form(
                 data
             )
@@ -235,15 +282,26 @@ async def course_review_activity_page() -> None:
                     **data,
                     ai_raw_json=json.dumps(data, ensure_ascii=False),
                 )
+            if not await _require_bound_session():
+                return None
+            if not _form_is_current(generation):
+                return None
             state["record_id"] = record.id
             return record.id
 
-        async def do_generate() -> None:
+        async def do_generate(
+            action_owner: object,
+            generation: int,
+            base_data: dict,
+        ) -> None:
             if not await _require_bound_session():
+                _release_action("generate", action_owner)
+                return
+            if not _form_is_current(generation):
+                _release_action("generate", action_owner)
                 return
             generate_btn.props("loading=true")
             try:
-                base_data = _current_form_dict()
                 errors = validate_generation_context(
                     context
                 ) + validate_course_review_form(
@@ -261,6 +319,8 @@ async def course_review_activity_page() -> None:
                         context=base_data,
                     )
                 if not await _require_bound_session():
+                    return
+                if not _form_is_current(generation):
                     return
                 activity_goal_input.value = str(result.get("activity_goal", ""))
                 activity_prep_input.value = str(result.get("activity_prep", ""))
@@ -290,48 +350,81 @@ async def course_review_activity_page() -> None:
             except ConfigError:
                 if not await _require_bound_session():
                     return
+                if not _form_is_current(generation):
+                    return
                 show_error("AI 配置不可用，请检查模型配置")
             except (AiCallError, AiParseError):
                 if not await _require_bound_session():
+                    return
+                if not _form_is_current(generation):
                     return
                 show_error("AI 调用或解析失败，请稍后重试")
             except Exception as exc:
                 if not await _require_bound_session():
                     return
+                if not _form_is_current(generation):
+                    return
                 logger.error("生成课程审议失败 error_type=%s", type(exc).__name__)
                 show_error(f"生成失败：{type(exc).__name__}")
             finally:
-                generate_btn.props(remove="loading")
+                if _owns_action("generate", action_owner):
+                    try:
+                        if await _require_bound_session():
+                            generate_btn.props(remove="loading")
+                    finally:
+                        _release_action("generate", action_owner)
 
-        async def do_save() -> None:
+        async def do_save(
+            action_owner: object,
+            generation: int,
+            data: dict,
+        ) -> None:
             if not await _require_bound_session():
+                _release_action("save", action_owner)
+                return
+            if not _form_is_current(generation):
+                _release_action("save", action_owner)
                 return
             save_btn.props("loading=true")
             try:
-                record_id = await _save_current()
+                record_id = await _save_current(data, generation)
                 if record_id is None:
                     return
                 show_success(f"保存成功（记录 ID：{record_id}）")
-                await refresh_history()
+                await trigger_refresh_history()
             except Exception as exc:
                 if not await _require_bound_session():
+                    return
+                if not _form_is_current(generation):
                     return
                 logger.error("保存课程审议失败 error_type=%s", type(exc).__name__)
                 show_error(f"保存失败：{type(exc).__name__}")
             finally:
-                save_btn.props(remove="loading")
+                if _owns_action("save", action_owner):
+                    try:
+                        if await _require_bound_session():
+                            save_btn.props(remove="loading")
+                    finally:
+                        _release_action("save", action_owner)
 
-        async def do_export() -> None:
+        async def do_export(
+            action_owner: object,
+            generation: int,
+            data: dict,
+            record_id: int | None,
+        ) -> None:
             if not await _require_bound_session():
+                _release_action("export", action_owner)
+                return
+            if not _form_is_current(generation):
+                _release_action("export", action_owner)
                 return
             export_btn.props("loading=true")
             try:
-                record_id = state.get("record_id")
                 if record_id is None:
-                    record_id = await _save_current()
+                    record_id = await _save_current(data, generation)
                     if record_id is None:
                         return
-                data = _current_form_dict()
                 doc_bytes = export_course_review_activity(data)
                 file_name = build_course_review_activity_filename(
                     tenant_id=tenant_id,
@@ -353,6 +446,8 @@ async def course_review_activity_page() -> None:
                     await session.commit()
                 if not await _require_bound_session():
                     return
+                if not _form_is_current(generation):
+                    return
                 log_audit(
                     "export_course_review_activity",
                     tenant_id=tenant_id,
@@ -365,23 +460,62 @@ async def course_review_activity_page() -> None:
             except Exception as exc:
                 if not await _require_bound_session():
                     return
+                if not _form_is_current(generation):
+                    return
                 logger.error("导出课程审议失败 error_type=%s", type(exc).__name__)
                 show_error(f"导出失败：{type(exc).__name__}")
             finally:
-                export_btn.props(remove="loading")
+                if _owns_action("export", action_owner):
+                    try:
+                        if await _require_bound_session():
+                            export_btn.props(remove="loading")
+                    finally:
+                        _release_action("export", action_owner)
 
-        generate_btn.on("click", do_generate)
-        save_btn.on("click", do_save)
-        export_btn.on("click", do_export)
+        def trigger_generate() -> object | None:
+            owner = _claim_action("generate")
+            if owner is None:
+                return None
+            return do_generate(owner, form_generation[0], _current_form_dict())
+
+        def trigger_save() -> object | None:
+            owner = _claim_action("save")
+            if owner is None:
+                return None
+            return do_save(owner, form_generation[0], _current_form_dict())
+
+        def trigger_export() -> object | None:
+            owner = _claim_action("export")
+            if owner is None:
+                return None
+            return do_export(
+                owner,
+                form_generation[0],
+                _current_form_dict(),
+                state.get("record_id"),
+            )
+
+        generate_btn.on("click", trigger_generate)
+        save_btn.on("click", trigger_save)
+        export_btn.on("click", trigger_export)
 
         ui.separator().classes("my-4")
         ui.label("历史记录").classes("text-lg font-semibold text-gray-700")
         history_container = ui.column().classes("w-full gap-2")
+        history_generation = [0]
 
-        async def refresh_history() -> None:
+        def _history_is_current(generation: int) -> bool:
+            return generation == history_generation[0]
+
+        def trigger_refresh_history() -> object:
+            history_generation[0] += 1
+            return refresh_history(history_generation[0])
+
+        async def refresh_history(generation: int) -> None:
             if not await _require_bound_session():
                 return
-            history_container.clear()
+            if not _history_is_current(generation):
+                return
             try:
                 async with AsyncSessionLocal() as session:
                     records = await list_course_review_activities(
@@ -392,6 +526,9 @@ async def course_review_activity_page() -> None:
                     )
                 if not await _require_bound_session():
                     return
+                if not _history_is_current(generation):
+                    return
+                history_container.clear()
                 with history_container:
                     if not records:
                         ui.label("暂无课程审议记录").classes("text-gray-400 text-sm")
@@ -413,8 +550,11 @@ async def course_review_activity_page() -> None:
                                             fresh = await get_course_review_activity(
                                                 session,
                                                 tenant_id=tenant_id,
+                                                user_id=user_id,
                                                 activity_id=r.id,
                                             )
+                                            if not await _require_bound_session():
+                                                return
                                             if fresh is None:
                                                 show_error("记录不存在或已删除")
                                                 return
@@ -482,7 +622,7 @@ async def course_review_activity_page() -> None:
                                                 user_id=user_id,
                                                 activity_id=r.id,
                                             )
-                                        await refresh_history()
+                                        await trigger_refresh_history()
 
                                 ui.button(
                                     "删除",
@@ -492,7 +632,9 @@ async def course_review_activity_page() -> None:
             except Exception as exc:
                 if not await _require_bound_session():
                     return
+                if not _history_is_current(generation):
+                    return
                 logger.error("加载课程审议历史失败 error_type=%s", type(exc).__name__)
                 show_error(f"加载历史失败：{type(exc).__name__}")
 
-        await refresh_history()
+        await trigger_refresh_history()

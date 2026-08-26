@@ -42,6 +42,13 @@ class TrustedUiSession:
         }
 
 
+def _reject_ui_session(token: object, redirect_to: str) -> None:
+    """只清除本轮校验的 token，避免旧请求擦除较新的登录。"""
+    if app.storage.user.get("token") == token:
+        app.storage.user.clear()
+    ui.navigate.to(redirect_to)
+
+
 def _positive_int(value: object) -> int | None:
     if type(value) is not int or value <= 0:
         return None
@@ -105,7 +112,7 @@ async def resolve_current_ui_session(
         return None
 
     user = await get_user_by_id(session, tenant_id=tenant_id, user_id=user_id)
-    if user is None or not user.is_active:
+    if user is None or not user.is_active or datetime.now(timezone.utc) >= expires_at:
         return None
 
     return TrustedUiSession(
@@ -135,13 +142,15 @@ async def require_current_ui_session(
             "ui_session_validation_failed error_type=%s",
             type(exc).__name__,
         )
-        app.storage.user.clear()
-        ui.navigate.to(redirect_to)
+        _reject_ui_session(token, redirect_to)
         return None
 
-    if current is None:
-        app.storage.user.clear()
-        ui.navigate.to(redirect_to)
+    if (
+        app.storage.user.get("token") != token
+        or current is None
+        or datetime.now(timezone.utc) >= current.expires_at_utc
+    ):
+        _reject_ui_session(token, redirect_to)
         return None
     if allowed_roles is not None and current.role not in allowed_roles:
         ui.navigate.to("/home")

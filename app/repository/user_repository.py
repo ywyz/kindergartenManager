@@ -3,7 +3,7 @@
 所有查询必须携带 tenant_id 过滤条件，确保多租户数据隔离。
 """
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models.user import User, UserRole
@@ -54,14 +54,30 @@ async def get_user_by_id(
     for_update: bool = False,
 ) -> User | None:
     """在指定租户下按 ID 查询用户；写授权可锁定该 actor 行。"""
+    dialect_name = session.get_bind().dialect.name
+    if for_update and dialect_name == "sqlite":
+        # SQLite has no row-level ``FOR UPDATE``.  A no-op write upgrades either
+        # a fresh or an already autobegun transaction to the database write
+        # lock without changing ORM-managed timestamps.  The following SELECT
+        # then refreshes the exact actor from that same locked transaction.
+        await session.execute(
+            text(
+                'UPDATE "user" SET id = id '
+                "WHERE tenant_id = :tenant_id AND id = :user_id"
+            ),
+            {"tenant_id": tenant_id, "user_id": user_id},
+        )
+
     statement = select(User).where(
         User.tenant_id == tenant_id,
         User.id == user_id,
     )
-    if for_update:
+    if for_update and dialect_name != "sqlite":
         statement = statement.with_for_update().execution_options(
             populate_existing=True
         )
+    elif for_update:
+        statement = statement.execution_options(populate_existing=True)
     result = await session.execute(statement)
     return result.scalar_one_or_none()
 

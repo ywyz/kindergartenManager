@@ -7,6 +7,7 @@
 - 管理员重置密码
 """
 
+from dataclasses import dataclass
 from math import ceil
 
 from nicegui import ui
@@ -25,6 +26,17 @@ from app.ui.components.app_shell import render_shell
 
 
 _ROLES = ["teacher", "teaching_admin", "sys_admin"]
+
+
+@dataclass(frozen=True, slots=True)
+class _UserTableQuery:
+    """One click's immutable account-list filters and pagination target."""
+
+    generation: int
+    page: int
+    page_size: int
+    keyword: str | None
+    role: str | None
 
 
 @ui.page("/user-admin")
@@ -75,9 +87,10 @@ async def user_admin_page() -> None:
             page_size_select = ui.select(
                 [10, 20, 50], value=10, label="每页条数"
             ).classes("w-36")
-            ui.button("查询", on_click=lambda: reload_table(reset_page=True)).classes(
-                "bg-blue-600 text-white"
-            )
+            ui.button(
+                "查询",
+                on_click=lambda: trigger_reload_table(reset_page=True),
+            ).classes("bg-blue-600 text-white")
 
         table_container = ui.column().classes("w-full gap-2")
         page_info = ui.label("").classes("text-sm text-gray-600")
@@ -115,22 +128,50 @@ async def user_admin_page() -> None:
             "total": 0,
             "rows": [],
         }
+        table_generation = [0]
+
+        def _table_query_is_current(query: _UserTableQuery) -> bool:
+            return query.generation == table_generation[0]
+
+        def _invalidate_table_query(*_event_args: object) -> None:
+            table_generation[0] += 1
+
+        def trigger_reload_table(
+            *,
+            reset_page: bool = False,
+            page: int | None = None,
+        ):
+            requested_page = (
+                1 if reset_page else page if page is not None else state["page"]
+            )
+            page_size = int(page_size_select.value or 10)
+            keyword = keyword_input.value.strip() or None
+            selected_role = role_filter.value
+            role = selected_role if selected_role in _ROLES else None
+            table_generation[0] += 1
+            return reload_table(
+                _UserTableQuery(
+                    generation=table_generation[0],
+                    page=requested_page,
+                    page_size=page_size,
+                    keyword=keyword,
+                    role=role,
+                )
+            )
+
+        for control in (keyword_input, role_filter, page_size_select):
+            control.on_value_change(_invalidate_table_query)
 
         def _set_msg(label, text: str, is_error: bool) -> None:
             label.classes(remove="text-red-500 text-green-600")
             label.text = text
             label.classes(add="text-red-500" if is_error else "text-green-600")
 
-        async def reload_table(reset_page: bool = False) -> None:
+        async def reload_table(query: _UserTableQuery) -> None:
             current = await _require_live_admin()
-            if current is None:
+            if current is None or not _table_query_is_current(query):
                 return
-            if reset_page:
-                state["page"] = 1
-
-            state["page_size"] = int(page_size_select.value or 10)
-            offset = (state["page"] - 1) * state["page_size"]
-            role = None if role_filter.value == "all" else role_filter.value
+            offset = (query.page - 1) * query.page_size
 
             async with AsyncSessionLocal() as session:
                 users, total = await list_users_for_admin(
@@ -138,12 +179,19 @@ async def user_admin_page() -> None:
                     tenant_id=tenant_id,
                     admin_user_id=admin_user_id,
                     admin_role=current.role,
-                    username_keyword=keyword_input.value.strip() or None,
-                    role=role,
-                    limit=state["page_size"],
+                    username_keyword=query.keyword,
+                    role=query.role,
+                    limit=query.page_size,
                     offset=offset,
                 )
             if await _require_live_admin() is None:
+                return
+            if not _table_query_is_current(query):
+                return
+
+            max_page = max(1, ceil(total / query.page_size))
+            if query.page > max_page:
+                await trigger_reload_table(page=max_page)
                 return
 
             state["rows"] = [
@@ -157,12 +205,8 @@ async def user_admin_page() -> None:
                 for item in users
             ]
             state["total"] = total
-
-            max_page = max(1, ceil(total / state["page_size"]))
-            if state["page"] > max_page:
-                state["page"] = max_page
-                await reload_table(reset_page=False)
-                return
+            state["page"] = query.page
+            state["page_size"] = query.page_size
 
             page_info.text = f"共 {total} 条，当前第 {state['page']} / {max_page} 页"
             prev_btn.enabled = state["page"] > 1
@@ -233,7 +277,7 @@ async def user_admin_page() -> None:
                     password_input.value = ""
                 if role_select.value == role:
                     role_select.value = "teacher"
-                await reload_table(reset_page=True)
+                await trigger_reload_table(reset_page=True)
             except (ValueError, AuthError) as exc:
                 if await _require_live_admin() is None:
                     return
@@ -275,7 +319,7 @@ async def user_admin_page() -> None:
                     f"账号 {target_user_id} 状态更新成功",
                     is_error=False,
                 )
-                await reload_table(reset_page=False)
+                await trigger_reload_table(reset_page=False)
             except (ValueError, AuthError) as exc:
                 if await _require_live_admin() is None:
                     return
@@ -332,26 +376,22 @@ async def user_admin_page() -> None:
                     return
                 _set_msg(action_message, "密码重置失败，请重试", is_error=True)
 
-        async def prev_page() -> None:
-            if await _require_live_admin() is None:
-                return
+        def prev_page():
             if state["page"] > 1:
-                state["page"] -= 1
-                await reload_table(reset_page=False)
+                return trigger_reload_table(page=state["page"] - 1)
+            return None
 
-        async def next_page() -> None:
-            if await _require_live_admin() is None:
-                return
+        def next_page():
             max_page = max(1, ceil(state["total"] / state["page_size"]))
             if state["page"] < max_page:
-                state["page"] += 1
-                await reload_table(reset_page=False)
+                return trigger_reload_table(page=state["page"] + 1)
+            return None
 
         ui.button("创建账号", on_click=on_create).classes("bg-blue-600 text-white")
         prev_btn.on_click(prev_page)
         next_btn.on_click(next_page)
 
-        await reload_table(reset_page=True)
+        await trigger_reload_table(reset_page=True)
 
         # ── 待审核用户 ────────────────────────────────────────────────
         ui.separator().classes("my-4")
@@ -359,12 +399,19 @@ async def user_admin_page() -> None:
 
         pending_container = ui.column().classes("w-full gap-2")
         pending_msg = ui.label("").classes("text-sm")
+        pending_generation = [0]
 
-        async def load_pending() -> None:
+        def _pending_query_is_current(generation: int) -> bool:
+            return generation == pending_generation[0]
+
+        def trigger_load_pending():
+            pending_generation[0] += 1
+            return load_pending(pending_generation[0])
+
+        async def load_pending(generation: int) -> None:
             current = await _require_live_admin()
-            if current is None:
+            if current is None or not _pending_query_is_current(generation):
                 return
-            pending_container.clear()
             async with AsyncSessionLocal() as session:
                 users_pending, _ = await list_users_for_admin(
                     session,
@@ -376,7 +423,10 @@ async def user_admin_page() -> None:
                 )
             if await _require_live_admin() is None:
                 return
+            if not _pending_query_is_current(generation):
+                return
             pending = [u for u in users_pending if not u.is_active]
+            pending_container.clear()
             with pending_container:
                 if not pending:
                     ui.label("暂无待审核用户").classes("text-gray-400 text-sm")
@@ -410,8 +460,8 @@ async def user_admin_page() -> None:
                                             f"已审核通过：{user_obj.username}",
                                             is_error=False,
                                         )
-                                        await load_pending()
-                                        await reload_table(reset_page=False)
+                                        await trigger_load_pending()
+                                        await trigger_reload_table(reset_page=False)
                                     except Exception as ex:
                                         if await _require_live_admin() is None:
                                             return
@@ -425,4 +475,4 @@ async def user_admin_page() -> None:
                                     "审核通过", on_click=_approve, icon="check"
                                 ).props("size=sm").classes("bg-green-600 text-white")
 
-        await load_pending()
+        await trigger_load_pending()

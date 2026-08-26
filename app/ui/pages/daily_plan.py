@@ -9,8 +9,9 @@
 """
 
 import asyncio
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
+from typing import TypedDict
 
 from nicegui import ui
 from sqlalchemy.orm.exc import StaleDataError
@@ -44,9 +45,32 @@ from app.ui.components.date_panel import DatePanel, DateSelection
 from app.ui.auth_context import require_bound_ui_session, require_current_ui_session
 from app.ui.daily_plan_target import (
     DailyPlanUiTarget,
+    UiGenerationGuard,
+    UiSingleFlightSlot,
     capture_daily_plan_ui_target,
     is_current_daily_plan_ui_target,
 )
+
+
+class _DailyPlanSavePayload(TypedDict):
+    plan_date: date
+    week_number: int
+    weekday_cn: str
+    grade: str
+    class_name: str
+    expected_plan_id: int | None
+    expected_revision: int | None
+    activity_goal: object
+    activity_prep: object
+    activity_key: object
+    activity_difficult: object
+    activity_process_original: object
+    activity_process_adapted: object
+    morning_activity: object
+    morning_talk_topic: object
+    indoor_area: object
+    outdoor_activity: object
+    daily_reflection: object
 
 
 @ui.page("/daily-plan")
@@ -112,6 +136,25 @@ async def daily_plan_page() -> None:
             state["outdoor_content"] = class_cfg.outdoor_content or ""
 
         selection_state: dict[str, DateSelection | None] = {"current": None}
+        form_generation = UiGenerationGuard()
+        split_operations = UiSingleFlightSlot[
+            tuple[DailyPlanUiTarget | None, str, str]
+        ]()
+        gen_all_operations = UiSingleFlightSlot[
+            tuple[DailyPlanUiTarget | None, dict[str, object], str, str]
+        ]()
+        reflection_operations = UiSingleFlightSlot[
+            tuple[DailyPlanUiTarget | None, dict[str, object]]
+        ]()
+        save_operations = UiSingleFlightSlot[
+            tuple[DailyPlanUiTarget | None, _DailyPlanSavePayload | None]
+        ]()
+        export_operations = UiSingleFlightSlot[DailyPlanUiTarget | None]()
+        batch_range_generation = UiGenerationGuard()
+        batch_export_operations = UiSingleFlightSlot[
+            tuple[int, str, str, date | None, date | None, bool]
+        ]()
+        history_requests = UiGenerationGuard()
 
         def _capture_plan_target() -> DailyPlanUiTarget | None:
             return capture_daily_plan_ui_target(
@@ -119,6 +162,7 @@ async def daily_plan_page() -> None:
                 selected_date=state["selected_date"],
                 loaded_plan_id=state["loaded_plan_id"],
                 loaded_revision=state["loaded_revision"],
+                form_generation=form_generation.capture(),
             )
 
         def _is_current_plan_target(target: DailyPlanUiTarget) -> bool:
@@ -128,6 +172,7 @@ async def daily_plan_page() -> None:
                 selected_date=state["selected_date"],
                 loaded_plan_id=state["loaded_plan_id"],
                 loaded_revision=state["loaded_revision"],
+                form_generation=form_generation.capture(),
             )
 
         def _on_date_selected(selection: DateSelection) -> None:
@@ -177,13 +222,15 @@ async def daily_plan_page() -> None:
                 .classes("w-full")
                 .props("rows=8 autogrow")
             )
+            raw_text_area.on_value_change(form_generation.advance)
 
             split_msg = ui.label("").classes("text-sm mt-1")
 
-            async def _do_split() -> None:
-                target = _capture_plan_target()
-                raw = str(raw_text_area.value or "").strip()
-                grade = state["grade"] or "中班"
+            async def _do_split(
+                owner: object,
+                frozen: tuple[DailyPlanUiTarget | None, str, str],
+            ) -> None:
+                target, raw, grade = frozen
                 if await _require_live_session() is None:
                     return
                 if target is None or not _is_current_plan_target(target):
@@ -217,6 +264,7 @@ async def daily_plan_page() -> None:
                         return
 
                     # 回填表单
+                    form_generation.advance()
                     goal_area.value = result.activity_goal
                     prep_area.value = result.activity_prep
                     key_area.value = result.activity_key
@@ -260,12 +308,23 @@ async def daily_plan_page() -> None:
                     split_msg.classes(add="text-red-500")
                     split_msg.text = f"❌ 拆分过程发生未知错误：{type(e).__name__}"
                 finally:
-                    if await _require_live_session() is not None:
+                    if (
+                        await _require_live_session() is not None
+                        and split_operations.owns(owner)
+                    ):
                         split_btn.props(remove="loading")
 
+            trigger_split = split_operations.bind(
+                capture=lambda: (
+                    _capture_plan_target(),
+                    str(raw_text_area.value or "").strip(),
+                    state["grade"] or "中班",
+                ),
+                run=_do_split,
+            )
             split_btn = ui.button(
                 "连接 AI 拆分",
-                on_click=_do_split,
+                on_click=trigger_split,
             ).classes("bg-blue-600 text-white mt-2")
 
         # ══════════════════════════════════════════════════════════════════════
@@ -277,15 +336,19 @@ async def daily_plan_page() -> None:
             goal_area = (
                 ui.textarea(label="活动目标").classes("w-full").props("rows=3 autogrow")
             )
+            goal_area.on_value_change(form_generation.advance)
             prep_area = (
                 ui.textarea(label="活动准备").classes("w-full").props("rows=3 autogrow")
             )
+            prep_area.on_value_change(form_generation.advance)
             key_area = (
                 ui.textarea(label="活动重点").classes("w-full").props("rows=2 autogrow")
             )
+            key_area.on_value_change(form_generation.advance)
             difficult_area = (
                 ui.textarea(label="活动难点").classes("w-full").props("rows=2 autogrow")
             )
+            difficult_area.on_value_change(form_generation.advance)
 
             ui.separator().classes("my-2")
             ui.label("活动过程（年龄适配改写版）").classes(
@@ -296,6 +359,7 @@ async def daily_plan_page() -> None:
                 .classes("w-full")
                 .props("rows=6 autogrow")
             )
+            adapted_area.on_value_change(form_generation.advance)
 
             # 折叠：查看拆分原文
             with ui.expansion("查看 AI 拆分原文（改写前）", icon="history").classes(
@@ -321,19 +385,16 @@ async def daily_plan_page() -> None:
                 "生成后各区块内容均可手动修改。"
             ).classes("text-xs text-gray-500")
 
-            async def _gen_all_daily() -> None:
-                target = _capture_plan_target()
-                base_ctx = {
-                    "grade": state["grade"],
-                    "class_name": state["class_name"],
-                    "activity_goal": goal_area.value,
-                    "activity_process": adapted_area.value or original_area.value,
-                    "week_number": state["week_number"],
-                    "weekday": state["weekday_cn"],
-                    "near_holiday": None,
-                }
-                indoor_areas = state["indoor_areas"]
-                outdoor_content = state["outdoor_content"]
+            async def _gen_all_daily(
+                owner: object,
+                frozen: tuple[
+                    DailyPlanUiTarget | None,
+                    dict[str, object],
+                    str,
+                    str,
+                ],
+            ) -> None:
+                target, base_ctx, indoor_areas, outdoor_content = frozen
                 if await _require_live_session() is None:
                     return
                 if target is None or not _is_current_plan_target(target):
@@ -355,10 +416,10 @@ async def daily_plan_page() -> None:
                 except Exception:
                     near_holiday = None
                 if await _require_live_session() is None:
-                    gen_all_btn.props(remove="loading")
                     return
                 if not _is_current_plan_target(target):
-                    gen_all_btn.props(remove="loading")
+                    if gen_all_operations.owns(owner):
+                        gen_all_btn.props(remove="loading")
                     return
 
                 base_ctx["near_holiday"] = near_holiday
@@ -409,12 +470,14 @@ async def daily_plan_page() -> None:
                     return_exceptions=True,
                 )
                 if await _require_live_session() is None:
-                    gen_all_btn.props(remove="loading")
                     return
                 if not _is_current_plan_target(target):
-                    gen_all_btn.props(remove="loading")
+                    if gen_all_operations.owns(owner):
+                        gen_all_btn.props(remove="loading")
                     return
 
+                if any(not isinstance(result, Exception) for result in results):
+                    form_generation.advance()
                 failures: list[str] = []
                 for (task_type, _extra, area, msg, name), res in zip(tasks, results):
                     msg.classes(remove="text-green-600 text-red-500 text-orange-500")
@@ -447,10 +510,36 @@ async def daily_plan_page() -> None:
                         f"⚠ 部分生成失败（{len(failures)}/{len(tasks)}）："
                         + "；".join(failures)
                     )
-                gen_all_btn.props(remove="loading")
+                if gen_all_operations.owns(owner):
+                    gen_all_btn.props(remove="loading")
 
+            def _capture_generate_all() -> tuple[
+                DailyPlanUiTarget | None,
+                dict[str, object],
+                str,
+                str,
+            ]:
+                return (
+                    _capture_plan_target(),
+                    {
+                        "grade": state["grade"],
+                        "class_name": state["class_name"],
+                        "activity_goal": goal_area.value,
+                        "activity_process": adapted_area.value or original_area.value,
+                        "week_number": state["week_number"],
+                        "weekday": state["weekday_cn"],
+                        "near_holiday": None,
+                    },
+                    str(state["indoor_areas"] or ""),
+                    str(state["outdoor_content"] or ""),
+                )
+
+            trigger_generate_all = gen_all_operations.bind(
+                capture=_capture_generate_all,
+                run=_gen_all_daily,
+            )
             gen_all_btn = ui.button(
-                "一键生成一日活动", on_click=_gen_all_daily
+                "一键生成一日活动", on_click=trigger_generate_all
             ).classes("bg-purple-600 text-white mt-1")
 
         # ══════════════════════════════════════════════════════════════════════
@@ -468,6 +557,7 @@ async def daily_plan_page() -> None:
                 .classes("w-full")
                 .props("rows=5 autogrow")
             )
+            morning_activity_area.on_value_change(form_generation.advance)
 
         # ══════════════════════════════════════════════════════════════════════
         # 区块三-C：晨间谈话
@@ -484,6 +574,7 @@ async def daily_plan_page() -> None:
                 .classes("w-full")
                 .props("rows=5 autogrow")
             )
+            morning_talk_area.on_value_change(form_generation.advance)
 
         # ══════════════════════════════════════════════════════════════════════
         # 区块三-D：室内区域游戏
@@ -502,6 +593,7 @@ async def daily_plan_page() -> None:
                 .classes("w-full")
                 .props("rows=5 autogrow")
             )
+            area_game_area.on_value_change(form_generation.advance)
 
         # ══════════════════════════════════════════════════════════════════════
         # 区块三-E：户外游戏
@@ -518,6 +610,7 @@ async def daily_plan_page() -> None:
                 .classes("w-full")
                 .props("rows=5 autogrow")
             )
+            outdoor_activity_area.on_value_change(form_generation.advance)
 
         # ══════════════════════════════════════════════════════════════════════
         # 区块三-F：一日活动反思
@@ -536,18 +629,13 @@ async def daily_plan_page() -> None:
                 .classes("w-full")
                 .props("rows=4 autogrow")
             )
+            daily_reflection_area.on_value_change(form_generation.advance)
 
-            async def _gen_daily_reflection() -> None:
-                target = _capture_plan_target()
-                context = {
-                    "grade": state["grade"],
-                    "class_name": state["class_name"],
-                    "activity_goal": goal_area.value,
-                    "morning_activity": morning_activity_area.value,
-                    "morning_talk": morning_talk_area.value,
-                    "indoor_area": area_game_area.value,
-                    "outdoor_activity": outdoor_activity_area.value,
-                }
+            async def _gen_daily_reflection(
+                owner: object,
+                frozen: tuple[DailyPlanUiTarget | None, dict[str, object]],
+            ) -> None:
+                target, context = frozen
                 if await _require_live_session() is None:
                     return
                 if target is None or not _is_current_plan_target(target):
@@ -570,6 +658,7 @@ async def daily_plan_page() -> None:
                         return
                     if not _is_current_plan_target(target):
                         return
+                    form_generation.advance()
                     daily_reflection_area.value = content
                     daily_reflection_msg.classes(add="text-green-600")
                     daily_reflection_msg.text = "✅ 生成完成"
@@ -595,11 +684,29 @@ async def daily_plan_page() -> None:
                     daily_reflection_msg.classes(add="text-red-500")
                     daily_reflection_msg.text = f"❌ {type(e).__name__}"
                 finally:
-                    if await _require_live_session() is not None:
+                    if (
+                        await _require_live_session() is not None
+                        and reflection_operations.owns(owner)
+                    ):
                         daily_reflection_btn.props(remove="loading")
 
+            trigger_generate_reflection = reflection_operations.bind(
+                capture=lambda: (
+                    _capture_plan_target(),
+                    {
+                        "grade": state["grade"],
+                        "class_name": state["class_name"],
+                        "activity_goal": goal_area.value,
+                        "morning_activity": morning_activity_area.value,
+                        "morning_talk": morning_talk_area.value,
+                        "indoor_area": area_game_area.value,
+                        "outdoor_activity": outdoor_activity_area.value,
+                    },
+                ),
+                run=_gen_daily_reflection,
+            )
             daily_reflection_btn = ui.button(
-                "AI 生成", on_click=_gen_daily_reflection
+                "AI 生成", on_click=trigger_generate_reflection
             ).classes("bg-purple-600 text-white text-sm mt-2")
 
         # ══════════════════════════════════════════════════════════════════════
@@ -608,31 +715,14 @@ async def daily_plan_page() -> None:
         with ui.row().classes("w-full gap-3 mt-2"):
             save_msg = ui.label("").classes("text-sm flex-1")
 
-            async def _save_draft() -> None:
-                target = _capture_plan_target()
-                save_payload = None
-                if target is not None:
-                    d = target.selected_date
-                    save_payload = {
-                        "plan_date": d,
-                        "week_number": state["week_number"] or 1,
-                        "weekday_cn": state["weekday_cn"] or get_weekday_cn(d),
-                        "grade": state["grade"],
-                        "class_name": state["class_name"],
-                        "expected_plan_id": target.plan_id,
-                        "expected_revision": target.revision,
-                        "activity_goal": goal_area.value,
-                        "activity_prep": prep_area.value,
-                        "activity_key": key_area.value,
-                        "activity_difficult": difficult_area.value,
-                        "activity_process_original": original_area.value,
-                        "activity_process_adapted": adapted_area.value,
-                        "morning_activity": morning_activity_area.value,
-                        "morning_talk_topic": morning_talk_area.value,
-                        "indoor_area": area_game_area.value,
-                        "outdoor_activity": outdoor_activity_area.value,
-                        "daily_reflection": daily_reflection_area.value,
-                    }
+            async def _save_draft(
+                owner: object,
+                frozen: tuple[
+                    DailyPlanUiTarget | None,
+                    _DailyPlanSavePayload | None,
+                ],
+            ) -> None:
+                target, save_payload = frozen
                 if await _require_live_session() is None:
                     return
                 if (
@@ -685,10 +775,47 @@ async def daily_plan_page() -> None:
                     save_msg.classes(add="text-red-500")
                     save_msg.text = "❌ 保存失败，请重试"
                 finally:
-                    if await _require_live_session() is not None:
+                    if (
+                        await _require_live_session() is not None
+                        and save_operations.owns(owner)
+                    ):
                         save_btn.props(remove="loading")
 
-            save_btn = ui.button("保存草稿", on_click=_save_draft).classes(
+            def _capture_save() -> tuple[
+                DailyPlanUiTarget | None,
+                _DailyPlanSavePayload | None,
+            ]:
+                target = _capture_plan_target()
+                if target is None:
+                    return None, None
+                d = target.selected_date
+                save_payload: _DailyPlanSavePayload = {
+                    "plan_date": d,
+                    "week_number": int(state["week_number"] or 1),
+                    "weekday_cn": str(state["weekday_cn"] or get_weekday_cn(d)),
+                    "grade": str(state["grade"] or ""),
+                    "class_name": str(state["class_name"] or ""),
+                    "expected_plan_id": target.plan_id,
+                    "expected_revision": target.revision,
+                    "activity_goal": goal_area.value,
+                    "activity_prep": prep_area.value,
+                    "activity_key": key_area.value,
+                    "activity_difficult": difficult_area.value,
+                    "activity_process_original": original_area.value,
+                    "activity_process_adapted": adapted_area.value,
+                    "morning_activity": morning_activity_area.value,
+                    "morning_talk_topic": morning_talk_area.value,
+                    "indoor_area": area_game_area.value,
+                    "outdoor_activity": outdoor_activity_area.value,
+                    "daily_reflection": daily_reflection_area.value,
+                }
+                return target, save_payload
+
+            trigger_save = save_operations.bind(
+                capture=_capture_save,
+                run=_save_draft,
+            )
+            save_btn = ui.button("保存草稿", on_click=trigger_save).classes(
                 "bg-green-600 text-white"
             )
 
@@ -795,8 +922,10 @@ async def daily_plan_page() -> None:
         with ui.row().classes("w-full gap-3 mt-1 items-center"):
             export_msg = ui.label("").classes("text-sm flex-1")
 
-            async def _export_word() -> None:
-                target = _capture_plan_target()
+            async def _export_word(
+                owner: object,
+                target: DailyPlanUiTarget | None,
+            ) -> None:
                 if await _require_live_session() is None:
                     return
                 if target is None or not _is_current_plan_target(target):
@@ -893,10 +1022,17 @@ async def daily_plan_page() -> None:
                     export_msg.classes(add="text-red-500")
                     export_msg.text = f"❌ 导出失败：{type(e).__name__}"
                 finally:
-                    if await _require_live_session() is not None:
+                    if (
+                        await _require_live_session() is not None
+                        and export_operations.owns(owner)
+                    ):
                         export_btn.props(remove="loading")
 
-            export_btn = ui.button("导出 Word", on_click=_export_word).classes(
+            trigger_export = export_operations.bind(
+                capture=_capture_plan_target,
+                run=_export_word,
+            )
+            export_btn = ui.button("导出 Word", on_click=trigger_export).classes(
                 "bg-indigo-600 text-white"
             )
 
@@ -927,23 +1063,28 @@ async def daily_plan_page() -> None:
                 with ui.menu() as batch_end_picker:
                     ui.date(mask="YYYY-MM-DD").bind_value(batch_end_input)
 
+        batch_start_input.on_value_change(batch_range_generation.advance)
+        batch_end_input.on_value_change(batch_range_generation.advance)
+
         batch_msg = ui.label("").classes("text-sm mt-2")
 
-        async def _batch_export() -> None:
-            from datetime import datetime
-
-            start_str = batch_start_input.value
-            end_str = batch_end_input.value
-            start_date = None
-            end_date = None
-            date_parse_failed = False
-            if start_str and end_str:
-                try:
-                    start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
-                    end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
-                except ValueError:
-                    date_parse_failed = True
+        async def _batch_export(
+            owner: object,
+            frozen: tuple[int, str, str, date | None, date | None, bool],
+        ) -> None:
+            (
+                range_generation,
+                start_str,
+                end_str,
+                start_date,
+                end_date,
+                date_parse_failed,
+            ) = frozen
             if await _require_live_session() is None:
+                return
+            if not batch_range_generation.is_current(
+                range_generation
+            ) or not batch_export_operations.owns(owner):
                 return
 
             if not start_str or not end_str:
@@ -983,6 +1124,10 @@ async def daily_plan_page() -> None:
                     )
                 if await _require_live_session() is None:
                     return
+                if not batch_range_generation.is_current(
+                    range_generation
+                ) or not batch_export_operations.owns(owner):
+                    return
 
                 if not plans:
                     batch_msg.classes(add="text-orange-500")
@@ -1007,6 +1152,10 @@ async def daily_plan_page() -> None:
 
                 doc_bytes = export_batch_daily_plans(plans_with_diffs)
                 if await _require_live_session() is None:
+                    return
+                if not batch_range_generation.is_current(
+                    range_generation
+                ) or not batch_export_operations.owns(owner):
                     return
 
                 # 取第一条（按日期升序后最早的）的年级班级信息
@@ -1035,6 +1184,10 @@ async def daily_plan_page() -> None:
                         )
                 if await _require_live_session() is None:
                     return
+                if not batch_range_generation.is_current(
+                    range_generation
+                ) or not batch_export_operations.owns(owner):
+                    return
 
                 ui.download(doc_bytes, filename=filename)
 
@@ -1056,13 +1209,53 @@ async def daily_plan_page() -> None:
             except Exception as e:
                 if await _require_live_session() is None:
                     return
+                if not batch_range_generation.is_current(
+                    range_generation
+                ) or not batch_export_operations.owns(owner):
+                    return
                 batch_msg.classes(add="text-red-500")
                 batch_msg.text = f"❌ 批量导出失败：{type(e).__name__}"
             finally:
-                if await _require_live_session() is not None:
+                if (
+                    await _require_live_session() is not None
+                    and batch_export_operations.owns(owner)
+                ):
                     batch_btn.props(remove="loading")
 
-        batch_btn = ui.button("批量导出 Word", on_click=_batch_export).classes(
+        def _capture_batch_export() -> tuple[
+            int,
+            str,
+            str,
+            date | None,
+            date | None,
+            bool,
+        ]:
+            range_generation = batch_range_generation.capture()
+            start_str = str(batch_start_input.value or "")
+            end_str = str(batch_end_input.value or "")
+            start_date = None
+            end_date = None
+            date_parse_failed = False
+            if start_str and end_str:
+                try:
+                    start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
+                    end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
+                except ValueError:
+                    date_parse_failed = True
+            return (
+                range_generation,
+                start_str,
+                end_str,
+                start_date,
+                end_date,
+                date_parse_failed,
+            )
+
+        trigger_batch_export = batch_export_operations.bind(
+            capture=_capture_batch_export,
+            run=_batch_export,
+        )
+        batch_btn = ui.button("批量导出 Word", on_click=trigger_batch_export).classes(
             "bg-emerald-600 text-white mt-2"
         )
 
@@ -1075,6 +1268,7 @@ async def daily_plan_page() -> None:
     history_container = ui.column().classes("w-full gap-2 mt-1")
 
     async def refresh_history() -> None:
+        request_generation = history_requests.advance()
         if await _require_live_session() is None:
             return
         try:
@@ -1086,6 +1280,8 @@ async def daily_plan_page() -> None:
                     limit=20,
                 )
             if await _require_live_session() is None:
+                return
+            if not history_requests.is_current(request_generation):
                 return
             history_container.clear()
             with history_container:
@@ -1110,6 +1306,8 @@ async def daily_plan_page() -> None:
                                         or selected_target.revision != p.revision
                                     ):
                                         selected_target = None
+                                    if await _require_live_session() is None:
+                                        return
                                     with ui.dialog() as dlg, ui.card():
                                         ui.label(
                                             f"确定要删除「{p.plan_date}」的活动计划吗？删除后无法恢复。"
@@ -1170,6 +1368,8 @@ async def daily_plan_page() -> None:
         except Exception:
             if await _require_live_session() is None:
                 return
+            if not history_requests.is_current(request_generation):
+                return
             with history_container:
                 ui.label("加载历史失败").classes("text-red-500 text-sm")
 
@@ -1219,6 +1419,7 @@ async def daily_plan_page() -> None:
         if plan is None or selection_state["current"] is not selection:
             return
 
+        form_generation.advance()
         goal_area.value = plan.activity_goal or ""
         prep_area.value = plan.activity_prep or ""
         key_area.value = plan.activity_key or ""
