@@ -1033,3 +1033,142 @@ async def test_completed_issue_waiters_observe_external_lifecycle_override(
         "repeated_status": expected_status,
         "writer_issue_count": 1,
     }
+
+
+@pytest.mark.asyncio
+async def test_prestart_invalidate_override_stays_with_old_issue_waiters() -> None:
+    """A cancelled-before-start flight cannot read its successor's snapshot."""
+    flow, writer, _agent, patch_a, patch_b = await _two_patch_flow(
+        block_phase="issue",
+        block_call_number=1,
+    )
+    ui_session = trusted_ui_session()
+    owner_a_results: list[object] = []
+
+    async def owner_issue_a_then_b() -> object:
+        result_a = await flow.issue(
+            ui_session,
+            patch_a.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+        owner_a_results.append(result_a)
+        return await flow.issue(
+            ui_session,
+            patch_b.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+
+    async def join_issue_a() -> object:
+        return await flow.issue(
+            ui_session,
+            patch_a.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+
+    async def invalidate_before_inner_start() -> None:
+        flow.invalidate()
+
+    owner_task = asyncio.create_task(owner_issue_a_then_b())
+    joiner_task = asyncio.create_task(join_issue_a())
+    invalidate_task = asyncio.create_task(invalidate_before_inner_start())
+
+    await writer.entered.wait()
+    joiner_a = await joiner_task
+    controller_during_b = flow.snapshot
+
+    writer.release.set()
+    pending_b = await owner_task
+    await invalidate_task
+    owner_a = owner_a_results[0]
+
+    assert {
+        "owner_a": (
+            getattr(owner_a, "status", None),
+            getattr(owner_a, "patch_id", None),
+        ),
+        "joiner_a": (
+            getattr(joiner_a, "status", None),
+            getattr(joiner_a, "patch_id", None),
+        ),
+        "joiner_matches_owner": joiner_a == owner_a,
+        "controller_during_b": (
+            controller_during_b.status,
+            controller_during_b.patch_id,
+        ),
+        "pending_b": (pending_b.status, pending_b.patch_id),
+        "writer_issue_order": tuple(writer.issue_patch_ids),
+    } == {
+        "owner_a": (PatchConfirmationStatus.STALE, patch_a.patch_id),
+        "joiner_a": (PatchConfirmationStatus.STALE, patch_a.patch_id),
+        "joiner_matches_owner": True,
+        "controller_during_b": (PatchConfirmationStatus.IDLE, patch_b.patch_id),
+        "pending_b": (PatchConfirmationStatus.PENDING, patch_b.patch_id),
+        "writer_issue_order": (patch_b.patch_id,),
+    }
+
+
+@pytest.mark.parametrize(
+    "lifecycle_method",
+    [
+        pytest.param("close", id="close"),
+        pytest.param("disconnect", id="disconnect"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_shutdown_base_exception_closes_owner_and_releases_writer(
+    lifecycle_method: str,
+) -> None:
+    """Shutdown cannot leave a raw writer traceback in an old public flight."""
+    flow, writer, agent, patch_a, _patch_b = await _two_patch_flow(
+        block_phase="issue",
+        cancellation_cleanup=True,
+        cancellation_outcome="raise_base_exception",
+    )
+    ui_session = trusted_ui_session()
+    owner_task = asyncio.create_task(
+        flow.issue(
+            ui_session,
+            patch_a.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+    )
+    await writer.entered.wait()
+
+    writer_ref = weakref.ref(writer)
+    agent_ref = weakref.ref(agent)
+    cleanup_entered = writer.cleanup_entered
+    cleanup_release = writer.cleanup_release
+    del writer, agent
+
+    shutdown_task = asyncio.create_task(getattr(flow, lifecycle_method)())
+    await cleanup_entered.wait()
+    cleanup_release.set()
+    shutdown_snapshot = await shutdown_task
+
+    await _event_loop_checkpoint()
+    await _event_loop_checkpoint()
+    gc.collect()
+    owner_done = owner_task.done()
+    writer_retained = writer_ref() is not None
+    agent_retained = agent_ref() is not None
+    owner_outcome = await _task_outcome(owner_task)
+
+    assert {
+        "shutdown_status": shutdown_snapshot.status,
+        "owner_done": owner_done,
+        "owner_outcome": owner_outcome[0],
+        "owner_status": getattr(owner_outcome[1], "status", None),
+        "writer_retained": writer_retained,
+        "agent_retained": agent_retained,
+    } == {
+        "shutdown_status": PatchConfirmationStatus.CLOSED,
+        "owner_done": True,
+        "owner_outcome": "result",
+        "owner_status": PatchConfirmationStatus.CLOSED,
+        "writer_retained": False,
+        "agent_retained": False,
+    }
