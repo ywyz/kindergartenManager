@@ -349,8 +349,9 @@ Agent Foundation 不新增业务表或 Alembic migration。以下对象只存在
 允许的持久化仍只有现有业务用例明确写入的数据。READ/DRAFT 不写 `daily_plan`、版本、preview、audit、
 备份、导出或日志正文。可以记录无正文的运行诊断计数，但不得把它描述为业务审计或长期记忆。
 
-独立 ADR/spec 已为后续 WRITE GREEN 冻结 `daily_plan` revision 和不可变 `agent_write_audit`，并要求新的
-Alembic revision；W004 不得预留空表或猜测迁移编号。
+独立 ADR/spec 已在 W005/W006 实现 `daily_plan` revision、短命确认 store、
+`daily_plan_operation_version` 与不可变 `agent_write_audit`；这些本地应用层证据不改变 Foundation
+READ/DRAFT 自身的零写入语义，也不授权 W007 UI 或 Provider WRITE。
 
 ## 10. Prompt injection 与 Tool 安全
 
@@ -477,11 +478,14 @@ UI/全逻辑摘要分别保持 `f60b310f…` / `bdb45487…`。两者 compare �
    和独立 `evidence_closure_sha` 顺序闭合。任何后续产品代码变化都会使本组人工证据失效。
 6. Graphify/codebase-memory 更新只证明覆盖，不替代测试、Review 和人工验收。
 
-## 13. 未来 WRITE 的额外前置条件
+## 13. W005/W006 已实现边界与 W007 前置条件
 
-- 可信 actor/session，而不是当前网络可达的固定管理员身份。
-- `daily_plan` 显式单调 revision 和受保护字段路径。
-- Confirmation 绑定 Patch hash、target、revision、session、turn、expiry 和一次性 nonce。
-- 一个短事务内重读、校验、保存操作前版本、完整应用 Patch、递增 revision、写最小 audit 并提交。
-- stale、归档只读、Schema/业务校验、audit 或 commit 失败时全部回滚；未知 commit 只对账不重放。
-- Provider、网络、Word、文件和备份不进入 WRITE 事务。
+- 可信 actor/session 已恢复；W005 Confirmation 绑定 Patch hash、target、revision、session、turn、expiry 和
+  一次性 nonce，确认材料只在有界进程内 store 短命保存。
+- `daily_plan` 已有显式单调 revision；W006 在一个短事务内重读、校验、append 完整
+  `daily_plan_operation_version`、CAS 应用 Patch、append 最小 `agent_write_audit` 并同 commit。
+- stale、Schema/业务校验、audit 或明确 commit 失败全部回滚；未知 commit 只读对账不重放。两张 evidence
+  表由数据库 trigger 拒绝 UPDATE/DELETE，Repository 查询在 SQL 层绑定 tenant/user。
+- Provider、Tool registry、网络、Word、文件和备份不进入 WRITE 事务；Provider 仍恰好四 READ + 两 DRAFT。
+- W007 才能在每日计划当前页面接入单 Patch 确认 UI；在 W006 Review/CI/验收/Issue 门闭合前不得进入，且
+  不能增加自动重试、批量/跨页面采用或长期 Patch 持久化。

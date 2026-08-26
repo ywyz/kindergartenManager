@@ -1,7 +1,8 @@
 # KindergartenManager 产品与工程路线图
 
-> 当前快照：2026-08-25；当前产品基线 `main@ca3b7bd922f838c0739ccf9ed0f58655d292dc2f`；
-> 本工作树正在完成 ADR-0006 先决条件 GREEN 与 Agent WRITE 稳定 RED，尚未 commit/push/CI/人工验收。
+> 当前快照：2026-08-26；合入基线 `main@ca3b7bd922f838c0739ccf9ed0f58655d292dc2f`；
+> 当前 `feat/agent-write` 已闭合 W005，W006 正在收敛第二轮 Review findings；Alembic head 为
+> `e5f7a9c2d4b6`。W007 尚未进入，merge/Issue 关闭/release 未授权。
 
 ## 1. 状态语义
 
@@ -37,7 +38,7 @@ R0 事实基线与图谱
        ├─ R2 当前五个教学模块复验
        └─ R3 Agent Foundation 规格与分支决策
             └─ R4A 受控 Agent READ/DRAFT
-                 ├─ R4B Agent WRITE（独立未来门禁）
+                 ├─ R4B Agent WRITE（独立实施门禁）
                  └─ R5 发布与运维复核
 ```
 
@@ -120,14 +121,15 @@ R0 事实基线与图谱
   `ddca78d…` 依次固定异常净化、硬时限、终态 current-context/TTL、drain 竞态和 BaseException 边界。
   最终本地候选 `51443a3…` 为 Foundation `110 passed`、全量 `551 passed`、Standards `0`、Spec `0`、
   scope creep `0`；证据 SHA `2fb4e6f…` 的远端 Quality `32648599591` 精确匹配成功。
-- Foundation 固定验收时使用旧单用户边界；本工作树已恢复可信 UI 登录/session，但尚未 commit、CI 或人工验收。
+- Foundation 固定验收时使用旧单用户边界；当前分支已恢复可信 UI 登录/session，并随 W005 通过精确 SHA
+  CI，但最终产品浏览器矩阵仍待 W008。
 - 当前继续保持模块化单体；服务拆分仍须独立 ADR 与运营理由，F009 不改变部署形态。
 - F004 已建立每日计划、班级设置和日历的 tenant+user 窄 Service 投影；F008 executor 只调用这些投影，
   Provider 不接触 Repository。
 
 当前执行边界：F009 已按稳定 RED、最小 GREEN、Review RED、固定 `tested_code_sha`、Linux Chrome mock、
-应用安全配置真实模型、独立 `evidence_closure_sha` 顺序闭合并合入 `main`。Issue 关闭、发布、WRITE GREEN、
-长期记忆或产品多 Agent 仍未授权。
+应用安全配置真实模型、独立 `evidence_closure_sha` 顺序闭合并合入 `main`。Issue 关闭、发布、Provider WRITE、
+长期记忆或产品多 Agent 仍未授权；本地应用层逐次确认 WRITE 由独立 R4B 边界治理。
 
 ## 8. R4A：受控 Agent Foundation READ/DRAFT
 
@@ -222,7 +224,7 @@ Review/Quality/远端/Issue 证据见 Issue #48。
 
 ## 9. R4B：Agent WRITE（独立里程碑）
 
-状态：`先决条件本地 GREEN / 稳定 RED`（生产 WRITE GREEN 未授权）。
+状态：`实现中`（W005 已闭合；W006 第二轮 finding RED 已固定并在本地修正；W007 尚未进入）。
 
 [ADR-0006](ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md) 与
 [冻结规格](../specs/agent-write/spec.md)、[Issue #52](https://github.com/ywyz/kindergartenManager/issues/52)
@@ -230,17 +232,16 @@ Review/Quality/远端/Issue 证据见 Issue #48。
 确认，绑定 actor/jti、Patch/turn/target/revision/before/expiry/nonce；`apply` 在短事务内完成完整操作前版本、
 CAS `N→N+1`、最小不可变审计与同 commit，任何已知失败全回滚，commit unknown 只对账不重放。
 
-本工作树已恢复可信 UI session，`b7d9e1f3a5c2` 增加 `daily_plan.revision`；当前 head
-`c1a8e4f6b2d9` 另行修复 SQLite `user.id` 自增兼容性。稳定 RED 只固定
-未来公开 `ConfirmedDailyPlanWriteService` seam；不得创建 confirmation store、version/audit 表、WRITE service
-或确认 UI。后续 W005-W008 的每个 GREEN、Review、commit、push、精确 CI、Linux 人工故障验收与 Issue 证据
-仍按 [tasks](../specs/agent-write/tasks.md) 单独授权，默认停在 merge/Issue 关闭/release 之前。
+当前分支已恢复可信 UI session；`b7d9e1f3a5c2` 增加 `daily_plan.revision`，`c1a8e4f6b2d9` 修复
+SQLite `user.id` 自增，当前 head `e5f7a9c2d4b6` 增加且仅增加 14/17 列的两张 append-only evidence 表和
+SQLite/MySQL 四个 UPDATE/DELETE 拒绝 trigger。W005 的 `ConfirmedDailyPlanWriteService` 契约/store 已在
+`e4a7f3c…` 取得 Review 0/0、精确 SHA CI、service 验收和 Issue 回写；W006 已实现 version→CAS→audit
+同事务、全回滚、commit-unknown 只读 reconcile，并在 Review 后固定两轮 finding RED。
 
-本地当前证据：常规 `693 passed`、Foundation `261 passed`、revision/SQLite user/bootstrap 专项 `22 passed`；WRITE RED
-clean collection `59`，连续两次均 `1 passed, 58 failed`，node-only 失败列表 SHA-256 均为
-`fe346fa3ebfe73deb1405eed183004278a99ca0618f28039c4aec1454110fc5e`。当前 revision migration 的 MySQL
-trigger 已固定二进制文本比较结构，未来 WRITE migration 的 MySQL 四 trigger 也已进入离线 DDL RED；真实
-MySQL 8、浏览器、Word、远端 CI 与人工验收仍未执行。
+W006 当前本地目标矩阵为 WRITE `78 passed`、Foundation `261 passed`、ordinary `847 passed`；修正后固定
+SHA Review、push、CI、service 故障验收与 Issue 回写仍待闭合。MySQL 离线 DDL 已证明方言分支结构，但真实
+MySQL 8 的迁移往返、四 trigger、revision CAS 与管理员行锁仍属 W008 独立验收。W007 确认 UI 尚不存在；
+后续门禁仍按 [tasks](../specs/agent-write/tasks.md) 顺序执行，默认停在 merge/Issue 关闭/release 之前。
 
 ## 10. R5：发布与运维复核
 

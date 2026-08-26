@@ -347,13 +347,17 @@ class _InMemoryConfirmationStore:
             )
             if record is None:
                 _reject("confirmation_not_found")
-            binding_error = self._binding_error(record, actor, now)
+            binding_error = self._binding_error(
+                record,
+                actor,
+                now,
+                enforce_expiry=record.state is _ConfirmationState.PENDING,
+            )
             if binding_error is not None:
-                if binding_error == "confirmation_expired" and record.state in {
-                    _ConfirmationState.PENDING,
-                    _ConfirmationState.APPLIED,
-                    _ConfirmationState.FAILED,
-                }:
+                if (
+                    binding_error == "confirmation_expired"
+                    and record.state is _ConfirmationState.PENDING
+                ):
                     self._records[record.confirmation_id] = replace(
                         record,
                         state=_ConfirmationState.FAILED,
@@ -801,6 +805,7 @@ class ConfirmedDailyPlanWriteService:
             actor=actor,
             now=self._now(),
         )
+        result: ConfirmedDailyPlanWriteResult | None = None
         try:
             async with self._session_factory() as session:
                 await self._require_active_actor(session, actor)
@@ -812,16 +817,27 @@ class ConfirmedDailyPlanWriteService:
             self._store.finish_indeterminate(claim)
             _reject("commit_outcome_unknown")
         except ConfirmedWriteRejected:
+            if result is not None:
+                if not self._store.finish_applied(claim, result):
+                    _reject("write_failed")
+                return result
             self._store.finish_failed(claim)
             raise
         except asyncio.CancelledError:
+            if result is not None:
+                self._store.finish_applied(claim, result)
+                raise
             self._store.finish_failed(claim)
             raise
         except Exception:
+            if result is not None:
+                if not self._store.finish_applied(claim, result):
+                    _reject("write_failed")
+                return result
             self._store.finish_failed(claim)
             _reject("write_failed")
 
-        if not self._store.finish_applied(claim, result):
+        if result is None or not self._store.finish_applied(claim, result):
             _reject("write_failed")
         return result
 

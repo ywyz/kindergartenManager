@@ -1,6 +1,6 @@
 # 幼儿园教学管理系统架构文档（初始化）
 
-> **历史文档说明（2026-08-25）**：本文按开发阶段累积，包含已被后续可信登录恢复取代的单用户描述和旧迁移/测试数字。当前架构事实见 [`../CONTEXT.md`](../CONTEXT.md)、[`../docs/design/system-architecture.md`](../docs/design/system-architecture.md)、[`../docs/design/data-model.md`](../docs/design/data-model.md) 和 [`../docs/ADR/README.md`](../docs/ADR/README.md)。受控 Agent 的 F003-F009 已固定 GREEN；当前工作树的可信 UI session、`daily_plan.revision` 与未来逐次确认 WRITE 边界见 [`../docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md`](../docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md) 和 [`../specs/agent-write/spec.md`](../specs/agent-write/spec.md)。下文历史内容不授权 Agent WRITE。当前工作树 Alembic head 为 `c1a8e4f6b2d9`。
+> **历史文档说明（2026-08-26）**：本文按开发阶段累积，包含已被后续可信登录恢复取代的单用户描述和旧迁移/测试数字。当前架构事实见 [`../CONTEXT.md`](../CONTEXT.md)、[`../docs/design/system-architecture.md`](../docs/design/system-architecture.md)、[`../docs/design/data-model.md`](../docs/design/data-model.md) 和 [`../docs/ADR/README.md`](../docs/ADR/README.md)。受控 Agent 的 F003-F009 已固定 GREEN；当前分支的可信 UI session、`daily_plan.revision` 与 W005/W006 逐次确认 WRITE 边界见 [`../docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md`](../docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md) 和 [`../specs/agent-write/spec.md`](../specs/agent-write/spec.md)。下文主体保留历史，不授权跳过 W006-W008 门禁。当前 Alembic head 为 `e5f7a9c2d4b6`。
 
 ## 1. 历史阶段记录
 
@@ -446,12 +446,13 @@ F009 稳定 RED `34e12f2…` 与后续 Review RED 固定零持久化、POSIX sec
 PASS；两者 UI/全逻辑 snapshot compare 均为 `equal=true`，完整脱敏证据位于
 `specs/agent-foundation/evidence/`，最终 closure SHA 的 Review/Quality/Issue 证据见 Issue #48。
 
-## 15. 可信 UI session、daily-plan revision 与 Agent WRITE 冻结边界（2026-08-25）
+## 15. 可信 UI session、daily-plan revision 与 Agent WRITE 冻结边界（2026-08-26 更新）
 
 当前工作树以 [ADR-0006](../docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md) 和
 [Agent WRITE spec](../specs/agent-write/spec.md) 为权威边界：UI actor 由唯一 JWT jti + active User 重建，敏感
 callback 在外部 await 后的成功/异常写回前重验原 session；`daily_plan` 保存和删除都使用精确 plan id +
-revision；该 revision 为 `b7d9e1f3a5c2`，当前迁移 head `c1a8e4f6b2d9` 另修 SQLite `user.id`
-自增兼容性。本地证据为常规 `693 passed`、Foundation `261 passed`、revision/SQLite user/bootstrap
-专项 `22 passed`；未来 WRITE 稳定 RED 为 `59 collected / 1 passed / 58 failed`，未创建生产 WRITE seam。
-Issue #52 保持 OPEN；本地改动尚未 commit、push、CI 或人工验收。
+revision；该 revision 为 `b7d9e1f3a5c2`，`c1a8e4f6b2d9` 另修 SQLite `user.id` 自增兼容性，当前
+`e5f7a9c2d4b6` 新增且仅新增 `daily_plan_operation_version`、`agent_write_audit` 与跨方言不可变
+trigger。W005 已闭合确认契约/store；W006 已实现 version→CAS→audit 同事务、全回滚与 commit-unknown
+只读对账，当前目标矩阵为 WRITE `78 passed`、Foundation `261 passed`、ordinary `847 passed`。
+W006 修正后 Review/CI/验收/Issue 与 W007 UI 仍未闭合；Issue #52 保持 OPEN，merge/关闭/release 未授权。

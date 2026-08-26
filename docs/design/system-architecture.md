@@ -1,6 +1,8 @@
 # KindergartenManager 系统架构设计
 
-> 当前基线为 `main@ca3b7bd`，Agent Foundation 已合入主线。本文同时标记当前工作树中尚未提交的可信 UI session 与 `daily_plan.revision` 事实；这些改动尚未进入 CI 或人工验收，不得写成已发布能力。
+> 合入基线为 `main@ca3b7bd`，Agent Foundation 已合入主线。当前 `feat/agent-write` 已恢复可信 UI
+> session 与 `daily_plan.revision`，W005 已闭合，W006 正在收敛 Review findings；W007 产品 UI 与最终
+> CI/人工验收尚未闭合，不得写成已发布能力。
 
 ## 1. 架构目标
 
@@ -258,12 +260,13 @@ AI Key 不应写入 `.env`、仓库或测试日志；数据库密文与原 `ENCR
 | 图片过大/方向异常 | 压缩、规格校验、横版归一 | 原图隐私和内存上限需持续验证 |
 | Agent Provider/Tool call | Runtime 本地校验、关闭 registry、有界 loop | Foundation 已合入；任何未知/WRITE Tool 仍必须拒绝 |
 | Agent 取消/上下文变化 | operation/scope/fingerprint 匹配，迟到结果丢弃 | 不得在页面切换后回填或保存 |
-| Agent 逐次确认 WRITE | 当前只有 ADR/spec/稳定 RED | confirmation、操作前版本、不可变审计和采用 UI 生产实现均不存在，不得视为可写能力 |
+| Agent 逐次确认 WRITE | W005 确认边界已闭合；W006 原子 evidence 事务修正中 | `daily_plan_operation_version` + `agent_write_audit` 只由本地 service 写精确已有 plan；W007 采用 UI 尚不存在，Provider/Tool 仍不可写 |
 
 ## 11. 可观测性与审计
 
 - 全局未捕获异常只以结构化日志记录异常类型；异常正文与 traceback 可能携带凭据或 Provider 数据，禁止跨越日志边界。
-- `log_audit` 用于 AI、导出、关键设置及登录/账号操作；它是日志边界，不是未来 Agent WRITE 的同事务不可变审计，当前失败不阻断主流程。
+- `log_audit` 用于 AI、导出、关键设置及登录/账号操作；它是日志边界，不是 W006 同事务
+  `agent_write_audit`，当前失败不阻断主流程。
 - 日志不得出现密码、API Key、HMAC secret、完整数据库 URL 或幼儿图片内容。
 - 当前没有集中式 metrics/tracing；需要时先定义运营问题，不盲目引入平台。
 
@@ -279,12 +282,13 @@ AI Key 不应写入 `.env`、仓库或测试日志；数据库密文与原 `ENCR
 - UI：纯 helper 自动测试 + 浏览器/人工主流程。
 - Agent Foundation：契约/Schema、未知和 WRITE Tool 拒绝、tenant/user 裁剪、有界 loop、取消/超时/迟到丢弃，
   并证明所有路径零业务持久化。
-- Agent WRITE：当前只保留独立 ADR/spec 与稳定 RED，不得将 RED 或未提交的 revision 先决条件写成生产 GREEN。
+- Agent WRITE：W005/W006 公共 seam、绑定、原子事务与 finding 矩阵；W007 UI、真实 MySQL 8 与最终固定 SHA
+  可见验收仍分别证明，不把 service GREEN 写成产品完成。
 - Word/打包：目标平台人工验收。
 
 codebase-memory/Graphify 只能发现结构、热点和文档关系，不替代这些测试。
-当前工作树的 UI session/revision/RED 改动尚未提交、未跑 CI、未做浏览器或真模型人工验收；
-旧 F009 人工结果不能填补这些门禁。
+当前分支的 UI session/revision/W005 已进入远端 CI；W006 修正后远端 CI 与人工故障验收、W007 浏览器 UI
+仍未完成。旧 F009 人工结果不能填补这些门禁。
 
 ## 13. 已知架构热点
 
@@ -299,4 +303,5 @@ codebase-memory/Graphify 只能发现结构、热点和文档关系，不替代�
 - 是否有真实吞吐/运维需求足以支持微服务拆分。
 - 图片后端、备份恢复和数据保留策略。
 - Agent Foundation 已合入主线，仍固定为 4 READ + 2 DRAFT 且零 Agent 持久化。
-- Agent WRITE 的可信 actor、`daily_plan.revision`、逐次确认、操作前版本、短事务、不可变审计与全回滚已在独立 ADR/spec/RED 冻结；下一门禁是否授权生产 GREEN，不是默认继续实现。
+- Agent WRITE 的可信 actor、`daily_plan.revision`、逐次确认、操作前版本、短事务、不可变审计与全回滚已在
+  W005/W006 实现；下一门是 W006 修正后交付闭合，再进入 W007 单 Patch UI，不能跳门。
