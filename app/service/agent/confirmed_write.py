@@ -120,7 +120,7 @@ def _as_utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
-def _session_snapshot(
+def _unchecked_session_snapshot(
     ui_session: object,
     *,
     now: datetime,
@@ -161,6 +161,19 @@ def _session_snapshot(
         issued_at_utc=issued_at,
         expires_at_utc=expires_at,
     )
+
+
+def _session_snapshot(
+    ui_session: object,
+    *,
+    now: datetime,
+) -> _UiSessionSnapshot:
+    try:
+        return _unchecked_session_snapshot(ui_session, now=now)
+    except ConfirmedWriteRejected:
+        raise
+    except Exception:
+        _reject("ui_session_invalid")
 
 
 class _InMemoryConfirmationStore:
@@ -246,7 +259,24 @@ class _InMemoryConfirmationStore:
             if record.state is not _ConfirmationState.PENDING:
                 _reject("confirmation_consumed")
 
-            claim_token = secrets.token_bytes(32)
+            try:
+                claim_token = secrets.token_bytes(32)
+            except Exception:
+                self._records[record.confirmation_id] = replace(
+                    record,
+                    state=_ConfirmationState.FAILED,
+                    claim_token=None,
+                    result=None,
+                )
+                _reject("write_unavailable")
+            if type(claim_token) is not bytes or len(claim_token) != 32:
+                self._records[record.confirmation_id] = replace(
+                    record,
+                    state=_ConfirmationState.FAILED,
+                    claim_token=None,
+                    result=None,
+                )
+                _reject("write_unavailable")
             consuming = replace(
                 record,
                 state=_ConfirmationState.CONSUMING,
@@ -345,10 +375,13 @@ class ConfirmedDailyPlanWriteService:
         self._store = _InMemoryConfirmationStore(capacity=store_capacity)
 
     def _now(self) -> datetime:
-        value = self._clock()
-        if type(value) is not datetime or value.tzinfo is None:
+        try:
+            value = self._clock()
+            if type(value) is not datetime or value.tzinfo is None:
+                raise ValueError
+            return _as_utc(value)
+        except Exception:
             _reject("write_unavailable")
-        return _as_utc(value)
 
     @staticmethod
     async def _require_active_actor(
@@ -373,12 +406,32 @@ class ConfirmedDailyPlanWriteService:
 
     @staticmethod
     def _authoritative_patch(patch: object) -> PlanPatch:
-        if not plan_patch_is_canonical(patch):
-            _reject("patch_invalid")
-        copied = deepcopy(patch)
-        if not plan_patch_is_canonical(copied):
+        try:
+            if not plan_patch_is_canonical(patch):
+                _reject("patch_invalid")
+            copied = deepcopy(patch)
+            if not plan_patch_is_canonical(copied):
+                _reject("patch_invalid")
+        except ConfirmedWriteRejected:
+            raise
+        except Exception:
             _reject("patch_invalid")
         return copied
+
+    @staticmethod
+    def _new_confirmation_material() -> tuple[UUID, bytes]:
+        try:
+            confirmation_id = uuid4()
+            nonce = secrets.token_bytes(32)
+        except Exception:
+            _reject("write_unavailable")
+        if (
+            type(confirmation_id) is not UUID
+            or type(nonce) is not bytes
+            or len(nonce) != 32
+        ):
+            _reject("write_unavailable")
+        return confirmation_id, nonce
 
     async def issue_confirmation(
         self,
@@ -428,15 +481,17 @@ class ConfirmedDailyPlanWriteService:
         issued_at = self._now()
         if issued_at >= actor.expires_at_utc:
             _reject("ui_session_invalid")
-        expires_at = min(
-            issued_at + self._confirmation_ttl,
-            actor.expires_at_utc,
-        )
+        try:
+            expires_at = min(
+                issued_at + self._confirmation_ttl,
+                actor.expires_at_utc,
+            )
+        except Exception:
+            _reject("write_unavailable")
         if expires_at <= issued_at:
             _reject("ui_session_invalid")
 
-        confirmation_id = uuid4()
-        nonce = secrets.token_bytes(32)
+        confirmation_id, nonce = self._new_confirmation_material()
         field_paths = tuple(
             operation.field_path for operation in authoritative_patch.operations
         )

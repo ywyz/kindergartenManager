@@ -391,8 +391,7 @@ def build_plan_patch_from_arguments(
         _reject("proposal_invalid")
 
 
-def plan_patch_is_canonical(value: object) -> bool:
-    """Verify that an immutable PlanPatch still matches every canonical field."""
+def _plan_patch_is_canonical(value: object) -> bool:
     if type(value) is not PlanPatch:
         return False
     if (
@@ -470,6 +469,14 @@ def plan_patch_is_canonical(value: object) -> bool:
         warnings=value.warnings,
     )
     return value.canonical_sha256 == canonical_sha256(canonical_payload)
+
+
+def plan_patch_is_canonical(value: object) -> bool:
+    """Verify every canonical field and fail closed for malformed exact types."""
+    try:
+        return _plan_patch_is_canonical(value)
+    except Exception:
+        return False
 
 
 def plan_patch_matches_expected(*, actual: object, expected: PlanPatch) -> bool:
