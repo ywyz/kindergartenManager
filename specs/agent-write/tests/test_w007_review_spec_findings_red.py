@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field
 import inspect
@@ -319,6 +320,62 @@ class _NoopPatchActions:
 
     async def close(self) -> None:
         return None
+
+
+@dataclass(slots=True)
+class _BlockingLifecycleController:
+    """Public controller fake with an Event-gated shutdown boundary."""
+
+    cleanup_started: asyncio.Event = field(default_factory=asyncio.Event)
+    allow_cleanup: asyncio.Event = field(default_factory=asyncio.Event)
+    cleanup_completed: asyncio.Event = field(default_factory=asyncio.Event)
+    shutdown_calls: list[str] = field(default_factory=list)
+    issue_calls: int = 0
+    _snapshot: PatchConfirmationSnapshot = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self._snapshot = PatchConfirmationSnapshot(
+            status=PatchConfirmationStatus.IDLE,
+        )
+
+    @property
+    def snapshot(self) -> PatchConfirmationSnapshot:
+        return self._snapshot
+
+    async def issue(
+        self,
+        ui_session: object,
+        patch_id: UUID,
+        *,
+        expected_plan_id: int,
+        expected_revision: int,
+    ) -> PatchConfirmationSnapshot:
+        del ui_session, patch_id, expected_plan_id, expected_revision
+        self.issue_calls += 1
+        return self._snapshot
+
+    async def apply(self, ui_session: object) -> PatchConfirmationSnapshot:
+        del ui_session
+        return self._snapshot
+
+    async def reconcile(self, ui_session: object) -> PatchConfirmationSnapshot:
+        del ui_session
+        return self._snapshot
+
+    def invalidate(self) -> None:
+        return None
+
+    async def disconnect(self) -> None:
+        await self._shutdown("disconnect")
+
+    async def close(self) -> None:
+        await self._shutdown("close")
+
+    async def _shutdown(self, lifecycle: str) -> None:
+        self.shutdown_calls.append(lifecycle)
+        self.cleanup_started.set()
+        await self.allow_cleanup.wait()
+        self.cleanup_completed.set()
 
 
 @dataclass(slots=True)
@@ -1387,6 +1444,128 @@ async def test_indeterminate_session_guard_abandons_old_reconcile_capability(
         "reconcile_calls_after_guard": (CONFIRMATION_ID,),
         "reconcile_calls_after_rerender": (CONFIRMATION_ID,),
         "reconcile_calls_after_old_button_probe": (CONFIRMATION_ID,),
+    }
+
+
+@pytest.mark.parametrize(
+    ("first_lifecycle", "second_lifecycle"),
+    [("disconnect", "close"), ("close", "disconnect")],
+)
+@pytest.mark.asyncio
+async def test_concurrent_panel_lifecycle_calls_share_cleanup_barrier(
+    monkeypatch: pytest.MonkeyPatch,
+    first_lifecycle: str,
+    second_lifecycle: str,
+) -> None:
+    confirmation_ui = __import__(
+        "app.ui.components.agent_write_confirmation",
+        fromlist=["DailyPlanPatchConfirmationPanel"],
+    )
+    patch = build_patch(
+        operation_id=OPERATION_ID,
+        turn_id=TURN_ID,
+        after_goal="并发生命周期调用必须共同等待底层 cleanup",
+    )
+    agent = _agent_controller(patch)
+    agent.scope_changed(PLAN_DATE)
+    turn = await agent.run("生成一份用于 lifecycle barrier 校验的草案")
+    patch_view = turn.patches[0]
+    controller = _BlockingLifecycleController()
+    target = DailyPlanUiTarget(
+        selection=DateSelection(generation=1, selected_date=PLAN_DATE),
+        plan_id=PLAN_ID,
+        revision=1,
+        form_generation=0,
+    )
+    session = trusted_ui_session()
+    page_events = {"on_applied": 0}
+
+    async def authorize() -> object:
+        return session
+
+    async def on_applied(_snapshot: object, _target: object) -> None:
+        page_events["on_applied"] += 1
+
+    fake_ui = _FakeUi()
+    monkeypatch.setattr(confirmation_ui, "ui", fake_ui)
+    panel = confirmation_ui.DailyPlanPatchConfirmationPanel(
+        controller,
+        authorize_confirmation=authorize,
+        capture_target=lambda: target,
+        is_current_target=lambda candidate: candidate == target,
+        on_applied=on_applied,
+    )
+    panel.render_patch_actions(patch_view)
+    original_view = fake_ui.latest_column()
+    old_prepare_button = fake_ui.latest_button("准备确认", within=original_view)
+
+    returned_after_cleanup: dict[str, bool] = {}
+
+    async def invoke_lifecycle(lifecycle: str) -> None:
+        await getattr(panel, lifecycle)()
+        returned_after_cleanup[lifecycle] = controller.cleanup_completed.is_set()
+
+    first_task = asyncio.create_task(invoke_lifecycle(first_lifecycle))
+    await controller.cleanup_started.wait()
+
+    second_started = asyncio.Event()
+    second_returned = asyncio.Event()
+
+    async def invoke_second_lifecycle() -> None:
+        second_started.set()
+        await invoke_lifecycle(second_lifecycle)
+        second_returned.set()
+
+    second_task = asyncio.create_task(invoke_second_lifecycle())
+    await second_started.wait()
+    before_release = {
+        "first_returned": first_task.done(),
+        "second_returned": second_returned.is_set(),
+        "cleanup_completed": controller.cleanup_completed.is_set(),
+    }
+
+    controller.allow_cleanup.set()
+    await asyncio.gather(first_task, second_task)
+
+    elements_before_rerender = len(fake_ui.elements)
+    panel.render_patch_actions(patch_view)
+    new_elements = fake_ui.elements[elements_before_rerender:]
+    post_shutdown_new_actions = sum(
+        element.kind == "button" and element.active and element.enabled
+        for element in new_elements
+    )
+    post_shutdown_labels = fake_ui.active_label_texts()
+    await _press(old_prepare_button)
+
+    assert {
+        "before_release": before_release,
+        "returned_after_cleanup": returned_after_cleanup,
+        "both_tasks_completed": first_task.done() and second_task.done(),
+        "cleanup_completed": controller.cleanup_completed.is_set(),
+        "first_shutdown_reached_controller": controller.shutdown_calls[:1],
+        "post_shutdown_new_actions": post_shutdown_new_actions,
+        "closed_copy_visible": any(
+            "关闭" in label or "刷新" in label for label in post_shutdown_labels
+        ),
+        "old_prepare_issue_calls": controller.issue_calls,
+        "page_events": page_events,
+    } == {
+        "before_release": {
+            "first_returned": False,
+            "second_returned": False,
+            "cleanup_completed": False,
+        },
+        "returned_after_cleanup": {
+            first_lifecycle: True,
+            second_lifecycle: True,
+        },
+        "both_tasks_completed": True,
+        "cleanup_completed": True,
+        "first_shutdown_reached_controller": [first_lifecycle],
+        "post_shutdown_new_actions": 0,
+        "closed_copy_visible": True,
+        "old_prepare_issue_calls": 0,
+        "page_events": {"on_applied": 0},
     }
 
 
