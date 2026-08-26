@@ -57,6 +57,16 @@ class PatchConfirmationSnapshot:
     error_code: str | None = None
 
 
+@dataclass(slots=True)
+class _FlightState:
+    """Share a cancellation override only with waiters of one exact flight."""
+
+    owner: asyncio.Task[object] | None = None
+    override: PatchConfirmationSnapshot | None = None
+    suppress_failure: bool = False
+    waiters: int = 0
+
+
 class ConfirmedWriteServicePort(Protocol):
     """The already-frozen W005/W006 service surface used by this adapter."""
 
@@ -126,6 +136,15 @@ _RECONCILE_INDETERMINATE_CODES = frozenset(
         "write_unavailable",
     }
 )
+_TERMINAL_STATUSES = frozenset(
+    {
+        PatchConfirmationStatus.APPLIED,
+        PatchConfirmationStatus.STALE,
+        PatchConfirmationStatus.EXPIRED,
+        PatchConfirmationStatus.FAILED,
+        PatchConfirmationStatus.NOT_APPLIED,
+    }
+)
 
 
 def _closed_error_code(value: object) -> str:
@@ -174,33 +193,101 @@ class DailyPlanPatchConfirmationController:
     ) -> None:
         if type(agent_controller) is not DailyPlanAgentController:
             raise TypeError("agent_controller_invalid")
-        self._agent_controller = agent_controller
-        self._write_service = write_service
+        self._agent_controller: DailyPlanAgentController | None = agent_controller
+        self._write_service: ConfirmedWriteServicePort | None = write_service
         self._snapshot = PatchConfirmationSnapshot(
             status=PatchConfirmationStatus.IDLE,
         )
         self._confirmation_id: UUID | None = None
+        self._terminal_snapshots: dict[
+            tuple[UUID, str],
+            PatchConfirmationSnapshot,
+        ] = {}
+        self._integrity_failure: PatchConfirmationSnapshot | None = None
         self._generation = 0
         self._closed = False
         self._inflight: asyncio.Task[PatchConfirmationSnapshot] | None = None
+        self._inflight_state: _FlightState | None = None
+        self._live_flight_states: list[_FlightState] = []
+        self._inflight_owner: asyncio.Task[object] | None = None
         self._inflight_key: tuple[object, ...] | None = None
         self._inflight_phase: str | None = None
+        self._inflight_cancel_settled = False
+        self._shutdown_task: asyncio.Task[PatchConfirmationSnapshot] | None = None
 
     @property
     def snapshot(self) -> PatchConfirmationSnapshot:
         return self._snapshot
 
+    @staticmethod
+    def _patch_identity(
+        snapshot: PatchConfirmationSnapshot,
+    ) -> tuple[UUID, str] | None:
+        if (
+            type(snapshot.patch_id) is not UUID
+            or type(snapshot.patch_sha256) is not str
+        ):
+            return None
+        return (snapshot.patch_id, snapshot.patch_sha256)
+
+    def _remember_terminal_snapshot(self) -> None:
+        """Retain an exact terminal Patch identity for this page lifetime."""
+        identity = self._patch_identity(self._snapshot)
+        if identity is not None and self._snapshot.status in _TERMINAL_STATUSES:
+            self._terminal_snapshots.setdefault(identity, self._snapshot)
+
+    def _latched_integrity_failure(self) -> PatchConfirmationSnapshot | None:
+        snapshot = self._integrity_failure
+        if snapshot is not None:
+            self._snapshot = snapshot
+        return snapshot
+
+    def _override_live_flights(self) -> None:
+        """Make an explicit page lifecycle transition dominate old waiters."""
+        for flight_state in tuple(self._live_flight_states):
+            flight_state.override = self._snapshot
+            flight_state.suppress_failure = True
+
     def _current_patch(self) -> PlanPatch | None:
+        agent_controller = self._agent_controller
+        if agent_controller is None:
+            return None
         snapshot = self._snapshot
         if snapshot.patch_id is None or snapshot.daily_plan_id is None:
             return None
-        patch = self._agent_controller.resolve_current_patch(
+        patch = agent_controller.resolve_current_patch(
             snapshot.patch_id,
             expected_plan_id=snapshot.daily_plan_id,
         )
         if (
             patch is None
             or snapshot.patch_sha256 != patch.canonical_sha256
+            or not plan_patch_is_canonical(patch)
+        ):
+            return None
+        return patch
+
+    def _resolve_current_patch_identity(self, patch_id: object) -> PlanPatch | None:
+        """Resolve a canonical Patch via the Agent's immutable current snapshot."""
+        agent_controller = self._agent_controller
+        if agent_controller is None or type(patch_id) is not UUID:
+            return None
+        safe_matches = tuple(
+            patch
+            for patch in agent_controller.snapshot.patches
+            if patch.patch_id == patch_id
+        )
+        if len(safe_matches) != 1:
+            return None
+        safe_patch = safe_matches[0]
+        patch = agent_controller.resolve_current_patch(
+            patch_id,
+            expected_plan_id=safe_patch.daily_plan_id,
+        )
+        if (
+            patch is None
+            or patch.target.daily_plan_id != safe_patch.daily_plan_id
+            or patch.canonical_sha256 != safe_patch.patch_sha256
             or not plan_patch_is_canonical(patch)
         ):
             return None
@@ -225,6 +312,7 @@ class DailyPlanPatchConfirmationController:
         )
         if status is not PatchConfirmationStatus.INDETERMINATE:
             self._confirmation_id = None
+        self._remember_terminal_snapshot()
         return self._snapshot
 
     def _publish_reconcile_error(
@@ -236,7 +324,15 @@ class DailyPlanPatchConfirmationController:
         """Keep an unknown outcome reconcilable after a transient read failure."""
         safe_code = _closed_error_code(code)
         if safe_code not in _RECONCILE_INDETERMINATE_CODES:
-            return self._publish_error(safe_code, generation=generation)
+            snapshot = self._publish_error(safe_code, generation=generation)
+            if (
+                safe_code == "reconcile_integrity_failure"
+                and not self._closed
+                and generation == self._generation
+                and snapshot.error_code == safe_code
+            ):
+                self._integrity_failure = snapshot
+            return snapshot
         if self._closed or generation != self._generation:
             return self._snapshot
         self._snapshot = replace(
@@ -252,18 +348,30 @@ class DailyPlanPatchConfirmationController:
         self,
         *,
         patch_id: object = None,
+        patch_sha256: object = None,
         expected_plan_id: object = None,
         expected_revision: object = None,
     ) -> PatchConfirmationSnapshot:
+        integrity_failure = self._latched_integrity_failure()
+        if integrity_failure is not None:
+            return integrity_failure
         self._generation += 1
         task = self._inflight
         self._confirmation_id = None
+        safe_patch_sha256 = (
+            patch_sha256
+            if type(patch_sha256) is str
+            else (
+                self._snapshot.patch_sha256
+                if self._snapshot.patch_id == patch_id
+                else None
+            )
+        )
         self._snapshot = PatchConfirmationSnapshot(
             status=PatchConfirmationStatus.STALE,
             patch_id=patch_id if type(patch_id) is UUID else None,
-            daily_plan_id=(
-                expected_plan_id if type(expected_plan_id) is int else None
-            ),
+            patch_sha256=safe_patch_sha256,
+            daily_plan_id=(expected_plan_id if type(expected_plan_id) is int else None),
             expected_revision=(
                 expected_revision if type(expected_revision) is int else None
             ),
@@ -271,13 +379,19 @@ class DailyPlanPatchConfirmationController:
         )
         if task is not None and not task.done():
             task.cancel()
+        self._remember_terminal_snapshot()
         return self._snapshot
 
-    def _cancelled_by_caller(self, phase: str) -> None:
+    def _settle_cancelled_flight(self, phase: str) -> None:
+        if self._inflight_cancel_settled:
+            return
+        self._inflight_cancel_settled = True
+        if self._closed or self._snapshot.status in _TERMINAL_STATUSES:
+            return
         self._generation += 1
-        task = self._inflight
-        if task is not None and not task.done():
-            task.cancel()
+        integrity_failure = self._latched_integrity_failure()
+        if integrity_failure is not None:
+            return
         if phase in {"apply", "reconcile"} and self._confirmation_id is not None:
             self._snapshot = replace(
                 self._snapshot,
@@ -295,36 +409,129 @@ class DailyPlanPatchConfirmationController:
                 after_revision=None,
                 error_code="target_mismatch",
             )
+        self._remember_terminal_snapshot()
 
     async def _single_flight(
         self,
         *,
         phase: str,
         key: tuple[object, ...],
-        operation: Callable[[], Awaitable[PatchConfirmationSnapshot]],
+        operation: Callable[[], Awaitable[PatchConfirmationSnapshot]] | None,
     ) -> PatchConfirmationSnapshot:
         task = self._inflight
+        flight_state = self._inflight_state
+        caller = asyncio.current_task()
         if task is None:
-            task = asyncio.create_task(operation())
+            if operation is None:
+                return self._snapshot
+            flight_state = _FlightState(owner=caller)
+            task = asyncio.create_task(
+                self._run_flight(
+                    phase=phase,
+                    operation=operation,
+                    flight_state=flight_state,
+                )
+            )
             self._inflight = task
+            self._inflight_state = flight_state
+            self._live_flight_states.append(flight_state)
+            self._inflight_owner = caller
             self._inflight_key = key
             self._inflight_phase = phase
+            self._inflight_cancel_settled = False
         elif self._inflight_key != key:
             return self._snapshot
-
-        try:
-            return await task
-        except asyncio.CancelledError:
-            caller = asyncio.current_task()
-            if caller is not None and caller.cancelling():
-                self._cancelled_by_caller(phase)
-                raise
+        elif flight_state is None:
             return self._snapshot
+
+        flight_state.waiters += 1
+        try:
+            await asyncio.wait((task,))
+            result = task.result()
+            override = flight_state.override
+            return override if override is not None else result
+        except asyncio.CancelledError as error:
+            if caller is not None and caller.cancelling():
+                if caller is flight_state.owner:
+                    self._settle_cancelled_flight(phase)
+                    flight_state.override = self._snapshot
+                    flight_state.suppress_failure = True
+                    await self._cancel_and_wait_flight(task)
+                raise error
+            override = flight_state.override
+            return override if override is not None else self._snapshot
+        except BaseException:
+            override = flight_state.override
+            if flight_state.suppress_failure and override is not None:
+                return override
+            raise
         finally:
-            if self._inflight is task and task.done():
+            caller_is_owner = caller is flight_state.owner
+            flight_state.waiters -= 1
+            if flight_state.waiters == 0:
+                self._live_flight_states = [
+                    state
+                    for state in self._live_flight_states
+                    if state is not flight_state
+                ]
+                flight_state.owner = None
+            if self._inflight is task and task.done() and caller_is_owner:
                 self._inflight = None
+                self._inflight_state = None
+                self._inflight_owner = None
                 self._inflight_key = None
                 self._inflight_phase = None
+                self._inflight_cancel_settled = False
+
+    async def _run_flight(
+        self,
+        *,
+        phase: str,
+        operation: Callable[[], Awaitable[PatchConfirmationSnapshot]],
+        flight_state: _FlightState,
+    ) -> PatchConfirmationSnapshot:
+        """Converge an inner cancellation before publishing it to any waiter."""
+        try:
+            return await operation()
+        except asyncio.CancelledError:
+            self._settle_cancelled_flight(phase)
+            flight_state.override = self._snapshot
+            flight_state.suppress_failure = True
+            return flight_state.override
+        except BaseException:
+            override = flight_state.override
+            if flight_state.suppress_failure and override is not None:
+                return override
+            self._settle_cancelled_flight(phase)
+            flight_state.override = self._snapshot
+            raise
+
+    @staticmethod
+    async def _cancel_and_wait_flight(
+        task: asyncio.Task[PatchConfirmationSnapshot],
+    ) -> bool:
+        """Cancel one inner flight and finish cleanup despite outer cancellation."""
+        if not task.done() and task.cancelling() == 0:
+            task.cancel()
+        caller_cancelled = False
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                caller = asyncio.current_task()
+                if caller is not None and caller.cancelling():
+                    caller_cancelled = True
+                if task.done():
+                    break
+            except BaseException:
+                if task.done():
+                    break
+                raise
+        try:
+            task.result()
+        except BaseException:
+            pass
+        return caller_cancelled
 
     async def issue(
         self,
@@ -337,6 +544,23 @@ class DailyPlanPatchConfirmationController:
         """Issue one opaque confirmation for the exact current authoritative Patch."""
         if self._closed:
             return self._snapshot
+        integrity_failure = self._latched_integrity_failure()
+        if integrity_failure is not None:
+            return integrity_failure
+
+        key = (
+            "issue",
+            _session_flight_key(ui_session),
+            patch_id,
+            expected_plan_id,
+            expected_revision,
+        )
+        if self._inflight is not None:
+            return await self._single_flight(
+                phase="issue",
+                key=key,
+                operation=None,
+            )
 
         if self._snapshot.status in {
             PatchConfirmationStatus.PENDING,
@@ -344,37 +568,37 @@ class DailyPlanPatchConfirmationController:
         }:
             return self._snapshot
 
-        if (
-            self._snapshot.patch_id == patch_id
-            and self._snapshot.status
-            in {
-                PatchConfirmationStatus.APPLIED,
-                PatchConfirmationStatus.EXPIRED,
-                PatchConfirmationStatus.FAILED,
-                PatchConfirmationStatus.NOT_APPLIED,
-                PatchConfirmationStatus.STALE,
-            }
-            and self._inflight is None
-        ):
-            return self._snapshot
-
-        patch = self._agent_controller.resolve_current_patch(
-            patch_id,
-            expected_plan_id=expected_plan_id,
-        )
-        if (
-            patch is None
-            or type(expected_revision) is not int
-            or expected_revision <= 0
-            or patch.target.daily_plan_id != expected_plan_id
-        ):
+        patch = self._resolve_current_patch_identity(patch_id)
+        if patch is None:
             return self._mark_stale(
                 patch_id=patch_id,
                 expected_plan_id=expected_plan_id,
                 expected_revision=expected_revision,
             )
 
-        if self._snapshot.patch_id != patch_id:
+        identity = (patch.patch_id, patch.canonical_sha256)
+        terminal = self._terminal_snapshots.get(identity)
+        if terminal is not None:
+            if self._patch_identity(self._snapshot) != identity:
+                self._generation += 1
+            self._confirmation_id = None
+            self._snapshot = terminal
+            return terminal
+
+        if (
+            type(expected_plan_id) is not int
+            or patch.target.daily_plan_id != expected_plan_id
+            or type(expected_revision) is not int
+            or expected_revision <= 0
+        ):
+            return self._mark_stale(
+                patch_id=patch.patch_id,
+                patch_sha256=patch.canonical_sha256,
+                expected_plan_id=patch.target.daily_plan_id,
+                expected_revision=expected_revision,
+            )
+
+        if self._patch_identity(self._snapshot) != identity:
             self._generation += 1
             self._confirmation_id = None
             self._snapshot = PatchConfirmationSnapshot(
@@ -388,13 +612,6 @@ class DailyPlanPatchConfirmationController:
                 ),
             )
         generation = self._generation
-        key = (
-            "issue",
-            _session_flight_key(ui_session),
-            patch.patch_id,
-            expected_plan_id,
-            expected_revision,
-        )
         return await self._single_flight(
             phase="issue",
             key=key,
@@ -414,8 +631,11 @@ class DailyPlanPatchConfirmationController:
         expected_revision: int,
         generation: int,
     ) -> PatchConfirmationSnapshot:
+        write_service = self._write_service
+        if write_service is None:
+            return self._snapshot
         try:
-            pending = await self._write_service.issue_confirmation(
+            pending = await write_service.issue_confirmation(
                 ui_session,
                 patch,
                 expected_revision=expected_revision,
@@ -427,18 +647,15 @@ class DailyPlanPatchConfirmationController:
         except Exception:
             return self._publish_error("write_unavailable", generation=generation)
 
-        expected_paths = tuple(
-            operation.field_path for operation in patch.operations
-        )
-        current = self._agent_controller.resolve_current_patch(
+        expected_paths = tuple(operation.field_path for operation in patch.operations)
+        agent_controller = self._agent_controller
+        if agent_controller is None:
+            return self._snapshot
+        current = agent_controller.resolve_current_patch(
             patch.patch_id,
             expected_plan_id=patch.target.daily_plan_id,
         )
-        if (
-            self._closed
-            or generation != self._generation
-            or current is None
-        ):
+        if self._closed or generation != self._generation or current is None:
             return self._snapshot
         if (
             type(pending) is not PendingPlanPatchConfirmation
@@ -472,6 +689,9 @@ class DailyPlanPatchConfirmationController:
         """Consume the one pending confirmation without retry or Patch replay."""
         if self._closed:
             return self._snapshot
+        integrity_failure = self._latched_integrity_failure()
+        if integrity_failure is not None:
+            return integrity_failure
         if self._snapshot.status is PatchConfirmationStatus.INDETERMINATE:
             return self._snapshot
         if self._snapshot.status is not PatchConfirmationStatus.PENDING:
@@ -502,8 +722,11 @@ class DailyPlanPatchConfirmationController:
         *,
         generation: int,
     ) -> PatchConfirmationSnapshot:
+        write_service = self._write_service
+        if write_service is None:
+            return self._snapshot
         try:
-            result = await self._write_service.apply(ui_session, confirmation_id)
+            result = await write_service.apply(ui_session, confirmation_id)
         except asyncio.CancelledError:
             raise
         except ConfirmedWriteRejected as error:
@@ -522,10 +745,12 @@ class DailyPlanPatchConfirmationController:
                 after_revision=None,
                 error_code="target_mismatch",
             )
+            self._remember_terminal_snapshot()
             return self._snapshot
         if not self._valid_result(result):
             return self._publish_error("write_failed", generation=generation)
 
+        self._confirmation_id = None
         self._snapshot = replace(
             self._snapshot,
             status=PatchConfirmationStatus.APPLIED,
@@ -533,6 +758,7 @@ class DailyPlanPatchConfirmationController:
             after_revision=result.after_revision,
             error_code=None,
         )
+        self._remember_terminal_snapshot()
         return self._snapshot
 
     def _valid_result(self, result: object) -> bool:
@@ -557,6 +783,9 @@ class DailyPlanPatchConfirmationController:
         """Explicitly read evidence for an indeterminate result; never reapply."""
         if self._closed:
             return self._snapshot
+        integrity_failure = self._latched_integrity_failure()
+        if integrity_failure is not None:
+            return integrity_failure
         confirmation_id = self._confirmation_id
         if (
             self._snapshot.status is not PatchConfirmationStatus.INDETERMINATE
@@ -586,8 +815,11 @@ class DailyPlanPatchConfirmationController:
         *,
         generation: int,
     ) -> PatchConfirmationSnapshot:
+        write_service = self._write_service
+        if write_service is None:
+            return self._snapshot
         try:
-            result = await self._write_service.reconcile(
+            result = await write_service.reconcile(
                 ui_session,
                 confirmation_id,
             )
@@ -605,6 +837,7 @@ class DailyPlanPatchConfirmationController:
             return self._snapshot
         if not self._valid_result(result):
             return self._publish_error("write_failed", generation=generation)
+        self._confirmation_id = None
         self._snapshot = replace(
             self._snapshot,
             status=PatchConfirmationStatus.APPLIED,
@@ -612,6 +845,7 @@ class DailyPlanPatchConfirmationController:
             after_revision=result.after_revision,
             error_code=None,
         )
+        self._remember_terminal_snapshot()
         return self._snapshot
 
     def invalidate(self) -> PatchConfirmationSnapshot:
@@ -621,12 +855,16 @@ class DailyPlanPatchConfirmationController:
         self._generation += 1
         task = self._inflight
         phase = self._inflight_phase
-        if (
-            self._confirmation_id is not None
-            and (
-                phase in {"apply", "reconcile"}
-                or self._snapshot.status is PatchConfirmationStatus.INDETERMINATE
-            )
+        integrity_failure = self._latched_integrity_failure()
+        if integrity_failure is not None:
+            self._confirmation_id = None
+            self._override_live_flights()
+            if task is not None and not task.done():
+                task.cancel()
+            return integrity_failure
+        if self._confirmation_id is not None and (
+            phase in {"apply", "reconcile"}
+            or self._snapshot.status is PatchConfirmationStatus.INDETERMINATE
         ):
             self._snapshot = replace(
                 self._snapshot,
@@ -644,6 +882,8 @@ class DailyPlanPatchConfirmationController:
                 after_revision=None,
                 error_code="target_mismatch",
             )
+        self._remember_terminal_snapshot()
+        self._override_live_flights()
         if task is not None and not task.done():
             task.cancel()
         return self._snapshot
@@ -657,8 +897,20 @@ class DailyPlanPatchConfirmationController:
         return await self._close_page()
 
     async def _close_page(self) -> PatchConfirmationSnapshot:
-        if self._closed:
+        shutdown_task = self._shutdown_task
+        if shutdown_task is None:
+            shutdown_task = asyncio.create_task(self._run_shutdown())
+            self._shutdown_task = shutdown_task
+        try:
+            return await asyncio.shield(shutdown_task)
+        except asyncio.CancelledError as error:
+            caller = asyncio.current_task()
+            if caller is not None and caller.cancelling():
+                await self._wait_for_task_completion(shutdown_task)
+                raise error
             return self._snapshot
+
+    async def _run_shutdown(self) -> PatchConfirmationSnapshot:
         self._closed = True
         self._generation += 1
         self._confirmation_id = None
@@ -666,10 +918,43 @@ class DailyPlanPatchConfirmationController:
         self._snapshot = PatchConfirmationSnapshot(
             status=PatchConfirmationStatus.CLOSED,
         )
-        if task is not None and not task.done():
-            task.cancel()
-            await asyncio.gather(task, return_exceptions=True)
+        self._override_live_flights()
+        try:
+            if task is not None:
+                await self._cancel_and_wait_flight(task)
+        finally:
+            self._terminal_snapshots.clear()
+            self._integrity_failure = None
+            self._inflight = None
+            self._inflight_state = None
+            self._live_flight_states.clear()
+            self._inflight_owner = None
+            self._inflight_key = None
+            self._inflight_phase = None
+            self._inflight_cancel_settled = False
+            self._agent_controller = None
+            self._write_service = None
         return self._snapshot
+
+    @staticmethod
+    async def _wait_for_task_completion(
+        task: asyncio.Task[PatchConfirmationSnapshot],
+    ) -> None:
+        """Wait through caller cancellation without cancelling shared shutdown."""
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                if task.done():
+                    break
+            except BaseException:
+                if task.done():
+                    break
+                raise
+        try:
+            task.result()
+        except BaseException:
+            pass
 
 
 def create_daily_plan_patch_confirmation_controller(

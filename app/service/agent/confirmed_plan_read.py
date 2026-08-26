@@ -75,9 +75,7 @@ async def read_confirmed_daily_plan(
             or plan.plan_date != selected_date
             or plan.revision != expected_revision
         ):
-            raise ConfirmedDailyPlanReloadMismatch(
-                "confirmed_plan_reload_mismatch"
-            )
+            raise ConfirmedDailyPlanReloadMismatch("confirmed_plan_reload_mismatch")
 
         return ConfirmedDailyPlanProjection(
             plan_id=plan.id,

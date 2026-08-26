@@ -56,7 +56,8 @@ DELIVERY_GATE_FACT_FILES = (
     "memory-bank/architecture.md",
 )
 CURRENT_GATE_FACT = (
-    "W007 GREEN commit 已存在，当前门是固定 SHA Review/finding RED；W008 未进入"
+    "W007 第四轮 Review 与多轮独立 precheck finding RED 已固定，当前仍待最终"
+    "提交前独立 precheck 与第五轮 fixed-SHA 双轴 Review；W008 未进入"
 )
 INITIAL_GREEN_BASELINE_FACT = (
     "W007 初始 GREEN commit 本地基线为 WRITE `99 passed`、Foundation "
@@ -79,18 +80,168 @@ THIRD_REVIEW_GATE_FACT = (
 PRECOMMIT_IDENTITY_FINDING_FACT = (
     "提交前终态 identity 审计发现 M1，finding RED 已由 `9972aab` 固定"
 )
-CURRENT_REPAIR_BASELINE_FACT = (
-    "本轮最终修复候选统一测试为 WRITE `115 passed`、Foundation `261 passed`、"
-    "ordinary `847 passed`"
+FOURTH_REVIEW_FINDING_FACT = (
+    "第四轮 fixed-SHA 双轴 Review 绑定 "
+    "`bc742d6c64744234f2702622fd4dbb1988b5650d`，结果为 Standards H0/M1/L0、"
+    "Spec H0/M1/L0"
 )
-FOURTH_REVIEW_FIXED_GATE_FACT = (
-    "本轮修复已固定在当前 SHA，当前门是第四轮 fixed-SHA 双轴 Review"
+FOURTH_REVIEW_BASELINE_FACT = (
+    "`bc742d6c64744234f2702622fd4dbb1988b5650d` 的统一测试基线为 WRITE "
+    "`115 passed`、Foundation `261 passed`、ordinary `847 passed`"
 )
-FOURTH_REVIEW_GATE_FACT_FILES = (
+FOURTH_REVIEW_FINDING_RED_FACT = (
+    "finding RED 已由 `a58c719796e9136a55932c59c930f1f0c98f14b9` 固定"
+)
+FOURTH_REVIEW_FINDING_RED_RESULT_FACTS = (
+    "稳定为 `10 failed / 9 passed`",
+    "node hash `eae4be37be04be28ba2647bac31e1ff57d871810fd29c1437e5c100c2261b7a5`",
+)
+FIRST_PRECHECK_CANDIDATE_BASELINE_FACT = (
+    "`a58c719796e9136a55932c59c930f1f0c98f14b9` 后第一版修复候选统一测试为 "
+    "WRITE `125 passed`、Foundation `261 passed`、ordinary `847 passed`"
+)
+PRECHECK_FINDING_FACTS = (
+    "提交前只读 precheck 发现 3M/1L",
+    "异 Patch 并发 issue",
+    "wrong-plan/invalid-revision exact identity",
+    "session guard 迟发 success",
+    "close/capability cleanup",
+    "finding RED 已由 `e8722f843f99aea4eb3321b06ad8074728adfd4a` 固定",
+    "连续两轮为 `6 failed / 15 passed`",
+    "combined node hash `157c6a8aed7025a7963af47ef1bcf5f0f332b44be37867fe006d4084de5d796a`",
+)
+SECOND_PRECHECK_CANDIDATE_BASELINE_FACT = (
+    "`e8722f843f99aea4eb3321b06ad8074728adfd4a` 后第二版修复候选统一测试为 "
+    "WRITE `131 passed`、Foundation `261 passed`、ordinary `847 passed`"
+)
+CANCELLATION_SESSION_PRECHECK_FINDING_FACTS = (
+    "取消/会话 precheck 复核发现 3M",
+    "same-key joiner cancel 取消 owner/shared task",
+    "cancelled close/disconnect 跳过 cleanup",
+    "commit-unknown 后 session 变化仍重开旧 reconcile",
+    "finding RED 已由 `ce8b7756eb1fc1069f4d31109d49dd6d7cccc14f` 固定",
+    "连续两轮为 `5 failed / 21 passed`",
+    "combined node hash `56d901193c517d284526b39f61a1f0286587ca20d7276838bc0c4a7859ece345`",
+)
+THIRD_PRECHECK_CANDIDATE_BASELINE_FACT = (
+    "`ce8b7756eb1fc1069f4d31109d49dd6d7cccc14f` 后第三版修复候选统一测试为 "
+    "WRITE `136 passed`、Foundation `261 passed`、ordinary `847 passed`"
+)
+INDEPENDENT_CANCELLATION_STATE_AUDIT_FACTS = (
+    "独立取消状态审计为 H0/M2",
+    "owner cancel 若 inner 吞取消/抛 BaseException 可迟发 APPLIED 或留 PENDING 重放",
+    "controller/UI 并发 close/disconnect 无共享 completion barrier",
+    "finding RED 已由 `149d45e0fb4a1b7110c3fb3676a4e44d495e810c` 固定",
+    "连续两轮为 `8 failed / 26 passed`",
+    "combined node hash `e12d635b2fa86999ce626d2763a81f4b9063c5ad83c42176f913b399464ce29b`",
+)
+FOURTH_PRECHECK_CANDIDATE_BASELINE_FACT = (
+    "`149d45e0fb4a1b7110c3fb3676a4e44d495e810c` 后第四版修复候选统一测试为 "
+    "WRITE `144 passed`、Foundation `261 passed`、ordinary `847 passed`"
+)
+GREEN_PRECHECK_FINDING_FACTS = (
+    "独立 GREEN precheck 结果为 Standards H0/M0、Spec H0/M1",
+    "inner issue 已完成但 owner cancel 在 shield 投递前使 same-key joiner 拿旧 PENDING",
+    "finding RED 已由 `c20aaa2f2b0c276bf985bb3d8ecf3fca4b364504` 固定",
+    "单节点连续两轮均为 `1 failed`",
+    "node hash `1a6cf115cba623fcef1e99cd11d5d3d1cdd8698717f01ec9d4b9971389e49a35`",
+)
+FIFTH_PRECHECK_CANDIDATE_BASELINE_FACT = (
+    "`c20aaa2f2b0c276bf985bb3d8ecf3fca4b364504` 后第五版修复候选统一测试为 "
+    "WRITE `145 passed`、Foundation `261 passed`、ordinary `847 passed`"
+)
+SUCCESSOR_PATCH_IDENTITY_PRECHECK_FACTS = (
+    "后继 Patch identity 独立 precheck 结果为 Standards H0/M0、Spec H0/M1",
+    "无条件 current snapshot 让旧 apply/reconcile joiner 收到后继 Patch B",
+    "finding RED 已由 `827b1113f1679b9b5af4736652c91d6742a63fc4` 固定",
+    "代表节点连续两轮均为 `1 failed`",
+    "node hash `29b35e46c1ee8f3bc872b09eaf1fcb23fa959e8d4c61b8b5b5b93f9506f551c5`",
+    "per-flight cancellation override",
+    "两个新节点 `2 passed`、finding 两文件 `36 passed`",
+)
+SIXTH_PRECHECK_CANDIDATE_BASELINE_FACT = (
+    "`827b1113f1679b9b5af4736652c91d6742a63fc4` 后第六版修复候选统一测试为 "
+    "WRITE `146 passed`、Foundation `261 passed`、ordinary `847 passed`"
+)
+LIFECYCLE_WAITER_PRECHECK_FACTS = (
+    "后续独立 precheck 发现 Spec M1",
+    "done-but-undelivered issue waiter 在 explicit invalidate/close 后仍发布旧 PENDING",
+    "finding RED 已由 `b2f91e7c604e92f1ae8461e709399c3842ac6c43` 固定",
+    "invalidate/close 两参数连续两轮均为 `2 failed`",
+    "combined node hash `f0f3a9b8ea6c99674746d7b8c8fc9d80342b097b5b21c097be40e09a833146b8`",
+    "live per-flight waiter registry + lifecycle override",
+    "新增 `2 passed`、finding 两文件 `38 passed`",
+)
+SEVENTH_PRECHECK_CANDIDATE_BASELINE_FACT = (
+    "`b2f91e7c604e92f1ae8461e709399c3842ac6c43` 后第七版修复候选统一测试为 "
+    "WRITE `148 passed`、Foundation `261 passed`、ordinary `847 passed`"
+)
+SUPPRESS_FAILURE_AUDIT_FACTS = (
+    "独立 lifecycle/cancel 审计为 H0/M2",
+    "pre-start cancel non-caller 分支把旧 A waiter 投到后继 B",
+    "close/disconnect 的 BaseException 穿透并由 traceback 保留 writer",
+    "finding RED 已由 `7d51d63994ceaf939833fc9679db31de3f21baf7` 固定",
+    "3 节点连续两轮均为 `3 failed`",
+    "combined node hash `d66294717711ef2581d15bcaa1ebe76754267d7d825acdb847574c16da01cf42`",
+    "suppress_failure 区分显式 lifecycle/cancel override 与 spontaneous BaseException",
+    "`3 passed`、finding 两文件 `41 passed`",
+)
+EIGHTH_PRECHECK_CANDIDATE_BASELINE_FACT = (
+    "`7d51d63994ceaf939833fc9679db31de3f21baf7` 后第八版修复候选统一测试为 "
+    "WRITE `151 passed`、Foundation `261 passed`、ordinary `847 passed`"
+)
+SHIELD_LOOP_HANDLER_AUDIT_FACTS = (
+    "joiner-cancel 后 shield loop handler 原始异常泄漏，审计 H0/M1",
+    "finding RED 已由 `bb539771f477e068d86e5bc3790f2a503e275ce9` 固定",
+    "单节点连续两轮均为 `1 failed`",
+    "node hash `915ad0796ad3b8ca96ae4c2efe0e8f2ed4946d0c4e4c5875dfafd19920f866ba`",
+    "asyncio.wait + task.result 替代 per-waiter shield",
+    "保留 owner spontaneous BaseException",
+    "新增 `1 passed`、finding 两文件 `42 passed`",
+)
+NINTH_PRECHECK_CANDIDATE_BASELINE_FACT = (
+    "`bb539771f477e068d86e5bc3790f2a503e275ce9` 后第九版修复候选统一测试为 "
+    "WRITE `152 passed`、Foundation `261 passed`、ordinary `847 passed`"
+)
+OWNER_IDENTITY_AUDIT_FACTS = (
+    "owner identity 独立审计为 H0/M1",
+    "joiner cancel 先 finally 清全局 `_inflight_owner`",
+    "随后 owner cancel 无法收敛，controller/repeat 留 PENDING（20/20）",
+    "finding RED 已由 `21c0a9e6a4ed4f8e7a6e91584d4b8cdba37a2d24` 固定",
+    "单节点连续两轮均为 `1 failed`",
+    "node hash `95dba951ab937642ec1518f5af44dcc5e58ec3d9c146e7c210339bd2d533dfd2`",
+    "`_FlightState.owner` + 仅 owner finally 释放 current flight",
+    "代表节点 `1 passed`、finding 两文件 `43 passed`",
+)
+CURRENT_REPAIR_BASELINE_FACT = "本轮最终修复候选统一测试为 WRITE `153 passed`"
+FIFTH_REVIEW_FIXED_GATE_FACT = (
+    "本轮修复已固定在当前 SHA，当前仍待最终提交前独立 precheck 与第五轮 "
+    "fixed-SHA 双轴 Review"
+)
+FIFTH_REVIEW_GATE_FACT_FILES = (
     "docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md",
     "specs/agent-write/spec.md",
 )
-STALE_CURRENT_CANDIDATE_FACT = "本轮修复候选经统一测试为 WRITE `113 passed`"
+STALE_CURRENT_CANDIDATE_FACTS = (
+    "本轮修复候选经统一测试为 WRITE `113 passed`",
+    "本轮最终修复候选统一测试为 WRITE `115 passed`",
+    "本轮最终修复候选统一测试为 WRITE `125 passed`",
+    "本轮最终修复候选统一测试为 WRITE `131 passed`",
+    "本轮最终修复候选统一测试为 WRITE `136 passed`",
+    "本轮最终修复候选统一测试为 WRITE `144 passed`",
+    "本轮最终修复候选统一测试为 WRITE `145 passed`",
+    "本轮最终修复候选统一测试为 WRITE `146 passed`",
+    "本轮最终修复候选统一测试为 WRITE `148 passed`",
+    "本轮最终修复候选统一测试为 WRITE `151 passed`",
+    "本轮最终修复候选统一测试为 WRITE `152 passed`",
+)
+STALE_FOURTH_REVIEW_WAIT_FACTS = (
+    "本轮修复已固定在当前 SHA，当前门是第四轮 fixed-SHA 双轴 Review",
+    "本轮修复已固定在当前 SHA，当前门是第五轮 fixed-SHA 双轴 Review",
+    "本轮修复已固定在当前 SHA，当前仍待下一次提交前独立 precheck 与第五轮 fixed-SHA 双轴 Review",
+    "等待第四轮 fixed-SHA 双轴 Review",
+    "下一门是第四轮 fixed-SHA 双轴 Review",
+)
 STALE_CURRENT_FACTS = {
     "AGENTS.md": (
         "The current authorized slice ends after",
@@ -459,10 +610,10 @@ def test_w007_current_facts_name_the_committed_green_review_gate() -> None:
         for relative_path, text in normalized_docs.items()
         if CURRENT_GATE_FACT not in text
     ]
-    missing_fourth_review_gate_fact = [
+    missing_fifth_review_gate_fact = [
         relative_path
-        for relative_path in FOURTH_REVIEW_GATE_FACT_FILES
-        if FOURTH_REVIEW_FIXED_GATE_FACT not in normalized_docs[relative_path]
+        for relative_path in FIFTH_REVIEW_GATE_FACT_FILES
+        if FIFTH_REVIEW_FIXED_GATE_FACT not in normalized_docs[relative_path]
     ]
     stale_claims = {
         relative_path: [
@@ -478,10 +629,10 @@ def test_w007_current_facts_name_the_committed_green_review_gate() -> None:
         if claims
     }
 
-    assert missing_gate_fact == [] and missing_fourth_review_gate_fact == [], (
+    assert missing_gate_fact == [] and missing_fifth_review_gate_fact == [], (
         "current W007 gate fact missing from: "
         f"committed_green={missing_gate_fact}, "
-        f"fourth_review={missing_fourth_review_gate_fact}"
+        f"fifth_review={missing_fifth_review_gate_fact}"
     )
     assert stale_claims == {}, (
         f"contradictory W007 current facts remain: {stale_claims}"
@@ -497,6 +648,28 @@ def test_w007_current_facts_name_the_committed_green_review_gate() -> None:
     required_current_progress_facts = (
         THIRD_REVIEW_GATE_FACT,
         PRECOMMIT_IDENTITY_FINDING_FACT,
+        FOURTH_REVIEW_FINDING_FACT,
+        FOURTH_REVIEW_BASELINE_FACT,
+        FOURTH_REVIEW_FINDING_RED_FACT,
+        *FOURTH_REVIEW_FINDING_RED_RESULT_FACTS,
+        FIRST_PRECHECK_CANDIDATE_BASELINE_FACT,
+        *PRECHECK_FINDING_FACTS,
+        SECOND_PRECHECK_CANDIDATE_BASELINE_FACT,
+        *CANCELLATION_SESSION_PRECHECK_FINDING_FACTS,
+        THIRD_PRECHECK_CANDIDATE_BASELINE_FACT,
+        *INDEPENDENT_CANCELLATION_STATE_AUDIT_FACTS,
+        FOURTH_PRECHECK_CANDIDATE_BASELINE_FACT,
+        *GREEN_PRECHECK_FINDING_FACTS,
+        FIFTH_PRECHECK_CANDIDATE_BASELINE_FACT,
+        *SUCCESSOR_PATCH_IDENTITY_PRECHECK_FACTS,
+        SIXTH_PRECHECK_CANDIDATE_BASELINE_FACT,
+        *LIFECYCLE_WAITER_PRECHECK_FACTS,
+        SEVENTH_PRECHECK_CANDIDATE_BASELINE_FACT,
+        *SUPPRESS_FAILURE_AUDIT_FACTS,
+        EIGHTH_PRECHECK_CANDIDATE_BASELINE_FACT,
+        *SHIELD_LOOP_HANDLER_AUDIT_FACTS,
+        NINTH_PRECHECK_CANDIDATE_BASELINE_FACT,
+        *OWNER_IDENTITY_AUDIT_FACTS,
         CURRENT_REPAIR_BASELINE_FACT,
     )
     missing_current_progress_facts = {
@@ -510,11 +683,30 @@ def test_w007_current_facts_name_the_committed_green_review_gate() -> None:
         for relative_path, facts in missing_current_progress_facts.items()
         if facts
     }
-    stale_current_candidates = [
-        relative_path
+    stale_current_candidates = {
+        relative_path: [
+            stale for stale in STALE_CURRENT_CANDIDATE_FACTS if stale in text
+        ]
         for relative_path, text in all_current_docs.items()
-        if STALE_CURRENT_CANDIDATE_FACT in text
-    ]
+    }
+    stale_current_candidates = {
+        relative_path: facts
+        for relative_path, facts in stale_current_candidates.items()
+        if facts
+    }
+    stale_fourth_review_waits = {
+        relative_path: [
+            stale
+            for stale in STALE_FOURTH_REVIEW_WAIT_FACTS
+            if _normalized(stale) in text
+        ]
+        for relative_path, text in all_current_docs.items()
+    }
+    stale_fourth_review_waits = {
+        relative_path: facts
+        for relative_path, facts in stale_fourth_review_waits.items()
+        if facts
+    }
     required_delivery_facts = (
         INITIAL_GREEN_BASELINE_FACT,
         FIRST_REVIEW_REPAIR_BASELINE_FACT,
@@ -545,13 +737,15 @@ def test_w007_current_facts_name_the_committed_green_review_gate() -> None:
 
     assert (
         missing_current_progress_facts == {}
-        and stale_current_candidates == []
+        and stale_current_candidates == {}
+        and stale_fourth_review_waits == {}
         and missing_delivery_facts == {}
         and stale_delivery_claims == {}
     ), (
         "W007 delivery-gate current facts are stale: "
         f"missing_progress={missing_current_progress_facts}, "
-        f"stale_113_candidates={stale_current_candidates}, "
+        f"stale_current_candidates={stale_current_candidates}, "
+        f"stale_fourth_review_waits={stale_fourth_review_waits}, "
         f"missing_history={missing_delivery_facts}, stale={stale_delivery_claims}"
     )
 

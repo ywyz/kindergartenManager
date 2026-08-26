@@ -335,10 +335,63 @@ def test_current_fact_docs_close_w006_and_track_w007_review_gate() -> None:
     assert "未授权" not in w005_row
     assert "未授权" not in w006_row
     assert "完成" in w006_row and "253d37d" in w006_row
-    assert "9972aab" in w007_row and "第四轮" in w007_row
+    assert all(marker in w007_row for marker in ("bc742d6", "21c0a9e", "第五轮"))
     assert "未进入" not in w007_row
     assert "未进入" in w008_row
-    assert "W007" in context and "9972aab" in context and "第四轮" in context
+    current_w007_docs = (
+        data_model,
+        context,
+        tasks,
+        roadmap,
+        system_architecture,
+        architecture_history,
+    )
+    assert all(
+        all(
+            marker in text
+            for marker in (
+                "bc742d6",
+                "a58c719",
+                "e8722f8",
+                "ce8b775",
+                "149d45e",
+                "c20aaa2",
+                "827b111",
+                "b2f91e7",
+                "7d51d63",
+                "bb53977",
+                "21c0a9e",
+                "第五轮",
+                "125 passed",
+                "131 passed",
+                "136 passed",
+                "144 passed",
+                "145 passed",
+                "146 passed",
+                "148 passed",
+                "151 passed",
+                "152 passed",
+                "153 passed",
+            )
+        )
+        for text in current_w007_docs
+    )
+    assert all(
+        "本轮最终修复候选统一测试为 WRITE `115 passed`" not in text
+        and "本轮最终修复候选统一测试为 WRITE `125 passed`" not in text
+        and "本轮最终修复候选统一测试为 WRITE `131 passed`" not in text
+        and "本轮最终修复候选统一测试为 WRITE `136 passed`" not in text
+        and "本轮最终修复候选统一测试为 WRITE `144 passed`" not in text
+        and "本轮最终修复候选统一测试为 WRITE `145 passed`" not in text
+        and "本轮最终修复候选统一测试为 WRITE `146 passed`" not in text
+        and "本轮最终修复候选统一测试为 WRITE `148 passed`" not in text
+        and "本轮最终修复候选统一测试为 WRITE `151 passed`" not in text
+        and "本轮最终修复候选统一测试为 WRITE `152 passed`" not in text
+        and "当前门是第五轮 fixed-SHA 双轴 Review" not in text
+        and "等待第四轮 fixed-SHA 双轴 Review" not in text
+        and "当前门是第四轮 fixed-SHA 双轴 Review" not in text
+        for text in current_w007_docs
+    )
     assert "e5f7a9c2d4b6" in roadmap
     assert "生产 WRITE GREEN 未授权" not in roadmap
     assert "daily_plan_operation_version" in system_architecture

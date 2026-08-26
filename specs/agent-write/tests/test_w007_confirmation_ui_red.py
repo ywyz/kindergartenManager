@@ -223,14 +223,18 @@ def test_public_flow_contract_is_closed_and_snapshot_is_frozen_and_safe() -> Non
     api = _flow_api()
     harness = _new_harness(api)
 
-    assert tuple(inspect.signature(api.DailyPlanPatchConfirmationController.issue).parameters) == (
+    assert tuple(
+        inspect.signature(api.DailyPlanPatchConfirmationController.issue).parameters
+    ) == (
         "self",
         "ui_session",
         "patch_id",
         "expected_plan_id",
         "expected_revision",
     )
-    assert tuple(inspect.signature(api.DailyPlanPatchConfirmationController.apply).parameters) == (
+    assert tuple(
+        inspect.signature(api.DailyPlanPatchConfirmationController.apply).parameters
+    ) == (
         "self",
         "ui_session",
     )
@@ -264,7 +268,9 @@ def test_public_flow_contract_is_closed_and_snapshot_is_frozen_and_safe() -> Non
 
 
 @pytest.mark.asyncio
-async def test_current_patch_identity_is_safe_and_issue_apply_forward_authority_exactly_once() -> None:
+async def test_current_patch_identity_is_safe_and_issue_apply_forward_authority_exactly_once() -> (
+    None
+):
     api = _flow_api()
     harness = _new_harness(api)
     patch_view = await _publish_patch(harness)

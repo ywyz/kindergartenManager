@@ -92,10 +92,8 @@ async def daily_plan_page() -> None:
     user_id = ui_session.user_id
     trusted_actor = TrustedActor(tenant_id=tenant_id, user_id=user_id)
     agent_controller = create_daily_plan_agent_controller(trusted_actor)
-    patch_confirmation_controller = (
-        create_daily_plan_patch_confirmation_controller(
-            agent_controller=agent_controller,
-        )
+    patch_confirmation_controller = create_daily_plan_patch_confirmation_controller(
+        agent_controller=agent_controller,
     )
 
     async def _require_live_session():
@@ -209,9 +207,8 @@ async def daily_plan_page() -> None:
                 expected_revision=confirmation.after_revision,
             )
 
-            if (
-                await _require_live_session() is None
-                or not _is_current_plan_target(target)
+            if await _require_live_session() is None or not _is_current_plan_target(
+                target
             ):
                 raise RuntimeError("agent_confirmation_target_stale")
 
@@ -228,14 +225,10 @@ async def daily_plan_page() -> None:
             area_game_area.value = authoritative.indoor_area
             outdoor_activity_area.value = authoritative.outdoor_activity
             daily_reflection_area.value = authoritative.daily_reflection
-            state["original_process"] = (
-                authoritative.activity_process_original
-            )
+            state["original_process"] = authoritative.activity_process_original
             state["loaded_plan_id"] = authoritative.plan_id
             state["loaded_revision"] = authoritative.revision
-            state["morning_talk_questions"] = (
-                authoritative.morning_talk_questions
-            )
+            state["morning_talk_questions"] = authoritative.morning_talk_questions
             save_msg.classes(
                 remove="text-red-500 text-orange-500",
                 add="text-green-600",

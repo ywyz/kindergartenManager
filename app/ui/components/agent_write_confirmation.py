@@ -8,6 +8,7 @@ captured synchronously at the user's click.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -71,6 +72,7 @@ _ERROR_COPY = {
     "confirmation_session_mismatch": "登录会话已变化，本次确认已关闭。",
     "confirmation_store_full": "当前确认服务繁忙，本次确认已关闭。",
     "patch_not_current": "草案已不属于当前页面，请重新生成。",
+    "patch_identity_mismatch": "草案身份校验失败，本页拒绝发布操作结果。",
     "reconcile_integrity_failure": "对账完整性检查失败，请停止操作并人工核查。",
     "revision_mismatch": "计划 revision 已变化，本次确认已关闭。",
     "target_mismatch": "确认目标与当前计划不一致，请重新生成草案。",
@@ -277,6 +279,8 @@ class DailyPlanPatchConfirmationPanel:
         self._issued_patch_sha256: str | None = None
         self._issued_target: DailyPlanUiTarget | None = None
         self._views: list[_PatchView] = []
+        self._shutdown_task: asyncio.Task[None] | None = None
+        # UI-only render/event cache; the controller owns terminal authority.
         self._terminal_patch_ledger: dict[
             tuple[UUID, str],
             _TerminalPatchRecord,
@@ -313,7 +317,7 @@ class DailyPlanPatchConfirmationPanel:
         self._latch_integrity_failure(self._controller.snapshot)
         if not self._integrity_blocked:
             self._controller.invalidate()
-            self._abandoned_indeterminate = (
+            self._abandoned_indeterminate = self._abandoned_indeterminate or (
                 _status_value(self._controller.snapshot) == "indeterminate"
             )
         self._terminal_patch_ledger.clear()
@@ -332,8 +336,19 @@ class DailyPlanPatchConfirmationPanel:
         await self._shutdown(self._controller.close)
 
     async def _shutdown(self, close_flow: Callable[[], Awaitable[None]]) -> None:
-        if self._closed:
-            return
+        task = self._shutdown_task
+        if task is None:
+            task = asyncio.create_task(
+                self._run_shutdown(close_flow),
+                name="daily-plan-patch-confirmation-shutdown",
+            )
+            self._shutdown_task = task
+        await self._await_shutdown_barrier(task)
+
+    async def _run_shutdown(
+        self,
+        close_flow: Callable[[], Awaitable[None]],
+    ) -> None:
         self._closed = True
         self._abandoned_indeterminate = True
         self._generation += 1
@@ -343,6 +358,26 @@ class DailyPlanPatchConfirmationPanel:
         self._views.clear()
         self._terminal_patch_ledger.clear()
         await close_flow()
+
+    @staticmethod
+    async def _await_shutdown_barrier(task: asyncio.Task[None]) -> None:
+        cancelled: asyncio.CancelledError | None = None
+        while True:
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError as exc:
+                if cancelled is None:
+                    cancelled = exc
+                if not task.done():
+                    continue
+            except BaseException:
+                if cancelled is None:
+                    raise
+            break
+        if cancelled is not None:
+            if not task.cancelled():
+                task.exception()
+            raise cancelled
 
     def _capture_click(self, view: _PatchView) -> _ConfirmationClick:
         try:
@@ -423,7 +458,12 @@ class DailyPlanPatchConfirmationPanel:
             and current_session.tenant_id == first_session.tenant_id
             and current_session.user_id == first_session.user_id
         ):
+            if _status_value(self._controller.snapshot) == "indeterminate":
+                await self._abandon_indeterminate_capability()
+                return _PublishGuard.SESSION_STALE
             self._controller.invalidate()
+            if _status_value(self._controller.snapshot) == "indeterminate":
+                await self._abandon_indeterminate_capability()
             return _PublishGuard.SESSION_STALE
         if self._click_is_current(
             view,
@@ -433,18 +473,30 @@ class DailyPlanPatchConfirmationPanel:
             return _PublishGuard.CURRENT
 
         status = _status_value(self._controller.snapshot)
+        if status == "indeterminate":
+            await self._abandon_indeterminate_capability()
+            return _PublishGuard.INDETERMINATE_TARGET_STALE
         self._controller.invalidate()
         if status == "applied":
             return _PublishGuard.APPLIED_TARGET_STALE
-        if status == "indeterminate" or (
-            _status_value(self._controller.snapshot) == "indeterminate"
-        ):
-            self._abandoned_indeterminate = True
-            self._issued_patch_id = None
-            self._issued_patch_sha256 = None
-            self._issued_target = None
+        if _status_value(self._controller.snapshot) == "indeterminate":
+            await self._abandon_indeterminate_capability()
             return _PublishGuard.INDETERMINATE_TARGET_STALE
         return _PublishGuard.TARGET_STALE
+
+    async def _abandon_indeterminate_capability(self) -> None:
+        """Make an unpublishable unknown result unreachable from this page."""
+        self._abandoned_indeterminate = True
+        self._issued_patch_id = None
+        self._issued_patch_sha256 = None
+        self._issued_target = None
+        try:
+            await self._controller.close()
+        except Exception as exc:
+            logger.error(
+                "patch_confirmation_abandon_close_failed error_type=%s",
+                type(exc).__name__,
+            )
 
     def _render_guard_rejection(
         self,
@@ -455,8 +507,14 @@ class DailyPlanPatchConfirmationPanel:
         if view.generation != self._generation:
             return
         if guard is _PublishGuard.SESSION_STALE:
+            if self._abandoned_indeterminate:
+                self._render_abandoned_indeterminate(
+                    view,
+                    "登录会话已变化且提交结果不明；旧人工对账入口已放弃，请刷新页面。",
+                )
+                return
             if _status_value(snapshot) != "indeterminate":
-                self._remember_patch_terminal(view.patch, "stale")
+                self._remember_guard_rejection(view.patch)
             view.container.clear()
             with view.container:
                 ui.label("登录会话已变化，操作结果未在本页发布。").classes(
@@ -467,6 +525,7 @@ class DailyPlanPatchConfirmationPanel:
                 )
             return
         if guard is _PublishGuard.APPLIED_TARGET_STALE:
+            self._remember_guard_rejection(view.patch)
             view.container.clear()
             with view.container:
                 ui.label("采用已经完成，但页面目标已变化；不要重复采用。").classes(
@@ -482,7 +541,7 @@ class DailyPlanPatchConfirmationPanel:
                 "提交结果不明且页面目标已变化；本页对账入口已放弃。",
             )
             return
-        self._remember_patch_terminal(view.patch, "stale")
+        self._remember_guard_rejection(view.patch)
         view.container.clear()
         with view.container:
             ui.label("页面目标已变化，操作结果未在本页发布。").classes(
@@ -558,6 +617,12 @@ class DailyPlanPatchConfirmationPanel:
             ),
         )
 
+    def _remember_guard_rejection(self, patch: AgentPatchSnapshot) -> None:
+        """Replace any unpublished result with a same-generation closed cache."""
+        self._terminal_patch_ledger[self._patch_identity(patch)] = _TerminalPatchRecord(
+            status="stale"
+        )
+
     def _remember_known_terminal(
         self,
         snapshot: PatchConfirmationSnapshotView,
@@ -577,24 +642,32 @@ class DailyPlanPatchConfirmationPanel:
             ),
         )
 
-    def _remember_action_terminal(
+    def _validate_action_terminal_identity(
         self,
         patch: AgentPatchSnapshot,
         snapshot: PatchConfirmationSnapshotView,
-    ) -> None:
-        """Close the clicked Patch when a terminal projection has bad identity."""
+    ) -> bool:
+        """Fail-close a terminal result that does not belong to the click."""
         status = _status_value(snapshot)
         if status not in _KNOWN_TERMINAL_STATUSES:
-            return
-        if self._snapshot_identity(snapshot) == self._patch_identity(patch):
-            self._remember_known_terminal(snapshot)
-            return
+            return True
+        if self._belongs_to_patch(snapshot, patch):
+            return True
         self._remember_patch_terminal(
             patch,
             "failed",
-            error_code="patch_not_current",
+            error_code="patch_identity_mismatch",
         )
-        self._remember_known_terminal(snapshot)
+        identity = self._snapshot_identity(snapshot)
+        if identity is not None:
+            self._terminal_patch_ledger.setdefault(
+                identity,
+                _TerminalPatchRecord(
+                    status="failed",
+                    error_code="patch_identity_mismatch",
+                ),
+            )
+        return False
 
     def _render_remembered_terminal(
         self,
@@ -619,9 +692,7 @@ class DailyPlanPatchConfirmationPanel:
                 _STATUS_COPY.get(record.status, _STATUS_COPY["failed"]),
             )
             css = (
-                "text-orange-700"
-                if record.status == "not_applied"
-                else "text-red-600"
+                "text-orange-700" if record.status == "not_applied" else "text-red-600"
             )
             ui.label(message).classes(f"text-xs {css}")
         ui.label("这一份草案已关闭，不会自动重试或重复采用；请重新生成草案。").classes(
@@ -863,9 +934,7 @@ class DailyPlanPatchConfirmationPanel:
                 )
                 return
             self._remember_known_terminal(snapshot)
-            terminal = self._terminal_patch_ledger.get(
-                self._patch_identity(view.patch)
-            )
+            terminal = self._terminal_patch_ledger.get(self._patch_identity(view.patch))
             if terminal is not None:
                 if self._belongs_to_patch(snapshot, view.patch):
                     self._render_target(snapshot)
@@ -948,13 +1017,12 @@ class DailyPlanPatchConfirmationPanel:
     ) -> None:
         if (
             self._closed
+            or self._abandoned_indeterminate
             or view.generation != self._generation
             or click.generation != self._generation
         ):
             return
-        remembered = self._terminal_patch_ledger.get(
-            self._patch_identity(click.patch)
-        )
+        remembered = self._terminal_patch_ledger.get(self._patch_identity(click.patch))
         if remembered is not None:
             self._render_remembered_view(view, remembered)
             return
@@ -1013,7 +1081,9 @@ class DailyPlanPatchConfirmationPanel:
         if self._latch_integrity_failure(snapshot):
             self._render_all_views(snapshot)
             return
-        self._remember_action_terminal(click.patch, snapshot)
+        if not self._validate_action_terminal_identity(click.patch, snapshot):
+            self._render_all_views(snapshot)
+            return
         publish_guard = await self._publish_guarded(
             view,
             click,
@@ -1024,10 +1094,10 @@ class DailyPlanPatchConfirmationPanel:
             self._render_guard_rejection(view, publish_guard, snapshot)
             return
 
+        self._remember_known_terminal(snapshot)
         if action is _Action.ISSUE:
-            if (
-                _status_value(snapshot) == "pending"
-                and self._belongs_to_patch(snapshot, click.patch)
+            if _status_value(snapshot) == "pending" and self._belongs_to_patch(
+                snapshot, click.patch
             ):
                 self._issued_patch_id = click.patch.patch_id
                 self._issued_patch_sha256 = click.patch.patch_sha256
@@ -1079,9 +1149,7 @@ class DailyPlanPatchConfirmationPanel:
         if self._integrity_blocked:
             self._render_all_views(self._controller.snapshot)
             return
-        remembered = self._terminal_patch_ledger.get(
-            self._patch_identity(view.patch)
-        )
+        remembered = self._terminal_patch_ledger.get(self._patch_identity(view.patch))
         if remembered is not None:
             self._render_remembered_view(view, remembered)
             return
