@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timedelta, timezone, tzinfo
 
 import pytest
 
@@ -21,6 +22,17 @@ from conftest import (
 
 
 DEPENDENCY_SENTINEL = "w005-review-dependency-detail-must-not-escape"
+
+
+class _FailingTimezone(tzinfo):
+    def utcoffset(self, _value):
+        raise RuntimeError(DEPENDENCY_SENTINEL)
+
+    def dst(self, _value):
+        raise RuntimeError(DEPENDENCY_SENTINEL)
+
+    def tzname(self, _value):
+        return "failing-timezone"
 
 
 def _service(api, database: WriteDatabase, clock):
@@ -97,6 +109,51 @@ async def test_clock_failure_is_closed_before_database_access(
     assert statements == []
 
 
+@pytest.mark.asyncio
+async def test_clock_normalization_failure_is_closed_before_database_access(
+    write_database: WriteDatabase,
+) -> None:
+    api = write_api()
+    hostile_now = datetime(2026, 9, 7, 9, 0, tzinfo=_FailingTimezone())
+
+    with capture_sql(write_database.engine) as statements:
+        with pytest.raises(api.ConfirmedWriteRejected) as raised:
+            await _service(api, write_database, lambda: hostile_now).issue_confirmation(
+                trusted_ui_session(),
+                build_patch(),
+                expected_revision=1,
+            )
+
+    _assert_closed(api, raised.value, "write_unavailable")
+    assert statements == []
+
+
+@pytest.mark.asyncio
+async def test_confirmation_expiry_overflow_is_closed_without_business_dml(
+    write_database: WriteDatabase,
+) -> None:
+    api = write_api()
+    near_datetime_max = datetime.max.replace(tzinfo=timezone.utc) - timedelta(minutes=1)
+    ui_session = trusted_ui_session(
+        expires_at_utc=datetime.max.replace(tzinfo=timezone.utc)
+    )
+
+    with capture_sql(write_database.engine) as statements:
+        with pytest.raises(api.ConfirmedWriteRejected) as raised:
+            await _service(
+                api,
+                write_database,
+                MutableClock(current=near_datetime_max),
+            ).issue_confirmation(
+                ui_session,
+                build_patch(),
+                expected_revision=1,
+            )
+
+    _assert_closed(api, raised.value, "write_unavailable")
+    assert dml_statements(statements) == []
+
+
 @pytest.mark.parametrize("dependency", ["confirmation-id", "nonce"])
 @pytest.mark.asyncio
 async def test_issue_entropy_failure_is_closed_without_business_dml(
@@ -126,10 +183,12 @@ async def test_issue_entropy_failure_is_closed_without_business_dml(
     assert dml_statements(statements) == []
 
 
+@pytest.mark.parametrize("failure_mode", ["exception", "wrong-type"])
 @pytest.mark.asyncio
 async def test_apply_claim_entropy_failure_is_closed_before_database_access(
     write_database: WriteDatabase,
     monkeypatch: pytest.MonkeyPatch,
+    failure_mode: str,
 ) -> None:
     api = write_api()
     service = _service(api, write_database, MutableClock())
@@ -140,8 +199,12 @@ async def test_apply_claim_entropy_failure_is_closed_before_database_access(
         expected_revision=1,
     )
 
+    original_token_bytes = api.secrets.token_bytes
+
     def fail_entropy(*_args, **_kwargs):
-        raise RuntimeError(DEPENDENCY_SENTINEL)
+        if failure_mode == "exception":
+            raise RuntimeError(DEPENDENCY_SENTINEL)
+        return bytearray(32)
 
     monkeypatch.setattr(api.secrets, "token_bytes", fail_entropy)
     with capture_sql(write_database.engine) as statements:
@@ -150,6 +213,13 @@ async def test_apply_claim_entropy_failure_is_closed_before_database_access(
 
     _assert_closed(api, raised.value, "write_unavailable")
     assert statements == []
+
+    monkeypatch.setattr(api.secrets, "token_bytes", original_token_bytes)
+    with capture_sql(write_database.engine) as replay_statements:
+        with pytest.raises(api.ConfirmedWriteRejected) as replay:
+            await service.apply(ui_session, pending.confirmation_id)
+    _assert_closed(api, replay.value, "confirmation_consumed")
+    assert replay_statements == []
 
 
 @pytest.mark.asyncio
