@@ -407,7 +407,7 @@ class _IdentityTerminalController:
 
 @dataclass(slots=True)
 class _MalformedAppliedController:
-    """Public controller fake returning APPLIED with an invalid Patch identity."""
+    """Public controller fake returning APPLIED with a controlled Patch identity."""
 
     patch: AgentPatchSnapshot
     action: str
@@ -429,7 +429,9 @@ class _MalformedAppliedController:
     def _applied_snapshot(self) -> PatchConfirmationSnapshot:
         patch_id: UUID | None = self.patch.patch_id
         patch_sha256: str | None = self.patch.patch_sha256
-        if self.identity_case == "missing_id":
+        if self.identity_case == "exact":
+            pass
+        elif self.identity_case == "missing_id":
             patch_id = None
         elif self.identity_case == "missing_hash":
             patch_sha256 = None
@@ -1164,6 +1166,105 @@ async def test_identity_invalid_applied_terminal_never_publishes_success(
             1,
             1 if action == "reconcile" else 0,
         ),
+    }
+
+
+@pytest.mark.asyncio
+async def test_exact_applied_rejected_by_session_publish_guard_stays_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    confirmation_ui = __import__(
+        "app.ui.components.agent_write_confirmation",
+        fromlist=["DailyPlanPatchConfirmationPanel"],
+    )
+    patch = build_patch(
+        operation_id=OPERATION_ID,
+        turn_id=TURN_ID,
+        after_goal="精确 APPLIED 被 session 发布门拒绝后必须持续关闭",
+    )
+    agent = _agent_controller(patch)
+    agent.scope_changed(PLAN_DATE)
+    turn = await agent.run("生成一份用于发布门复核的草案")
+    patch_view = turn.patches[0]
+    controller = _MalformedAppliedController(
+        patch=patch_view,
+        action="apply",
+        identity_case="exact",
+    )
+    target = DailyPlanUiTarget(
+        selection=DateSelection(generation=1, selected_date=PLAN_DATE),
+        plan_id=PLAN_ID,
+        revision=1,
+        form_generation=0,
+    )
+    opened_session = trusted_ui_session()
+    reauthenticated_session = trusted_ui_session(
+        session_id=UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+    )
+    authorization_calls = 0
+    page_events = {"on_applied": 0}
+
+    async def authorize() -> object:
+        nonlocal authorization_calls
+        authorization_calls += 1
+        if authorization_calls <= 3:
+            return opened_session
+        return reauthenticated_session
+
+    async def on_applied(_snapshot: object, frozen_target: object) -> None:
+        assert frozen_target == target
+        page_events["on_applied"] += 1
+
+    fake_ui = _FakeUi()
+    monkeypatch.setattr(confirmation_ui, "ui", fake_ui)
+    panel = confirmation_ui.DailyPlanPatchConfirmationPanel(
+        controller,
+        authorize_confirmation=authorize,
+        capture_target=lambda: target,
+        is_current_target=lambda candidate: candidate == target,
+        on_applied=on_applied,
+    )
+
+    panel.render_patch_actions(patch_view)
+    view = fake_ui.latest_column()
+    await _press(fake_ui.latest_button("准备确认", within=view))
+    await _press(fake_ui.latest_button("确认采用", within=view))
+    labels_after_guard = fake_ui.active_label_texts(within=view)
+
+    # No panel invalidation occurs here: this is the same page/generation and Patch.
+    panel.render_patch_actions(patch_view)
+    repeated_view = fake_ui.latest_column()
+    repeated_labels = fake_ui.active_label_texts(within=repeated_view)
+    repeated_action_controls = sum(
+        len(fake_ui.active_buttons(label, within=repeated_view, enabled=True))
+        for label in ("准备确认", "确认采用", "人工对账")
+    )
+
+    assert {
+        "initial_session_guard_rejected": any(
+            "登录会话已变化" in label for label in labels_after_guard
+        ),
+        "page_events": page_events,
+        "success_copy_count": sum(
+            "这一份草案已确认采用" in label
+            for label in (*labels_after_guard, *repeated_labels)
+        ),
+        "repeated_fail_closed_copy": any(
+            "核查" in label or "重新生成" in label for label in repeated_labels
+        ),
+        "repeated_action_controls": repeated_action_controls,
+        "authorization_calls": authorization_calls,
+        "issue_calls": controller.issue_calls,
+        "apply_calls": controller.apply_calls,
+    } == {
+        "initial_session_guard_rejected": True,
+        "page_events": {"on_applied": 0},
+        "success_copy_count": 0,
+        "repeated_fail_closed_copy": True,
+        "repeated_action_controls": 0,
+        "authorization_calls": 4,
+        "issue_calls": 1,
+        "apply_calls": 1,
     }
 
 
