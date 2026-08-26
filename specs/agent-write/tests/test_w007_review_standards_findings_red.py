@@ -17,8 +17,23 @@ CURRENT_FACT_FILES = (
     "docs/design/system-architecture.md",
     "specs/agent-write/spec.md",
 )
+DELIVERY_GATE_FACT_FILES = (
+    "docs/ROADMAP.md",
+    "specs/agent-write/tasks.md",
+    "specs/agent-write/tests/README.md",
+    "memory-bank/architecture.md",
+)
 CURRENT_GATE_FACT = (
     "W007 GREEN commit 已存在，当前门是固定 SHA Review/finding RED；W008 未进入"
+)
+INITIAL_GREEN_BASELINE_FACT = (
+    "W007 初始 GREEN commit 本地基线为 WRITE `99 passed`、Foundation "
+    "`261 passed`、ordinary `847 passed`"
+)
+FINDING_CANDIDATE_REVIEW_FACT = (
+    "首轮 fixed-SHA Review 已完成；finding 修正候选当前本地 WRITE "
+    "`110 passed`、Foundation `261 passed`、ordinary `847 passed`，并等待 "
+    "fixed-SHA 复审"
 )
 STALE_CURRENT_FACTS = {
     "AGENTS.md": (
@@ -45,6 +60,23 @@ STALE_CURRENT_FACTS = {
     "specs/agent-write/spec.md": (
         "须先形成 GREEN commit",
         "W007 候选必须依序经过：最小 GREEN commit",
+    ),
+}
+STALE_DELIVERY_GATE_FACTS = {
+    "docs/ROADMAP.md": (
+        "当前 GREEN 候选为 WRITE `99 passed`",
+        "不预宣称 fixed-SHA Review",
+    ),
+    "specs/agent-write/tasks.md": (
+        "GREEN 候选：稳定 RED `e5f7317…` 后本地 WRITE 99",
+        "待 fixed-SHA Review/push/CI/验收/Issue",
+    ),
+    "specs/agent-write/tests/README.md": (
+        "GREEN 候选现为 WRITE `99 passed`",
+        "尚未取得 fixed-SHA Review",
+    ),
+    "memory-bank/architecture.md": (
+        "GREEN 候选现为 WRITE `99 passed`",
     ),
 }
 
@@ -213,3 +245,43 @@ def test_w007_current_facts_name_the_committed_green_review_gate() -> None:
         f"current W007 gate fact missing from: {missing_gate_fact}"
     )
     assert stale_claims == {}, f"contradictory W007 current facts remain: {stale_claims}"
+
+    delivery_gate_docs = {
+        relative_path: _normalized(
+            (REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
+        )
+        for relative_path in DELIVERY_GATE_FACT_FILES
+    }
+    required_delivery_facts = (
+        INITIAL_GREEN_BASELINE_FACT,
+        FINDING_CANDIDATE_REVIEW_FACT,
+    )
+    missing_delivery_facts = {
+        relative_path: [
+            fact for fact in required_delivery_facts if fact not in text
+        ]
+        for relative_path, text in delivery_gate_docs.items()
+    }
+    missing_delivery_facts = {
+        relative_path: facts
+        for relative_path, facts in missing_delivery_facts.items()
+        if facts
+    }
+    stale_delivery_claims = {
+        relative_path: [
+            stale
+            for stale in STALE_DELIVERY_GATE_FACTS[relative_path]
+            if _normalized(stale) in text
+        ]
+        for relative_path, text in delivery_gate_docs.items()
+    }
+    stale_delivery_claims = {
+        relative_path: claims
+        for relative_path, claims in stale_delivery_claims.items()
+        if claims
+    }
+
+    assert missing_delivery_facts == {} and stale_delivery_claims == {}, (
+        "W007 delivery-gate current facts are stale: "
+        f"missing={missing_delivery_facts}, stale={stale_delivery_claims}"
+    )

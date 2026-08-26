@@ -1,4 +1,4 @@
-"""Stable RED for the first fixed-SHA W007 Spec Review findings."""
+"""Stable RED for fixed-SHA W007 Spec Review findings."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from app.service.agent.composition import (
 )
 from app.service.agent.confirmed_write import (
     ConfirmedDailyPlanWriteResult,
+    ConfirmedWriteRejected,
     PendingPlanPatchConfirmation,
 )
 from app.service.agent.contracts import DailyPlanScope, TrustedActor
@@ -77,6 +78,9 @@ class _MultiPatchCoordinator:
 class _RecordingWriter:
     issue_patch_ids: list[UUID] = field(default_factory=list)
     apply_confirmation_ids: list[UUID] = field(default_factory=list)
+    reconcile_confirmation_ids: list[UUID] = field(default_factory=list)
+    apply_error_code: str | None = None
+    reconcile_error_code: str | None = None
 
     async def issue_confirmation(
         self,
@@ -104,6 +108,8 @@ class _RecordingWriter:
     ) -> ConfirmedDailyPlanWriteResult:
         del ui_session
         self.apply_confirmation_ids.append(confirmation_id)
+        if self.apply_error_code is not None:
+            raise ConfirmedWriteRejected(self.apply_error_code)
         return ConfirmedDailyPlanWriteResult(
             before_version_id=41,
             audit_id=42,
@@ -116,8 +122,16 @@ class _RecordingWriter:
         ui_session: object,
         confirmation_id: UUID,
     ) -> ConfirmedDailyPlanWriteResult:
-        del ui_session, confirmation_id
-        raise AssertionError("reconcile must not run in this scenario")
+        del ui_session
+        self.reconcile_confirmation_ids.append(confirmation_id)
+        if self.reconcile_error_code is not None:
+            raise ConfirmedWriteRejected(self.reconcile_error_code)
+        return ConfirmedDailyPlanWriteResult(
+            before_version_id=41,
+            audit_id=42,
+            before_revision=1,
+            after_revision=2,
+        )
 
 
 class _FakeElement:
@@ -136,6 +150,7 @@ class _FakeElement:
         self.parent = fake_ui._stack[-1] if fake_ui._stack else None
         self.children: list[_FakeElement] = []
         self.active = True
+        self.enabled = True
         self.value = ""
         if self.parent is not None:
             self.parent.children.append(self)
@@ -154,10 +169,10 @@ class _FakeElement:
         return self
 
     def enable(self) -> None:
-        return None
+        self.enabled = True
 
     def disable(self) -> None:
-        return None
+        self.enabled = False
 
     def clear(self) -> None:
         def deactivate(element: _FakeElement) -> None:
@@ -248,13 +263,35 @@ class _FakeUi:
             and element.is_within(within)
         )
 
-    def active_label_texts(self) -> tuple[str, ...]:
+    def active_label_texts(
+        self,
+        *,
+        within: _FakeElement | None = None,
+    ) -> tuple[str, ...]:
         return tuple(
             element.text
             for element in self.elements
             if element.active
             and element.kind == "label"
             and type(element.text) is str
+            and (within is None or element.is_within(within))
+        )
+
+    def active_buttons(
+        self,
+        text: str,
+        *,
+        within: _FakeElement,
+        enabled: bool | None = None,
+    ) -> tuple[_FakeElement, ...]:
+        return tuple(
+            element
+            for element in self.elements
+            if element.active
+            and element.kind == "button"
+            and element.text == text
+            and element.is_within(within)
+            and (enabled is None or element.enabled is enabled)
         )
 
 
@@ -369,6 +406,221 @@ async def test_second_patch_prepare_cannot_steal_pending_patch_owner(
     assert applied == [patch_a.patch_id]
     assert flow.snapshot.patch_id == patch_a.patch_id
     assert flow.snapshot.status.value == "applied"
+
+
+@pytest.mark.asyncio
+async def test_reconcile_integrity_failure_keeps_every_patch_blocked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    confirmation_ui = __import__(
+        "app.ui.components.agent_write_confirmation",
+        fromlist=["DailyPlanPatchConfirmationPanel"],
+    )
+    flow_api = __import__(
+        "app.service.agent.confirmation_flow",
+        fromlist=["create_daily_plan_patch_confirmation_controller"],
+    )
+    patch_a = build_patch(
+        operation_id=OPERATION_ID,
+        turn_id=TURN_ID,
+        after_goal="对账完整性失败的草案 A",
+    )
+    patch_b = build_patch(
+        operation_id=SECOND_OPERATION_ID,
+        turn_id=TURN_ID,
+        after_goal="必须继续阻断的草案 B",
+    )
+    agent = _agent_controller(patch_a, patch_b)
+    agent.scope_changed(PLAN_DATE)
+    turn = await agent.run("同一 turn 生成 A/B 两份草案")
+    patch_view_a, patch_view_b = turn.patches
+    writer = _RecordingWriter(
+        apply_error_code="commit_outcome_unknown",
+        reconcile_error_code="reconcile_integrity_failure",
+    )
+    flow = flow_api.create_daily_plan_patch_confirmation_controller(
+        agent_controller=agent,
+        write_service=writer,
+    )
+    target = DailyPlanUiTarget(
+        selection=DateSelection(generation=1, selected_date=PLAN_DATE),
+        plan_id=PLAN_ID,
+        revision=1,
+        form_generation=0,
+    )
+    session = trusted_ui_session()
+
+    async def authorize() -> object:
+        return session
+
+    async def on_applied(_snapshot: object, _target: object) -> None:
+        raise AssertionError("an integrity failure must never publish an apply")
+
+    fake_ui = _FakeUi()
+    monkeypatch.setattr(confirmation_ui, "ui", fake_ui)
+    panel = confirmation_ui.DailyPlanPatchConfirmationPanel(
+        flow,
+        authorize_confirmation=authorize,
+        capture_target=lambda: target,
+        is_current_target=lambda candidate: candidate == target,
+        on_applied=on_applied,
+    )
+
+    panel.render_patch_actions(patch_view_a)
+    view_a = fake_ui.latest_column()
+    panel.render_patch_actions(patch_view_b)
+    view_b = fake_ui.latest_column()
+    await _press(fake_ui.latest_button("准备确认", within=view_a))
+    await _press(fake_ui.latest_button("确认采用", within=view_a))
+    await _press(fake_ui.latest_button("人工对账", within=view_a))
+
+    labels_a = fake_ui.active_label_texts(within=view_a)
+    labels_b = fake_ui.active_label_texts(within=view_b)
+    usable_prepare_b = fake_ui.active_buttons(
+        "准备确认",
+        within=view_b,
+        enabled=True,
+    )
+    status_before_probe = flow.snapshot.status.value
+    error_before_probe = flow.snapshot.error_code
+    for button in usable_prepare_b:
+        await _press(button)
+
+    assert {
+        "status_before_probe": status_before_probe,
+        "error_before_probe": error_before_probe,
+        "terminal_error_visible_on_a": any(
+            "对账完整性检查失败" in label for label in labels_a
+        ),
+        "blocking_copy_visible_on_b": any(
+            "人工核查" in label for label in labels_b
+        ),
+        "usable_prepare_count_on_b": len(usable_prepare_b),
+        "issue_count_after_probe": len(writer.issue_patch_ids),
+        "only_patch_a_issued": writer.issue_patch_ids == [patch_a.patch_id],
+        "only_confirmation_reconciled": writer.reconcile_confirmation_ids
+        == [CONFIRMATION_ID],
+        "status_after_probe": flow.snapshot.status.value,
+    } == {
+        "status_before_probe": "failed",
+        "error_before_probe": "reconcile_integrity_failure",
+        "terminal_error_visible_on_a": True,
+        "blocking_copy_visible_on_b": True,
+        "usable_prepare_count_on_b": 0,
+        "issue_count_after_probe": 1,
+        "only_patch_a_issued": True,
+        "only_confirmation_reconciled": True,
+        "status_after_probe": "failed",
+    }
+
+
+@pytest.mark.asyncio
+async def test_cancel_pending_patch_rerenders_all_current_patch_views(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    confirmation_ui = __import__(
+        "app.ui.components.agent_write_confirmation",
+        fromlist=["DailyPlanPatchConfirmationPanel"],
+    )
+    flow_api = __import__(
+        "app.service.agent.confirmation_flow",
+        fromlist=["create_daily_plan_patch_confirmation_controller"],
+    )
+    patch_a = build_patch(
+        operation_id=OPERATION_ID,
+        turn_id=TURN_ID,
+        after_goal="待取消的草案 A",
+    )
+    patch_b = build_patch(
+        operation_id=SECOND_OPERATION_ID,
+        turn_id=TURN_ID,
+        after_goal="取消后可独立确认的草案 B",
+    )
+    agent = _agent_controller(patch_a, patch_b)
+    agent.scope_changed(PLAN_DATE)
+    turn = await agent.run("同一 turn 生成 A/B 两份草案")
+    patch_view_a, patch_view_b = turn.patches
+    writer = _RecordingWriter()
+    flow = flow_api.create_daily_plan_patch_confirmation_controller(
+        agent_controller=agent,
+        write_service=writer,
+    )
+    target = DailyPlanUiTarget(
+        selection=DateSelection(generation=1, selected_date=PLAN_DATE),
+        plan_id=PLAN_ID,
+        revision=1,
+        form_generation=0,
+    )
+    session = trusted_ui_session()
+
+    async def authorize() -> object:
+        return session
+
+    async def on_applied(_snapshot: object, _target: object) -> None:
+        raise AssertionError("this scenario only prepares confirmations")
+
+    fake_ui = _FakeUi()
+    monkeypatch.setattr(confirmation_ui, "ui", fake_ui)
+    panel = confirmation_ui.DailyPlanPatchConfirmationPanel(
+        flow,
+        authorize_confirmation=authorize,
+        capture_target=lambda: target,
+        is_current_target=lambda candidate: candidate == target,
+        on_applied=on_applied,
+    )
+
+    panel.render_patch_actions(patch_view_a)
+    view_a = fake_ui.latest_column()
+    panel.render_patch_actions(patch_view_b)
+    view_b = fake_ui.latest_column()
+    await _press(fake_ui.latest_button("准备确认", within=view_a))
+    occupied_before_cancel = any(
+        "另一份草案正在占用" in label
+        for label in fake_ui.active_label_texts(within=view_b)
+    )
+
+    cancel_a = fake_ui.latest_button("取消确认", within=view_a)
+    assert callable(cancel_a.on_click)
+    assert cancel_a.on_click() is None
+
+    labels_a_after_cancel = fake_ui.active_label_texts(within=view_a)
+    labels_b_after_cancel = fake_ui.active_label_texts(within=view_b)
+    usable_prepare_b = fake_ui.active_buttons(
+        "准备确认",
+        within=view_b,
+        enabled=True,
+    )
+    stale_occupied_controls_b = fake_ui.active_buttons(
+        "准备确认",
+        within=view_b,
+        enabled=False,
+    )
+    for button in usable_prepare_b:
+        await _press(button)
+
+    assert {
+        "occupied_before_cancel": occupied_before_cancel,
+        "cancelled_copy_visible_on_a": any(
+            "已取消这一份草案的确认" in label
+            for label in labels_a_after_cancel
+        ),
+        "occupied_copy_after_cancel": any(
+            "另一份草案正在占用" in label for label in labels_b_after_cancel
+        ),
+        "usable_prepare_count_on_b": len(usable_prepare_b),
+        "stale_occupied_control_count_on_b": len(stale_occupied_controls_b),
+        "issue_count_after_b_prepare": len(writer.issue_patch_ids),
+        "patches_issued_in_order": writer.issue_patch_ids
+        == [patch_a.patch_id, patch_b.patch_id],
+    } == {
+        "occupied_before_cancel": True,
+        "cancelled_copy_visible_on_a": True,
+        "occupied_copy_after_cancel": False,
+        "usable_prepare_count_on_b": 1,
+        "stale_occupied_control_count_on_b": 0,
+        "issue_count_after_b_prepare": 2,
+        "patches_issued_in_order": True,
+    }
 
 
 def test_agent_notice_distinguishes_read_only_from_explicit_local_adoption(
