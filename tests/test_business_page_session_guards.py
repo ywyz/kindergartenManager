@@ -149,6 +149,25 @@ def _sync_functions(tree: ast.AST) -> dict[str, ast.FunctionDef]:
     }
 
 
+@pytest.mark.parametrize("relative_path", _PAGE_CALLBACKS)
+def test_business_pages_use_shared_ui_operation_guard(relative_path: str) -> None:
+    tree = _parse(relative_path)
+    functions = _sync_functions(tree)
+
+    assert "_claim_action" not in functions
+    assert "_owns_action" not in functions
+    assert not any(
+        isinstance(node, ast.Name) and node.id == "action_owners"
+        for node in ast.walk(tree)
+    )
+    assert any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "UiOperationGuard"
+        for node in ast.walk(tree)
+    )
+
+
 def _is_bound_guard(statement: ast.stmt) -> bool:
     if not isinstance(statement, ast.If) or not statement.body:
         return False
@@ -340,18 +359,18 @@ def test_long_or_confirmed_callbacks_revalidate_before_returning_data_or_writing
         (
             "app/ui/pages/course_review_activity.py",
             "trigger_generate",
-            ("form_generation[0]", "_current_form_dict()"),
+            ("action_guard.capture_generation()", "_current_form_dict()"),
         ),
         (
             "app/ui/pages/course_review_activity.py",
             "trigger_save",
-            ("form_generation[0]", "_current_form_dict()"),
+            ("action_guard.capture_generation()", "_current_form_dict()"),
         ),
         (
             "app/ui/pages/course_review_activity.py",
             "trigger_export",
             (
-                "form_generation[0]",
+                "action_guard.capture_generation()",
                 "_current_form_dict()",
                 "state.get('record_id')",
             ),
@@ -360,20 +379,20 @@ def test_long_or_confirmed_callbacks_revalidate_before_returning_data_or_writing
             "app/ui/pages/homemade_teaching.py",
             "trigger_generate",
             (
-                "form_generation[0]",
+                "action_guard.capture_generation()",
                 "dict(context)",
             ),
         ),
         (
             "app/ui/pages/homemade_teaching.py",
             "trigger_save",
-            ("form_generation[0]", "_current_record_dict()"),
+            ("action_guard.capture_generation()", "_current_record_dict()"),
         ),
         (
             "app/ui/pages/homemade_teaching.py",
             "trigger_export",
             (
-                "form_generation[0]",
+                "action_guard.capture_generation()",
                 "_current_record_dict()",
                 "state.get('record_id')",
             ),
@@ -722,7 +741,7 @@ def test_business_result_revalidates_session_and_generation_before_writeback(
     source = _normalized_function_source(relative_path, callback)
     _assert_guard_between(source, after=awaited_work, before=writeback)
     work_index = source.index(awaited_work)
-    generation_index = source.index("_form_is_current(generation)", work_index)
+    generation_index = source.index("action_guard.is_current(generation)", work_index)
     writeback_index = source.index(writeback, work_index)
     assert work_index < generation_index < writeback_index
 
@@ -730,9 +749,15 @@ def test_business_result_revalidates_session_and_generation_before_writeback(
 @pytest.mark.parametrize(
     ("relative_path", "generation_guard"),
     [
-        ("app/ui/pages/course_review_activity.py", "_form_is_current(generation)"),
+        (
+            "app/ui/pages/course_review_activity.py",
+            "action_guard.is_current(generation)",
+        ),
         ("app/ui/pages/game_observation.py", "generation != state['generation']"),
-        ("app/ui/pages/homemade_teaching.py", "_form_is_current(generation)"),
+        (
+            "app/ui/pages/homemade_teaching.py",
+            "action_guard.is_current(generation)",
+        ),
     ],
 )
 @pytest.mark.parametrize("callback", ["do_generate", "do_save", "do_export"])
@@ -767,7 +792,7 @@ def test_business_terminal_cleanup_has_single_flight_owner(
     callback: str,
 ) -> None:
     source = _normalized_function_source(relative_path, callback)
-    assert "_owns_action(" in source[source.index("finally:") :]
+    assert "action_guard.owns(" in source[source.index("finally:") :]
 
 
 @pytest.mark.parametrize(

@@ -42,6 +42,43 @@ def _operation_symbols(*names: str):
     return tuple(getattr(module, name) for name in names)
 
 
+def test_ui_operation_guard_tracks_monotonic_generation() -> None:
+    (UiOperationGuard,) = _operation_symbols("UiOperationGuard")
+
+    guard = UiOperationGuard()
+    generation = guard.capture_generation()
+    assert generation == 0
+    assert guard.is_current(generation) is True
+
+    guard.advance(object())
+    assert guard.capture_generation() == 1
+    assert guard.is_current(generation) is False
+
+
+def test_ui_operation_guard_releases_only_the_exact_slot_owner() -> None:
+    (UiOperationGuard,) = _operation_symbols("UiOperationGuard")
+
+    guard = UiOperationGuard()
+    save_owner = guard.claim("save")
+    export_owner = guard.claim("export")
+    assert save_owner is not None
+    assert export_owner is not None
+    assert export_owner is not save_owner
+    assert guard.claim("save") is None
+    assert guard.owns("save", save_owner) is True
+
+    wrong_owner = object()
+    assert guard.owns("save", wrong_owner) is False
+    guard.release("save", wrong_owner)
+    assert guard.claim("save") is None
+
+    guard.release("save", save_owner)
+    replacement_owner = guard.claim("save")
+    assert replacement_owner is not None
+    assert replacement_owner is not save_owner
+    assert guard.owns("export", export_owner) is True
+
+
 async def test_trigger_captures_payload_synchronously_before_authentication() -> None:
     BoundUiOperationScope, UiOperationPhase, UiOperationStatus = _operation_symbols(
         "BoundUiOperationScope",
