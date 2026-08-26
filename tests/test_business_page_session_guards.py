@@ -143,20 +143,32 @@ def _async_functions(tree: ast.AST) -> dict[str, ast.AsyncFunctionDef]:
     }
 
 
+def _sync_functions(tree: ast.AST) -> dict[str, ast.FunctionDef]:
+    return {
+        node.name: node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)
+    }
+
+
 def _is_bound_guard(statement: ast.stmt) -> bool:
     if not isinstance(statement, ast.If) or not statement.body:
         return False
-    test = statement.test
-    if not isinstance(test, ast.UnaryOp) or not isinstance(test.op, ast.Not):
-        return False
-    operand = test.operand
-    return (
-        isinstance(operand, ast.Await)
-        and isinstance(operand.value, ast.Call)
-        and isinstance(operand.value.func, ast.Name)
-        and operand.value.func.id == "_require_bound_session"
-        and isinstance(statement.body[0], ast.Return)
+    tests = (
+        statement.test.values
+        if isinstance(statement.test, (ast.BoolOp,))
+        else [statement.test]
     )
+    for test in tests:
+        if not isinstance(test, ast.UnaryOp) or not isinstance(test.op, ast.Not):
+            continue
+        operand = test.operand
+        if (
+            isinstance(operand, ast.Await)
+            and isinstance(operand.value, ast.Call)
+            and isinstance(operand.value.func, ast.Name)
+            and operand.value.func.id == "_require_bound_session"
+        ):
+            return isinstance(statement.body[0], ast.Return)
+    return False
 
 
 def _walk_body_without_nested_functions(function: ast.AsyncFunctionDef):
@@ -289,7 +301,7 @@ def test_initial_actor_scoped_reads_revalidate_exact_jti_before_rendering(
 
 
 @pytest.mark.parametrize("relative_path", _PAGE_CALLBACKS)
-def test_external_effect_callbacks_fail_closed_before_any_other_work(
+def test_external_effect_callbacks_have_no_await_before_exact_session_guard(
     relative_path: str,
 ) -> None:
     config = _PAGE_CALLBACKS[relative_path]
@@ -298,9 +310,12 @@ def test_external_effect_callbacks_fail_closed_before_any_other_work(
     assert config["callbacks"] <= functions.keys()
     for callback_name in config["callbacks"]:
         callback = functions[callback_name]
-        assert _is_bound_guard(callback.body[0]), (
-            f"{relative_path}:{callback.lineno} {callback_name} must begin with "
-            "an exact-session guard"
+        source = ast.unparse(callback)
+        assert source.index("await ") == source.index(
+            "await _require_bound_session()"
+        ), (
+            f"{relative_path}:{callback.lineno} {callback_name} must authenticate "
+            "before its first asynchronous boundary"
         )
 
 
@@ -317,6 +332,464 @@ def test_long_or_confirmed_callbacks_revalidate_before_returning_data_or_writing
             f"{relative_path}:{callback.lineno} {callback_name} must revalidate "
             "after its await boundary"
         )
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "trigger", "snapshots"),
+    [
+        (
+            "app/ui/pages/course_review_activity.py",
+            "trigger_generate",
+            ("form_generation[0]", "_current_form_dict()"),
+        ),
+        (
+            "app/ui/pages/course_review_activity.py",
+            "trigger_save",
+            ("form_generation[0]", "_current_form_dict()"),
+        ),
+        (
+            "app/ui/pages/course_review_activity.py",
+            "trigger_export",
+            (
+                "form_generation[0]",
+                "_current_form_dict()",
+                "state.get('record_id')",
+            ),
+        ),
+        (
+            "app/ui/pages/homemade_teaching.py",
+            "trigger_generate",
+            (
+                "form_generation[0]",
+                "dict(context)",
+            ),
+        ),
+        (
+            "app/ui/pages/homemade_teaching.py",
+            "trigger_save",
+            ("form_generation[0]", "_current_record_dict()"),
+        ),
+        (
+            "app/ui/pages/homemade_teaching.py",
+            "trigger_export",
+            (
+                "form_generation[0]",
+                "_current_record_dict()",
+                "state.get('record_id')",
+            ),
+        ),
+        (
+            "app/ui/pages/game_observation.py",
+            "trigger_generate",
+            (
+                "state['generation']",
+                "tuple(state['images'])",
+                "_current_observation_payload()",
+            ),
+        ),
+        (
+            "app/ui/pages/game_observation.py",
+            "trigger_save",
+            (
+                "state['generation']",
+                "_current_observation_payload()",
+                "tuple(state.get('compressed_images', []))",
+            ),
+        ),
+        (
+            "app/ui/pages/game_observation.py",
+            "trigger_export",
+            (
+                "state['generation']",
+                "_current_observation_payload()",
+                "tuple(state.get('compressed_images', []))",
+                "state.get('observation_id')",
+            ),
+        ),
+    ],
+)
+def test_business_action_freezes_payload_and_generation_before_authentication(
+    relative_path: str,
+    trigger: str,
+    snapshots: tuple[str, ...],
+) -> None:
+    source = ast.unparse(_sync_functions(_parse(relative_path))[trigger])
+
+    for snapshot in snapshots:
+        assert snapshot in source
+    assert "await " not in source
+    assert f'.on("click", {trigger})' in (_ROOT / relative_path).read_text(
+        encoding="utf-8"
+    )
+
+
+def test_game_upload_captures_one_multiple_file_batch_synchronously() -> None:
+    relative_path = "app/ui/pages/game_observation.py"
+    source = ast.unparse(_sync_functions(_parse(relative_path))["trigger_upload"])
+
+    assert "state['generation']" in source
+    assert "state['upload_generation']" in source
+    assert "len(state['images'])" in source
+    assert "tuple(e.files)" in source
+    assert "await " not in source
+    page_source = (_ROOT / relative_path).read_text(encoding="utf-8")
+    assert "on_multi_upload=trigger_upload" in page_source
+    assert "on_upload=trigger_upload" not in page_source
+
+
+def test_game_multiple_upload_keeps_siblings_but_discards_an_old_batch() -> None:
+    source = _normalized_function_source(
+        "app/ui/pages/game_observation.py",
+        "handle_upload",
+    )
+
+    read_index = source.index("await file.read()")
+    batch_guard_index = source.index(
+        "upload_generation != state['upload_generation']",
+        read_index,
+    )
+    form_guard_index = source.index(
+        "generation != state['generation']",
+        read_index,
+    )
+    extend_index = source.index("state['images'].extend(batch_data)")
+    advance_index = source.index("state['generation'] += 1", extend_index)
+
+    assert "for file in files:" in source
+    assert "image_count + len(files) > 3" in source
+    assert source.count("state['generation'] += 1") == 1
+    assert read_index < batch_guard_index < extend_index < advance_index
+    assert read_index < form_guard_index < extend_index
+
+
+@pytest.mark.parametrize(
+    ("trigger", "snapshots"),
+    [
+        ("trigger_render_domains", ("form_generation[0]", "stage_select.value")),
+        ("trigger_upload", ("domain_states.get(d) is not s",)),
+        (
+            "trigger_generate",
+            (
+                "form_generation[0]",
+                "tuple(s['raw_images'])",
+                "child_name_input.value",
+            ),
+        ),
+        (
+            "trigger_pick_workdays",
+            ("form_generation[0]", "s['year'].value", "s['month'].value"),
+        ),
+        ("trigger_autopick_all", ("form_generation[0]", "tuple(targets)")),
+        ("trigger_bulk_upload", ("bulk_generation[0]",)),
+        ("trigger_apply_bulk", ("form_generation[0]", "tuple(bulk_state['files'])")),
+        ("trigger_generate_all", ("form_generation[0]", "tuple(targets)")),
+        (
+            "trigger_save",
+            ("form_generation[0]", "_collect()", "edit_state.get('record_id')"),
+        ),
+        (
+            "trigger_export_combined",
+            ("form_generation[0]", "_collect()", "_export_record_dict()"),
+        ),
+        (
+            "trigger_export_split",
+            ("form_generation[0]", "_collect()", "_export_record_dict()"),
+        ),
+        ("trigger_load_for_edit", ("form_generation[0]", "rid")),
+        (
+            "trigger_batch_export",
+            (
+                "history_generation[0]",
+                "tuple(sorted(selected_ids))",
+                "filter_year.value",
+                "filter_month.value",
+            ),
+        ),
+    ],
+)
+def test_listening_actions_capture_targets_before_authentication(
+    trigger: str,
+    snapshots: tuple[str, ...],
+) -> None:
+    relative_path = "app/ui/pages/one_on_one_listening.py"
+    source = ast.unparse(_sync_functions(_parse(relative_path))[trigger])
+
+    for snapshot in snapshots:
+        assert snapshot in source
+    assert "await " not in source
+
+
+def test_listening_renders_each_domain_section_once() -> None:
+    source = _normalized_function_source(
+        "app/ui/pages/one_on_one_listening.py",
+        "render_domains",
+    )
+    assert source.count("_build_domain_section(") == 1
+
+
+@pytest.mark.parametrize(
+    ("callback", "awaited_work", "writeback", "generation_guard"),
+    [
+        (
+            "render_domains",
+            "await list_indicators(",
+            "domains_container.clear()",
+            "_form_is_current(generation)",
+        ),
+        (
+            "_on_upload",
+            "await e.file.read()",
+            "s['raw_images'].append(",
+            "domain_states.get(d) is not s",
+        ),
+        (
+            "_do_generate",
+            "await generate_domain_content(",
+            "s['goals'].value =",
+            "_form_is_current(generation)",
+        ),
+        (
+            "_pick_domain_workdays",
+            "await _auto_pick_workdays(",
+            "date_input.value =",
+            "_form_is_current(generation)",
+        ),
+        (
+            "do_save",
+            "await save_record_with_all(",
+            "show_info(",
+            "_form_is_current(generation)",
+        ),
+        (
+            "do_export_combined",
+            "await session.commit()",
+            "ui.download(",
+            "_form_is_current(generation)",
+        ),
+        (
+            "do_export_split",
+            "await session.commit()",
+            "ui.download(",
+            "_form_is_current(generation)",
+        ),
+        (
+            "do_load_for_edit",
+            "await load_record_detail(",
+            "year_input.value =",
+            "_form_is_current(generation)",
+        ),
+        (
+            "refresh_history",
+            "await list_records(",
+            "history_container.clear()",
+            "_history_is_current(generation)",
+        ),
+        (
+            "do_batch_export",
+            "await session.commit()",
+            "ui.download(",
+            "_history_is_current(generation)",
+        ),
+    ],
+)
+def test_listening_async_results_revalidate_session_and_target_before_writeback(
+    callback: str,
+    awaited_work: str,
+    writeback: str,
+    generation_guard: str,
+) -> None:
+    source = _normalized_function_source(
+        "app/ui/pages/one_on_one_listening.py",
+        callback,
+    )
+    work_index = source.index(awaited_work)
+    session_index = source.index("await _require_bound_session()", work_index)
+    target_index = source.index(generation_guard, work_index)
+    writeback_index = source.index(writeback, work_index)
+    assert work_index < session_index < writeback_index
+    assert work_index < target_index < writeback_index
+
+
+@pytest.mark.parametrize(
+    "callback",
+    [
+        "do_load_for_edit",
+        "_show_detail",
+        "_reexport_combined",
+        "_reexport_split",
+    ],
+)
+def test_listening_record_reads_revalidate_before_not_found_ui(
+    callback: str,
+) -> None:
+    source = _normalized_function_source(
+        "app/ui/pages/one_on_one_listening.py",
+        callback,
+    )
+    read_index = source.index("await load_record_detail(")
+    session_index = source.index("await _require_bound_session()", read_index)
+    not_found_index = source.index("if not detail:", read_index)
+    assert read_index < session_index < not_found_index
+
+
+def test_listening_delete_revalidates_after_committed_write() -> None:
+    source = _normalized_function_source(
+        "app/ui/pages/one_on_one_listening.py",
+        "_delete_listening_record",
+    )
+    delete_index = source.index("await delete_record(")
+    session_index = source.index("await _require_bound_session()", delete_index)
+    target_index = source.index("_history_is_current(generation)", delete_index)
+    success_index = source.index("show_info('已删除'", delete_index)
+    assert delete_index < session_index < success_index
+    assert delete_index < target_index < success_index
+
+
+@pytest.mark.parametrize(
+    ("callback", "awaited_work", "writeback"),
+    [
+        (
+            "do_generate",
+            "await generate_observation_content(",
+            "goal_area.value =",
+        ),
+        (
+            "do_save",
+            "await save_observation_with_images(",
+            "state['observation_id'] =",
+        ),
+        (
+            "do_export",
+            "await session.commit()",
+            "ui.download(",
+        ),
+    ],
+)
+def test_game_result_revalidates_session_and_generation_before_writeback(
+    callback: str,
+    awaited_work: str,
+    writeback: str,
+) -> None:
+    source = _normalized_function_source(
+        "app/ui/pages/game_observation.py",
+        callback,
+    )
+    _assert_guard_between(source, after=awaited_work, before=writeback)
+    work_index = source.index(awaited_work)
+    generation_index = source.index(
+        "generation != state['generation']",
+        work_index,
+    )
+    writeback_index = source.index(writeback, work_index)
+    assert work_index < generation_index < writeback_index
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "callback", "awaited_work", "writeback"),
+    [
+        (
+            "app/ui/pages/course_review_activity.py",
+            "do_generate",
+            "await generate_course_review_activity_content(",
+            "activity_goal_input.value =",
+        ),
+        (
+            "app/ui/pages/course_review_activity.py",
+            "do_export",
+            "await session.commit()",
+            "ui.download(",
+        ),
+        (
+            "app/ui/pages/homemade_teaching.py",
+            "do_generate",
+            "await generate_homemade_teaching_content(",
+            "toy_name_input.value =",
+        ),
+        (
+            "app/ui/pages/homemade_teaching.py",
+            "do_export",
+            "await session.commit()",
+            "ui.download(",
+        ),
+    ],
+)
+def test_business_result_revalidates_session_and_generation_before_writeback(
+    relative_path: str,
+    callback: str,
+    awaited_work: str,
+    writeback: str,
+) -> None:
+    source = _normalized_function_source(relative_path, callback)
+    _assert_guard_between(source, after=awaited_work, before=writeback)
+    work_index = source.index(awaited_work)
+    generation_index = source.index("_form_is_current(generation)", work_index)
+    writeback_index = source.index(writeback, work_index)
+    assert work_index < generation_index < writeback_index
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "generation_guard"),
+    [
+        ("app/ui/pages/course_review_activity.py", "_form_is_current(generation)"),
+        ("app/ui/pages/game_observation.py", "generation != state['generation']"),
+        ("app/ui/pages/homemade_teaching.py", "_form_is_current(generation)"),
+    ],
+)
+@pytest.mark.parametrize("callback", ["do_generate", "do_save", "do_export"])
+def test_business_async_error_paths_require_current_form_generation(
+    relative_path: str,
+    generation_guard: str,
+    callback: str,
+) -> None:
+    function = _async_functions(_parse(relative_path))[callback]
+    handlers = [
+        handler
+        for node in ast.walk(function)
+        if isinstance(node, ast.Try)
+        for handler in node.handlers
+    ]
+    assert handlers
+    for handler in handlers:
+        assert generation_guard in ast.unparse(handler)
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "app/ui/pages/course_review_activity.py",
+        "app/ui/pages/game_observation.py",
+        "app/ui/pages/homemade_teaching.py",
+    ],
+)
+@pytest.mark.parametrize("callback", ["do_generate", "do_save", "do_export"])
+def test_business_terminal_cleanup_has_single_flight_owner(
+    relative_path: str,
+    callback: str,
+) -> None:
+    source = _normalized_function_source(relative_path, callback)
+    assert "_owns_action(" in source[source.index("finally:") :]
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "app/ui/pages/course_review_activity.py",
+        "app/ui/pages/game_observation.py",
+        "app/ui/pages/homemade_teaching.py",
+    ],
+)
+def test_business_history_refresh_discards_older_query_results(
+    relative_path: str,
+) -> None:
+    functions = _sync_functions(_parse(relative_path))
+    trigger = ast.unparse(functions["trigger_refresh_history"])
+    source = _normalized_function_source(relative_path, "refresh_history")
+
+    assert "history_generation[0]" in trigger
+    query_index = source.index("await list_")
+    generation_index = source.index("_history_is_current(generation)", query_index)
+    clear_index = source.index("history_container.clear()", query_index)
+    assert query_index < generation_index < clear_index
 
 
 @pytest.mark.parametrize("relative_path", _PAGE_CALLBACKS)
@@ -347,3 +820,36 @@ def test_async_failure_paths_revalidate_before_ui_writeback(
         f"{relative_path} must revalidate before async failure writeback: "
         + ", ".join(violations)
     )
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "getter"),
+    [
+        (
+            "app/ui/pages/course_review_activity.py",
+            "get_course_review_activity",
+        ),
+        (
+            "app/ui/pages/homemade_teaching.py",
+            "get_homemade_teaching_toy",
+        ),
+    ],
+)
+def test_reexport_detail_read_keeps_exact_actor_scope(
+    relative_path: str,
+    getter: str,
+) -> None:
+    callback = _async_functions(_parse(relative_path))["_reexport"]
+    calls = [
+        node
+        for node in ast.walk(callback)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == getter
+    ]
+
+    assert len(calls) == 1
+    assert {keyword.arg for keyword in calls[0].keywords} >= {
+        "tenant_id",
+        "user_id",
+    }

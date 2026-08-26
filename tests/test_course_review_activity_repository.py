@@ -54,7 +54,7 @@ async def test_create_course_review_activity_persists_fields(async_session):
 
 
 @pytest.mark.asyncio
-async def test_get_course_review_activity_tenant_isolation(async_session):
+async def test_get_course_review_activity_actor_isolation(async_session):
     from app.repository.course_review_activity_repository import (
         create_course_review_activity,
         get_course_review_activity,
@@ -65,6 +65,7 @@ async def test_get_course_review_activity_tenant_isolation(async_session):
     found = await get_course_review_activity(
         async_session,
         tenant_id=1,
+        user_id=2,
         activity_id=record.id,
     )
     assert found is not None
@@ -73,9 +74,18 @@ async def test_get_course_review_activity_tenant_isolation(async_session):
     missing = await get_course_review_activity(
         async_session,
         tenant_id=99,
+        user_id=2,
         activity_id=record.id,
     )
     assert missing is None
+
+    another_user = await get_course_review_activity(
+        async_session,
+        tenant_id=1,
+        user_id=3,
+        activity_id=record.id,
+    )
+    assert another_user is None
 
 
 @pytest.mark.asyncio
@@ -118,26 +128,37 @@ async def test_delete_course_review_activity_requires_tenant_and_user(async_sess
 
     record = await create_course_review_activity(async_session, **_payload())
 
-    assert await delete_course_review_activity(
-        async_session,
-        tenant_id=1,
-        user_id=99,
-        activity_id=record.id,
-    ) is False
-    assert await get_course_review_activity(
-        async_session,
-        tenant_id=1,
-        activity_id=record.id,
+    assert (
+        await delete_course_review_activity(
+            async_session,
+            tenant_id=1,
+            user_id=99,
+            activity_id=record.id,
+        )
+        is False
     )
-
-    assert await delete_course_review_activity(
+    assert await get_course_review_activity(
         async_session,
         tenant_id=1,
         user_id=2,
         activity_id=record.id,
-    ) is True
-    assert await get_course_review_activity(
-        async_session,
-        tenant_id=1,
-        activity_id=record.id,
-    ) is None
+    )
+
+    assert (
+        await delete_course_review_activity(
+            async_session,
+            tenant_id=1,
+            user_id=2,
+            activity_id=record.id,
+        )
+        is True
+    )
+    assert (
+        await get_course_review_activity(
+            async_session,
+            tenant_id=1,
+            user_id=2,
+            activity_id=record.id,
+        )
+        is None
+    )
