@@ -6,8 +6,18 @@
 
 from datetime import date, datetime, timezone
 
-from sqlalchemy import BigInteger, Date, DateTime, Integer, String, Text
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    Date,
+    DateTime,
+    Integer,
+    String,
+    Text,
+)
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.database import Base
 
@@ -29,6 +39,9 @@ class DailyPlan(Base):
     """
 
     __tablename__ = "daily_plan"
+    __table_args__ = (
+        CheckConstraint("revision >= 1", name="ck_daily_plan_revision_positive"),
+    )
 
     id: Mapped[int] = mapped_column(
         BigInteger().with_variant(Integer, "sqlite"),
@@ -37,6 +50,25 @@ class DailyPlan(Base):
     )
     tenant_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    _revision: Mapped[int] = mapped_column(
+        "revision",
+        Integer,
+        nullable=False,
+        default=1,
+        server_default="1",
+    )
+
+    __mapper_args__ = {"version_id_col": _revision}
+
+    @hybrid_property
+    def revision(self) -> int:
+        """只读公开版本；递增只允许由 ORM version generator/CAS 完成。"""
+        return self._revision
+
+    @revision.inplace.expression
+    @classmethod
+    def _revision_expression(cls) -> ColumnElement[int]:
+        return cls._revision
 
     # 日期与教学周信息
     plan_date: Mapped[date] = mapped_column(Date, nullable=False)

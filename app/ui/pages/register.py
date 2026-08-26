@@ -2,9 +2,10 @@
 
 功能：
   - 用户自助注册（无需邀请码，无需登录即可访问）
-  - 若系统尚无用户，第一个注册者自动成为 sys_admin（立即可登录）
-  - 后续注册者创建 is_active=False 的待审核账号，需管理员审核
+  - 仅创建 is_active=False 的待审核教师账号
+  - 空库必须先由应用主机上的显式 bootstrap 初始化管理员
 """
+
 from nicegui import ui
 
 from app.core.database import AsyncSessionLocal
@@ -18,15 +19,19 @@ logger = get_logger(__name__)
 async def register_page() -> None:
     with ui.column().classes("w-full max-w-md mx-auto mt-16 p-8 gap-4"):
         ui.label("注册账号").classes("text-2xl font-bold text-blue-700 text-center")
-        ui.label(
-            "首个注册账号将自动成为系统管理员；后续账号需管理员审核激活。"
-        ).classes("text-sm text-gray-500 text-center")
+        ui.label("账号将进入待审核状态；系统管理员审核后才能登录。").classes(
+            "text-sm text-gray-500 text-center"
+        )
 
         error_label = ui.label("").classes("text-red-600 text-sm hidden")
         success_label = ui.label("").classes("text-green-600 text-sm hidden")
 
-        username_input = ui.input(label="用户名", placeholder="4~64个字符").classes("w-full")
-        display_name_input = ui.input(label="姓名（显示名）", placeholder="如：李老师").classes("w-full")
+        username_input = ui.input(label="用户名", placeholder="4~64个字符").classes(
+            "w-full"
+        )
+        display_name_input = ui.input(
+            label="姓名（显示名）", placeholder="如：李老师"
+        ).classes("w-full")
         password_input = ui.input(
             label="密码",
             placeholder="至少 8 位",
@@ -39,7 +44,9 @@ async def register_page() -> None:
             password_toggle_button=True,
         ).classes("w-full")
 
-        register_btn = ui.button("注册", icon="person_add").classes("w-full bg-blue-600 text-white mt-2")
+        register_btn = ui.button("注册", icon="person_add").classes(
+            "w-full bg-blue-600 text-white mt-2"
+        )
 
         async def do_register() -> None:
             error_label.classes(add="hidden")
@@ -66,28 +73,23 @@ async def register_page() -> None:
             register_btn.props("loading=true")
             try:
                 async with AsyncSessionLocal() as session:
-                    user = await register_user(
+                    await register_user(
                         session,
                         username=username,
                         password=pwd,
                         display_name=display_name,
                     )
-                if user.is_active:
-                    success_label.set_text(
-                        "✓ 注册成功！您是系统的第一个用户，已自动获得管理员权限，可直接登录。"
-                    )
-                else:
-                    success_label.set_text(
-                        "✓ 注册成功！您的账号已创建，请等待管理员审核激活后再登录。"
-                    )
+                success_label.set_text(
+                    "✓ 注册成功！您的账号已创建，请等待管理员审核激活后再登录。"
+                )
                 success_label.classes(remove="hidden")
                 register_btn.props("disabled=true")
             except ValueError as e:
                 error_label.set_text(str(e))
                 error_label.classes(remove="hidden")
             except Exception as e:
-                logger.error("注册失败", exc_info=e)
-                error_label.set_text(f"注册失败：{e}")
+                logger.error("注册失败 error_type=%s", type(e).__name__)
+                error_label.set_text(f"注册失败：{type(e).__name__}")
                 error_label.classes(remove="hidden")
             finally:
                 register_btn.props(remove="loading")

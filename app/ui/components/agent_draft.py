@@ -4,6 +4,7 @@ The panel renders detached suggestions only. It deliberately exposes no path for
 adopting a patch, mutating page body fields, or persisting conversation state.
 """
 
+from collections.abc import Awaitable, Callable
 from datetime import date
 
 from nicegui import context, ui
@@ -46,10 +47,16 @@ _ERROR_COPY = {
 class DailyPlanAgentPanel:
     """NiceGUI rendering facade around one page-local Agent controller."""
 
-    def __init__(self, controller: DailyPlanAgentController) -> None:
+    def __init__(
+        self,
+        controller: DailyPlanAgentController,
+        *,
+        authorize_operation: Callable[[], Awaitable[bool]] | None = None,
+    ) -> None:
         if type(controller) is not DailyPlanAgentController:
             raise ValueError("agent_controller_invalid")
         self._controller = controller
+        self._authorize_operation = authorize_operation
         self._closed = False
 
         with ui.card().classes("w-full"):
@@ -123,7 +130,15 @@ class DailyPlanAgentPanel:
     async def _run(self) -> None:
         if self._closed:
             return
+        operation_snapshot = self._controller.snapshot
         intent = str(self._intent.value or "").strip()
+        if (
+            self._authorize_operation is not None
+            and not await self._authorize_operation()
+        ):
+            return
+        if self._controller.snapshot is not operation_snapshot:
+            return
         if not intent:
             self._status_label.text = "请输入本次协助意图。"
             self._status_label.classes(
@@ -133,6 +148,12 @@ class DailyPlanAgentPanel:
             return
         self._render_running()
         snapshot = await self._controller.run(intent)
+        if (
+            self._authorize_operation is not None
+            and not await self._authorize_operation()
+        ):
+            self._controller.discard()
+            return
         if not self._closed:
             self._render(snapshot)
 
@@ -228,6 +249,11 @@ class DailyPlanAgentPanel:
 
 def render_daily_plan_agent_panel(
     controller: DailyPlanAgentController,
+    *,
+    authorize_operation: Callable[[], Awaitable[bool]] | None = None,
 ) -> DailyPlanAgentPanel:
     """Render and return the non-writing daily-plan Agent panel."""
-    return DailyPlanAgentPanel(controller)
+    return DailyPlanAgentPanel(
+        controller,
+        authorize_operation=authorize_operation,
+    )

@@ -14,10 +14,11 @@ ADR 记录会长期影响多个模块、难以通过普通代码注释表达的�
 | ADR | 决策 | 状态 |
 |---|---|---|
 | [ADR-0001](ADR-0001-modular-monolith-current-baseline.md) | 当前以 NiceGUI 模块化单体为事实基线 | 接受 |
-| [ADR-0002](ADR-0002-single-user-ui-and-tenant-api.md) | 单用户 UI 与租户只读 API 是两个身份边界 | 接受 |
+| [ADR-0002](ADR-0002-single-user-ui-and-tenant-api.md) | 单用户 UI 与租户只读 API 是两个身份边界 | 部分取代（UI 身份见 ADR-0006） |
 | [ADR-0003](ADR-0003-sqlite-default-mysql-optional-alembic.md) | SQLite 默认、MySQL 可选、Alembic 唯一 schema 路径 | 接受 |
 | [ADR-0004](ADR-0004-ai-and-fixed-word-boundaries.md) | AI 适配器、教师采用与固定 Word 模板边界 | 接受 |
 | [ADR-0005](ADR-0005-controlled-ai-agent-runtime.md) | 受控单 AI Agent、关闭 READ/DRAFT Tool 与零持久化 | 接受 |
+| [ADR-0006](ADR-0006-trusted-ui-session-and-confirmed-agent-write.md) | 可信 UI 会话、每日计划 revision 与逐次确认 Agent WRITE | 接受（当前只到先决条件 GREEN + 稳定 RED） |
 
 ## 何时新增 ADR
 

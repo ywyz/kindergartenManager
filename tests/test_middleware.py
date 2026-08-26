@@ -1,8 +1,8 @@
-"""tests/test_middleware.py — 单用户模式路由中间件测试。
+"""tests/test_middleware.py — 登录模式路由中间件测试。
 
 验证：
-- 根路径 (/) 重定向到 /home
-- 其他路由直接放行，无认证检查
+- 根路径 (/) 重定向到 /login
+- 页面层统一执行数据库回查的会话守卫，中间件不拦 WebSocket/静态资源/API
 """
 
 from unittest.mock import AsyncMock, MagicMock
@@ -12,14 +12,14 @@ import pytest
 from app.auth.middleware import UNRESTRICTED_PAGE_ROUTES, AuthMiddleware
 
 
-def test_unrestricted_routes_includes_home():
-    """白名单包含 /home。"""
-    assert "/home" in UNRESTRICTED_PAGE_ROUTES
+def test_only_login_is_a_public_ui_auth_route():
+    assert "/login" in UNRESTRICTED_PAGE_ROUTES
+    assert "/register" not in UNRESTRICTED_PAGE_ROUTES
 
 
-def test_unrestricted_routes_includes_setup():
-    """/setup 在白名单中。"""
-    assert "/setup" in UNRESTRICTED_PAGE_ROUTES
+def test_unrestricted_routes_include_health_only_outside_auth_pages():
+    assert "/api/v1/health" in UNRESTRICTED_PAGE_ROUTES
+    assert "/home" not in UNRESTRICTED_PAGE_ROUTES
 
 
 def test_middleware_instantiable():
@@ -29,8 +29,8 @@ def test_middleware_instantiable():
 
 
 @pytest.mark.asyncio
-async def test_root_redirects_to_home():
-    """根路径 / 应重定向到 /home。"""
+async def test_root_redirects_to_login():
+    """根路径 / 应重定向到 /login。"""
     mw = AuthMiddleware(app=MagicMock())
     request = MagicMock()
     request.url.path = "/"
@@ -39,7 +39,7 @@ async def test_root_redirects_to_home():
     response = await mw.dispatch(request, call_next)
 
     assert response.status_code == 307
-    assert response.headers["location"] == "/home"
+    assert response.headers["location"] == "/login"
     call_next.assert_not_called()
 
 

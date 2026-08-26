@@ -12,6 +12,7 @@
   - infer_age_by_grade / default_year_month / validate_image_count
   - build_export_filename / parse_stage_label / format_stage_label
 """
+
 from __future__ import annotations
 
 import base64
@@ -26,7 +27,6 @@ from app.core.database import AsyncSessionLocal
 from app.core.exceptions import AiCallError, AiParseError, AppError, ConfigError
 from app.core.logging import get_logger
 from app.core.unit_of_work import AsyncSessionUnitOfWork
-from app.core.user_context import get_current_user
 from app.integration.holiday_client.client import get_legal_holidays_in_year
 from app.integration.image_processing import (
     CompressedImage,
@@ -60,6 +60,7 @@ from app.service.listening_service import (
     to_export_payload,
     update_record_with_all,
 )
+from app.ui.auth_context import require_bound_ui_session, require_current_ui_session
 from app.ui.components.app_shell import get_display_name, render_shell
 from app.ui.helpers import validate_image_count
 
@@ -102,14 +103,18 @@ def build_export_filename(
 ) -> str:
     """构造导出文件名：{租户}_{用户}_{幼儿}_{年}{月}_一对一倾听_{suffix}.docx。"""
     safe_name = (child_name or "幼儿").strip().replace("/", "_").replace(" ", "")
-    return f"{tenant_id}_{user_id}_{safe_name}_{year}年{month}月_一对一倾听_{suffix}.docx"
+    return (
+        f"{tenant_id}_{user_id}_{safe_name}_{year}年{month}月_一对一倾听_{suffix}.docx"
+    )
 
 
 def build_batch_export_filename(
     tenant_id: int, user_id: int, year: int, month: int, count: int
 ) -> str:
     """构造批量按领域导出的 zip 文件名。"""
-    return f"{tenant_id}_{user_id}_{year}年{month}月_一对一倾听_批量按领域_{count}人.zip"
+    return (
+        f"{tenant_id}_{user_id}_{year}年{month}月_一对一倾听_批量按领域_{count}人.zip"
+    )
 
 
 def validate_bulk_import_count(count: int, minimum: int = 15) -> bool:
@@ -133,7 +138,7 @@ def distribute_images_by_filename(
     ordered = sorted(files, key=lambda f: f[0])
     result: dict[str, list[bytes]] = {}
     for i, domain in enumerate(domains):
-        chunk = ordered[i * per_domain:(i + 1) * per_domain]
+        chunk = ordered[i * per_domain : (i + 1) * per_domain]
         result[domain] = [b for _name, b in chunk]
     return result
 
@@ -193,9 +198,14 @@ async def _auto_pick_workdays(year: int, month: int) -> tuple[list[date], bool]:
 
 @ui.page("/one-on-one-listening")
 async def one_on_one_listening_page() -> None:
-    user = get_current_user()
-    tenant_id: int = user["tenant_id"]
-    user_id: int = int(user["sub"])
+    ui_session = await require_current_ui_session()
+    if ui_session is None:
+        return
+    tenant_id = ui_session.tenant_id
+    user_id = ui_session.user_id
+
+    async def _require_bound_session() -> bool:
+        return await require_bound_ui_session(ui_session) is not None
 
     # 取班级 / 学期默认值
     grade_default = ""
@@ -214,15 +224,21 @@ async def one_on_one_listening_page() -> None:
                 term_default = "上学期"
         stages = await list_available_stages(session, tenant_id)
 
+    if not await _require_bound_session():
+        return
+
     # 学段下拉选项
     stage_labels = [format_stage_label(g, t) for g, t in stages] or ["小班·下学期"]
-    default_stage = format_stage_label(grade_default or "小班", term_default or "下学期")
+    default_stage = format_stage_label(
+        grade_default or "小班", term_default or "下学期"
+    )
     if default_stage not in stage_labels:
         default_stage = stage_labels[0]
 
-    await render_shell(user, active="one-on-one-listening")
+    shell_user = ui_session.as_user_dict()
+    await render_shell(shell_user, active="one-on-one-listening")
 
-    observer_default = get_display_name(user)
+    observer_default = get_display_name(shell_user)
     cur_year, cur_month = default_year_month()
 
     # 每领域状态：raw_images / compressed / 各 widget 引用 / 指标行
@@ -257,54 +273,83 @@ async def one_on_one_listening_page() -> None:
         with ui.card().classes("w-full"):
             ui.label("基本信息").classes("font-semibold text-gray-700 mb-2")
             with ui.row().classes("w-full gap-4 flex-wrap items-end"):
-                year_input = ui.number(label="观察年", value=cur_year, min=2020, max=2100,
-                                       format="%d").classes("w-28")
-                month_select = ui.select(label="观察月", options=_MONTHS, value=cur_month).classes("w-24")
-                child_name_input = ui.input(label="幼儿姓名", placeholder="单个幼儿").classes("flex-1 min-w-40")
-                adult_count_input = ui.number(label="成人数目", value=1, min=1).classes("w-28")
+                year_input = ui.number(
+                    label="观察年", value=cur_year, min=2020, max=2100, format="%d"
+                ).classes("w-28")
+                month_select = ui.select(
+                    label="观察月", options=_MONTHS, value=cur_month
+                ).classes("w-24")
+                child_name_input = ui.input(
+                    label="幼儿姓名", placeholder="单个幼儿"
+                ).classes("flex-1 min-w-40")
+                adult_count_input = ui.number(label="成人数目", value=1, min=1).classes(
+                    "w-28"
+                )
 
             with ui.row().classes("w-full gap-4 flex-wrap items-end"):
                 stage_select = ui.select(
-                    label="年级·学期（指标版本）", options=stage_labels, value=default_stage,
+                    label="年级·学期（指标版本）",
+                    options=stage_labels,
+                    value=default_stage,
                 ).classes("w-52")
                 child_age_input = ui.input(
-                    label="幼儿年龄", value=infer_age_by_grade(grade_default or "小班"),
+                    label="幼儿年龄",
+                    value=infer_age_by_grade(grade_default or "小班"),
                 ).classes("w-28")
-                observer_input = ui.input(label="观察者", value=observer_default).classes("flex-1 min-w-40")
+                observer_input = ui.input(
+                    label="观察者", value=observer_default
+                ).classes("flex-1 min-w-40")
 
             with ui.row().classes("w-full gap-3 items-center flex-wrap"):
-                autopick_btn = ui.button("一键为所有领域按各自年月选取工作日", icon="event_available").props("outline")
-                ui.label("各领域按其自身年月，从前三周各取一个工作日（排除法定节假日）").classes(
-                    "text-xs text-gray-400"
-                )
+                autopick_btn = ui.button(
+                    "一键为所有领域按各自年月选取工作日", icon="event_available"
+                ).props("outline")
+                ui.label(
+                    "各领域按其自身年月，从前三周各取一个工作日（排除法定节假日）"
+                ).classes("text-xs text-gray-400")
 
             ui.separator().classes("my-1")
-            ui.label("一键导入照片（恰好 15 张，按文件名排序自动分配五领域，每领域 3 张，统一横版）").classes(
-                "text-sm text-gray-600"
-            )
+            ui.label(
+                "一键导入照片（恰好 15 张，按文件名排序自动分配五领域，每领域 3 张，统一横版）"
+            ).classes("text-sm text-gray-600")
             with ui.row().classes("w-full gap-3 items-center flex-wrap"):
-                bulk_count_label = ui.label("已选 0 张").classes("text-gray-500 text-sm")
-                apply_bulk_btn = ui.button("分配到五领域", icon="auto_fix_high").props("outline")
-                generate_all_btn = ui.button("生成全部领域", icon="auto_awesome").classes(
-                    "bg-indigo-600 text-white"
+                bulk_count_label = ui.label("已选 0 张").classes(
+                    "text-gray-500 text-sm"
                 )
+                apply_bulk_btn = ui.button("分配到五领域", icon="auto_fix_high").props(
+                    "outline"
+                )
+                generate_all_btn = ui.button(
+                    "生成全部领域", icon="auto_awesome"
+                ).classes("bg-indigo-600 text-white")
             ui.upload(
                 on_upload=lambda e: _on_bulk_upload(e),
-                auto_upload=True, multiple=True,
+                auto_upload=True,
+                multiple=True,
             ).props("accept=image/*").classes("w-full")
 
         # ── 编辑状态横幅 ──────────────────────────────────────────
         with ui.row().classes("w-full gap-3 items-center"):
-            edit_banner = ui.label("").classes("text-amber-700 text-sm font-semibold hidden")
-            cancel_edit_btn = ui.button("取消编辑 / 新建", icon="close").props("flat dense").classes("hidden")
+            edit_banner = ui.label("").classes(
+                "text-amber-700 text-sm font-semibold hidden"
+            )
+            cancel_edit_btn = (
+                ui.button("取消编辑 / 新建", icon="close")
+                .props("flat dense")
+                .classes("hidden")
+            )
 
         domains_container = ui.column().classes("w-full gap-3")
 
         # ── 操作按钮 ──────────────────────────────────────────────
         with ui.row().classes("w-full gap-3 justify-end mt-2"):
             save_btn = ui.button("保存", icon="save").classes("bg-blue-600 text-white")
-            export_combined_btn = ui.button("导出合并 Word", icon="download").classes("bg-orange-500 text-white")
-            export_split_btn = ui.button("导出按领域(zip)", icon="folder_zip").props("outline")
+            export_combined_btn = ui.button("导出合并 Word", icon="download").classes(
+                "bg-orange-500 text-white"
+            )
+            export_split_btn = ui.button("导出按领域(zip)", icon="folder_zip").props(
+                "outline"
+            )
 
     # ── 领域分区渲染 ───────────────────────────────────────────────
     def _on_grade_age_sync() -> None:
@@ -312,6 +357,8 @@ async def one_on_one_listening_page() -> None:
         child_age_input.value = infer_age_by_grade(g)
 
     async def render_domains() -> None:
+        if not await _require_bound_session():
+            return
         domains_container.clear()
         domain_states.clear()
         grade, term = parse_stage_label(stage_select.value or default_stage)
@@ -320,31 +367,52 @@ async def one_on_one_listening_page() -> None:
                 d: await list_indicators(session, tenant_id, grade, term, d)
                 for d in _UI_DOMAINS
             }
+        if not await _require_bound_session():
+            return
         with domains_container:
             with ui.tabs().classes("w-full") as domain_tabs:
                 tab_refs = {d: ui.tab(d) for d in _UI_DOMAINS}
-            with ui.tab_panels(domain_tabs, value=tab_refs[_UI_DOMAINS[0]]).classes("w-full"):
+            with ui.tab_panels(domain_tabs, value=tab_refs[_UI_DOMAINS[0]]).classes(
+                "w-full"
+            ):
                 for domain in _UI_DOMAINS:
                     with ui.tab_panel(tab_refs[domain]):
                         _build_domain_section(domain, catalog_by_domain.get(domain, []))
 
     def _build_domain_section(domain: str, catalog: list) -> None:
-        st: dict = {"raw_images": [], "compressed": None, "desc_areas": [],
-                    "date_inputs": [], "indicators": []}
+        st: dict = {
+            "raw_images": [],
+            "compressed": None,
+            "desc_areas": [],
+            "date_inputs": [],
+            "indicators": [],
+        }
         domain_states[domain] = st
 
         with ui.column().classes("w-full p-1 gap-3"):
             # 年月 + 日期 + 本领域自动选取
             with ui.row().classes("w-full gap-3 flex-wrap items-end"):
-                st["year"] = ui.number(label="年", value=int(year_input.value or cur_year),
-                                       min=2020, max=2100, format="%d").classes("w-24")
-                st["month"] = ui.select(label="月", options=_MONTHS,
-                                        value=int(month_select.value or cur_month)).classes("w-20")
+                st["year"] = ui.number(
+                    label="年",
+                    value=int(year_input.value or cur_year),
+                    min=2020,
+                    max=2100,
+                    format="%d",
+                ).classes("w-24")
+                st["month"] = ui.select(
+                    label="月",
+                    options=_MONTHS,
+                    value=int(month_select.value or cur_month),
+                ).classes("w-20")
                 for i in range(3):
                     st["date_inputs"].append(
-                        ui.input(label=f"日期{i+1}", placeholder="YYYY-MM-DD").classes("w-36")
+                        ui.input(
+                            label=f"日期{i + 1}", placeholder="YYYY-MM-DD"
+                        ).classes("w-36")
                     )
-                pick_btn = ui.button("自动选取本领域工作日", icon="event_available").props("outline dense")
+                pick_btn = ui.button(
+                    "自动选取本领域工作日", icon="event_available"
+                ).props("outline dense")
                 st["pick_btn"] = pick_btn
 
             # 图片上传
@@ -355,11 +423,15 @@ async def one_on_one_listening_page() -> None:
             st["preview_row"] = preview_row
 
             async def _on_upload(e, d=domain) -> None:
+                if not await _require_bound_session():
+                    return
                 s = domain_states[d]
                 if len(s["raw_images"]) >= 3:
                     show_error(f"{d}领域最多 3 张图片")
                     return
                 raw = await e.file.read() if hasattr(e, "file") else e.content.read()
+                if not await _require_bound_session():
+                    return
                 try:
                     data = normalize_to_landscape(raw)
                 except AppError as ex:
@@ -369,9 +441,9 @@ async def one_on_one_listening_page() -> None:
                 s["compressed"] = None  # 新图需重新生成
                 s["count_label"].set_text(f"已上传：{len(s['raw_images'])} 张")
                 with s["preview_row"]:
-                    ui.image(f"data:image/jpeg;base64,{base64.b64encode(data).decode()}").classes(
-                        "w-20 h-20 object-cover rounded border"
-                    )
+                    ui.image(
+                        f"data:image/jpeg;base64,{base64.b64encode(data).decode()}"
+                    ).classes("w-20 h-20 object-cover rounded border")
 
             ui.upload(on_upload=_on_upload, auto_upload=True, multiple=True).props(
                 "accept=image/*"
@@ -387,11 +459,13 @@ async def one_on_one_listening_page() -> None:
                 ui.label("图片描述（一对一倾听记录）").classes("text-sm text-gray-600")
                 for i in range(3):
                     st["desc_areas"].append(
-                        ui.textarea(label=f"图{i+1}描述").classes("w-full")
+                        ui.textarea(label=f"图{i + 1}描述").classes("w-full")
                     )
 
             # 指标星级
-            with ui.expansion(f"二级指标评定（{len(catalog)} 项）", icon="star").classes("w-full"):
+            with ui.expansion(
+                f"二级指标评定（{len(catalog)} 项）", icon="star"
+            ).classes("w-full"):
                 if not catalog:
                     ui.label("未找到该领域指标，请检查年级·学期配置").classes(
                         "text-amber-600 text-sm"
@@ -402,16 +476,25 @@ async def one_on_one_listening_page() -> None:
                             "flex-1 text-xs text-gray-700"
                         )
                         sel = ui.select(
-                            options={1: "★", 2: "★★", 3: "★★★"}, value=3,
+                            options={1: "★", 2: "★★", 3: "★★★"},
+                            value=3,
                         ).classes("w-24")
                         st["indicators"].append(
-                            {"catalog_id": cat.id, "sort_order": cat.sort_order, "select": sel}
+                            {
+                                "catalog_id": cat.id,
+                                "sort_order": cat.sort_order,
+                                "select": sel,
+                            }
                         )
 
             st["eval"] = ui.textarea(label="综合评价（约 200 字）").classes("w-full")
-            st["strategy"] = ui.textarea(label="支持策略（约 200 字）").classes("w-full")
+            st["strategy"] = ui.textarea(label="支持策略（约 200 字）").classes(
+                "w-full"
+            )
 
         async def _do_generate(d=domain) -> None:
+            if not await _require_bound_session():
+                return
             s = domain_states[d]
             s["gen_btn"].props("loading=true")
             try:
@@ -420,46 +503,67 @@ async def one_on_one_listening_page() -> None:
                     return
                 grade, term = parse_stage_label(stage_select.value or default_stage)
                 ctx = {
-                    "grade": grade, "term": term,
+                    "grade": grade,
+                    "term": term,
                     "child_name": child_name_input.value,
                     "child_age": child_age_input.value,
                 }
                 show_info(f"⏳ 正在生成{d}领域……")
                 async with AsyncSessionLocal() as session:
                     result = await generate_domain_content(
-                        session=session, tenant_id=tenant_id, user_id=user_id,
-                        domain=d, images=s["raw_images"], context=ctx,
+                        session=session,
+                        tenant_id=tenant_id,
+                        user_id=user_id,
+                        domain=d,
+                        images=s["raw_images"],
+                        context=ctx,
                     )
+                if not await _require_bound_session():
+                    return
                 s["compressed"] = result["compressed_images"]
                 s["goals"].value = result["goals"]
                 descs = result["image_descriptions"]
                 for i, area in enumerate(s["desc_areas"]):
                     area.value = descs[i] if i < len(descs) else ""
-                stars_by_order = {r["sort_order"]: r["stars"] for r in result["indicator_results"]}
+                stars_by_order = {
+                    r["sort_order"]: r["stars"] for r in result["indicator_results"]
+                }
                 for ind in s["indicators"]:
                     ind["select"].value = stars_by_order.get(ind["sort_order"], 3)
                 s["eval"].value = result["evaluation"]
                 s["strategy"].value = result["support_strategy"]
                 show_info(f"{d}领域生成成功，请检查后保存", ok=True)
-            except ConfigError as ex:
-                show_error(f"配置错误：{ex.message}")
-            except (AiCallError, AiParseError) as ex:
-                show_error(f"AI 调用失败：{ex.message}")
+            except ConfigError:
+                if not await _require_bound_session():
+                    return
+                show_error("AI 配置不可用，请检查模型配置")
+            except (AiCallError, AiParseError):
+                if not await _require_bound_session():
+                    return
+                show_error("AI 调用或解析失败，请稍后重试")
             except AppError as ex:
+                if not await _require_bound_session():
+                    return
                 show_error(f"生成失败：{ex.message}")
             except Exception as ex:  # noqa: BLE001
-                logger.error("生成倾听领域失败", exc_info=ex)
-                show_error(f"生成失败：{ex}")
+                if not await _require_bound_session():
+                    return
+                logger.error("生成倾听领域失败 error_type=%s", type(ex).__name__)
+                show_error(f"生成失败：{type(ex).__name__}")
             finally:
                 s["gen_btn"].props(remove="loading")
 
         async def _pick_domain_workdays(d=domain) -> None:
+            if not await _require_bound_session():
+                return
             s = domain_states[d]
             s["pick_btn"].props("loading=true")
             try:
                 y = int(s["year"].value or year_input.value or cur_year)
                 m = int(s["month"].value or month_select.value or cur_month)
                 wds, hol_ok = await _auto_pick_workdays(y, m)
+                if not await _require_bound_session():
+                    return
                 for i, di in enumerate(s["date_inputs"]):
                     di.value = wds[i].isoformat() if i < len(wds) else ""
                 note = "" if hol_ok else "（节假日信息暂不可用，请人工核对）"
@@ -468,8 +572,10 @@ async def one_on_one_listening_page() -> None:
                 else:
                     show_info(f"{d}领域工作日已填入，可手动调整{note}", ok=hol_ok)
             except Exception as ex:  # noqa: BLE001
-                logger.error("领域自动选取工作日失败", exc_info=ex)
-                show_error(f"自动选取失败：{ex}")
+                if not await _require_bound_session():
+                    return
+                logger.error("领域自动选取工作日失败 error_type=%s", type(ex).__name__)
+                show_error(f"自动选取失败：{type(ex).__name__}")
             finally:
                 s["pick_btn"].props(remove="loading")
 
@@ -479,6 +585,8 @@ async def one_on_one_listening_page() -> None:
 
     # ── 自动选取工作日（各领域按自身年月）────────────────────────────
     async def do_autopick_all() -> None:
+        if not await _require_bound_session():
+            return
         autopick_btn.props("loading=true")
         try:
             any_short = False
@@ -487,6 +595,8 @@ async def one_on_one_listening_page() -> None:
                 y = int(st["year"].value or year_input.value or cur_year)
                 m = int(st["month"].value or month_select.value or cur_month)
                 workdays, hol_ok = await _auto_pick_workdays(y, m)
+                if not await _require_bound_session():
+                    return
                 if not hol_ok:
                     any_hol_unavailable = True
                 for i, di in enumerate(st["date_inputs"]):
@@ -495,18 +605,29 @@ async def one_on_one_listening_page() -> None:
                     any_short = True
             note = "（节假日信息暂不可用，请人工核对）" if any_hol_unavailable else ""
             if any_short:
-                show_info(f"已按各领域年月填入工作日；部分领域不足 3 天，请手动补全{note}")
+                show_info(
+                    f"已按各领域年月填入工作日；部分领域不足 3 天，请手动补全{note}"
+                )
             else:
-                show_info(f"已按各领域年月填入工作日，可手动调整{note}", ok=not any_hol_unavailable)
+                show_info(
+                    f"已按各领域年月填入工作日，可手动调整{note}",
+                    ok=not any_hol_unavailable,
+                )
         except Exception as ex:  # noqa: BLE001
-            logger.error("自动选取工作日失败", exc_info=ex)
-            show_error(f"自动选取失败：{ex}")
+            if not await _require_bound_session():
+                return
+            logger.error("自动选取工作日失败 error_type=%s", type(ex).__name__)
+            show_error(f"自动选取失败：{type(ex).__name__}")
         finally:
             autopick_btn.props(remove="loading")
 
     # ── 一键导入照片 ───────────────────────────────────────────────
     async def _on_bulk_upload(e) -> None:
+        if not await _require_bound_session():
+            return
         raw = await e.file.read() if hasattr(e, "file") else e.content.read()
+        if not await _require_bound_session():
+            return
         name = getattr(e, "name", "") or f"img{len(bulk_state['files']):02d}"
         bulk_state["files"].append((name, raw))
         bulk_count_label.set_text(f"已选 {len(bulk_state['files'])} 张")
@@ -516,11 +637,13 @@ async def one_on_one_listening_page() -> None:
         st["count_label"].set_text(f"已上传：{len(st['raw_images'])} 张")
         with st["preview_row"]:
             for b in st["raw_images"]:
-                ui.image(f"data:image/jpeg;base64,{base64.b64encode(b).decode()}").classes(
-                    "w-20 h-20 object-cover rounded border"
-                )
+                ui.image(
+                    f"data:image/jpeg;base64,{base64.b64encode(b).decode()}"
+                ).classes("w-20 h-20 object-cover rounded border")
 
     async def do_apply_bulk() -> None:
+        if not await _require_bound_session():
+            return
         files = bulk_state["files"]
         if not validate_bulk_import_count(len(files)):
             show_error(f"一键导入至少需要 15 张照片（当前 {len(files)} 张）")
@@ -538,23 +661,33 @@ async def one_on_one_listening_page() -> None:
             bulk_state["files"] = []
             bulk_count_label.set_text("已选 0 张")
             extra = f"（共上传 {total} 张，已按文件名取前 15 张）" if total > 15 else ""
-            show_info(f"已分配到五领域（每领域 3 张，统一横版）{extra}，请逐领域或一键生成", ok=True)
+            show_info(
+                f"已分配到五领域（每领域 3 张，统一横版）{extra}，请逐领域或一键生成",
+                ok=True,
+            )
         except AppError as ex:
             show_error(f"图片处理失败：{ex.message}")
         except Exception as ex:  # noqa: BLE001
-            logger.error("一键导入分配失败", exc_info=ex)
-            show_error(f"导入失败：{ex}")
+            logger.error("一键导入分配失败 error_type=%s", type(ex).__name__)
+            show_error(f"导入失败：{type(ex).__name__}")
 
     async def do_generate_all() -> None:
+        if not await _require_bound_session():
+            return
         generate_all_btn.props("loading=true")
         try:
-            target = [d for d in _UI_DOMAINS
-                      if domain_states.get(d) and domain_states[d]["raw_images"]]
+            target = [
+                d
+                for d in _UI_DOMAINS
+                if domain_states.get(d) and domain_states[d]["raw_images"]
+            ]
             if not target:
                 show_error("请先上传/导入照片再生成")
                 return
             for d in target:
                 await domain_states[d]["do_generate"]()
+            if not await _require_bound_session():
+                return
             show_info("全部领域生成完成，请检查后保存", ok=True)
         finally:
             generate_all_btn.props(remove="loading")
@@ -581,12 +714,17 @@ async def one_on_one_listening_page() -> None:
         if not has_content:
             return None
         indicator_results = [
-            {"catalog_id": ind["catalog_id"], "sort_order": ind["sort_order"],
-             "stars": int(ind["select"].value or 3)}
+            {
+                "catalog_id": ind["catalog_id"],
+                "sort_order": ind["sort_order"],
+                "stars": int(ind["select"].value or 3),
+            }
             for ind in st["indicators"]
         ]
-        images = [(compressed[i].data, descriptions[i] if i < len(descriptions) else "")
-                  for i in range(len(compressed))]
+        images = [
+            (compressed[i].data, descriptions[i] if i < len(descriptions) else "")
+            for i in range(len(compressed))
+        ]
         return {
             "domain": domain,
             "obs_year": int(st["year"].value or year_input.value or cur_year),
@@ -612,10 +750,12 @@ async def one_on_one_listening_page() -> None:
             "child_age": child_age_input.value or None,
         }
         record_full = {
-            "tenant_id": tenant_id, "user_id": user_id,
+            "tenant_id": tenant_id,
+            "user_id": user_id,
             "obs_year": int(year_input.value or cur_year),
             "obs_month": int(month_select.value or cur_month),
-            "grade": grade or None, "term": term or None,
+            "grade": grade or None,
+            "term": term or None,
             "class_name": class_name_default or None,
             "observer": observer_input.value or None,
             **record,
@@ -624,6 +764,8 @@ async def one_on_one_listening_page() -> None:
         return record_full, domains
 
     async def do_save() -> None:
+        if not await _require_bound_session():
+            return
         save_btn.props("loading=true")
         try:
             record_full, domains = _collect()
@@ -633,24 +775,33 @@ async def one_on_one_listening_page() -> None:
             if not domains:
                 show_error("请至少为一个领域上传图片并生成内容")
                 return
+            is_edit = bool(edit_state["record_id"])
             async with AsyncSessionLocal() as session:
-                if edit_state["record_id"]:
+                if is_edit:
                     rid = await update_record_with_all(
-                        session, record_id=edit_state["record_id"],
-                        record_data=record_full, domains=domains,
+                        session,
+                        record_id=edit_state["record_id"],
+                        record_data=record_full,
+                        domains=domains,
                         storage=get_storage_backend(),
                     )
-                    show_info(f"覆盖保存成功（记录 ID：{rid}）", ok=True)
                 else:
                     rid = await save_record_with_all(
-                        session, record_data=record_full, domains=domains,
+                        session,
+                        record_data=record_full,
+                        domains=domains,
                         storage=get_storage_backend(),
                     )
-                    show_info(f"保存成功（记录 ID：{rid}）", ok=True)
+            if not await _require_bound_session():
+                return
+            action = "覆盖保存" if is_edit else "保存"
+            show_info(f"{action}成功（记录 ID：{rid}）", ok=True)
             await refresh_history()
         except Exception as ex:  # noqa: BLE001
-            logger.error("保存倾听记录失败", exc_info=ex)
-            show_error(f"保存失败：{ex}")
+            if not await _require_bound_session():
+                return
+            logger.error("保存倾听记录失败 error_type=%s", type(ex).__name__)
+            show_error(f"保存失败：{type(ex).__name__}")
         finally:
             save_btn.props(remove="loading")
 
@@ -664,6 +815,8 @@ async def one_on_one_listening_page() -> None:
         }
 
     async def do_export_combined() -> None:
+        if not await _require_bound_session():
+            return
         export_combined_btn.props("loading=true")
         try:
             _record_full, domains = _collect()
@@ -672,28 +825,47 @@ async def one_on_one_listening_page() -> None:
                 return
             data = export_combined(_export_record_dict(), domains)
             fname = build_export_filename(
-                tenant_id, user_id, child_name_input.value or "幼儿",
-                int(year_input.value or cur_year), int(month_select.value or cur_month), "合并",
+                tenant_id,
+                user_id,
+                child_name_input.value or "幼儿",
+                int(year_input.value or cur_year),
+                int(month_select.value or cur_month),
+                "合并",
             )
             async with AsyncSessionLocal() as session:
                 await save_export_record(
-                    session, tenant_id=tenant_id, user_id=user_id,
-                    daily_plan_id=None, file_name=fname, file_path=f"exports/{fname}",
+                    session,
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    daily_plan_id=None,
+                    file_name=fname,
+                    file_path=f"exports/{fname}",
                     listening_record_id=edit_state.get("record_id"),
                 )
                 await session.commit()
-            log_audit("export_listening", tenant_id=tenant_id, user_id=user_id,
-                      file_name=fname, listening_record_id=edit_state.get("record_id"),
-                      mode="combined")
+            if not await _require_bound_session():
+                return
+            log_audit(
+                "export_listening",
+                tenant_id=tenant_id,
+                user_id=user_id,
+                file_name=fname,
+                listening_record_id=edit_state.get("record_id"),
+                mode="combined",
+            )
             ui.download(data, fname)
             show_info(f"导出成功：{fname}", ok=True)
         except Exception as ex:  # noqa: BLE001
-            logger.error("导出合并失败", exc_info=ex)
-            show_error(f"导出失败：{ex}")
+            if not await _require_bound_session():
+                return
+            logger.error("导出合并失败 error_type=%s", type(ex).__name__)
+            show_error(f"导出失败：{type(ex).__name__}")
         finally:
             export_combined_btn.props(remove="loading")
 
     async def do_export_split() -> None:
+        if not await _require_bound_session():
+            return
         export_split_btn.props("loading=true")
         try:
             _record_full, domains = _collect()
@@ -703,24 +875,41 @@ async def one_on_one_listening_page() -> None:
             files = export_split_by_domain(_export_record_dict(), domains)
             zip_bytes = pack_domain_files_to_zip(files)
             zip_name = build_export_filename(
-                tenant_id, user_id, child_name_input.value or "幼儿",
-                int(year_input.value or cur_year), int(month_select.value or cur_month), "按领域",
+                tenant_id,
+                user_id,
+                child_name_input.value or "幼儿",
+                int(year_input.value or cur_year),
+                int(month_select.value or cur_month),
+                "按领域",
             ).replace(".docx", ".zip")
             async with AsyncSessionLocal() as session:
                 await save_export_record(
-                    session, tenant_id=tenant_id, user_id=user_id,
-                    daily_plan_id=None, file_name=zip_name, file_path=f"exports/{zip_name}",
+                    session,
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    daily_plan_id=None,
+                    file_name=zip_name,
+                    file_path=f"exports/{zip_name}",
                     listening_record_id=edit_state.get("record_id"),
                 )
                 await session.commit()
-            log_audit("export_listening", tenant_id=tenant_id, user_id=user_id,
-                      file_name=zip_name, listening_record_id=edit_state.get("record_id"),
-                      mode="split")
+            if not await _require_bound_session():
+                return
+            log_audit(
+                "export_listening",
+                tenant_id=tenant_id,
+                user_id=user_id,
+                file_name=zip_name,
+                listening_record_id=edit_state.get("record_id"),
+                mode="split",
+            )
             ui.download(zip_bytes, zip_name)
             show_info(f"导出成功：{zip_name}", ok=True)
         except Exception as ex:  # noqa: BLE001
-            logger.error("导出按领域失败", exc_info=ex)
-            show_error(f"导出失败：{ex}")
+            if not await _require_bound_session():
+                return
+            logger.error("导出按领域失败 error_type=%s", type(ex).__name__)
+            show_error(f"导出失败：{type(ex).__name__}")
         finally:
             export_split_btn.props(remove="loading")
 
@@ -734,18 +923,25 @@ async def one_on_one_listening_page() -> None:
         if not width or not height:
             try:
                 from PIL import Image
+
                 with Image.open(io.BytesIO(im["data"])) as pim:
                     width, height = pim.size
             except Exception:  # noqa: BLE001
                 width, height = 0, 0
         return CompressedImage(
-            data=im["data"], mime_type=im.get("mime_type") or "image/jpeg",
-            width=width, height=height,
+            data=im["data"],
+            mime_type=im.get("mime_type") or "image/jpeg",
+            width=width,
+            height=height,
         )
 
     async def do_load_for_edit(rid: int) -> None:
+        if not await _require_bound_session():
+            return
         async with AsyncSessionLocal() as session:
             detail = await load_record_detail(session, tenant_id, user_id, rid)
+        if not await _require_bound_session():
+            return
         if not detail:
             show_error("记录不存在")
             return
@@ -755,11 +951,15 @@ async def one_on_one_listening_page() -> None:
         child_name_input.value = rec["child_name"] or ""
         adult_count_input.value = rec["adult_count"] or 1
         observer_input.value = rec["observer"] or ""
-        stage_label = format_stage_label(rec["grade"] or "小班", rec["term"] or "下学期")
+        stage_label = format_stage_label(
+            rec["grade"] or "小班", rec["term"] or "下学期"
+        )
         if stage_label in (stage_select.options or []):
             stage_select.value = stage_label
         child_age_input.value = infer_age_by_grade(rec["grade"] or "")
         await render_domains()
+        if not await _require_bound_session():
+            return
         detail_by_domain = {d["domain"]: d for d in detail["domains"]}
         for domain, st in domain_states.items():
             dom = detail_by_domain.get(domain)
@@ -779,7 +979,9 @@ async def one_on_one_listening_page() -> None:
             _render_domain_previews(st)
             for i, area in enumerate(st["desc_areas"]):
                 area.value = (imgs[i].get("description") or "") if i < len(imgs) else ""
-            stars_by_order = {ind["sort_order"]: ind["stars"] for ind in dom.get("indicators") or []}
+            stars_by_order = {
+                ind["sort_order"]: ind["stars"] for ind in dom.get("indicators") or []
+            }
             for ind in st["indicators"]:
                 ind["select"].value = stars_by_order.get(ind["sort_order"], 3)
         edit_state["record_id"] = rid
@@ -790,12 +992,16 @@ async def one_on_one_listening_page() -> None:
         show_info(f"已载入记录 {rid}，可修改后覆盖保存", ok=True)
 
     async def do_cancel_edit() -> None:
+        if not await _require_bound_session():
+            return
         edit_state["record_id"] = None
         edit_banner.classes(add="hidden")
         cancel_edit_btn.classes(add="hidden")
         save_btn.set_text("保存")
         child_name_input.value = ""
         await render_domains()
+        if not await _require_bound_session():
+            return
         show_info("已退出编辑，可新建记录", ok=True)
 
     cancel_edit_btn.on("click", do_cancel_edit)
@@ -807,32 +1013,44 @@ async def one_on_one_listening_page() -> None:
         ui.separator()
         ui.label("历史倾听记录").classes("text-lg font-semibold text-gray-700")
         with ui.row().classes("w-full gap-3 items-end flex-wrap"):
-            filter_year = ui.number(label="筛选年", min=2020, max=2100, format="%d").classes("w-28")
+            filter_year = ui.number(
+                label="筛选年", min=2020, max=2100, format="%d"
+            ).classes("w-28")
             filter_month = ui.select(
-                label="筛选月", options={0: "全部", **{m: str(m) for m in _MONTHS}}, value=0,
+                label="筛选月",
+                options={0: "全部", **{m: str(m) for m in _MONTHS}},
+                value=0,
             ).classes("w-28")
             filter_name = ui.input(label="幼儿姓名").classes("w-40")
             refresh_btn = ui.button("查询", icon="search").props("outline")
-            batch_export_btn = ui.button("批量按领域导出(zip)", icon="folder_zip").classes(
-                "bg-orange-500 text-white"
-            )
+            batch_export_btn = ui.button(
+                "批量按领域导出(zip)", icon="folder_zip"
+            ).classes("bg-orange-500 text-white")
         history_container = ui.column().classes("w-full gap-2")
 
     async def _show_detail(rid: int) -> None:
+        if not await _require_bound_session():
+            return
         async with AsyncSessionLocal() as session:
             detail = await load_record_detail(session, tenant_id, user_id, rid)
+        if not await _require_bound_session():
+            return
         if not detail:
             show_error("记录不存在")
             return
         rec = detail["record"]
         with ui.dialog() as dlg, ui.card().classes("max-w-3xl"):
             stage = format_stage_label(rec["grade"] or "", rec["term"] or "").strip("·")
-            ui.label(f"{rec['child_name']}  {rec['obs_year']}年{rec['obs_month']}月  {stage}").classes(
-                "text-lg font-semibold"
-            )
+            ui.label(
+                f"{rec['child_name']}  {rec['obs_year']}年{rec['obs_month']}月  {stage}"
+            ).classes("text-lg font-semibold")
             for dom in detail["domains"]:
-                with ui.expansion(f"{dom['domain']}领域", icon="folder_open").classes("w-full"):
-                    ui.label(f"目标：{dom.get('goals') or '-'}").classes("text-sm whitespace-pre-wrap")
+                with ui.expansion(f"{dom['domain']}领域", icon="folder_open").classes(
+                    "w-full"
+                ):
+                    ui.label(f"目标：{dom.get('goals') or '-'}").classes(
+                        "text-sm whitespace-pre-wrap"
+                    )
                     with ui.row().classes("gap-2 flex-wrap"):
                         for im in dom.get("images") or []:
                             if im.get("data"):
@@ -841,14 +1059,16 @@ async def one_on_one_listening_page() -> None:
                                     f"data:{mime};base64,{base64.b64encode(im['data']).decode()}"
                                 ).classes("w-24 h-24 object-cover rounded border")
                     for i, im in enumerate(dom.get("images") or []):
-                        ui.label(f"图{i+1}描述：{im.get('description') or '-'}").classes(
-                            "text-xs text-gray-600 whitespace-pre-wrap"
-                        )
+                        ui.label(
+                            f"图{i + 1}描述：{im.get('description') or '-'}"
+                        ).classes("text-xs text-gray-600 whitespace-pre-wrap")
                     stars = "，".join(
                         f"[{ind['sort_order']}]{'★' * int(ind['stars'])}"
                         for ind in dom.get("indicators") or []
                     )
-                    ui.label(f"指标星级：{stars or '-'}").classes("text-xs text-gray-600")
+                    ui.label(f"指标星级：{stars or '-'}").classes(
+                        "text-xs text-gray-600"
+                    )
                     ui.label(f"综合评价：{dom.get('evaluation') or '-'}").classes(
                         "text-sm whitespace-pre-wrap"
                     )
@@ -858,7 +1078,11 @@ async def one_on_one_listening_page() -> None:
             ui.button("关闭", on_click=dlg.close).classes("mt-2")
         dlg.open()
 
-    async def _reexport_combined(rid: int, child_name: str, year: int, month: int) -> None:
+    async def _reexport_combined(
+        rid: int, child_name: str, year: int, month: int
+    ) -> None:
+        if not await _require_bound_session():
+            return
         try:
             async with AsyncSessionLocal() as session:
                 detail = await load_record_detail(session, tenant_id, user_id, rid)
@@ -868,22 +1092,44 @@ async def one_on_one_listening_page() -> None:
                 record, domains = to_export_payload(detail)
                 data = export_combined(record, domains)
                 fname = build_export_filename(
-                    tenant_id, user_id, child_name or "幼儿", year or 0, month or 0, "合并",
+                    tenant_id,
+                    user_id,
+                    child_name or "幼儿",
+                    year or 0,
+                    month or 0,
+                    "合并",
                 )
                 await save_export_record(
-                    session, tenant_id=tenant_id, user_id=user_id, daily_plan_id=None,
-                    file_name=fname, file_path=f"exports/{fname}", listening_record_id=rid,
+                    session,
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    daily_plan_id=None,
+                    file_name=fname,
+                    file_path=f"exports/{fname}",
+                    listening_record_id=rid,
                 )
                 await session.commit()
-            log_audit("export_listening", tenant_id=tenant_id, user_id=user_id,
-                      file_name=fname, listening_record_id=rid, mode="combined")
+            if not await _require_bound_session():
+                return
+            log_audit(
+                "export_listening",
+                tenant_id=tenant_id,
+                user_id=user_id,
+                file_name=fname,
+                listening_record_id=rid,
+                mode="combined",
+            )
             ui.download(data, fname)
             show_info(f"导出成功：{fname}", ok=True)
         except Exception as ex:  # noqa: BLE001
-            logger.error("历史合并导出失败", exc_info=ex)
-            show_error(f"导出失败：{ex}")
+            if not await _require_bound_session():
+                return
+            logger.error("历史合并导出失败 error_type=%s", type(ex).__name__)
+            show_error(f"导出失败：{type(ex).__name__}")
 
     async def _reexport_split(rid: int, child_name: str, year: int, month: int) -> None:
+        if not await _require_bound_session():
+            return
         try:
             async with AsyncSessionLocal() as session:
                 detail = await load_record_detail(session, tenant_id, user_id, rid)
@@ -894,32 +1140,56 @@ async def one_on_one_listening_page() -> None:
                 files = export_split_by_domain(record, domains)
                 zip_bytes = pack_domain_files_to_zip(files)
                 zip_name = build_export_filename(
-                    tenant_id, user_id, child_name or "幼儿", year or 0, month or 0, "按领域",
+                    tenant_id,
+                    user_id,
+                    child_name or "幼儿",
+                    year or 0,
+                    month or 0,
+                    "按领域",
                 ).replace(".docx", ".zip")
                 await save_export_record(
-                    session, tenant_id=tenant_id, user_id=user_id, daily_plan_id=None,
-                    file_name=zip_name, file_path=f"exports/{zip_name}", listening_record_id=rid,
+                    session,
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    daily_plan_id=None,
+                    file_name=zip_name,
+                    file_path=f"exports/{zip_name}",
+                    listening_record_id=rid,
                 )
                 await session.commit()
-            log_audit("export_listening", tenant_id=tenant_id, user_id=user_id,
-                      file_name=zip_name, listening_record_id=rid, mode="split")
+            if not await _require_bound_session():
+                return
+            log_audit(
+                "export_listening",
+                tenant_id=tenant_id,
+                user_id=user_id,
+                file_name=zip_name,
+                listening_record_id=rid,
+                mode="split",
+            )
             ui.download(zip_bytes, zip_name)
             show_info(f"导出成功：{zip_name}", ok=True)
         except Exception as ex:  # noqa: BLE001
-            logger.error("历史按领域导出失败", exc_info=ex)
-            show_error(f"导出失败：{ex}")
+            if not await _require_bound_session():
+                return
+            logger.error("历史按领域导出失败 error_type=%s", type(ex).__name__)
+            show_error(f"导出失败：{type(ex).__name__}")
 
     async def _delete_listening_record(rid: int) -> None:
+        if not await _require_bound_session():
+            return
         with ui.dialog() as dlg, ui.card():
-            ui.label("确定删除这条倾听记录吗？将一并删除其图片与指标，删除后无法恢复。").classes(
-                "text-base"
-            )
+            ui.label(
+                "确定删除这条倾听记录吗？将一并删除其图片与指标，删除后无法恢复。"
+            ).classes("text-base")
             with ui.row().classes("gap-3 mt-3"):
                 ui.button("确认删除", on_click=lambda: dlg.submit("yes")).classes(
                     "bg-red-600 text-white"
                 )
                 ui.button("取消", on_click=lambda: dlg.submit("no"))
         if await dlg == "yes":
+            if not await _require_bound_session():
+                return
             try:
                 async with AsyncSessionLocal() as session:
                     async with AsyncSessionUnitOfWork(session):
@@ -932,8 +1202,10 @@ async def one_on_one_listening_page() -> None:
                 show_info("已删除", ok=True)
                 await refresh_history()
             except Exception as ex:  # noqa: BLE001
-                logger.error("删除倾听记录失败", exc_info=ex)
-                show_error(f"删除失败：{ex}")
+                if not await _require_bound_session():
+                    return
+                logger.error("删除倾听记录失败 error_type=%s", type(ex).__name__)
+                show_error(f"删除失败：{type(ex).__name__}")
 
     def _toggle_select(rid: int, checked: bool) -> None:
         if checked:
@@ -943,36 +1215,59 @@ async def one_on_one_listening_page() -> None:
 
     def _build_history_row(rec) -> None:
         with ui.card().classes("w-full"):
-            with ui.row().classes("w-full justify-between items-center flex-wrap gap-2"):
+            with ui.row().classes(
+                "w-full justify-between items-center flex-wrap gap-2"
+            ):
                 with ui.row().classes("items-center gap-2"):
                     ui.checkbox(
-                        on_change=lambda e, rid=rec.id: _toggle_select(rid, bool(e.value))
+                        on_change=lambda e, rid=rec.id: _toggle_select(
+                            rid, bool(e.value)
+                        )
                     )
-                    ui.label(format_record_summary(
-                        rec.child_name, rec.obs_year, rec.obs_month,
-                        rec.grade, rec.term, rec.observer,
-                    )).classes("text-sm text-gray-700")
+                    ui.label(
+                        format_record_summary(
+                            rec.child_name,
+                            rec.obs_year,
+                            rec.obs_month,
+                            rec.grade,
+                            rec.term,
+                            rec.observer,
+                        )
+                    ).classes("text-sm text-gray-700")
                 with ui.row().classes("items-center gap-1"):
-                    ui.button("详情", icon="visibility",
-                              on_click=lambda rid=rec.id: _show_detail(rid)).props("size=sm flat")
                     ui.button(
-                        "导出合并", icon="download",
-                        on_click=lambda rid=rec.id, nm=rec.child_name, y=rec.obs_year, m=rec.obs_month:
-                        _reexport_combined(rid, nm, y, m),
+                        "详情",
+                        icon="visibility",
+                        on_click=lambda rid=rec.id: _show_detail(rid),
+                    ).props("size=sm flat")
+                    ui.button(
+                        "导出合并",
+                        icon="download",
+                        on_click=lambda rid=rec.id, nm=rec.child_name, y=rec.obs_year, m=rec.obs_month: (
+                            _reexport_combined(rid, nm, y, m)
+                        ),
                     ).props("size=sm flat").classes("text-blue-600")
                     ui.button(
-                        "按领域zip", icon="folder_zip",
-                        on_click=lambda rid=rec.id, nm=rec.child_name, y=rec.obs_year, m=rec.obs_month:
-                        _reexport_split(rid, nm, y, m),
+                        "按领域zip",
+                        icon="folder_zip",
+                        on_click=lambda rid=rec.id, nm=rec.child_name, y=rec.obs_year, m=rec.obs_month: (
+                            _reexport_split(rid, nm, y, m)
+                        ),
                     ).props("size=sm flat").classes("text-blue-600")
-                    ui.button("编辑", icon="edit",
-                              on_click=lambda rid=rec.id: do_load_for_edit(rid)).props(
-                        "size=sm flat").classes("text-indigo-600")
-                    ui.button("删除", icon="delete",
-                              on_click=lambda rid=rec.id: _delete_listening_record(rid)).props(
-                        "size=sm flat").classes("text-red-500")
+                    ui.button(
+                        "编辑",
+                        icon="edit",
+                        on_click=lambda rid=rec.id: do_load_for_edit(rid),
+                    ).props("size=sm flat").classes("text-indigo-600")
+                    ui.button(
+                        "删除",
+                        icon="delete",
+                        on_click=lambda rid=rec.id: _delete_listening_record(rid),
+                    ).props("size=sm flat").classes("text-red-500")
 
     async def refresh_history() -> None:
+        if not await _require_bound_session():
+            return
         history_container.clear()
         selected_ids.clear()
         try:
@@ -981,9 +1276,17 @@ async def one_on_one_listening_page() -> None:
             fn = (filter_name.value or "").strip() or None
             async with AsyncSessionLocal() as session:
                 records = await list_records(
-                    session, tenant_id, user_id, limit=50, offset=0,
-                    obs_year=fy, obs_month=fm, child_name=fn,
+                    session,
+                    tenant_id,
+                    user_id,
+                    limit=50,
+                    offset=0,
+                    obs_year=fy,
+                    obs_month=fm,
+                    child_name=fn,
                 )
+            if not await _require_bound_session():
+                return
             with history_container:
                 if not records:
                     ui.label("暂无记录").classes("text-gray-400 text-sm")
@@ -991,11 +1294,15 @@ async def one_on_one_listening_page() -> None:
                 for rec in records:
                     _build_history_row(rec)
         except Exception as ex:  # noqa: BLE001
-            logger.error("加载倾听历史失败", exc_info=ex)
+            if not await _require_bound_session():
+                return
+            logger.error("加载倾听历史失败 error_type=%s", type(ex).__name__)
             with history_container:
                 ui.label("加载历史失败").classes("text-red-500 text-sm")
 
     async def do_batch_export() -> None:
+        if not await _require_bound_session():
+            return
         if not selected_ids:
             show_error("请先勾选要导出的幼儿记录")
             return
@@ -1008,6 +1315,8 @@ async def one_on_one_listening_page() -> None:
                     detail = await load_record_detail(session, tenant_id, user_id, rid)
                     if detail:
                         children.append(to_export_payload(detail))
+            if not await _require_bound_session():
+                return
             if not children:
                 show_error("所选记录无可导出内容")
                 return
@@ -1015,20 +1324,37 @@ async def one_on_one_listening_page() -> None:
             zip_bytes = pack_domain_files_to_zip(files)
             y = int(filter_year.value) if filter_year.value else cur_year
             m = int(filter_month.value) or cur_month
-            zip_name = build_batch_export_filename(tenant_id, user_id, y, m, len(children))
+            zip_name = build_batch_export_filename(
+                tenant_id, user_id, y, m, len(children)
+            )
             async with AsyncSessionLocal() as session:
                 await save_export_record(
-                    session, tenant_id=tenant_id, user_id=user_id, daily_plan_id=None,
-                    file_name=zip_name, file_path=f"exports/{zip_name}", listening_record_id=None,
+                    session,
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    daily_plan_id=None,
+                    file_name=zip_name,
+                    file_path=f"exports/{zip_name}",
+                    listening_record_id=None,
                 )
                 await session.commit()
-            log_audit("export_listening", tenant_id=tenant_id, user_id=user_id,
-                      file_name=zip_name, mode="batch", count=len(children))
+            if not await _require_bound_session():
+                return
+            log_audit(
+                "export_listening",
+                tenant_id=tenant_id,
+                user_id=user_id,
+                file_name=zip_name,
+                mode="batch",
+                count=len(children),
+            )
             ui.download(zip_bytes, zip_name)
             show_info(f"批量导出成功：{zip_name}（{len(children)} 人）", ok=True)
         except Exception as ex:  # noqa: BLE001
-            logger.error("批量按领域导出失败", exc_info=ex)
-            show_error(f"批量导出失败：{ex}")
+            if not await _require_bound_session():
+                return
+            logger.error("批量按领域导出失败 error_type=%s", type(ex).__name__)
+            show_error(f"批量导出失败：{type(ex).__name__}")
         finally:
             batch_export_btn.props(remove="loading")
 

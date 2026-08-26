@@ -16,13 +16,17 @@ class TestGetMenuItems:
         assert "course-review-activity" in keys
         assert "settings" in keys
         assert "user-admin" not in keys
-        assert "profile" not in keys
+        assert "profile" in keys
 
-    def test_sys_admin_sees_same_items(self):
-        """单用户模式下 sys_admin 与 teacher 看到相同菜单。"""
+    def test_sys_admin_sees_account_administration(self):
+        """可信会话中的 sys_admin 额外看到账号管理入口。"""
         admin_items = get_menu_items("sys_admin")
         teacher_items = get_menu_items("teacher")
-        assert [i["key"] for i in admin_items] == [i["key"] for i in teacher_items]
+        admin_keys = [item["key"] for item in admin_items]
+        teacher_keys = [item["key"] for item in teacher_items]
+        assert "user-admin" in admin_keys
+        assert "user-admin" not in teacher_keys
+        assert set(teacher_keys) < set(admin_keys)
 
     def test_all_roles_see_core_items(self):
         """所有角色均可见核心菜单项：每日活动计划、设置、提示词管理。"""
@@ -31,7 +35,9 @@ class TestGetMenuItems:
             keys = [item["key"] for item in items]
             assert "daily-plan" in keys, f"role={role} 缺少 daily-plan"
             assert "homemade-teaching" in keys, f"role={role} 缺少 homemade-teaching"
-            assert "course-review-activity" in keys, f"role={role} 缺少 course-review-activity"
+            assert "course-review-activity" in keys, (
+                f"role={role} 缺少 course-review-activity"
+            )
             assert "settings" in keys, f"role={role} 缺少 settings"
             assert "prompts" in keys, f"role={role} 缺少 prompts"
 

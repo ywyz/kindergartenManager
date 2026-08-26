@@ -15,13 +15,17 @@
 - 查看历史版本列表，支持一键回滚
 """
 
+from collections.abc import Awaitable, Callable
+
 from nicegui import ui
 
 from app.core.database import AsyncSessionLocal
 from app.core.exceptions import AiCallError, AiParseError, ConfigError
 from app.core.logging import get_logger
-from app.core.user_context import get_current_user
-from app.integration.ai_client.adapt_client import DEFAULT_ADAPT_PROMPT, adapt_activity_process
+from app.integration.ai_client.adapt_client import (
+    DEFAULT_ADAPT_PROMPT,
+    adapt_activity_process,
+)
 from app.integration.ai_client.base import call_ai_text
 from app.integration.ai_client.course_review_activity_client import (
     DEFAULT_COURSE_REVIEW_ACTIVITY_PROMPT,
@@ -33,8 +37,13 @@ from app.integration.ai_client.generate_client import (
     DEFAULT_MORNING_TALK_PROMPT,
     DEFAULT_OUTDOOR_GAME_PROMPT,
 )
-from app.integration.ai_client.homemade_teaching_client import DEFAULT_HOMEMADE_TEACHING_PROMPT
-from app.integration.ai_client.lesson_plan_client import DEFAULT_SPLIT_PROMPT, split_lesson_plan
+from app.integration.ai_client.homemade_teaching_client import (
+    DEFAULT_HOMEMADE_TEACHING_PROMPT,
+)
+from app.integration.ai_client.lesson_plan_client import (
+    DEFAULT_SPLIT_PROMPT,
+    split_lesson_plan,
+)
 from app.integration.ai_client.listening_client import DEFAULT_LISTENING_PROMPT
 from app.integration.ai_client.observation_client import DEFAULT_OBSERVATION_PROMPT
 from app.repository.ai_key_repository import get_active_ai_key, get_decrypted_key
@@ -44,9 +53,16 @@ from app.repository.prompt_repository import (
     rollback_to_version,
     save_new_version,
 )
+from app.ui.auth_context import (
+    TrustedUiSession,
+    require_bound_ui_session,
+    require_current_ui_session,
+)
 from app.ui.components.app_shell import render_shell
 
 logger = get_logger(__name__)
+
+SessionGuard = Callable[[], Awaitable[TrustedUiSession | None]]
 
 # 每种任务类型的展示名称与内置默认提示词
 _TASK_CONFIG = {
@@ -158,12 +174,14 @@ _TEST_PLACEHOLDER: dict[str, str] = {
 
 @ui.page("/prompts")
 async def prompt_mgmt_page() -> None:
-    user = get_current_user()
+    ui_session = await require_current_ui_session()
+    if ui_session is None:
+        return
 
-    tenant_id: int = user["tenant_id"]
-    user_id: int = int(user["sub"])
+    await render_shell(ui_session.as_user_dict(), active="prompts")
 
-    await render_shell(user, active="prompts")
+    async def require_live_session() -> TrustedUiSession | None:
+        return await require_bound_ui_session(ui_session)
 
     with ui.column().classes("w-full max-w-3xl mx-auto p-6 gap-6"):
         ui.label("提示词管理").classes("text-xl font-bold text-blue-700")
@@ -187,31 +205,53 @@ async def prompt_mgmt_page() -> None:
 
         with ui.tab_panels(tabs, value=tab_split).classes("w-full"):
             with ui.tab_panel(tab_split):
-                await _build_task_panel(tenant_id, user_id, "split")
+                await _build_task_panel(ui_session, require_live_session, "split")
             with ui.tab_panel(tab_adapt):
-                await _build_task_panel(tenant_id, user_id, "adapt")
+                await _build_task_panel(ui_session, require_live_session, "adapt")
             with ui.tab_panel(tab_morning_exercise):
-                await _build_task_panel(tenant_id, user_id, "morning_exercise")
+                await _build_task_panel(
+                    ui_session, require_live_session, "morning_exercise"
+                )
             with ui.tab_panel(tab_morning_talk):
-                await _build_task_panel(tenant_id, user_id, "morning_talk")
+                await _build_task_panel(
+                    ui_session, require_live_session, "morning_talk"
+                )
             with ui.tab_panel(tab_area_game):
-                await _build_task_panel(tenant_id, user_id, "area_game")
+                await _build_task_panel(ui_session, require_live_session, "area_game")
             with ui.tab_panel(tab_outdoor_game):
-                await _build_task_panel(tenant_id, user_id, "outdoor_game")
+                await _build_task_panel(
+                    ui_session, require_live_session, "outdoor_game"
+                )
             with ui.tab_panel(tab_daily_reflection):
-                await _build_task_panel(tenant_id, user_id, "daily_reflection")
+                await _build_task_panel(
+                    ui_session, require_live_session, "daily_reflection"
+                )
             with ui.tab_panel(tab_game_observation):
-                await _build_task_panel(tenant_id, user_id, "game_observation")
+                await _build_task_panel(
+                    ui_session, require_live_session, "game_observation"
+                )
             with ui.tab_panel(tab_one_on_one_listening):
-                await _build_task_panel(tenant_id, user_id, "one_on_one_listening")
+                await _build_task_panel(
+                    ui_session, require_live_session, "one_on_one_listening"
+                )
             with ui.tab_panel(tab_homemade_teaching):
-                await _build_task_panel(tenant_id, user_id, "homemade_teaching")
+                await _build_task_panel(
+                    ui_session, require_live_session, "homemade_teaching"
+                )
             with ui.tab_panel(tab_course_review_activity):
-                await _build_task_panel(tenant_id, user_id, "course_review_activity")
+                await _build_task_panel(
+                    ui_session, require_live_session, "course_review_activity"
+                )
 
 
-async def _build_task_panel(tenant_id: int, user_id: int, task_type: str) -> None:
+async def _build_task_panel(
+    ui_session: TrustedUiSession,
+    require_live_session: SessionGuard,
+    task_type: str,
+) -> None:
     """构建单个任务类型的提示词编辑区块（含历史版本列表）。"""
+    tenant_id = ui_session.tenant_id
+    user_id = ui_session.user_id
     config = _TASK_CONFIG[task_type]
     label = config["label"]
     placeholder = config["placeholder"]
@@ -220,6 +260,9 @@ async def _build_task_panel(tenant_id: int, user_id: int, task_type: str) -> Non
     async with AsyncSessionLocal() as session:
         active = await get_active_prompt(session, tenant_id, user_id, task_type)
         versions = await list_versions(session, tenant_id, user_id, task_type)
+
+    if await require_live_session() is None:
+        return
 
     initial_content = active.content if active else ""
 
@@ -231,14 +274,21 @@ async def _build_task_panel(tenant_id: int, user_id: int, task_type: str) -> Non
         else:
             ui.badge("使用内置默认（尚未保存自定义版本）", color="gray").classes("mb-2")
 
-        content_area = ui.textarea(
-            placeholder=placeholder,
-            value=initial_content,
-        ).classes("w-full font-mono text-sm").props("rows=12 outlined")
+        content_area = (
+            ui.textarea(
+                placeholder=placeholder,
+                value=initial_content,
+            )
+            .classes("w-full font-mono text-sm")
+            .props("rows=12 outlined")
+        )
 
         msg_label = ui.label("").classes("text-sm mt-1")
 
         async def save_version() -> None:
+            current = await require_live_session()
+            if current is None:
+                return
             new_content = content_area.value.strip()
             if not new_content:
                 msg_label.set_text("⚠ 内容不能为空")
@@ -248,29 +298,53 @@ async def _build_task_panel(tenant_id: int, user_id: int, task_type: str) -> Non
             try:
                 async with AsyncSessionLocal() as session:
                     new_prompt = await save_new_version(
-                        session, tenant_id, user_id, task_type, new_content
+                        session,
+                        current.tenant_id,
+                        current.user_id,
+                        task_type,
+                        new_content,
                     )
                 logger.info(
                     "保存提示词新版本",
                     extra={
-                        "tenant_id": tenant_id,
-                        "user_id": user_id,
+                        "tenant_id": current.tenant_id,
+                        "user_id": current.user_id,
                         "task_type": task_type,
                         "version": new_prompt.version,
                     },
                 )
-                msg_label.set_text(f"✓ 已保存为 v{new_prompt.version}，刷新页面可查看历史")
+                msg_label.set_text(
+                    f"✓ 已保存为 v{new_prompt.version}，刷新页面可查看历史"
+                )
                 msg_label.classes(replace="text-sm mt-1 text-green-600")
                 # 刷新历史列表
+                current = await require_live_session()
+                if current is None:
+                    return
                 history_container.clear()
                 async with AsyncSessionLocal() as session:
                     updated_versions = await list_versions(
-                        session, tenant_id, user_id, task_type
+                        session,
+                        current.tenant_id,
+                        current.user_id,
+                        task_type,
                     )
-                _render_history(history_container, updated_versions, tenant_id, user_id, task_type, content_area, msg_label)
+                if await require_live_session() is None:
+                    return
+                _render_history(
+                    history_container,
+                    updated_versions,
+                    ui_session,
+                    require_live_session,
+                    task_type,
+                    content_area,
+                    msg_label,
+                )
             except Exception as e:
-                logger.error("保存提示词失败", extra={"error": str(e)})
-                msg_label.set_text(f"✗ 保存失败：{e}")
+                if await require_live_session() is None:
+                    return
+                logger.error("保存提示词失败 error_type=%s", type(e).__name__)
+                msg_label.set_text(f"✗ 保存失败：{type(e).__name__}")
                 msg_label.classes(replace="text-sm mt-1 text-red-600")
 
         ui.button("保存为新版本", on_click=save_version).classes(
@@ -291,11 +365,14 @@ async def _build_task_panel(tenant_id: int, user_id: int, task_type: str) -> Non
     # ── 在线测试 ──────────────────────────────────────────────────────────────
     with ui.expansion("🧪 测试提示词效果", icon="science").classes("w-full mt-2"):
         with ui.column().classes("w-full gap-3 p-1"):
-
-            test_input = ui.textarea(
-                label="测试输入",
-                placeholder=_TEST_PLACEHOLDER.get(task_type, "请输入测试内容……"),
-            ).classes("w-full").props("rows=6 outlined")
+            test_input = (
+                ui.textarea(
+                    label="测试输入",
+                    placeholder=_TEST_PLACEHOLDER.get(task_type, "请输入测试内容……"),
+                )
+                .classes("w-full")
+                .props("rows=6 outlined")
+            )
 
             # 年龄适配额外选项
             test_grade_select = None
@@ -310,27 +387,42 @@ async def _build_task_panel(tenant_id: int, user_id: int, task_type: str) -> Non
 
             # 输出区域（split 显示 5 个字段，其余显示原始文本）
             if task_type == "split":
-                test_goal_out = ui.textarea(label="活动目标").classes("w-full").props(
-                    "rows=3 outlined readonly"
+                test_goal_out = (
+                    ui.textarea(label="活动目标")
+                    .classes("w-full")
+                    .props("rows=3 outlined readonly")
                 )
-                test_prep_out = ui.textarea(label="活动准备").classes("w-full").props(
-                    "rows=2 outlined readonly"
+                test_prep_out = (
+                    ui.textarea(label="活动准备")
+                    .classes("w-full")
+                    .props("rows=2 outlined readonly")
                 )
-                test_key_out = ui.textarea(label="活动重点").classes("w-full").props(
-                    "rows=2 outlined readonly"
+                test_key_out = (
+                    ui.textarea(label="活动重点")
+                    .classes("w-full")
+                    .props("rows=2 outlined readonly")
                 )
-                test_diff_out = ui.textarea(label="活动难点").classes("w-full").props(
-                    "rows=2 outlined readonly"
+                test_diff_out = (
+                    ui.textarea(label="活动难点")
+                    .classes("w-full")
+                    .props("rows=2 outlined readonly")
                 )
-                test_proc_out = ui.textarea(label="活动过程").classes("w-full").props(
-                    "rows=5 outlined readonly"
+                test_proc_out = (
+                    ui.textarea(label="活动过程")
+                    .classes("w-full")
+                    .props("rows=5 outlined readonly")
                 )
             else:
-                test_result_out = ui.textarea(label="AI 返回结果").classes(
-                    "w-full"
-                ).props("rows=7 outlined readonly")
+                test_result_out = (
+                    ui.textarea(label="AI 返回结果")
+                    .classes("w-full")
+                    .props("rows=7 outlined readonly")
+                )
 
             async def do_test() -> None:
+                current = await require_live_session()
+                if current is None:
+                    return
                 if not content_area.value.strip():
                     test_msg.classes(replace="text-sm text-orange-500")
                     test_msg.set_text("⚠ 请先在上方输入提示词内容")
@@ -346,7 +438,11 @@ async def _build_task_panel(tenant_id: int, user_id: int, task_type: str) -> Non
 
                 try:
                     async with AsyncSessionLocal() as session:
-                        ai_key = await get_active_ai_key(session, tenant_id, user_id)
+                        ai_key = await get_active_ai_key(
+                            session,
+                            current.tenant_id,
+                            current.user_id,
+                        )
                     if ai_key is None:
                         test_msg.classes(replace="text-sm text-orange-500")
                         test_msg.set_text("⚠ 未配置 AI Key，请到【设置】页面配置")
@@ -365,6 +461,8 @@ async def _build_task_panel(tenant_id: int, user_id: int, task_type: str) -> Non
                             model_name=model,
                             system_prompt=current_prompt,
                         )
+                        if await require_live_session() is None:
+                            return
                         test_goal_out.value = result.get("activity_goal", "")
                         test_prep_out.value = result.get("activity_prep", "")
                         test_key_out.value = result.get("activity_key", "")
@@ -381,6 +479,8 @@ async def _build_task_panel(tenant_id: int, user_id: int, task_type: str) -> Non
                             model_name=model,
                             system_prompt=current_prompt,
                         )
+                        if await require_live_session() is None:
+                            return
                         test_result_out.value = adapted
 
                     else:
@@ -394,23 +494,33 @@ async def _build_task_panel(tenant_id: int, user_id: int, task_type: str) -> Non
                             api_key=api_key_plain,
                             model_name=model,
                         )
+                        if await require_live_session() is None:
+                            return
                         test_result_out.value = text
 
                     test_msg.classes(replace="text-sm text-green-600")
                     test_msg.set_text("✅ 测试完成")
 
-                except AiParseError as e:
+                except AiParseError:
+                    if await require_live_session() is None:
+                        return
                     test_msg.classes(replace="text-sm text-red-500")
-                    test_msg.set_text(f"❌ 解析失败：{e.message}")
-                except AiCallError as e:
+                    test_msg.set_text("❌ AI 返回内容解析失败，请稍后重试")
+                except AiCallError:
+                    if await require_live_session() is None:
+                        return
                     test_msg.classes(replace="text-sm text-red-500")
-                    test_msg.set_text(f"❌ AI调用失败：{e.message}")
-                except ConfigError as e:
+                    test_msg.set_text("❌ AI 调用失败，请检查配置或稍后重试")
+                except ConfigError:
+                    if await require_live_session() is None:
+                        return
                     test_msg.classes(replace="text-sm text-orange-500")
-                    test_msg.set_text(f"⚠ {e.message}")
+                    test_msg.set_text("⚠ AI 配置不可用，请检查模型配置")
                 except Exception as e:
+                    if await require_live_session() is None:
+                        return
                     test_msg.classes(replace="text-sm text-red-500")
-                    test_msg.set_text(f"❌ {type(e).__name__}: {e}")
+                    test_msg.set_text(f"❌ {type(e).__name__}")
                 finally:
                     test_btn.props(remove="loading")
 
@@ -420,14 +530,22 @@ async def _build_task_panel(tenant_id: int, user_id: int, task_type: str) -> Non
 
     # ── 历史版本列表 ──────────────────────────────────────────────────────────
     history_container = ui.column().classes("w-full gap-2 mt-2")
-    _render_history(history_container, versions, tenant_id, user_id, task_type, content_area, msg_label)
+    _render_history(
+        history_container,
+        versions,
+        ui_session,
+        require_live_session,
+        task_type,
+        content_area,
+        msg_label,
+    )
 
 
 def _render_history(
     container: ui.column,
     versions: list,
-    tenant_id: int,
-    user_id: int,
+    ui_session: TrustedUiSession,
+    require_live_session: SessionGuard,
     task_type: str,
     content_area: ui.textarea,
     msg_label: ui.label,
@@ -439,7 +557,9 @@ def _render_history(
     with container:
         ui.label("历史版本").classes("text-sm font-semibold text-gray-600 mt-2")
         for v in versions:
-            created_str = v.created_at.strftime("%Y-%m-%d %H:%M") if v.created_at else "—"
+            created_str = (
+                v.created_at.strftime("%Y-%m-%d %H:%M") if v.created_at else "—"
+            )
             with ui.row().classes("items-center gap-2 bg-gray-50 rounded p-2 w-full"):
                 if v.is_active:
                     ui.badge(f"v{v.version} ✓ 激活", color="green")
@@ -452,23 +572,50 @@ def _render_history(
                     _ver = v.version
 
                     async def rollback(_ver=_ver) -> None:
+                        current = await require_live_session()
+                        if current is None:
+                            return
                         try:
                             async with AsyncSessionLocal() as session:
                                 rolled = await rollback_to_version(
-                                    session, tenant_id, user_id, task_type, _ver
+                                    session,
+                                    current.tenant_id,
+                                    current.user_id,
+                                    task_type,
+                                    _ver,
                                 )
+                            current = await require_live_session()
+                            if current is None:
+                                return
                             content_area.value = rolled.content
-                            msg_label.set_text(f"✓ 已回滚到 v{_ver}，刷新页面可看完整历史")
+                            msg_label.set_text(
+                                f"✓ 已回滚到 v{_ver}，刷新页面可看完整历史"
+                            )
                             msg_label.classes(replace="text-sm mt-1 text-blue-600")
                             # 刷新容器
                             container.clear()
                             async with AsyncSessionLocal() as session:
                                 updated = await list_versions(
-                                    session, tenant_id, user_id, task_type
+                                    session,
+                                    current.tenant_id,
+                                    current.user_id,
+                                    task_type,
                                 )
-                            _render_history(container, updated, tenant_id, user_id, task_type, content_area, msg_label)
+                            if await require_live_session() is None:
+                                return
+                            _render_history(
+                                container,
+                                updated,
+                                ui_session,
+                                require_live_session,
+                                task_type,
+                                content_area,
+                                msg_label,
+                            )
                         except Exception as e:
-                            msg_label.set_text(f"✗ 回滚失败：{e}")
+                            if await require_live_session() is None:
+                                return
+                            msg_label.set_text(f"✗ 回滚失败：{type(e).__name__}")
                             msg_label.classes(replace="text-sm mt-1 text-red-600")
 
                     ui.button("回滚", on_click=rollback).classes(

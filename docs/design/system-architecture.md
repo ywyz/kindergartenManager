@@ -1,6 +1,6 @@
 # KindergartenManager 系统架构设计
 
-> 本文描述审查基线 `dev4.0@0657c3a` 的实际架构；最近产品主线为 `main@225fe139`。不把旧分支、未提交改动或未来规划写成已发布能力。
+> 当前基线为 `main@ca3b7bd`，Agent Foundation 已合入主线。本文同时标记当前工作树中尚未提交的可信 UI session 与 `daily_plan.revision` 事实；这些改动尚未进入 CI 或人工验收，不得写成已发布能力。
 
 ## 1. 架构目标
 
@@ -33,11 +33,12 @@ NiceGUI 页面与组件  ───────────────┐
 
 当前代码是模块化单体。`services/` 没有可运行的 ai/word/holiday 微服务；任何服务拆分都属于未来架构变更，需独立 ADR、契约和运维理由。
 
-### 2.1 已实现并验收的 Agent 视图（功能分支）
+### 2.1 已合入主线的 Agent Foundation 视图
 
 [ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md) 已确认该能力的架构上限。下图已在
-`feat/agent-foundation` 实现并完成 F009 验收；它仍是主应用内的模块化单体调用链，不代表已经合入 `main`、
-拆分为微服务或发布：
+`feat/agent-foundation` 完成并合入 `main@ca3b7bd`；它仍是主应用内的模块化单体调用链，不代表
+拆分为微服务。F009 自动/人工证据仅对其 `tested_code_sha` 有效；当前工作树已有产品改动，
+因此旧证据只是历史证据，不是当前树的人工验收。
 
 ```text
 NiceGUI 每日计划 Agent 面板
@@ -62,8 +63,8 @@ Python、SQL、MCP 或动态插件。完整契约见 [Agent Runtime 设计](agen
 python -m app.main
   ├─ 解析配置与用户数据目录
   ├─ 尝试 Alembic upgrade head
-  ├─ 注册默认单用户
-  ├─ 注册异常处理、当前单用户路由、/api/v1
+  ├─ 不自动创建固定 admin；空库初始化/旧库恢复只走本地主机显式 bootstrap
+  ├─ 登录与受保护 UI 路由、/api/v1
   └─ NiceGUI 监听 0.0.0.0:PORT
 ```
 
@@ -111,8 +112,11 @@ app/jobs        ─┘
 
 当前由 `app/main.py` 注册的 UI 页面：
 
-- `/` → `/home`
+- `/` → `/login`
+- `/login`
 - `/home`
+- `/profile`
+- `/user-admin`（仅 `sys_admin`）
 - `/settings`
 - `/setup`（旧链接兼容入口，立即跳转 `/settings`）
 - `/daily-plan`
@@ -122,7 +126,9 @@ app/jobs        ─┘
 - `/homemade-teaching`
 - `/course-review-activity`
 
-代码库仍有 `/register`、`/profile`、`/user-admin` 页面模块和认证中间件，但 `app/main.py` 当前不导入/挂载它们，因此不属于有效产品导航或安全边界；这些代码只作为低优先级多用户预备资产保留。
+除 `/login` 与根跳转外，业务页面在页面入口通过可信 session seam 失败关闭；
+`/user-admin` 还使用数据库权威角色做 `sys_admin` 限制。中间件只负责根路径兼容跳转，
+不取代页面入口的数据库回查，也不介入独立的 API 身份边界。
 
 当前 API（统一前缀 `/api/v1`）：
 
@@ -138,19 +144,25 @@ app/jobs        ─┘
 
 ### 6.1 UI
 
-UI 使用固定用户上下文，不执行登录鉴权：
+UI 不再使用固定 `tenant_id=1/user_id=1/sys_admin` actor。登录成功后签发带唯一 `jti`、
+`iat` 和 `exp` 的 JWT；浏览器只保存 token。每次进入受保护页面时，`TrustedUiSession`
+同时验证签名/claims 并按 token 中的 tenant + user 重新读取数据库 active User：
 
 ```text
-tenant_id = 1
-user_id   = int(sub) = 1
-role      = sys_admin
+JWT(sub, tenant_id, jti, iat, exp)
+       + actor-scoped active User DB re-read
+       → TrustedUiSession(session_id, tenant_id, user_id, DB role/name, expiry)
 ```
 
-保留的 JWT、密码和 RBAC 模块是历史/未来资产，不代表当前页面受它们保护。恢复多用户需要独立设计：会话存储、路由守卫、管理员初始化、邀请/注册、迁移和所有模块的越权测试必须成套完成。
+token 中的 role/name 不是权威来源；停用、删除、tenant/user 不匹配或无效 session 都清空登录状态并
+跳转 `/login`。有外部副作用的长寿命 callback 还必须重验页面初始 `jti` 与当前登录完全一致；
+旧标签页不能跨退出/重新登录复用旧 actor。旧版固定 admin 自动 bootstrap 已退役，且其历史固定密码哈希不得登录；
+匿名自注册不挂载；只有显式本地 `app.jobs.bootstrap_admin --init` 才能初始化/恢复管理员。
 
 ### 6.2 API
 
-API Key 是服务主体，不是 UI 用户。配置格式把 Key 映射到租户；repository 查询以该租户为强制条件。启用 HMAC 时签名覆盖时间戳、方法、路径和原始 query，时间偏差受限。
+API Key 是服务主体，不是 UI 用户，也不使用 UI JWT/session。配置格式把 Key 映射到租户；
+repository 查询以该租户为强制条件。启用 HMAC 时签名覆盖时间戳、方法、路径和原始 query，时间偏差受限。
 
 ## 7. 主要业务流
 
@@ -166,7 +178,7 @@ UI 输入 → Service 读取 active prompt / AI profile
 
 Service 不应直接发 HTTP；原始 AI 结果如需保存必须按业务设计处理，不能含密钥。
 
-这条已有“单次生成”流与未来 Agent 循环是两个不同的应用边界。不得把既有 AI 生成函数临时包装为动态
+这条已有“单次生成”流与已合入的 Agent Foundation 循环是两个不同的应用边界。不得把既有 AI 生成函数临时包装为动态
 Agent Tool；Agent Foundation 只能登记以下六个关闭 Tool：
 
 ```text
@@ -203,6 +215,13 @@ DRAFT 只返回内存 `PlanPatch`，不修改 UI 正文、数据库、版本、p
 ## 8. 数据与事务
 
 - `AsyncSessionLocal` 为 SQLAlchemy 异步会话工厂。
+- 当前工作树为 `daily_plan` 增加非空正整数 `revision`：新行和迁移回填都从 1 开始。
+  页面加载保存精确 plan id + revision；Repository 更新必须匹配这两个调用方观察值，ORM
+  `version_id_col` 再执行实际 UPDATE CAS。成功内容更新恰好 `+1`，陈旧页面/并发对象均失败。
+  调用方不能经 `**kwargs` 或公开 ORM 属性指定 revision；数据库 trigger 拒绝非 1 初始值、纯 revision bump
+  及任何不满足“内容变化且 `OLD + 1`”的 UPDATE；MySQL 文本比较使用 `CAST(... AS BINARY)`，不受默认
+  case/accent-insensitive collation 影响；只读 API 显式返回 revision。人工删除也以页面读取的 plan id +
+  revision 做 tenant/user-scoped 条件 DELETE，stale 页面不能按日期误删新版本。
 - 一对一倾听和游戏观察的聚合保存/覆盖由 service/use-case 持有 `AsyncSessionUnitOfWork`；相关内部 repository 只 `flush()`，由最外层统一 commit，任一存储或子记录写入失败都会 rollback。
 - UI 触发的聚合删除也在最外层 Unit of Work 中完成；其他单记录 repository 的事务迁移按用例逐步进行，不把局部完成误写为全仓库完成。
 - API 只读路由使用显式 `for_tenant` 投影；UI 用户资源使用 tenant + user 投影。ID、父记录 ID 和同租户关系都不能替代 user 条件。
@@ -219,7 +238,13 @@ DRAFT 只返回内存 `PlanPatch`，不修改 UI 正文、数据库、版本、p
 - `API_SIGNING_SECRET` 非空时强制 HMAC。
 - `IMAGE_STORAGE_BACKEND` 当前默认 `mysql_blob`。
 
+AI endpoint/model 和加密后的 AI Key 已由 `/settings` 按 actor 的 tenant + user 持久化到
+`ai_api_key`。日常跨 worktree 复测应使用仓库外的专用非生产数据库，并稳定保留与该库配对的
+`ENCRYPTION_KEY`/`JWT_SECRET`；源码跨 worktree 时应从仓库外、权限受限的环境文件加载这些进程环境变量，
+打包版或同一持久化启动目录则可复用其 owner-only `.kindergarten_secrets`。这样不需每次重填。
+AI Key 不应写入 `.env`、仓库或测试日志；数据库密文与原 `ENCRYPTION_KEY` 必须配对才能解密。
 自动生成密钥方便本地运行，但服务器部署应显式提供、备份并限制文件权限。
+正式 F009 隔离验收仍要求指定 SHA 的新鲜环境/数据库与安全一次性录入，不能用日常持久化 profile 冒充该证据。
 
 ## 10. 故障与降级
 
@@ -231,13 +256,14 @@ DRAFT 只返回内存 `PlanPatch`，不修改 UI 正文、数据库、版本、p
 | 模板缺失/异常 | 部分 exporter 有降级路径 | 正式交付必须验证固定模板，不以降级稿代替 |
 | 数据库不可达 | Repository/页面显示错误 | 不记录连接密钥，事务不得半完成 |
 | 图片过大/方向异常 | 压缩、规格校验、横版归一 | 原图隐私和内存上限需持续验证 |
-| Agent Provider/Tool call（计划） | Runtime 本地校验、关闭 registry、有界 loop | 未实现；任何未知/WRITE Tool 都必须拒绝 |
-| Agent 取消/上下文变化（计划） | operation/scope/fingerprint 匹配，迟到结果丢弃 | 不得在页面切换后回填或保存 |
+| Agent Provider/Tool call | Runtime 本地校验、关闭 registry、有界 loop | Foundation 已合入；任何未知/WRITE Tool 仍必须拒绝 |
+| Agent 取消/上下文变化 | operation/scope/fingerprint 匹配，迟到结果丢弃 | 不得在页面切换后回填或保存 |
+| Agent 逐次确认 WRITE | 当前只有 ADR/spec/稳定 RED | confirmation、操作前版本、不可变审计和采用 UI 生产实现均不存在，不得视为可写能力 |
 
 ## 11. 可观测性与审计
 
 - 全局异常以结构化日志记录类型、消息和 traceback。
-- `log_audit` 用于 AI、导出、关键设置及保留的历史登录路径；审计失败不应阻断主流程。
+- `log_audit` 用于 AI、导出、关键设置及登录/账号操作；它是日志边界，不是未来 Agent WRITE 的同事务不可变审计，当前失败不阻断主流程。
 - 日志不得出现密码、API Key、HMAC secret、完整数据库 URL 或幼儿图片内容。
 - 当前没有集中式 metrics/tracing；需要时先定义运营问题，不盲目引入平台。
 
@@ -253,9 +279,12 @@ DRAFT 只返回内存 `PlanPatch`，不修改 UI 正文、数据库、版本、p
 - UI：纯 helper 自动测试 + 浏览器/人工主流程。
 - Agent Foundation：契约/Schema、未知和 WRITE Tool 拒绝、tenant/user 裁剪、有界 loop、取消/超时/迟到丢弃，
   并证明所有路径零业务持久化。
+- Agent WRITE：当前只保留独立 ADR/spec 与稳定 RED，不得将 RED 或未提交的 revision 先决条件写成生产 GREEN。
 - Word/打包：目标平台人工验收。
 
 codebase-memory/Graphify 只能发现结构、热点和文档关系，不替代这些测试。
+当前工作树的 UI session/revision/RED 改动尚未提交、未跑 CI、未做浏览器或真模型人工验收；
+旧 F009 人工结果不能填补这些门禁。
 
 ## 13. 已知架构热点
 
@@ -263,11 +292,11 @@ codebase-memory/Graphify 只能发现结构、热点和文档关系，不替代�
 
 ## 14. 后续架构决策点
 
-- 当前继续单用户；多用户/RBAC 为低优先级预备能力，恢复时需独立门禁。
+- 可信 UI 登录/session 与 DB 权威角色已在当前工作树恢复；其提交、CI、浏览器矩阵和会话撤销/运维策略仍是独立门禁。
 - 启动迁移已统一采用 fail-closed；若未来需要离线只读恢复模式，需独立 ADR。
 - 下一项功能开发使用哪个固定分支/SHA。
 - 逻辑外键是否逐步收紧为数据库外键。
 - 是否有真实吞吐/运维需求足以支持微服务拆分。
 - 图片后端、备份恢复和数据保留策略。
-- Agent Foundation 已具备冻结分支/spec/Issue/RED 的前置基础；具体窄 Service 投影仍按后续任务逐项建立。
-- Agent WRITE 是否有真实需求；如有，需独立决定可信 actor、`daily_plan` revision、确认、版本和审计模型。
+- Agent Foundation 已合入主线，仍固定为 4 READ + 2 DRAFT 且零 Agent 持久化。
+- Agent WRITE 的可信 actor、`daily_plan.revision`、逐次确认、操作前版本、短事务、不可变审计与全回滚已在独立 ADR/spec/RED 冻结；下一门禁是否授权生产 GREEN，不是默认继续实现。

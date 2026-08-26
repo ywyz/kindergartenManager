@@ -10,7 +10,6 @@ from app.core.audit import log_audit
 from app.core.database import AsyncSessionLocal
 from app.core.exceptions import AiCallError, AiParseError, ConfigError
 from app.core.logging import get_logger
-from app.core.user_context import get_current_user
 from app.integration.word_export.course_review_activity_exporter import (
     export_course_review_activity,
 )
@@ -25,6 +24,7 @@ from app.repository.export_repository import save_export_record
 from app.service.course_review_activity_service import (
     generate_course_review_activity_content,
 )
+from app.ui.auth_context import require_bound_ui_session, require_current_ui_session
 from app.ui.components.app_shell import render_shell
 from app.ui.helpers import (
     clean_filename_part as _clean_filename_part,
@@ -50,7 +50,9 @@ def build_course_review_activity_filename(
     return f"{tenant_id}_{user_id}_{grade_part}_{cls}_{rid}_课程审议.docx"
 
 
-def validate_course_review_form(data: dict, *, require_generated: bool = True) -> list[str]:
+def validate_course_review_form(
+    data: dict, *, require_generated: bool = True
+) -> list[str]:
     """校验课程审议表单内容。"""
     required = [
         ("activity_name", "请填写活动名称"),
@@ -71,20 +73,25 @@ def validate_course_review_form(data: dict, *, require_generated: bool = True) -
             ]
         )
     return [
-        message
-        for key, message in required
-        if not str(data.get(key) or "").strip()
+        message for key, message in required if not str(data.get(key) or "").strip()
     ]
 
 
 @ui.page("/course-review-activity")
 async def course_review_activity_page() -> None:
-    user = get_current_user()
-    tenant_id: int = user["tenant_id"]
-    user_id: int = int(user["sub"])
+    ui_session = await require_current_ui_session()
+    if ui_session is None:
+        return
+    tenant_id = ui_session.tenant_id
+    user_id = ui_session.user_id
+
+    async def _require_bound_session() -> bool:
+        return await require_bound_ui_session(ui_session) is not None
 
     async with AsyncSessionLocal() as session:
         class_cfg = await get_class_config(session, tenant_id, user_id)
+    if not await _require_bound_session():
+        return
 
     context = {
         "grade": class_cfg.grade if class_cfg else "",
@@ -92,7 +99,7 @@ async def course_review_activity_page() -> None:
         "teacher_name": class_cfg.teacher_name if class_cfg else "",
     }
 
-    await render_shell(user, active="course-review-activity")
+    await render_shell(ui_session.as_user_dict(), active="course-review-activity")
 
     state: dict = {"record_id": None}
 
@@ -126,28 +133,56 @@ async def course_review_activity_page() -> None:
                     label="活动时间",
                     placeholder="如：2026.06.28",
                 ).classes("w-48")
-            lesson_plan_original_input = ui.textarea(
-                label="原始教案",
-                placeholder="粘贴完整教案，AI 将拆分并生成课程审议内容",
-            ).classes("w-full").props("rows=8")
+            lesson_plan_original_input = (
+                ui.textarea(
+                    label="原始教案",
+                    placeholder="粘贴完整教案，AI 将拆分并生成课程审议内容",
+                )
+                .classes("w-full")
+                .props("rows=8")
+            )
 
         with ui.card().classes("w-full"):
             ui.label("AI 生成与编辑").classes("font-semibold text-gray-700 mb-2")
-            activity_goal_input = ui.textarea(label="活动目标").classes("w-full").props("rows=4")
+            activity_goal_input = (
+                ui.textarea(label="活动目标").classes("w-full").props("rows=4")
+            )
             goal_adjusted_checkbox = ui.checkbox("活动目标有所调整")
-            goal_adjustment_input = ui.textarea(label="活动目标调整内容").classes("w-full").props("rows=3")
-            activity_goal_revised_input = ui.textarea(label="调整后的活动目标").classes("w-full").props("rows=4")
+            goal_adjustment_input = (
+                ui.textarea(label="活动目标调整内容").classes("w-full").props("rows=3")
+            )
+            activity_goal_revised_input = (
+                ui.textarea(label="调整后的活动目标").classes("w-full").props("rows=4")
+            )
 
-            activity_prep_input = ui.textarea(label="活动准备").classes("w-full").props("rows=4")
+            activity_prep_input = (
+                ui.textarea(label="活动准备").classes("w-full").props("rows=4")
+            )
             prep_adjusted_checkbox = ui.checkbox("活动准备有所调整")
-            prep_adjustment_input = ui.textarea(label="活动准备调整内容").classes("w-full").props("rows=3")
-            activity_prep_revised_input = ui.textarea(label="调整后的活动准备").classes("w-full").props("rows=4")
+            prep_adjustment_input = (
+                ui.textarea(label="活动准备调整内容").classes("w-full").props("rows=3")
+            )
+            activity_prep_revised_input = (
+                ui.textarea(label="调整后的活动准备").classes("w-full").props("rows=4")
+            )
 
-            activity_process_input = ui.textarea(label="活动过程记录").classes("w-full").props("rows=7")
-            process_adjustment_input = ui.textarea(label="活动过程调整内容").classes("w-full").props("rows=5")
-            activity_process_revised_input = ui.textarea(label="调整后的活动过程").classes("w-full").props("rows=7")
-            review_reason_input = ui.textarea(label="课程审议后调整的理由").classes("w-full").props("rows=5")
-            revised_lesson_plan_input = ui.textarea(label="二次修改完整教案").classes("w-full").props("rows=10")
+            activity_process_input = (
+                ui.textarea(label="活动过程记录").classes("w-full").props("rows=7")
+            )
+            process_adjustment_input = (
+                ui.textarea(label="活动过程调整内容").classes("w-full").props("rows=5")
+            )
+            activity_process_revised_input = (
+                ui.textarea(label="调整后的活动过程").classes("w-full").props("rows=7")
+            )
+            review_reason_input = (
+                ui.textarea(label="课程审议后调整的理由")
+                .classes("w-full")
+                .props("rows=5")
+            )
+            revised_lesson_plan_input = (
+                ui.textarea(label="二次修改完整教案").classes("w-full").props("rows=10")
+            )
 
         with ui.row().classes("w-full gap-3 justify-end"):
             generate_btn = ui.button("AI 生成", icon="auto_awesome").classes(
@@ -183,8 +218,12 @@ async def course_review_activity_page() -> None:
             }
 
         async def _save_current() -> int | None:
+            if not await _require_bound_session():
+                return None
             data = _current_form_dict()
-            errors = validate_generation_context(context) + validate_course_review_form(data)
+            errors = validate_generation_context(context) + validate_course_review_form(
+                data
+            )
             if errors:
                 show_error("；".join(errors))
                 return None
@@ -200,10 +239,14 @@ async def course_review_activity_page() -> None:
             return record.id
 
         async def do_generate() -> None:
+            if not await _require_bound_session():
+                return
             generate_btn.props("loading=true")
             try:
                 base_data = _current_form_dict()
-                errors = validate_generation_context(context) + validate_course_review_form(
+                errors = validate_generation_context(
+                    context
+                ) + validate_course_review_form(
                     base_data,
                     require_generated=False,
                 )
@@ -217,32 +260,52 @@ async def course_review_activity_page() -> None:
                         user_id=user_id,
                         context=base_data,
                     )
+                if not await _require_bound_session():
+                    return
                 activity_goal_input.value = str(result.get("activity_goal", ""))
                 activity_prep_input.value = str(result.get("activity_prep", ""))
                 activity_process_input.value = str(result.get("activity_process", ""))
                 goal_adjusted_checkbox.value = bool(result.get("goal_adjusted", False))
                 goal_adjustment_input.value = str(result.get("goal_adjustment", ""))
-                activity_goal_revised_input.value = str(result.get("activity_goal_revised", ""))
+                activity_goal_revised_input.value = str(
+                    result.get("activity_goal_revised", "")
+                )
                 prep_adjusted_checkbox.value = bool(result.get("prep_adjusted", False))
                 prep_adjustment_input.value = str(result.get("prep_adjustment", ""))
-                activity_prep_revised_input.value = str(result.get("activity_prep_revised", ""))
-                process_adjustment_input.value = str(result.get("process_adjustment", ""))
-                activity_process_revised_input.value = str(result.get("activity_process_revised", ""))
+                activity_prep_revised_input.value = str(
+                    result.get("activity_prep_revised", "")
+                )
+                process_adjustment_input.value = str(
+                    result.get("process_adjustment", "")
+                )
+                activity_process_revised_input.value = str(
+                    result.get("activity_process_revised", "")
+                )
                 review_reason_input.value = str(result.get("review_reason", ""))
-                revised_lesson_plan_input.value = str(result.get("revised_lesson_plan", ""))
+                revised_lesson_plan_input.value = str(
+                    result.get("revised_lesson_plan", "")
+                )
                 state["record_id"] = None
                 show_success("生成成功，请检查并保存")
-            except ConfigError as exc:
-                show_error(exc.message)
-            except (AiCallError, AiParseError) as exc:
-                show_error(exc.message)
+            except ConfigError:
+                if not await _require_bound_session():
+                    return
+                show_error("AI 配置不可用，请检查模型配置")
+            except (AiCallError, AiParseError):
+                if not await _require_bound_session():
+                    return
+                show_error("AI 调用或解析失败，请稍后重试")
             except Exception as exc:
-                logger.error("生成课程审议失败", exc_info=exc)
-                show_error(f"生成失败：{type(exc).__name__}: {exc}")
+                if not await _require_bound_session():
+                    return
+                logger.error("生成课程审议失败 error_type=%s", type(exc).__name__)
+                show_error(f"生成失败：{type(exc).__name__}")
             finally:
                 generate_btn.props(remove="loading")
 
         async def do_save() -> None:
+            if not await _require_bound_session():
+                return
             save_btn.props("loading=true")
             try:
                 record_id = await _save_current()
@@ -251,12 +314,16 @@ async def course_review_activity_page() -> None:
                 show_success(f"保存成功（记录 ID：{record_id}）")
                 await refresh_history()
             except Exception as exc:
-                logger.error("保存课程审议失败", exc_info=exc)
-                show_error(f"保存失败：{exc}")
+                if not await _require_bound_session():
+                    return
+                logger.error("保存课程审议失败 error_type=%s", type(exc).__name__)
+                show_error(f"保存失败：{type(exc).__name__}")
             finally:
                 save_btn.props(remove="loading")
 
         async def do_export() -> None:
+            if not await _require_bound_session():
+                return
             export_btn.props("loading=true")
             try:
                 record_id = state.get("record_id")
@@ -284,6 +351,8 @@ async def course_review_activity_page() -> None:
                         course_review_activity_id=record_id,
                     )
                     await session.commit()
+                if not await _require_bound_session():
+                    return
                 log_audit(
                     "export_course_review_activity",
                     tenant_id=tenant_id,
@@ -294,8 +363,10 @@ async def course_review_activity_page() -> None:
                 ui.download(doc_bytes, file_name)
                 show_success(f"导出成功：{file_name}")
             except Exception as exc:
-                logger.error("导出课程审议失败", exc_info=exc)
-                show_error(f"导出失败：{exc}")
+                if not await _require_bound_session():
+                    return
+                logger.error("导出课程审议失败 error_type=%s", type(exc).__name__)
+                show_error(f"导出失败：{type(exc).__name__}")
             finally:
                 export_btn.props(remove="loading")
 
@@ -308,6 +379,8 @@ async def course_review_activity_page() -> None:
         history_container = ui.column().classes("w-full gap-2")
 
         async def refresh_history() -> None:
+            if not await _require_bound_session():
+                return
             history_container.clear()
             try:
                 async with AsyncSessionLocal() as session:
@@ -317,18 +390,24 @@ async def course_review_activity_page() -> None:
                         user_id=user_id,
                         limit=10,
                     )
+                if not await _require_bound_session():
+                    return
                 with history_container:
                     if not records:
                         ui.label("暂无课程审议记录").classes("text-gray-400 text-sm")
                         return
                     for rec in records:
                         with ui.card().classes("w-full"):
-                            with ui.row().classes("w-full justify-between items-center gap-2"):
+                            with ui.row().classes(
+                                "w-full justify-between items-center gap-2"
+                            ):
                                 ui.label(
                                     f"{rec.activity_name} · {rec.grade} {rec.class_name} · {rec.activity_time}"
                                 ).classes("text-sm text-gray-700 flex-1")
 
                                 async def _reexport(r=rec) -> None:
+                                    if not await _require_bound_session():
+                                        return
                                     try:
                                         async with AsyncSessionLocal() as session:
                                             fresh = await get_course_review_activity(
@@ -340,12 +419,14 @@ async def course_review_activity_page() -> None:
                                                 show_error("记录不存在或已删除")
                                                 return
                                             data = export_course_review_activity(fresh)
-                                            fname = build_course_review_activity_filename(
-                                                tenant_id=tenant_id,
-                                                user_id=user_id,
-                                                record_id=fresh.id,
-                                                grade=fresh.grade,
-                                                class_name=fresh.class_name,
+                                            fname = (
+                                                build_course_review_activity_filename(
+                                                    tenant_id=tenant_id,
+                                                    user_id=user_id,
+                                                    record_id=fresh.id,
+                                                    grade=fresh.grade,
+                                                    class_name=fresh.class_name,
+                                                )
                                             )
                                             await save_export_record(
                                                 session,
@@ -357,10 +438,16 @@ async def course_review_activity_page() -> None:
                                                 course_review_activity_id=fresh.id,
                                             )
                                             await session.commit()
+                                        if not await _require_bound_session():
+                                            return
                                         ui.download(data, fname)
                                         show_success(f"重新导出成功：{fname}")
                                     except Exception as exc:
-                                        show_error(f"重新导出失败：{exc}")
+                                        if not await _require_bound_session():
+                                            return
+                                        show_error(
+                                            f"重新导出失败：{type(exc).__name__}"
+                                        )
 
                                 ui.button(
                                     "重新导出",
@@ -369,16 +456,25 @@ async def course_review_activity_page() -> None:
                                 ).props("size=sm flat").classes("text-blue-600")
 
                                 async def _delete(r=rec) -> None:
+                                    if not await _require_bound_session():
+                                        return
                                     with ui.dialog() as dlg, ui.card():
-                                        ui.label("确定要删除这条课程审议记录吗？").classes("text-base")
+                                        ui.label(
+                                            "确定要删除这条课程审议记录吗？"
+                                        ).classes("text-base")
                                         with ui.row().classes("gap-3 mt-3"):
                                             ui.button(
                                                 "确认删除",
                                                 on_click=lambda: dlg.submit("yes"),
                                             ).classes("bg-red-600 text-white")
-                                            ui.button("取消", on_click=lambda: dlg.submit("no"))
+                                            ui.button(
+                                                "取消",
+                                                on_click=lambda: dlg.submit("no"),
+                                            )
                                     result = await dlg
                                     if result == "yes":
+                                        if not await _require_bound_session():
+                                            return
                                         async with AsyncSessionLocal() as session:
                                             await delete_course_review_activity(
                                                 session,
@@ -394,7 +490,9 @@ async def course_review_activity_page() -> None:
                                     on_click=_delete,
                                 ).props("size=sm flat").classes("text-red-600")
             except Exception as exc:
-                logger.error("加载课程审议历史失败", exc_info=exc)
-                show_error(f"加载历史失败：{exc}")
+                if not await _require_bound_session():
+                    return
+                logger.error("加载课程审议历史失败 error_type=%s", type(exc).__name__)
+                show_error(f"加载历史失败：{type(exc).__name__}")
 
         await refresh_history()

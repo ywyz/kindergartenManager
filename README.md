@@ -70,7 +70,7 @@ python3.14 -m venv .venv
 .venv/bin/alembic upgrade head
 ```
 
-当前 Alembic head：`a6c4d8e2f9b1`。
+当前工作树 Alembic head：`c1a8e4f6b2d9`。
 
 仓库历史曾记录多次通过结果，但这些数字属于对应旧 SHA。本 README 不把历史数字当作当前验证；交付时应记录本次命令、SHA、平台和结果。
 

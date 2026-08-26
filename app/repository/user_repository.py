@@ -2,6 +2,7 @@
 
 所有查询必须携带 tenant_id 过滤条件，确保多租户数据隔离。
 """
+
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -49,14 +50,19 @@ async def get_user_by_id(
     session: AsyncSession,
     tenant_id: int,
     user_id: int,
+    *,
+    for_update: bool = False,
 ) -> User | None:
-    """在指定租户下按 ID 查询用户，不存在时返回 None。"""
-    result = await session.execute(
-        select(User).where(
-            User.tenant_id == tenant_id,
-            User.id == user_id,
-        )
+    """在指定租户下按 ID 查询用户；写授权可锁定该 actor 行。"""
+    statement = select(User).where(
+        User.tenant_id == tenant_id,
+        User.id == user_id,
     )
+    if for_update:
+        statement = statement.with_for_update().execution_options(
+            populate_existing=True
+        )
+    result = await session.execute(statement)
     return result.scalar_one_or_none()
 
 
@@ -85,20 +91,21 @@ async def list_users_by_tenant(
 ) -> list[User]:
     """返回指定租户下的用户列表（按创建时间倒序）。"""
     result = await session.execute(
-        select(User)
-        .where(User.tenant_id == tenant_id)
-        .order_by(User.created_at.desc())
+        select(User).where(User.tenant_id == tenant_id).order_by(User.created_at.desc())
     )
     return list(result.scalars().all())
 
 
-async def has_any_user(
-    session: AsyncSession,
-    tenant_id: int,
-) -> bool:
-    """检查指定租户是否已有任意用户，用于判断注册者是否是第一个用户。"""
+async def has_active_sys_admin(session: AsyncSession, tenant_id: int) -> bool:
+    """检查租户是否已有可登录的系统管理员。"""
     result = await session.execute(
-        select(func.count()).select_from(User).where(User.tenant_id == tenant_id)
+        select(func.count())
+        .select_from(User)
+        .where(
+            User.tenant_id == tenant_id,
+            User.role == UserRole.sys_admin,
+            User.is_active.is_(True),
+        )
     )
     return (result.scalar_one() or 0) > 0
 

@@ -5,6 +5,20 @@
 .kindergarten_secrets
 .kindergarten_secrets.lock
 
+# 本地 SQLite 数据（可能包含加密后的 AI Key 与用户资料）
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+*.db.*.bak
+*.sqlite.*.bak
+*.sqlite3.*.bak
+
 # 虚拟环境
 .venv/
 .venv.bak*/

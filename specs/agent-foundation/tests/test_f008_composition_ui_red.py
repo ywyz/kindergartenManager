@@ -584,14 +584,38 @@ def test_daily_plan_page_wires_immediate_selection_and_agent_panel_without_write
     assert source.index("agent_panel.plan_changed(d)") < save_call
 
     direct_delete = source.index("await delete_daily_plan(")
-    captured_date = source.index('deleting_date = state["selected_date"]')
+    captured_target = source.index("target = _capture_plan_target()", save_call)
+    captured_date = source.index(
+        "deleting_date = target.selected_date", captured_target
+    )
+    captured_plan_id = source.index("deleting_plan_id = target.plan_id", captured_date)
+    captured_revision = source.index(
+        "deleting_revision = target.revision", captured_plan_id
+    )
+    delete_auth = source.index("await _require_live_session()", captured_revision)
+    current_guard = source.index("_is_current_plan_target(target)", delete_auth)
     direct_invalidation = source.index("agent_panel.plan_changed(deleting_date)")
-    assert captured_date < direct_invalidation < direct_delete
-    assert source.index("plan_date=deleting_date", direct_delete) > direct_delete
+    assert (
+        captured_target
+        < captured_date
+        < captured_plan_id
+        < captured_revision
+        < delete_auth
+        < current_guard
+        < direct_invalidation
+    )
+    assert direct_invalidation < direct_delete
+    assert source.index("plan_id=deleting_plan_id", direct_delete) > direct_delete
+    assert (
+        source.index("expected_revision=deleting_revision", direct_delete)
+        > direct_delete
+    )
 
     history_delete = source.index("await delete_daily_plan(", direct_delete + 1)
     history_invalidation = source.index("agent_panel.plan_changed(p.plan_date)")
     assert history_invalidation < history_delete
+    assert source.index("plan_id=p.id", history_delete) > history_delete
+    assert source.index("expected_revision=p.revision", history_delete) > history_delete
     assert "agent_controller" in source
     assert "adopt_patch" not in source
     assert "confirm_write" not in source

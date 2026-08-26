@@ -13,6 +13,7 @@
   - validate_big_env(value)
   - validate_image_count(count)
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -24,7 +25,6 @@ from app.core.database import AsyncSessionLocal
 from app.core.exceptions import AiCallError, AiParseError, ConfigError
 from app.core.logging import get_logger
 from app.core.unit_of_work import AsyncSessionUnitOfWork
-from app.core.user_context import get_current_user
 from app.integration.image_storage import get_storage_backend
 from app.integration.word_export.observation_exporter import export_observation
 from app.repository.class_repository import get_class_config
@@ -41,6 +41,7 @@ from app.service.observation_service import (
     generate_observation_content,
     save_observation_with_images,
 )
+from app.ui.auth_context import require_bound_ui_session, require_current_ui_session
 from app.ui.components.app_shell import get_display_name, render_shell
 from app.ui.helpers import validate_image_count
 
@@ -76,26 +77,34 @@ def validate_big_env(value: str) -> bool:
 
 @ui.page("/game-observation")
 async def game_observation_page() -> None:
-    user = get_current_user()
+    ui_session = await require_current_ui_session()
+    if ui_session is None:
+        return
 
-    tenant_id: int = user["tenant_id"]
-    user_id: int = int(user["sub"])
+    tenant_id = ui_session.tenant_id
+    user_id = ui_session.user_id
+
+    async def _require_bound_session() -> bool:
+        return await require_bound_ui_session(ui_session) is not None
 
     # 取班级配置（年级、班级名称）
     grade_val = ""
     class_name_val = ""
-    observer_default = get_display_name(user)
+    shell_user = ui_session.as_user_dict()
+    observer_default = get_display_name(shell_user)
     async with AsyncSessionLocal() as session:
         cls_cfg = await get_class_config(session, tenant_id, user_id)
         if cls_cfg:
             grade_val = cls_cfg.grade or ""
             class_name_val = cls_cfg.class_name or ""
+    if not await _require_bound_session():
+        return
 
-    await render_shell(user, active="game-observation")
+    await render_shell(shell_user, active="game-observation")
 
     # 保存当前表单状态（用于跨回调共享）
     state: dict = {
-        "images": [],          # list[bytes] — 上传的原始图片
+        "images": [],  # list[bytes] — 上传的原始图片
         "observation_id": None,  # 保存后的记录 ID
     }
 
@@ -104,7 +113,9 @@ async def game_observation_page() -> None:
 
         # 班级信息（只读提示）
         if grade_val or class_name_val:
-            ui.label(f"班级：{grade_val} {class_name_val}").classes("text-gray-500 text-sm")
+            ui.label(f"班级：{grade_val} {class_name_val}").classes(
+                "text-gray-500 text-sm"
+            )
 
         error_label = ui.label("").classes("text-red-600 text-sm hidden")
         success_label = ui.label("").classes("text-green-600 text-sm hidden")
@@ -129,11 +140,13 @@ async def game_observation_page() -> None:
             ui.label("基本信息").classes("font-semibold text-gray-700 mb-2")
             with ui.row().classes("w-full gap-4 flex-wrap"):
                 obs_date_input = ui.input(
-                    label="观察日期", placeholder="YYYY-MM-DD",
+                    label="观察日期",
+                    placeholder="YYYY-MM-DD",
                     value=str(date.today()),
                 ).classes("flex-1 min-w-40")
                 time_range_input = ui.input(
-                    label="起止时间", placeholder="如 9:00-9:40",
+                    label="起止时间",
+                    placeholder="如 9:00-9:40",
                 ).classes("flex-1 min-w-40")
 
             with ui.row().classes("w-full gap-4 flex-wrap"):
@@ -143,15 +156,20 @@ async def game_observation_page() -> None:
                     value="户外",
                 ).classes("flex-1 min-w-32")
                 game_area_input = ui.input(
-                    label="游戏区域", placeholder="如：建构区",
+                    label="游戏区域",
+                    placeholder="如：建构区",
                 ).classes("flex-1 min-w-40")
 
             with ui.row().classes("w-full gap-4 flex-wrap"):
                 adult_count_input = ui.number(
-                    label="成人数目", value=1, min=1,
+                    label="成人数目",
+                    value=1,
+                    min=1,
                 ).classes("flex-1 min-w-28")
                 child_count_input = ui.number(
-                    label="儿童数目", value=10, min=1,
+                    label="儿童数目",
+                    value=10,
+                    min=1,
                 ).classes("flex-1 min-w-28")
                 observer_input = ui.input(
                     label="观察者",
@@ -160,29 +178,37 @@ async def game_observation_page() -> None:
 
             with ui.row().classes("w-full gap-4 flex-wrap"):
                 child_names_input = ui.input(
-                    label="幼儿姓名", placeholder="如：小明、小红",
+                    label="幼儿姓名",
+                    placeholder="如：小明、小红",
                 ).classes("flex-1 min-w-40")
                 child_age_input = ui.input(
-                    label="幼儿年龄", placeholder="如：5岁",
+                    label="幼儿年龄",
+                    placeholder="如：5岁",
                 ).classes("flex-1 min-w-32")
 
         # ── 图片上传 ────────────────────────────────────────────────
         with ui.card().classes("w-full"):
             ui.label("游戏照片（1~3 张）").classes("font-semibold text-gray-700 mb-2")
-            image_count_label = ui.label("已上传：0 张").classes("text-gray-500 text-sm")
+            image_count_label = ui.label("已上传：0 张").classes(
+                "text-gray-500 text-sm"
+            )
             preview_row = ui.row().classes("gap-2 flex-wrap mt-2")
 
             async def handle_upload(e) -> None:
+                if not await _require_bound_session():
+                    return
                 if len(state["images"]) >= 3:
                     show_error("最多只能上传 3 张图片")
                     return
                 data = await e.file.read()
+                if not await _require_bound_session():
+                    return
                 state["images"].append(data)
                 image_count_label.set_text(f"已上传：{len(state['images'])} 张")
                 with preview_row:
-                    ui.image(f"data:image/jpeg;base64,{__import__('base64').b64encode(data).decode()}").classes(
-                        "w-24 h-24 object-cover rounded border"
-                    )
+                    ui.image(
+                        f"data:image/jpeg;base64,{__import__('base64').b64encode(data).decode()}"
+                    ).classes("w-24 h-24 object-cover rounded border")
 
             ui.upload(
                 label="上传照片",
@@ -193,19 +219,21 @@ async def game_observation_page() -> None:
 
         # ── AI 生成结果 ────────────────────────────────────────────
         with ui.card().classes("w-full"):
-            ui.label("AI 生成结果（可编辑后保存）").classes("font-semibold text-gray-700 mb-2")
+            ui.label("AI 生成结果（可编辑后保存）").classes(
+                "font-semibold text-gray-700 mb-2"
+            )
             goal_area = ui.textarea(
                 label="观察目标", placeholder="点击「生成观察记录」后自动填入"
             ).classes("w-full")
-            record_area = ui.textarea(
-                label="观察记录", placeholder="..."
-            ).classes("w-full")
-            eval_area = ui.textarea(
-                label="评价分析", placeholder="..."
-            ).classes("w-full")
-            strategy_area = ui.textarea(
-                label="支持策略", placeholder="..."
-            ).classes("w-full")
+            record_area = ui.textarea(label="观察记录", placeholder="...").classes(
+                "w-full"
+            )
+            eval_area = ui.textarea(label="评价分析", placeholder="...").classes(
+                "w-full"
+            )
+            strategy_area = ui.textarea(label="支持策略", placeholder="...").classes(
+                "w-full"
+            )
 
         # ── 操作按钮 ────────────────────────────────────────────────
         with ui.row().classes("w-full gap-3 justify-end"):
@@ -218,6 +246,8 @@ async def game_observation_page() -> None:
             )
 
         async def do_generate() -> None:
+            if not await _require_bound_session():
+                return
             generate_btn.props("loading=true")
             error_label.classes(add="hidden")
             show_info("⏳ AI 正在分析照片，请稍候……")
@@ -245,31 +275,43 @@ async def game_observation_page() -> None:
                         images=state["images"],
                         context=ctx,
                     )
+                if not await _require_bound_session():
+                    return
                 goal_area.value = result.get("observation_goal", "")
                 record_area.value = result.get("observation_record", "")
                 eval_area.value = result.get("evaluation_analysis", "")
                 strategy_area.value = result.get("support_strategy", "")
                 state["compressed_images"] = result.get("compressed_images", [])
                 show_success("生成成功，请检查并编辑后保存")
-            except ConfigError as e:
-                show_error(f"配置错误：{e.message}")
-            except (AiCallError, AiParseError) as e:
-                show_error(f"AI 调用失败：{e.message}")
+            except ConfigError:
+                if not await _require_bound_session():
+                    return
+                show_error("AI 配置不可用，请检查模型配置")
+            except (AiCallError, AiParseError):
+                if not await _require_bound_session():
+                    return
+                show_error("AI 调用或解析失败，请稍后重试")
             except Exception as e:
-                logger.error("生成观察记录失败", exc_info=e)
-                show_error(f"生成失败：{e}")
+                if not await _require_bound_session():
+                    return
+                logger.error("生成观察记录失败 error_type=%s", type(e).__name__)
+                show_error(f"生成失败：{type(e).__name__}")
             finally:
                 generate_btn.props(remove="loading")
 
         generate_btn.on("click", do_generate)
 
         async def do_save() -> None:
+            if not await _require_bound_session():
+                return
             save_btn.props("loading=true")
             try:
                 obs_data = {
                     "tenant_id": tenant_id,
                     "user_id": user_id,
-                    "obs_date": date.fromisoformat(obs_date_input.value) if obs_date_input.value else date.today(),
+                    "obs_date": date.fromisoformat(obs_date_input.value)
+                    if obs_date_input.value
+                    else date.today(),
                     "time_range": time_range_input.value or None,
                     "big_env": big_env_select.value or "户外",
                     "game_area": game_area_input.value or None,
@@ -294,18 +336,24 @@ async def game_observation_page() -> None:
                         compressed_images=compressed,
                         storage=storage,
                     )
+                if not await _require_bound_session():
+                    return
                 state["observation_id"] = obs_id
                 show_success(f"保存成功（记录 ID：{obs_id}）")
                 await refresh_history()
             except Exception as e:
-                logger.error("保存观察记录失败", exc_info=e)
-                show_error(f"保存失败：{e}")
+                if not await _require_bound_session():
+                    return
+                logger.error("保存观察记录失败 error_type=%s", type(e).__name__)
+                show_error(f"保存失败：{type(e).__name__}")
             finally:
                 save_btn.props(remove="loading")
 
         save_btn.on("click", do_save)
 
         async def do_export() -> None:
+            if not await _require_bound_session():
+                return
             export_btn.props("loading=true")
             try:
                 obs = {
@@ -348,6 +396,8 @@ async def game_observation_page() -> None:
                     )
                     await session.commit()
 
+                if not await _require_bound_session():
+                    return
                 ui.download(doc_bytes, file_name)
                 log_audit(
                     "export_observation",
@@ -358,8 +408,10 @@ async def game_observation_page() -> None:
                 )
                 show_success(f"导出成功：{file_name}")
             except Exception as e:
-                logger.error("导出观察记录失败", exc_info=e)
-                show_error(f"导出失败：{e}")
+                if not await _require_bound_session():
+                    return
+                logger.error("导出观察记录失败 error_type=%s", type(e).__name__)
+                show_error(f"导出失败：{type(e).__name__}")
             finally:
                 export_btn.props(remove="loading")
 
@@ -372,6 +424,8 @@ async def game_observation_page() -> None:
         history_container = ui.column().classes("w-full gap-2")
 
         async def refresh_history() -> None:
+            if not await _require_bound_session():
+                return
             history_container.clear()
             try:
                 async with AsyncSessionLocal() as session:
@@ -382,18 +436,24 @@ async def game_observation_page() -> None:
                         limit=10,
                         offset=0,
                     )
+                if not await _require_bound_session():
+                    return
                 with history_container:
                     if not records:
                         ui.label("暂无观察记录").classes("text-gray-400 text-sm")
                     else:
                         for rec in records:
                             with ui.card().classes("w-full"):
-                                with ui.row().classes("w-full justify-between items-center"):
+                                with ui.row().classes(
+                                    "w-full justify-between items-center"
+                                ):
                                     ui.label(
                                         f"{rec.obs_date}  {rec.big_env} · {rec.game_area or '-'}  {rec.observer or ''}"
                                     ).classes("text-sm text-gray-700")
 
                                     async def _reexport(r=rec) -> None:
+                                        if not await _require_bound_session():
+                                            return
                                         try:
                                             async with AsyncSessionLocal() as s:
                                                 imgs = await list_images_by_observation(
@@ -402,6 +462,8 @@ async def game_observation_page() -> None:
                                                     user_id=user_id,
                                                     observation_id=r.id,
                                                 )
+                                            if not await _require_bound_session():
+                                                return
                                             obs_dict = {
                                                 "class_name": r.class_name,
                                                 "obs_date": str(r.obs_date),
@@ -418,38 +480,63 @@ async def game_observation_page() -> None:
                                                 "evaluation_analysis": r.evaluation_analysis,
                                                 "support_strategy": r.support_strategy,
                                             }
-                                            img_bytes = [img.blob_content for img in imgs if img.blob_content]
-                                            doc_bytes = export_observation(obs_dict, img_bytes)
+                                            img_bytes = [
+                                                img.blob_content
+                                                for img in imgs
+                                                if img.blob_content
+                                            ]
+                                            doc_bytes = export_observation(
+                                                obs_dict, img_bytes
+                                            )
                                             fname = build_export_filename(
-                                                tenant_id, user_id, r.grade or "", r.class_name or "", str(r.obs_date)
+                                                tenant_id,
+                                                user_id,
+                                                r.grade or "",
+                                                r.class_name or "",
+                                                str(r.obs_date),
                                             )
                                             ui.download(doc_bytes, fname)
                                         except Exception as ex:
-                                            show_error(f"重新导出失败：{ex}")
+                                            if not await _require_bound_session():
+                                                return
+                                            show_error(
+                                                f"重新导出失败：{type(ex).__name__}"
+                                            )
 
-                                    ui.button("重新导出", icon="download", on_click=_reexport).props(
-                                        "size=sm flat"
-                                    ).classes("text-blue-600")
+                                    ui.button(
+                                        "重新导出", icon="download", on_click=_reexport
+                                    ).props("size=sm flat").classes("text-blue-600")
 
                                     async def _delete(r=rec) -> None:
+                                        if not await _require_bound_session():
+                                            return
                                         with ui.dialog() as dlg, ui.card():
-                                            ui.label("确定要删除这条观察记录吗？删除后无法恢复。").classes("text-base")
+                                            ui.label(
+                                                "确定要删除这条观察记录吗？删除后无法恢复。"
+                                            ).classes("text-base")
                                             with ui.row().classes("gap-3 mt-3"):
                                                 ui.button(
                                                     "确认删除",
                                                     on_click=lambda: dlg.submit("yes"),
                                                 ).classes("bg-red-600 text-white")
-                                                ui.button("取消", on_click=lambda: dlg.submit("no"))
+                                                ui.button(
+                                                    "取消",
+                                                    on_click=lambda: dlg.submit("no"),
+                                                )
                                         result = await dlg
                                         if result == "yes":
+                                            if not await _require_bound_session():
+                                                return
                                             try:
                                                 async with AsyncSessionLocal() as s:
-                                                    async with AsyncSessionUnitOfWork(s):
+                                                    async with AsyncSessionUnitOfWork(
+                                                        s
+                                                    ):
                                                         await delete_images_by_observation(
-                                                                    s,
-                                                                    tenant_id=tenant_id,
-                                                                    user_id=user_id,
-                                                                    observation_id=r.id,
+                                                            s,
+                                                            tenant_id=tenant_id,
+                                                            user_id=user_id,
+                                                            observation_id=r.id,
                                                         )
                                                         await delete_observation(
                                                             s,
@@ -459,13 +546,19 @@ async def game_observation_page() -> None:
                                                         )
                                                 await refresh_history()
                                             except Exception as ex:
-                                                show_error(f"删除失败：{ex}")
+                                                if not await _require_bound_session():
+                                                    return
+                                                show_error(
+                                                    f"删除失败：{type(ex).__name__}"
+                                                )
 
-                                    ui.button("删除", icon="delete", on_click=_delete).props(
-                                        "size=sm flat"
-                                    ).classes("text-red-500")
+                                    ui.button(
+                                        "删除", icon="delete", on_click=_delete
+                                    ).props("size=sm flat").classes("text-red-500")
             except Exception as e:
-                logger.error("加载历史记录失败", exc_info=e)
+                if not await _require_bound_session():
+                    return
+                logger.error("加载历史记录失败 error_type=%s", type(e).__name__)
                 with history_container:
                     ui.label("加载历史失败").classes("text-red-500 text-sm")
 

@@ -13,19 +13,26 @@
     .venv/bin/python -m app.jobs.bootstrap_admin --init
     .venv/bin/python -m app.jobs.bootstrap_admin --reset-password
 """
+
 import argparse
 import asyncio
 import getpass
 
 from sqlalchemy.engine import make_url
 
+from app.auth.legacy import uses_legacy_single_user_password
 from app.auth.password import hash_password, verify_password
 from app.core.audit import log_audit
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.core.models.user import UserRole
 from app.core.startup import run_startup_migrations
-from app.repository.user_repository import create_user, get_user_by_username, update_password
+from app.repository.user_repository import (
+    create_user,
+    get_user_by_username,
+    list_users_by_tenant,
+    update_password,
+)
 
 
 async def bootstrap_admin(
@@ -59,8 +66,35 @@ async def bootstrap_admin(
             tenant_id=tenant_id,
             username=normalized_username,
         )
+        legacy_admins = [
+            candidate
+            for candidate in await list_users_by_tenant(session, tenant_id=tenant_id)
+            if candidate.role is UserRole.sys_admin
+            and uses_legacy_single_user_password(candidate.hashed_password)
+        ]
+        if len(legacy_admins) > 1:
+            return "error: multiple legacy sys_admin accounts require manual recovery"
+        if len(legacy_admins) == 1:
+            legacy_admin = legacy_admins[0]
+            legacy_admin.hashed_password = hash_password(password)
+            legacy_admin.is_active = True
+            await session.commit()
+            log_audit(
+                "bootstrap_recover_single_user_admin",
+                tenant_id=tenant_id,
+                user_id=legacy_admin.id,
+                username=legacy_admin.username,
+            )
+            return (
+                "ok: recovered legacy sys_admin "
+                f"{legacy_admin.username} (id={legacy_admin.id})"
+            )
         if existing is not None:
-            return f"skip: sys_admin already exists ({normalized_username})"
+            if existing.role is UserRole.sys_admin:
+                return f"skip: sys_admin already exists ({normalized_username})"
+            return (
+                f"error: username already belongs to non-admin ({normalized_username})"
+            )
 
         user = await create_user(
             session,
@@ -140,33 +174,48 @@ async def _run_init() -> None:
     try:
         run_startup_migrations()
         print("[Step 1/3] ✅ 迁移完成")
-    except Exception as exc:
-        print(f"[Step 1/3] ⚠️  迁移失败（{exc}），继续尝试...")
+    except Exception:
+        # 数据库异常可能携带连接串或 SQL 参数，不跨 CLI 边界输出正文。
+        print("[Step 1/3] ❌ 迁移失败，已停止管理员初始化")
+        return
 
     print("\n[Step 2/3] 配置管理员账号...")
 
     enabled = settings.BOOTSTRAP_ADMIN_ENABLED
     if not enabled:
-        resp = input("BOOTSTRAP_ADMIN_ENABLED 未设置为 true，是否继续？[y/N] ").strip().lower()
+        resp = (
+            input("BOOTSTRAP_ADMIN_ENABLED 未设置为 true，是否继续？[y/N] ")
+            .strip()
+            .lower()
+        )
         if resp != "y":
             print("已取消。")
             return
         enabled = True
 
     tenant_id = settings.BOOTSTRAP_ADMIN_TENANT_ID
-    username = settings.BOOTSTRAP_ADMIN_USERNAME or _prompt_str("管理员用户名", "sysadmin")
-    password = settings.BOOTSTRAP_ADMIN_PASSWORD or _prompt_password("管理员密码（至少8位）")
+    username = settings.BOOTSTRAP_ADMIN_USERNAME or _prompt_str(
+        "管理员用户名", "sysadmin"
+    )
+    password = settings.BOOTSTRAP_ADMIN_PASSWORD or _prompt_password(
+        "管理员密码（至少8位）"
+    )
     allow_remote = settings.BOOTSTRAP_ADMIN_ALLOW_REMOTE
 
     print("\n[Step 3/3] 创建管理员账号...")
-    message = await bootstrap_admin(
-        enabled=enabled,
-        tenant_id=tenant_id,
-        username=username,
-        password=password,
-        allow_remote=allow_remote,
-        database_url=settings.DATABASE_URL,
-    )
+    try:
+        message = await bootstrap_admin(
+            enabled=enabled,
+            tenant_id=tenant_id,
+            username=username,
+            password=password,
+            allow_remote=allow_remote,
+            database_url=settings.DATABASE_URL,
+        )
+    except Exception:
+        # SQLAlchemy 异常参数可能包含密码哈希；只输出固定失败文案。
+        print("[Step 3/3] ❌ 创建失败：请检查数据库迁移与连接状态")
+        return
     # 同 _run_reset：bootstrap_admin 接收明文密码参数，避免将其返回值直接内插
     # 日志，改为按状态前缀输出固定文案，规避 CodeQL 明文记录密码的误报。
     if message.startswith("ok"):
@@ -217,7 +266,9 @@ async def _main() -> None:
     parser = argparse.ArgumentParser(description="系统管理员初始化脚本")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--init", action="store_true", help="创建系统管理员账号（默认）")
-    group.add_argument("--reset-password", action="store_true", help="重置系统管理员密码")
+    group.add_argument(
+        "--reset-password", action="store_true", help="重置系统管理员密码"
+    )
     args = parser.parse_args()
 
     if args.reset_password:

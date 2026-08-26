@@ -2,6 +2,7 @@
 
 仅暴露教学计划相关的只读字段；不包含密钥、密码等敏感信息。
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -30,6 +31,7 @@ class DailyPlanOut(BaseModel):
     id: int
     tenant_id: int
     user_id: int
+    revision: int
     plan_date: date
     week_number: int
     weekday_cn: str
@@ -56,6 +58,7 @@ class DailyPlanOut(BaseModel):
             id=m.id,
             tenant_id=m.tenant_id,
             user_id=m.user_id,
+            revision=m.revision,
             plan_date=m.plan_date,
             week_number=m.week_number,
             weekday_cn=m.weekday_cn,

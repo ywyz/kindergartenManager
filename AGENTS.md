@@ -105,6 +105,14 @@ tool results, patches, or provider-managed memory. WRITE, adoption/confirmation 
 multi-agent workflows require a separate ADR/spec/Issue and stable RED; do not add placeholders for them in the
 Foundation.
 
+The separate WRITE boundary is now frozen by
+`docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md` and `specs/agent-write/`. The current authorized
+slice ends after restoring a database-revalidated `TrustedUiSession`, adding monotonic `daily_plan.revision`, opening the
+new Issue, and proving the WRITE suite is stable RED. Until an explicit later GREEN gate, do not create
+`app.service.agent.confirmed_write`, a confirmation store, `daily_plan_operation_version`, `agent_write_audit`, a WRITE
+migration, confirmation UI, or any Provider WRITE tool. The existing four READ and two DRAFT tools remain the complete
+Provider capability surface.
+
 F009 adds no Agent capability. Its automated baseline is taken after initialization/seed and dynamically reflects every
 actual database table, protected configuration/export artifacts, caller-owned UI body, the independent audit logger, and
 post-seed DML/DDL attempts. Manual mock and real-model evidence share a `tested_code_sha`; evidence and final graph updates

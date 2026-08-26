@@ -7,6 +7,7 @@
 4. 数据库配置（SQLite / MySQL）
 5. 端口配置
 """
+
 from datetime import date
 
 from nicegui import ui
@@ -15,7 +16,6 @@ from app.core.config import settings as app_settings
 from app.core.database import AsyncSessionLocal
 from app.core.env_writer import read_dot_env, write_dot_env
 from app.core.exceptions import CryptoError
-from app.core.user_context import get_current_user
 from app.repository.ai_key_repository import (
     get_active_ai_key,
     get_decrypted_key,
@@ -27,6 +27,11 @@ from app.repository.semester_repository import (
     upsert_active_semester,
 )
 from app.service.settings_service import verify_saved_ai_connection
+from app.ui.auth_context import (
+    TrustedUiSession,
+    require_bound_ui_session,
+    require_current_ui_session,
+)
 from app.ui.components.app_shell import render_shell
 from app.ui.helpers import mask_api_key as _mask_api_key
 
@@ -35,15 +40,19 @@ _GRADES = ["小班", "中班", "大班"]
 
 @ui.page("/settings")
 async def settings_page() -> None:
-    user = get_current_user()
+    ui_session = await require_current_ui_session()
+    if ui_session is None:
+        return
 
-    tenant_id: int = user["tenant_id"]
-    user_id: int = int(user["sub"])
+    tenant_id = ui_session.tenant_id
+    user_id = ui_session.user_id
 
-    await render_shell(user, active="settings")
+    await render_shell(ui_session.as_user_dict(), active="settings")
+
+    async def require_live_session() -> TrustedUiSession | None:
+        return await require_bound_ui_session(ui_session)
 
     with ui.column().classes("w-full max-w-2xl mx-auto p-6 gap-6"):
-
         # ══════════════════════════════════════════════════════════════════════
         # 区块一：学期配置
         # ══════════════════════════════════════════════════════════════════════
@@ -79,16 +88,15 @@ async def settings_page() -> None:
                     with ui.menu().props("no-parent-event") as end_menu:
                         with ui.date().bind_value(end_date_input):
                             with ui.row().classes("justify-end"):
-                                ui.button("确定", on_click=end_menu.close).props(
-                                    "flat"
-                                )
-                    ui.button(icon="event", on_click=end_menu.open).props(
-                        "flat round"
-                    )
+                                ui.button("确定", on_click=end_menu.close).props("flat")
+                    ui.button(icon="event", on_click=end_menu.open).props("flat round")
 
             semester_msg = ui.label("").classes("text-sm mt-1")
 
             async def save_semester() -> None:
+                current = await require_live_session()
+                if current is None:
+                    return
                 semester_msg.classes(remove="text-green-600 text-red-500")
                 name = semester_name_input.value.strip()
                 start_str = start_date_input.value.strip()
@@ -119,7 +127,12 @@ async def settings_page() -> None:
                 async with AsyncSessionLocal() as session:
                     async with session.begin():
                         await upsert_active_semester(
-                            session, tenant_id, user_id, name, start_date, end_date
+                            session,
+                            current.tenant_id,
+                            current.user_id,
+                            name,
+                            start_date,
+                            end_date,
                         )
 
                 semester_msg.text = "学期配置已保存"
@@ -165,6 +178,9 @@ async def settings_page() -> None:
             class_msg = ui.label("").classes("text-sm mt-1")
 
             async def save_class() -> None:
+                current = await require_live_session()
+                if current is None:
+                    return
                 class_msg.classes(remove="text-green-600 text-red-500")
                 c_name = class_name_input.value.strip()
                 grade = grade_select.value
@@ -178,8 +194,8 @@ async def settings_page() -> None:
                     async with session.begin():
                         await upsert_class_config(
                             session,
-                            tenant_id,
-                            user_id,
+                            current.tenant_id,
+                            current.user_id,
                             grade=grade,
                             class_name=c_name,
                             teacher_name=teacher_name_input.value.strip() or None,
@@ -198,7 +214,9 @@ async def settings_page() -> None:
         # 区块三：AI 接口配置 — 文本模型
         # ══════════════════════════════════════════════════════════════════════
         with ui.card().classes("w-full"):
-            ui.label("AI 接口配置 — 文本模型").classes("text-lg font-bold text-blue-700 mb-2")
+            ui.label("AI 接口配置 — 文本模型").classes(
+                "text-lg font-bold text-blue-700 mb-2"
+            )
             ui.label(
                 "用于教案拆分、年龄适配、一日活动生成等文本任务。API Key 保存后以脱敏形式显示。"
             ).classes("text-xs text-gray-500 mb-3")
@@ -226,6 +244,9 @@ async def settings_page() -> None:
             _current_masked: list[str] = [""]
 
             async def save_ai_key_handler() -> None:
+                current = await require_live_session()
+                if current is None:
+                    return
                 ai_msg.classes(remove="text-green-600 text-red-500")
                 url = ai_url_input.value.strip()
                 model = ai_model_input.value.strip()
@@ -250,7 +271,11 @@ async def settings_page() -> None:
                 elif not key_val:
                     # Key 字段为空：尝试复用数据库中已有的 Key
                     async with AsyncSessionLocal() as session:
-                        existing = await get_active_ai_key(session, tenant_id, user_id)
+                        existing = await get_active_ai_key(
+                            session,
+                            current.tenant_id,
+                            current.user_id,
+                        )
                     if existing is None:
                         ai_msg.text = "请输入 API Key"
                         ai_msg.classes(add="text-red-500")
@@ -264,7 +289,11 @@ async def settings_page() -> None:
                 else:
                     # 用户未修改 Key（值等于脱敏字符串）：复用已有 Key
                     async with AsyncSessionLocal() as session:
-                        existing = await get_active_ai_key(session, tenant_id, user_id)
+                        existing = await get_active_ai_key(
+                            session,
+                            current.tenant_id,
+                            current.user_id,
+                        )
                     if existing is None:
                         ai_msg.text = "请输入 API Key"
                         ai_msg.classes(add="text-red-500")
@@ -276,8 +305,19 @@ async def settings_page() -> None:
                         ai_msg.classes(add="text-red-500")
                         return
 
+                current = await require_live_session()
+                if current is None:
+                    return
                 async with AsyncSessionLocal() as session:
-                    await save_ai_key(session, tenant_id, user_id, url, plain_key, model, key_type="text")
+                    await save_ai_key(
+                        session,
+                        current.tenant_id,
+                        current.user_id,
+                        url,
+                        plain_key,
+                        model,
+                        key_type="text",
+                    )
 
                 masked = _mask_api_key(plain_key)
                 _current_masked[0] = masked
@@ -286,16 +326,21 @@ async def settings_page() -> None:
                 ai_msg.classes(add="text-green-600")
 
             async def verify_connection() -> None:
+                current = await require_live_session()
+                if current is None:
+                    return
                 ai_msg.classes(remove="text-green-600 text-red-500 text-blue-600")
                 ai_msg.text = "连接测试中……"
 
                 async with AsyncSessionLocal() as session:
                     result = await verify_saved_ai_connection(
                         session,
-                        tenant_id=tenant_id,
-                        user_id=user_id,
+                        tenant_id=current.tenant_id,
+                        user_id=current.user_id,
                         key_type="text",
                     )
+                if await require_live_session() is None:
+                    return
 
                 if result.code == "not_configured":
                     ai_msg.text = "请先保存 AI 接口配置"
@@ -330,7 +375,9 @@ async def settings_page() -> None:
         # 区块四：AI 接口配置 — 视觉模型
         # ══════════════════════════════════════════════════════════════════════
         with ui.card().classes("w-full"):
-            ui.label("AI 接口配置 — 视觉模型").classes("text-lg font-bold text-green-700 mb-2")
+            ui.label("AI 接口配置 — 视觉模型").classes(
+                "text-lg font-bold text-green-700 mb-2"
+            )
             ui.label(
                 "用于游戏观察图片分析（key_type=vision），与文本模型独立配置。"
             ).classes("text-xs text-gray-500 mb-3")
@@ -356,6 +403,9 @@ async def settings_page() -> None:
             _vision_masked: list[str] = [""]
 
             async def save_vision_key_handler() -> None:
+                current = await require_live_session()
+                if current is None:
+                    return
                 vision_msg.classes(remove="text-green-600 text-red-500")
                 url = vision_url_input.value.strip()
                 model = vision_model_input.value.strip()
@@ -375,7 +425,12 @@ async def settings_page() -> None:
                     plain_key = key_val
                 else:
                     async with AsyncSessionLocal() as session:
-                        existing = await get_active_ai_key(session, tenant_id, user_id, key_type="vision")
+                        existing = await get_active_ai_key(
+                            session,
+                            current.tenant_id,
+                            current.user_id,
+                            key_type="vision",
+                        )
                     if existing is None:
                         if not key_val:
                             vision_msg.text = "请输入视觉模型 API Key"
@@ -390,8 +445,19 @@ async def settings_page() -> None:
                             vision_msg.classes(add="text-red-500")
                             return
 
+                current = await require_live_session()
+                if current is None:
+                    return
                 async with AsyncSessionLocal() as session:
-                    await save_ai_key(session, tenant_id, user_id, url, plain_key, model, key_type="vision")
+                    await save_ai_key(
+                        session,
+                        current.tenant_id,
+                        current.user_id,
+                        url,
+                        plain_key,
+                        model,
+                        key_type="vision",
+                    )
 
                 masked = _mask_api_key(plain_key)
                 _vision_masked[0] = masked
@@ -400,16 +466,21 @@ async def settings_page() -> None:
                 vision_msg.classes(add="text-green-600")
 
             async def verify_vision_connection() -> None:
+                current = await require_live_session()
+                if current is None:
+                    return
                 vision_msg.classes(remove="text-green-600 text-red-500")
                 vision_msg.text = "连接测试中……"
 
                 async with AsyncSessionLocal() as session:
                     result = await verify_saved_ai_connection(
                         session,
-                        tenant_id=tenant_id,
-                        user_id=user_id,
+                        tenant_id=current.tenant_id,
+                        user_id=current.user_id,
                         key_type="vision",
                     )
+                if await require_live_session() is None:
+                    return
 
                 if result.code == "not_configured":
                     vision_msg.text = "请先保存视觉模型配置"
@@ -444,8 +515,15 @@ async def settings_page() -> None:
     async with AsyncSessionLocal() as session:
         semester = await get_active_semester(session, tenant_id, user_id)
         class_cfg = await get_class_config(session, tenant_id, user_id)
-        ai_key_record = await get_active_ai_key(session, tenant_id, user_id, key_type="text")
-        ai_vision_record = await get_active_ai_key(session, tenant_id, user_id, key_type="vision")
+        ai_key_record = await get_active_ai_key(
+            session, tenant_id, user_id, key_type="text"
+        )
+        ai_vision_record = await get_active_ai_key(
+            session, tenant_id, user_id, key_type="vision"
+        )
+
+    if await require_live_session() is None:
+        return
 
     if semester:
         semester_name_input.value = semester.semester_name
@@ -507,6 +585,7 @@ async def settings_page() -> None:
             if is_mysql and "://" in current_db_url:
                 try:
                     from urllib.parse import urlparse
+
                     parsed = urlparse(current_db_url.replace("mysql+aiomysql", "mysql"))
                     _parsed_host = parsed.hostname or ""
                     _parsed_port = str(parsed.port or 3306)
@@ -537,20 +616,24 @@ async def settings_page() -> None:
                     label="用户名", value=_parsed_user, placeholder="root"
                 ).classes("w-full")
                 db_pass_input = ui.input(
-                    label="密码", value=_parsed_password,
-                    password=True, password_toggle_button=True,
+                    label="密码",
+                    value=_parsed_password,
+                    password=True,
+                    password_toggle_button=True,
                 ).classes("w-full")
                 db_name_input = ui.input(
                     label="数据库名", value=_parsed_dbname, placeholder="kindergarten"
                 ).classes("w-full")
 
-            ui.label(
-                "⚠️ 切换数据库后原有数据不会自动迁移，请提前备份。"
-            ).classes("text-xs text-amber-600 mt-1")
+            ui.label("⚠️ 切换数据库后原有数据不会自动迁移，请提前备份。").classes(
+                "text-xs text-amber-600 mt-1"
+            )
 
             db_status = ui.label("").classes("text-sm mt-2")
 
             async def _save_db_config() -> None:
+                if await require_live_session() is None:
+                    return
                 db_status.set_text("")
                 if db_mode_radio.value == "sqlite":
                     new_url = ""
@@ -566,7 +649,9 @@ async def settings_page() -> None:
                         db_status.classes(replace="text-red-600 text-sm mt-2")
                         return
 
-                    new_url = f"mysql+aiomysql://{user_val}:{pwd_val}@{host}:{port}/{dbname}"
+                    new_url = (
+                        f"mysql+aiomysql://{user_val}:{pwd_val}@{host}:{port}/{dbname}"
+                    )
 
                 try:
                     write_dot_env({"DATABASE_URL": new_url})
@@ -598,6 +683,8 @@ async def settings_page() -> None:
             port_status = ui.label("").classes("text-sm mt-2")
 
             async def _save_port() -> None:
+                if await require_live_session() is None:
+                    return
                 port_status.set_text("")
                 try:
                     new_port = int(port_input.value or app_settings.PORT)

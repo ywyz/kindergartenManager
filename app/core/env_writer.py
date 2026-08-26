@@ -1,12 +1,13 @@
 """运行时 .env 文件读写工具。
 
 路径策略：
-- PyInstaller 打包模式：可执行文件同级目录
+- PyInstaller 打包模式：平台用户数据目录
 - 开发 / Docker 模式：当前工作目录
 
 这与 app.core.config 中 _secrets_file_path() 的路径逻辑一致，
 保证 .env 文件始终与 .kindergarten_secrets 文件位于同一目录。
 """
+
 from pathlib import Path
 
 from app.core.paths import app_data_dir
