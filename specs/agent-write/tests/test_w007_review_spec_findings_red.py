@@ -1268,6 +1268,128 @@ async def test_exact_applied_rejected_by_session_publish_guard_stays_fail_closed
     }
 
 
+@pytest.mark.asyncio
+async def test_indeterminate_session_guard_abandons_old_reconcile_capability(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    confirmation_ui = __import__(
+        "app.ui.components.agent_write_confirmation",
+        fromlist=["DailyPlanPatchConfirmationPanel"],
+    )
+    flow_api = __import__(
+        "app.service.agent.confirmation_flow",
+        fromlist=["create_daily_plan_patch_confirmation_controller"],
+    )
+    patch = build_patch(
+        operation_id=OPERATION_ID,
+        turn_id=TURN_ID,
+        after_goal="结果不明后 session 变化必须放弃旧对账能力",
+    )
+    agent = _agent_controller(patch)
+    agent.scope_changed(PLAN_DATE)
+    turn = await agent.run("生成一份用于结果不明发布门校验的草案")
+    patch_view = turn.patches[0]
+    writer = _RecordingWriter(
+        apply_error_code="commit_outcome_unknown",
+        reconcile_error_code="confirmation_indeterminate",
+    )
+    flow = flow_api.create_daily_plan_patch_confirmation_controller(
+        agent_controller=agent,
+        write_service=writer,
+    )
+    target = DailyPlanUiTarget(
+        selection=DateSelection(generation=1, selected_date=PLAN_DATE),
+        plan_id=PLAN_ID,
+        revision=1,
+        form_generation=0,
+    )
+    opened_session = trusted_ui_session()
+    reauthenticated_session = trusted_ui_session(
+        session_id=UUID("cccccccc-cccc-4ccc-8ccc-cccccccccccc"),
+    )
+    authorization_calls = 0
+    page_events = {"on_applied": 0}
+
+    async def authorize() -> object:
+        nonlocal authorization_calls
+        authorization_calls += 1
+        if authorization_calls <= 5:
+            return opened_session
+        return reauthenticated_session
+
+    async def on_applied(_snapshot: object, frozen_target: object) -> None:
+        assert frozen_target == target
+        page_events["on_applied"] += 1
+
+    fake_ui = _FakeUi()
+    monkeypatch.setattr(confirmation_ui, "ui", fake_ui)
+    panel = confirmation_ui.DailyPlanPatchConfirmationPanel(
+        flow,
+        authorize_confirmation=authorize,
+        capture_target=lambda: target,
+        is_current_target=lambda candidate: candidate == target,
+        on_applied=on_applied,
+    )
+
+    panel.render_patch_actions(patch_view)
+    view = fake_ui.latest_column()
+    await _press(fake_ui.latest_button("准备确认", within=view))
+    await _press(fake_ui.latest_button("确认采用", within=view))
+    labels_before_session_change = fake_ui.active_label_texts(within=view)
+    old_reconcile_button = fake_ui.latest_button("人工对账", within=view)
+
+    # The reconcile call starts under the bound session, then its publish guard
+    # observes a new jti. The old confirmation must become unreachable.
+    await _press(old_reconcile_button)
+    labels_after_session_guard = fake_ui.active_label_texts(within=view)
+    reconcile_calls_after_guard = tuple(writer.reconcile_confirmation_ids)
+
+    # No panel invalidation occurs here: this is the same page/generation and Patch.
+    panel.render_patch_actions(patch_view)
+    repeated_view = fake_ui.latest_column()
+    repeated_labels = fake_ui.active_label_texts(within=repeated_view)
+    repeated_action_controls = sum(
+        len(fake_ui.active_buttons(label, within=repeated_view, enabled=True))
+        for label in ("准备确认", "确认采用", "人工对账")
+    )
+    reconcile_calls_after_rerender = tuple(writer.reconcile_confirmation_ids)
+
+    # A queued browser event from the now-stale control must also be inert.
+    await _press(old_reconcile_button)
+
+    assert {
+        "commit_unknown_was_visible": any(
+            "提交结果暂不确定" in label for label in labels_before_session_change
+        ),
+        "session_guard_rejected_publication": any(
+            "登录会话已变化" in label for label in labels_after_session_guard
+        ),
+        "page_events": page_events,
+        "same_generation_is_abandoned": any(
+            "只能人工核查" in label or "刷新" in label for label in repeated_labels
+        ),
+        "repeated_action_controls": repeated_action_controls,
+        "issue_calls": tuple(writer.issue_patch_ids),
+        "apply_calls": tuple(writer.apply_confirmation_ids),
+        "reconcile_calls_after_guard": reconcile_calls_after_guard,
+        "reconcile_calls_after_rerender": reconcile_calls_after_rerender,
+        "reconcile_calls_after_old_button_probe": tuple(
+            writer.reconcile_confirmation_ids
+        ),
+    } == {
+        "commit_unknown_was_visible": True,
+        "session_guard_rejected_publication": True,
+        "page_events": {"on_applied": 0},
+        "same_generation_is_abandoned": True,
+        "repeated_action_controls": 0,
+        "issue_calls": (patch.patch_id,),
+        "apply_calls": (CONFIRMATION_ID,),
+        "reconcile_calls_after_guard": (CONFIRMATION_ID,),
+        "reconcile_calls_after_rerender": (CONFIRMATION_ID,),
+        "reconcile_calls_after_old_button_probe": (CONFIRMATION_ID,),
+    }
+
+
 def test_agent_notice_distinguishes_read_only_from_explicit_local_adoption(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
