@@ -955,3 +955,81 @@ async def test_completed_apply_joiner_keeps_its_result_when_next_issue_starts() 
         "writer_issue_order": (patch_a.patch_id, patch_b.patch_id),
         "writer_apply_count": 1,
     }
+
+
+@pytest.mark.parametrize(
+    ("lifecycle", "expected_status"),
+    [
+        pytest.param(
+            "invalidate",
+            PatchConfirmationStatus.STALE,
+            id="external-invalidate",
+        ),
+        pytest.param(
+            "close",
+            PatchConfirmationStatus.CLOSED,
+            id="external-close",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_completed_issue_waiters_observe_external_lifecycle_override(
+    lifecycle: str,
+    expected_status: PatchConfirmationStatus,
+) -> None:
+    """A lifecycle transition dominates a completed, undelivered issue result."""
+    flow, writer, _agent, patch_a, _patch_b = await _two_patch_flow(
+        block_phase="issue",
+    )
+    ui_session = trusted_ui_session()
+    loop = asyncio.get_running_loop()
+    lifecycle_tasks: list[asyncio.Task[object]] = []
+    waiter_observations: list[PatchConfirmationStatus] = []
+
+    def queue_lifecycle_before_shield_delivery() -> None:
+        if lifecycle == "invalidate":
+            loop.call_soon(flow.invalidate)
+        else:
+            lifecycle_tasks.append(loop.create_task(flow.close()))
+
+    writer.before_issue_return = queue_lifecycle_before_shield_delivery
+
+    async def invoke_issue() -> object:
+        result = await flow.issue(
+            ui_session,
+            patch_a.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+        waiter_observations.append(flow.snapshot.status)
+        return result
+
+    owner_task = asyncio.create_task(invoke_issue())
+    await writer.entered.wait()
+    joiner_task = asyncio.create_task(invoke_issue())
+    await _event_loop_checkpoint()
+    writer.release.set()
+
+    owner_result, joiner_result = await asyncio.gather(owner_task, joiner_task)
+    if lifecycle_tasks:
+        await lifecycle_tasks[0]
+    repeated = await flow.issue(
+        ui_session,
+        patch_a.patch_id,
+        expected_plan_id=PLAN_ID,
+        expected_revision=1,
+    )
+
+    assert {
+        "returned_statuses": (owner_result.status, joiner_result.status),
+        "waiters_observed_controller": tuple(waiter_observations),
+        "controller_status": flow.snapshot.status,
+        "repeated_status": repeated.status,
+        "writer_issue_count": len(writer.issue_patch_ids),
+    } == {
+        "returned_statuses": (expected_status, expected_status),
+        "waiters_observed_controller": (expected_status, expected_status),
+        "controller_status": expected_status,
+        "repeated_status": expected_status,
+        "writer_issue_count": 1,
+    }
