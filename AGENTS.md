@@ -109,10 +109,12 @@ The separate WRITE boundary is now frozen by
 `docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md` and `specs/agent-write/`. W005/W006 are closed, and
 W007 has a committed current-page, one-Patch confirmation UI implementation, but its independent delivery gates remain
 open. W007 GREEN commit 已存在，当前门是固定 SHA Review/finding RED；W008 未进入。
-The first fixed-SHA Review found
-Standards M2 and Spec M1/L1; finding RED was committed as `cf38725`, and the corresponding repair candidate turns all
-four finding tests GREEN. That candidate must be reviewed again on its fixed SHA. Do not treat this as Standards/Spec 0/0 or as authorization for push, CI,
-manual acceptance, Issue closure, merge, or release. Do not add Provider WRITE, automatic retry, bulk or cross-page
+W007 初始 GREEN commit 本地基线为 WRITE `99 passed`、Foundation `261 passed`、ordinary `847 passed`。
+首轮 fixed-SHA Review 为 Standards M2、Spec M1/L1；`cf38725` 后修正基线为 WRITE `110 passed`、Foundation
+`261 passed`、ordinary `847 passed`。二轮 fixed-SHA Review 为 Standards M1、Spec M1/L1，finding RED 已由
+`40f25b7` 固定；本轮修复候选已转 GREEN，下一门是第三轮 fixed-SHA 双轴 Review。本轮修复候选经统一测试为
+WRITE `112 passed`、Foundation `261 passed`、ordinary `847 passed`。Do not treat this as Standards/Spec 0/0 or
+as authorization for push, CI, manual acceptance, Issue closure, merge, or release. Do not add Provider WRITE, automatic retry, bulk or cross-page
 adoption, settings/files/Word/delete/create writes, long-term Patch persistence, new tools, or multi-Agent behavior. The
 existing four READ and two DRAFT tools remain the complete Provider capability surface.
 

@@ -3,8 +3,11 @@
 > 状态快照：2026-08-26；合入基线：`main@ca3b7bd922f838c0739ccf9ed0f58655d292dc2f`；
 > 当前分支：`feat/agent-write`。Agent WRITE 的 W005/W006 独立门禁均已闭合；W006 fixed SHA 为
 > `253d37d92f2983ea55f688340078380d41c78fd4`。W007 GREEN commit 已存在，当前门是固定 SHA Review/finding RED；W008 未进入。
-> 首轮 fixed-SHA Review 发现 Standards M2、Spec M1/L1，finding RED 已提交 `cf38725`；本修正候选已使四项
-> finding 测试 GREEN，下一门是对该候选的固定 SHA 重新执行双轴 Review。push、CI、人工验收与 Issue 回写尚未闭合，
+> W007 初始 GREEN commit 本地基线为 WRITE `99 passed`、Foundation `261 passed`、ordinary `847 passed`。
+> 首轮 fixed-SHA Review 为 Standards M2、Spec M1/L1；`cf38725` 后修正基线为 WRITE `110 passed`、Foundation
+> `261 passed`、ordinary `847 passed`。二轮 fixed-SHA Review 为 Standards M1、Spec M1/L1，finding RED 已由
+> `40f25b7` 固定；本轮修复候选已转 GREEN，下一门是第三轮 fixed-SHA 双轴 Review。本轮修复候选经统一测试为
+> WRITE `112 passed`、Foundation `261 passed`、ordinary `847 passed`。push、CI、人工验收与 Issue 回写尚未闭合，
 > 不得写成 Standards/Spec 0/0 或产品完成。
 > merge、Issue 关闭与 release 未授权。
 >
@@ -110,16 +113,19 @@ UI 登录用户与 API 的租户服务主体仍是两个不同边界，不得混
 ## 7. 分支与仓库状态
 
 - 当前 merge base 为 `main@ca3b7bd922f838c0739ccf9ed0f58655d292dc2f`；远端
-  `feat/agent-write` 已到 W006 fixed SHA `253d37d…`；本地 W007 已有 GREEN commit、首轮 Review finding
-  RED `cf38725` 与使四项 finding 测试 GREEN 的修正候选；下一门是在该候选的固定 SHA 上复审。
+  `feat/agent-write` 已到 W006 fixed SHA `253d37d…`；本地 W007 已有 GREEN commit、首轮 Review finding RED
+  `cf38725`、首轮修正基线与二轮 Review finding RED `40f25b7`；本轮修复候选已转 GREEN，下一门是第三轮
+  fixed-SHA 双轴 Review。
   `main` 的 merge commit 以 `--no-ff` 语义保留 Agent Foundation 的 RED/GREEN ancestry。
 - F009 产品验收仍只绑定 `tested_code_sha=a50c6f6b9aa941996052c59a301a7a40bdbd706f`，closure 证据绑定
   `0ec2e944…`，详见 Issue #48。当前产品/测试改动使这些人工证据成为历史证据，不能覆盖本工作树。
 - W004-W006 已完成各自分阶段 commit、push、精确 SHA CI 与 Issue #52 回写；W006 Quality
-  `32954156965` 在精确 `253d37d…` 成功。W007 GREEN commit 的既有本地证据为 WRITE `99 passed`、Foundation
-  `261 passed`、ordinary `847 passed`；首轮 Review 的 Standards M2、Spec M1/L1 已由 `cf38725` 固定，
-  本修正候选当前本地证据为 WRITE `110 passed`、Foundation `261 passed`、ordinary `847 passed`；其
-  fixed-SHA 复审、push、CI、人工验收与 Issue 回写均未闭合。
+  `32954156965` 在精确 `253d37d…` 成功。W007 初始 GREEN commit 本地基线为 WRITE `99 passed`、Foundation
+  `261 passed`、ordinary `847 passed`。首轮 fixed-SHA Review 为 Standards M2、Spec M1/L1；`cf38725` 后修正
+  基线为 WRITE `110 passed`、Foundation `261 passed`、ordinary `847 passed`。二轮 fixed-SHA Review 为
+  Standards M1、Spec M1/L1，finding RED 已由 `40f25b7` 固定；本轮修复候选经统一测试为 WRITE `112 passed`、
+  Foundation `261 passed`、ordinary `847 passed`。第三轮 fixed-SHA 双轴 Review、push、CI、人工验收与
+  Issue 回写均未闭合。
   当前没有 PR、merge、Issue 关闭或 release 授权；Issue #48 与 Issue #52 均保持 OPEN。
 - `feat/agent-foundation` 的 F005-F009 固定 SHA、双轴 Review、Quality 与人工验收历史仍可在 Issue #48
   回读；Foundation 已通过 `ca3b7bd…` 合入 `main`，但 Issue 关闭与发布没有由该 merge 自动授权。
@@ -211,9 +217,11 @@ W007 已在稳定 RED 上形成页面本地逐 Patch 确认 GREEN commit。W006 
 `10/10` PASS，精确 SHA Quality 成功，Issue #52 证据已回写。W007 RED commit `e5f7317…` 的 WRITE 套件
 连续两轮均为 `77 passed / 22 failed`（node hash `e0898e89…`），Foundation 连续两轮均为
 `259 passed / 2 failed`（node hash `fb168e7a…`），ordinary `847 passed`。W007 GREEN commit 已把三组门转为
-WRITE `99 passed`、Foundation `261 passed`、ordinary `847 passed`；首轮 fixed-SHA Review 随后发现
-Standards M2、Spec M1/L1，finding RED 已提交 `cf38725`；本修正候选当前本地 WRITE `110 passed`、Foundation
-`261 passed`、ordinary `847 passed`，并等待 fixed-SHA 复审。这些证据
+WRITE `99 passed`、Foundation `261 passed`、ordinary `847 passed`；首轮 fixed-SHA Review 为 Standards M2、
+Spec M1/L1，`cf38725` 后修正基线为 WRITE `110 passed`、Foundation `261 passed`、ordinary `847 passed`。
+二轮 fixed-SHA Review 为 Standards M1、Spec M1/L1，finding RED 已由 `40f25b7` 固定；本轮修复候选经统一
+测试为 WRITE `112 passed`、Foundation `261 passed`、ordinary `847 passed`，下一门是第三轮 fixed-SHA
+双轴 Review。这些证据
 不能替代 push、CI、人工验收与 Issue 门。真实 MySQL 8 与最终可见矩阵仍属于 W008。
 
 ## 9. 当前主要风险与债务
@@ -226,7 +234,8 @@ Standards M2、Spec M1/L1，finding RED 已提交 `cf38725`；本修正候选当
 6. **远端质量证据需按 SHA 回读**：F005-F009 的既有 push Quality 均已按各自 `headSha` 回读；最终
    `evidence_closure_sha` 仍必须使用自身 Review/CI/远端证据，不能沿用 `tested_code_sha` 的旧 CI。
 7. **会话与 WRITE 门禁**：可信页面入口与敏感 callback exact-jti 绑定已进入分支与 CI；W005/W006 service
-   只允许用户逐 Patch 的本地确认写入。W007 UI adapter 已形成 GREEN commit，首轮 Review finding 的修正候选已转 GREEN；
+   只允许用户逐 Patch 的本地确认写入。W007 UI adapter 已形成 GREEN commit，二轮 Review finding RED
+   `40f25b7` 的本轮修复候选已转 GREEN，等待第三轮 fixed-SHA 双轴 Review；
    它仍须在每次 seam 调用前重验当前 session，service 再重读 active User。Provider 与 Tool 能力仍保持
    READ/DRAFT，不能据此宣称产品交付已闭合。
 
@@ -234,7 +243,7 @@ Standards M2、Spec M1/L1，finding RED 已提交 `cf38725`；本修正候选当
 
 当前共同下一步是：
 
-1. 将已使 `cf38725` 四项 finding 测试 GREEN 的修正候选固定为 commit，并在该 fixed SHA 重新执行双轴
+1. 将已使 `40f25b7` finding 测试 GREEN 的本修正候选固定为 commit，并在该 fixed SHA 执行第三轮双轴
    Review；若仍有 finding，继续先以独立 RED commit 固定，再修正并复审。达到 0/0 后才依序
    完成 push、精确 SHA CI、人工验收与 Issue #52 回写。这些门不可互相替代。
 2. W007 上述全部独立门闭合后才进入 W008。若 W008 不改产品/helper/test，可在同一 W007 fixed SHA 上完成

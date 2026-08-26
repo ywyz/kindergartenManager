@@ -1,8 +1,9 @@
 # KindergartenManager 产品与工程路线图
 
 > 当前快照：2026-08-26；合入基线 `main@ca3b7bd922f838c0739ccf9ed0f58655d292dc2f`；
-> 当前 `feat/agent-write` 已闭合 W005/W006；Alembic head 为 `e5f7a9c2d4b6`。W007 稳定 RED 已固定在
-> 本地 `e5f7317…`，GREEN 候选已实现并通过本地全量；W008 未进入，merge/Issue 关闭/release 未授权。
+> 当前 `feat/agent-write` 已闭合 W005/W006；Alembic head 为 `e5f7a9c2d4b6`。W007 二轮 Review finding RED
+> `40f25b7` 的修复候选已转 GREEN，下一门是第三轮 fixed-SHA 双轴 Review；W008 未进入，
+> merge/Issue 关闭/release 未授权。
 
 ## 1. 状态语义
 
@@ -224,7 +225,7 @@ Review/Quality/远端/Issue 证据见 Issue #48。
 
 ## 9. R4B：Agent WRITE（独立里程碑）
 
-状态：`实现中`（W005/W006 已闭合；W007 稳定 RED 与本地 GREEN 候选已固定；W008 未进入）。
+状态：`实现中`（W005/W006 已闭合；W007 第二轮 Review finding 修复候选已转 GREEN，等待第三轮 fixed-SHA 双轴 Review；W008 未进入）。
 
 [ADR-0006](ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md) 与
 [冻结规格](../specs/agent-write/spec.md)、[Issue #52](https://github.com/ywyz/kindergartenManager/issues/52)
@@ -244,8 +245,11 @@ Quality `32954156965` 精确匹配成功，Issue #52 comment `5423617401` 已回
 
 W007 稳定 RED 已固定在尚未 push 的本地 commit `e5f7317…`：WRITE 套件连续两轮均为
 `77 passed / 22 failed`（node hash `e0898e89…`），Foundation 连续两轮均为 `259 passed / 2 failed`
-（node hash `fb168e7a…`），ordinary `847 passed`。当前 GREEN 候选为 WRITE `99 passed`、Foundation
-`261 passed`、ordinary `847 passed`，但不预宣称 fixed-SHA Review、push、CI、人工验收或 Issue 回写。
+（node hash `fb168e7a…`），ordinary `847 passed`。W007 初始 GREEN commit 本地基线为 WRITE `99 passed`、Foundation `261 passed`、ordinary `847 passed`。
+首轮 fixed-SHA Review 为 Standards M2、Spec M1/L1；`cf38725` 后修正基线为 WRITE `110 passed`、Foundation `261 passed`、ordinary `847 passed`。
+二轮 fixed-SHA Review 为 Standards M1、Spec M1/L1，finding RED 已由 `40f25b7` 固定；本轮修复候选已转 GREEN，下一门是第三轮 fixed-SHA 双轴 Review。
+本轮修复候选经统一测试为 WRITE `112 passed`、Foundation `261 passed`、ordinary `847 passed`；当前不得视为 Standards/Spec 0/0、push、CI、人工验收或 Issue
+回写已完成。
 MySQL 离线 DDL 已证明方言分支结构，但真实 MySQL 8 的迁移往返、四 trigger、
 revision CAS 与管理员行锁仍属尚未进入的 W008 独立验收；默认停在 merge/Issue 关闭/release 之前。
 

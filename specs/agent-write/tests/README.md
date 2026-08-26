@@ -62,5 +62,8 @@ ordinary：847 passed
 三组 RED 均 collection clean，无 skip/xfail/error；失败只固定尚未满足的页面本地单 Patch confirmation flow、
 基础面板可选动作端口和每日计划页安全接线。Provider registry 仍恰好四 READ + 两 DRAFT，测试不授权 Provider
 WRITE、自动重试、批量/跨页面采用、设置/文件/Word/删除/创建写入或长期 Patch 持久化。该证据只固定 W007
-RED；GREEN 候选现为 WRITE `99 passed`、Foundation `261 passed`、ordinary `847 passed`，尚未取得
-fixed-SHA Review、push、CI、人工验收或 Issue 回写。
+RED。W007 初始 GREEN commit 本地基线为 WRITE `99 passed`、Foundation `261 passed`、ordinary `847 passed`。
+首轮 fixed-SHA Review 为 Standards M2、Spec M1/L1；`cf38725` 后修正基线为 WRITE `110 passed`、Foundation `261 passed`、ordinary `847 passed`。
+二轮 fixed-SHA Review 为 Standards M1、Spec M1/L1，finding RED 已由 `40f25b7` 固定；本轮修复候选已转 GREEN，下一门是第三轮 fixed-SHA 双轴 Review。
+本轮修复候选经统一测试为 WRITE `112 passed`、Foundation `261 passed`、ordinary `847 passed`，也尚未取得 Standards/Spec 0/0、push、CI、人工验收或 Issue
+回写；W008 未进入。

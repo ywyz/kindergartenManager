@@ -261,6 +261,7 @@ class DailyPlanPatchConfirmationPanel:
         self._generation = 0
         self._closed = False
         self._abandoned_indeterminate = False
+        self._integrity_blocked = False
         self._issued_patch_id: UUID | None = None
         self._issued_patch_sha256: str | None = None
         self._issued_target: DailyPlanUiTarget | None = None
@@ -294,10 +295,12 @@ class DailyPlanPatchConfirmationPanel:
         """Synchronously close pending authority before any page mutation."""
         if self._closed:
             return
-        self._controller.invalidate()
-        self._abandoned_indeterminate = (
-            _status_value(self._controller.snapshot) == "indeterminate"
-        )
+        self._latch_integrity_failure(self._controller.snapshot)
+        if not self._integrity_blocked:
+            self._controller.invalidate()
+            self._abandoned_indeterminate = (
+                _status_value(self._controller.snapshot) == "indeterminate"
+            )
         self._generation += 1
         self._issued_patch_id = None
         self._issued_patch_sha256 = None
@@ -334,7 +337,7 @@ class DailyPlanPatchConfirmationPanel:
             )
             target = None
         return _ConfirmationClick(
-            generation=self._generation,
+            generation=view.generation,
             patch=view.patch,
             target=target,
         )
@@ -349,6 +352,7 @@ class DailyPlanPatchConfirmationPanel:
         target = click.target
         if (
             self._closed
+            or self._integrity_blocked
             or view.generation != self._generation
             or click.generation != self._generation
             or type(target) is not DailyPlanUiTarget
@@ -497,6 +501,33 @@ class DailyPlanPatchConfirmationPanel:
             ui.label("不会自动重试；如需采用，请重新生成草案。").classes(
                 "text-xs text-gray-600"
             )
+
+    def _latch_integrity_failure(
+        self,
+        snapshot: PatchConfirmationSnapshotView,
+    ) -> bool:
+        """Keep a reconcile-integrity failure terminal for this page lifetime."""
+        if snapshot.error_code == "reconcile_integrity_failure":
+            self._integrity_blocked = True
+            self._issued_patch_id = None
+            self._issued_patch_sha256 = None
+            self._issued_target = None
+        return self._integrity_blocked
+
+    def _render_integrity_blocked(
+        self,
+        view: _PatchView,
+        snapshot: PatchConfirmationSnapshotView,
+    ) -> None:
+        if self._belongs_to_patch(snapshot, view.patch):
+            self._render_target(snapshot)
+        ui.label(_ERROR_COPY["reconcile_integrity_failure"]).classes(
+            "text-xs font-medium text-red-700"
+        )
+        ui.label(
+            "本页面的所有草案确认均已停止；请人工核查数据库与审计证据，"
+            "刷新页面前不能准备或采用任何草案。"
+        ).classes("text-xs text-gray-600")
 
     def _belongs_to_patch(
         self,
@@ -683,6 +714,9 @@ class DailyPlanPatchConfirmationPanel:
             if self._closed:
                 ui.label(_STATUS_COPY["closed"]).classes("text-xs text-red-600")
                 return
+            if self._latch_integrity_failure(snapshot):
+                self._render_integrity_blocked(view, snapshot)
+                return
             if self._patch_hash_mismatch(snapshot, view.patch):
                 ui.label("草案身份校验失败，本页拒绝提供确认操作。").classes(
                     "text-xs text-red-600"
@@ -763,8 +797,17 @@ class DailyPlanPatchConfirmationPanel:
         click: _ConfirmationClick,
         action: _Action,
     ) -> None:
+        if (
+            self._closed
+            or view.generation != self._generation
+            or click.generation != self._generation
+        ):
+            return
         require_issued_target = action is not _Action.ISSUE
         current_snapshot = self._controller.snapshot
+        if self._latch_integrity_failure(current_snapshot):
+            self._render_all_views(current_snapshot)
+            return
         if (
             action is _Action.ISSUE
             and _status_value(current_snapshot) in {"pending", "indeterminate"}
@@ -809,6 +852,9 @@ class DailyPlanPatchConfirmationPanel:
                 )
                 return
             self._render_local_closed(view, _ACTION_FAILURE_COPY[action])
+            return
+        if self._latch_integrity_failure(snapshot):
+            self._render_all_views(snapshot)
             return
         publish_guard = await self._publish_guarded(
             view,
@@ -872,18 +918,42 @@ class DailyPlanPatchConfirmationPanel:
     def _cancel_confirmation(self, view: _PatchView) -> None:
         if self._closed or view.generation != self._generation:
             return
+        if self._integrity_blocked:
+            self._render_all_views(self._controller.snapshot)
+            return
         self._controller.invalidate()
         if _status_value(self._controller.snapshot) == "indeterminate":
-            self._render_view(view, self._controller.snapshot)
+            self._render_all_views(self._controller.snapshot)
             return
+        current_views = tuple(
+            current_view
+            for current_view in self._views
+            if current_view.generation == self._generation
+        )
         self._generation += 1
         self._issued_patch_id = None
         self._issued_patch_sha256 = None
         self._issued_target = None
-        self._views.clear()
-        view.generation = self._generation
-        self._views.append(view)
-        self._render_local_closed(
-            view,
-            "已取消这一份草案的确认；未执行写入。",
-        )
+        self._views = [
+            _PatchView(
+                generation=self._generation,
+                patch=current_view.patch,
+                container=current_view.container,
+            )
+            for current_view in current_views
+        ]
+        snapshot = self._controller.snapshot
+        for current_view in self._views:
+            if (
+                current_view.patch.patch_id == view.patch.patch_id
+                and secrets.compare_digest(
+                    current_view.patch.patch_sha256,
+                    view.patch.patch_sha256,
+                )
+            ):
+                self._render_local_closed(
+                    current_view,
+                    "已取消这一份草案的确认；未执行写入。",
+                )
+            else:
+                self._render_view(current_view, snapshot)

@@ -13,9 +13,15 @@
 | W004 | 建立逐次绑定、revision/before、操作前版本、短事务、不可变审计、全回滚与 commit-unknown 稳定 RED | W001-W003 | 完成：59 clean；连续两次均 `1 passed, 58 failed`，node-only SHA-256 均为 `fe346fa3…` |
 | W005 | 实现 `confirmed_write` 契约与短命一次性 confirmation store | W004 固定 RED + 明确 GREEN 授权 | 完成：fixed SHA `e4a7f3c…`，Review 0/0、本地/CI/service 验收与 Issue 回写均闭合 |
 | W006 | 实现 `daily_plan_operation_version`、`agent_write_audit`、DB immutability trigger 与原子 CAS 写事务 | W005 GREEN + Review | 完成：fixed SHA `253d37d…`，Review 0/0、本地/CI、Linux service-boundary 10/10 与 Issue 回写均闭合 |
-| W007 | 在每日计划页增加逐 Patch 确认/过期/失败/对账 UI，保持 Provider READ/DRAFT | W006 GREEN + Review | GREEN 候选：稳定 RED `e5f7317…` 后本地 WRITE 99、Foundation 261、ordinary 847；待 fixed-SHA Review/push/CI/验收/Issue |
+| W007 | 在每日计划页增加逐 Patch 确认/过期/失败/对账 UI，保持 Provider READ/DRAFT | W006 GREEN + Review | 二轮 Review finding RED `40f25b7` 的修复候选已转 GREEN；待第三轮 fixed-SHA 双轴 Review，尚未取得 0/0 或后续交付证据 |
 | W008 | 最终固定 SHA 双轴 Review、本地全量、精确 CI、人工故障验收与 Issue 证据；如有改动则 finding RED/修正并全部重跑 | W007 GREEN/Review/commit/push/CI/人工验收/Issue 全部门禁闭合 | 未进入 |
 | W009 | merge、Issue 关闭与发布 | W008 全门禁闭合 + 单独授权 | 未授权 |
+
+W007 初始 GREEN commit 本地基线为 WRITE `99 passed`、Foundation `261 passed`、ordinary `847 passed`。
+首轮 fixed-SHA Review 为 Standards M2、Spec M1/L1；`cf38725` 后修正基线为 WRITE `110 passed`、Foundation `261 passed`、ordinary `847 passed`。
+二轮 fixed-SHA Review 为 Standards M1、Spec M1/L1，finding RED 已由 `40f25b7` 固定；本轮修复候选已转 GREEN，下一门是第三轮 fixed-SHA 双轴 Review。
+本轮修复候选经统一测试为 WRITE `112 passed`、Foundation `261 passed`、ordinary `847 passed`，不能据此宣称 Standards/Spec 0/0、push、CI、人工验收或 Issue
+回写已经闭合；W008 仍未进入。
 
 ## 本轮 W004 执行顺序
 

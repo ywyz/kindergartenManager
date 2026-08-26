@@ -457,6 +457,8 @@ trigger。W005 已闭合确认契约/store；W006 已实现 version→CAS→audi
 只读对账，并在 fixed SHA `253d37d…` 取得 Standards/Spec 0/0、WRITE `78 passed`、Foundation
 `261 passed`、ordinary `847 passed`、Quality `32954156965` 精确成功、Linux service-boundary `10/10`
 与 Issue #52 comment `5423617401`。W007 稳定 RED 已固定在本地 `e5f7317…`，两轮 WRITE 均为
-`77 passed / 22 failed`、Foundation 均为 `259 passed / 2 failed`；GREEN 候选现为 WRITE `99 passed`、
-Foundation `261 passed`、ordinary `847 passed`。W008 未进入，Issue #52
-保持 OPEN，merge/关闭/release 未授权。
+`77 passed / 22 failed`、Foundation 均为 `259 passed / 2 failed`。W007 初始 GREEN commit 本地基线为 WRITE `99 passed`、Foundation `261 passed`、ordinary `847 passed`。
+首轮 fixed-SHA Review 为 Standards M2、Spec M1/L1；`cf38725` 后修正基线为 WRITE `110 passed`、Foundation `261 passed`、ordinary `847 passed`。
+二轮 fixed-SHA Review 为 Standards M1、Spec M1/L1，finding RED 已由 `40f25b7` 固定；本轮修复候选已转 GREEN，下一门是第三轮 fixed-SHA 双轴 Review。
+本轮修复候选经统一测试为 WRITE `112 passed`、Foundation `261 passed`、ordinary `847 passed`，不能宣称 Standards/Spec 0/0、push、CI、人工验收或 Issue 回写已
+闭合。W008 未进入，Issue #52 保持 OPEN，merge/关闭/release 未授权。

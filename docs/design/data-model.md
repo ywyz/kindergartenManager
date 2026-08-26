@@ -2,8 +2,11 @@
 
 > 合入基线：`main@ca3b7bd`；当前 `feat/agent-write` 工作树 Alembic head：`e5f7a9c2d4b6`。
 > W005/W006 已通过各自远端精确 SHA CI；W006 fixed SHA 为 `253d37d…`。W007 GREEN commit 已存在，当前门是固定 SHA Review/finding RED；W008 未进入。
-> 首轮 fixed-SHA Review 发现 Standards M2、Spec M1/L1，finding RED 已提交 `cf38725`；本修正候选已使四项
-> finding 测试 GREEN，下一门是对该候选的 fixed SHA 重新执行双轴 Review。push、CI、人工验收与 Issue 回写尚未闭合。
+> W007 初始 GREEN commit 本地基线为 WRITE `99 passed`、Foundation `261 passed`、ordinary `847 passed`。
+> 首轮 fixed-SHA Review 为 Standards M2、Spec M1/L1；`cf38725` 后修正基线为 WRITE `110 passed`、Foundation
+> `261 passed`、ordinary `847 passed`。二轮 fixed-SHA Review 为 Standards M1、Spec M1/L1，finding RED 已由
+> `40f25b7` 固定；本轮修复候选已转 GREEN，下一门是第三轮 fixed-SHA 双轴 Review。本轮修复候选经统一测试为
+> WRITE `112 passed`、Foundation `261 passed`、ordinary `847 passed`。push、CI、人工验收与 Issue 回写尚未闭合。
 
 ## 1. 建模原则
 
@@ -235,8 +238,9 @@ F009 自动矩阵曾在其固定 `tested_code_sha` 动态反射包含 Alembic �
 - 确认必须逐次绑定 session/actor/Patch/turn/target/revision/before/expiry，并在短事务中原子完成版本、CAS 更新与审计；已知失败全回滚。
 
 当前 confirmation store 与生产 WRITE service 已实现；确认材料仍只在进程内短命保存。W007 采用 UI 已形成
-GREEN commit，但首轮 Review 的 Standards M2、Spec M1/L1 已由 finding RED `cf38725` 固定；本修正候选已使
-四项 finding 测试 GREEN，仍须对其 fixed SHA 复审。Provider/Tool 仍恰好四 READ + 两 DRAFT，也没有 conversation、长期 Patch 或新的
+GREEN commit；首轮 Review 的 Standards M2、Spec M1/L1 已由 finding RED `cf38725` 固定，首轮修正基线为
+WRITE `110 passed`、Foundation `261 passed`、ordinary `847 passed`。二轮 Review 的 Standards M1、Spec M1/L1
+已由 finding RED `40f25b7` 固定；本轮修复候选已转 GREEN，仍须执行第三轮 fixed-SHA 双轴 Review。Provider/Tool 仍恰好四 READ + 两 DRAFT，也没有 conversation、长期 Patch 或新的
 通用 WRITE 表。
 
 ## 14. 迁移链
@@ -272,6 +276,6 @@ W008 独立人工门。
 - 表时间戳类型/默认实现不完全统一。
 - `export_records` 没有 `updated_at`，属于明确的不可变例外；仓库总规则应承认该例外。
 - 可信 UI session 已恢复并进入分支/远端 CI，但当前会话不落独立 server-side session 表，后续撤销/运维策略需以独立需求收紧。
-- W005/W006 已闭合逐次确认、操作前版本、不可变审计和原子 CAS；W007 GREEN commit 的首轮 Review findings
-  已在本修正候选转 GREEN，尚未获得 fixed-SHA 复审 0/0、push、CI、人工验收或 Issue 证据；真实 MySQL 8 与最终固定 SHA
+- W005/W006 已闭合逐次确认、操作前版本、不可变审计和原子 CAS；W007 GREEN commit 的二轮 Review findings
+  已由 `40f25b7` 固定并在本修正候选转 GREEN，尚未获得第三轮 fixed-SHA Review、push、CI、人工验收或 Issue 证据；真实 MySQL 8 与最终固定 SHA
   可见验收仍属未进入的 W008。

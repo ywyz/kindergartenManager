@@ -30,10 +30,13 @@ INITIAL_GREEN_BASELINE_FACT = (
     "W007 初始 GREEN commit 本地基线为 WRITE `99 passed`、Foundation "
     "`261 passed`、ordinary `847 passed`"
 )
-FINDING_CANDIDATE_REVIEW_FACT = (
-    "首轮 fixed-SHA Review 已完成；finding 修正候选当前本地 WRITE "
-    "`110 passed`、Foundation `261 passed`、ordinary `847 passed`，并等待 "
-    "fixed-SHA 复审"
+FIRST_REVIEW_REPAIR_BASELINE_FACT = (
+    "首轮 fixed-SHA Review 为 Standards M2、Spec M1/L1；`cf38725` 后修正"
+    "基线为 WRITE `110 passed`、Foundation `261 passed`、ordinary `847 passed`"
+)
+SECOND_REVIEW_GATE_FACT = (
+    "二轮 fixed-SHA Review 为 Standards M1、Spec M1/L1，finding RED 已由 "
+    "`40f25b7` 固定；本轮修复候选已转 GREEN，下一门是第三轮 fixed-SHA 双轴 Review"
 )
 STALE_CURRENT_FACTS = {
     "AGENTS.md": (
@@ -66,17 +69,25 @@ STALE_DELIVERY_GATE_FACTS = {
     "docs/ROADMAP.md": (
         "当前 GREEN 候选为 WRITE `99 passed`",
         "不预宣称 fixed-SHA Review",
+        "finding 修正候选当前本地 WRITE",
+        "并等待 fixed-SHA 复审",
     ),
     "specs/agent-write/tasks.md": (
         "GREEN 候选：稳定 RED `e5f7317…` 后本地 WRITE 99",
         "待 fixed-SHA Review/push/CI/验收/Issue",
+        "finding 修正候选当前本地 WRITE",
+        "并等待 fixed-SHA 复审",
     ),
     "specs/agent-write/tests/README.md": (
         "GREEN 候选现为 WRITE `99 passed`",
         "尚未取得 fixed-SHA Review",
+        "finding 修正候选当前本地 WRITE",
+        "并等待 fixed-SHA 复审",
     ),
     "memory-bank/architecture.md": (
         "GREEN 候选现为 WRITE `99 passed`",
+        "finding 修正候选当前本地 WRITE",
+        "并等待 fixed-SHA 复审",
     ),
 }
 
@@ -254,7 +265,8 @@ def test_w007_current_facts_name_the_committed_green_review_gate() -> None:
     }
     required_delivery_facts = (
         INITIAL_GREEN_BASELINE_FACT,
-        FINDING_CANDIDATE_REVIEW_FACT,
+        FIRST_REVIEW_REPAIR_BASELINE_FACT,
+        SECOND_REVIEW_GATE_FACT,
     )
     missing_delivery_facts = {
         relative_path: [
