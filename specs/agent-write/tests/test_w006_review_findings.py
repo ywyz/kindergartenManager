@@ -310,7 +310,7 @@ async def test_version_repository_read_binds_actor_confirmation_and_plan(
     assert wrong_confirmation is None
 
 
-def test_current_fact_docs_record_w006_without_authorizing_w007() -> None:
+def test_current_fact_docs_close_w006_and_open_only_w007_red() -> None:
     data_model = (REPOSITORY_ROOT / "docs/design/data-model.md").read_text()
     context = (REPOSITORY_ROOT / "CONTEXT.md").read_text()
     tasks = (REPOSITORY_ROOT / "specs/agent-write/tasks.md").read_text()
@@ -327,13 +327,17 @@ def test_current_fact_docs_record_w006_without_authorizing_w007() -> None:
         data_model
     )
     assert "W006" in context and "原子" in context
-    assert "| W005 |" in tasks and "| W006 |" in tasks and "| W007 |" in tasks
+    assert all(f"| W00{stage} |" in tasks for stage in range(5, 9))
     w005_row = next(line for line in tasks.splitlines() if line.startswith("| W005 |"))
     w006_row = next(line for line in tasks.splitlines() if line.startswith("| W006 |"))
     w007_row = next(line for line in tasks.splitlines() if line.startswith("| W007 |"))
+    w008_row = next(line for line in tasks.splitlines() if line.startswith("| W008 |"))
     assert "未授权" not in w005_row
     assert "未授权" not in w006_row
-    assert "未进入" in w007_row
+    assert "完成" in w006_row and "253d37d" in w006_row
+    assert "RED" in w007_row and "未进入" not in w007_row
+    assert "未进入" in w008_row
+    assert "W007" in context and "RED" in context
     assert "e5f7a9c2d4b6" in roadmap
     assert "生产 WRITE GREEN 未授权" not in roadmap
     assert "daily_plan_operation_version" in system_architecture

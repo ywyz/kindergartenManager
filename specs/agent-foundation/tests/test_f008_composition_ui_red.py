@@ -544,9 +544,10 @@ async def test_discard_only_clears_agent_memory_not_caller_owned_body(
     assert body == before
 
 
-def test_agent_ui_surface_is_closed_and_patch_rows_are_detached_primitives():
+def test_foundation_panel_stays_read_draft_while_local_patch_actions_are_explicit():
     component = import_module("app.ui.components.agent_draft")
     panel_source = inspect.getsource(component.DailyPlanAgentPanel)
+    render_signature = inspect.signature(component.render_daily_plan_agent_panel)
 
     assert component.AGENT_ACTION_LABELS == ("运行", "取消", "丢弃建议")
     assert component.AGENT_FIXED_NOTICE == "仅生成建议，不会保存或修改当前计划。"
@@ -554,6 +555,9 @@ def test_agent_ui_surface_is_closed_and_patch_rows_are_detached_primitives():
     assert not hasattr(component, "apply_patch")
     assert not hasattr(component, "confirm_write")
     assert callable(component.render_daily_plan_agent_panel)
+    assert "patch_actions" in render_signature.parameters
+    assert "ConfirmedDailyPlanWriteService" not in panel_source
+    assert "save_daily_plan" not in panel_source
     assert "on_disconnect(self.disconnect)" in panel_source
     assert "on_disconnect(self.close)" not in panel_source
     assert "on_delete(self.close)" in panel_source
@@ -572,7 +576,7 @@ def test_date_selection_guard_invalidates_out_of_order_callbacks():
     assert guard.current == second
 
 
-def test_daily_plan_page_wires_immediate_selection_and_agent_panel_without_write_actions():
+def test_daily_plan_page_wires_local_confirmation_without_provider_write():
     page = import_module("app.ui.pages.daily_plan")
     source = inspect.getsource(page)
 
@@ -617,5 +621,8 @@ def test_daily_plan_page_wires_immediate_selection_and_agent_panel_without_write
     assert source.index("plan_id=p.id", history_delete) > history_delete
     assert source.index("expected_revision=p.revision", history_delete) > history_delete
     assert "agent_controller" in source
-    assert "adopt_patch" not in source
-    assert "confirm_write" not in source
+    assert "create_daily_plan_patch_confirmation_controller" in source
+    assert "DailyPlanPatchConfirmationPanel" in source
+    assert "patch_actions=" in source
+    assert "Permission.WRITE" not in source
+    assert "build_foundation_registry" not in source
