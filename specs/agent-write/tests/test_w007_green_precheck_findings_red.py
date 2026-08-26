@@ -1172,3 +1172,77 @@ async def test_shutdown_base_exception_closes_owner_and_releases_writer(
         "writer_retained": False,
         "agent_retained": False,
     }
+
+
+@pytest.mark.asyncio
+async def test_cancelled_issue_joiner_does_not_log_later_base_exception() -> None:
+    """A cancelled joiner cannot expose a later private writer failure."""
+    flow, writer, _agent, patch_a, _patch_b = await _two_patch_flow(
+        block_phase="issue",
+    )
+    ui_session = trusted_ui_session()
+    loop = asyncio.get_running_loop()
+    previous_handler = loop.get_exception_handler()
+    loop_contexts: list[dict[str, object]] = []
+
+    def capture_loop_exception(
+        _loop: asyncio.AbstractEventLoop,
+        context: dict[str, object],
+    ) -> None:
+        loop_contexts.append(context)
+
+    def raise_private_writer_failure() -> None:
+        raise _WriterCleanupAbort("writer_private_marker")
+
+    writer.before_issue_return = raise_private_writer_failure
+    loop.set_exception_handler(capture_loop_exception)
+    try:
+        owner_task = asyncio.create_task(
+            flow.issue(
+                ui_session,
+                patch_a.patch_id,
+                expected_plan_id=PLAN_ID,
+                expected_revision=1,
+            )
+        )
+        await writer.entered.wait()
+        joiner_task = asyncio.create_task(
+            flow.issue(
+                ui_session,
+                patch_a.patch_id,
+                expected_plan_id=PLAN_ID,
+                expected_revision=1,
+            )
+        )
+        await _event_loop_checkpoint()
+        joiner_task.cancel()
+        joiner_outcome = await _task_outcome(joiner_task)
+        writer.release.set()
+        owner_outcome = await _task_outcome(owner_task)
+        await _event_loop_checkpoint()
+        await _event_loop_checkpoint()
+        observed_loop_events = tuple(
+            (
+                context.get("message"),
+                type(context.get("exception")).__name__,
+                str(context.get("exception")),
+            )
+            for context in loop_contexts
+        )
+    finally:
+        writer.release.set()
+        await flow.close()
+        await _event_loop_checkpoint()
+        loop.set_exception_handler(previous_handler)
+
+    assert {
+        "joiner_outcome": joiner_outcome[0],
+        "owner_outcome": owner_outcome[0],
+        "writer_issue_count": len(writer.issue_patch_ids),
+        "loop_events": observed_loop_events,
+    } == {
+        "joiner_outcome": "cancelled",
+        "owner_outcome": "base_exception",
+        "writer_issue_count": 1,
+        "loop_events": (),
+    }
