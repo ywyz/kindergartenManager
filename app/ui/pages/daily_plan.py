@@ -28,7 +28,6 @@ from app.repository.class_repository import get_class_config
 from app.repository.daily_plan_repository import (
     delete_daily_plan,
     get_daily_plan_by_date,
-    get_daily_plan_by_id_for_user,
     list_daily_plans_for_user,
     save_daily_plan,
 )
@@ -39,6 +38,7 @@ from app.service.diff_service import compute_diff
 from app.service.generate_service import generate_activity_content
 from app.service.lesson_plan_service import process_lesson_plan
 from app.service.agent.composition import create_daily_plan_agent_controller
+from app.service.agent.confirmed_plan_read import read_confirmed_daily_plan
 from app.service.agent.confirmation_flow import (
     create_daily_plan_patch_confirmation_controller,
 )
@@ -90,9 +90,8 @@ async def daily_plan_page() -> None:
 
     tenant_id = ui_session.tenant_id
     user_id = ui_session.user_id
-    agent_controller = create_daily_plan_agent_controller(
-        TrustedActor(tenant_id=tenant_id, user_id=user_id)
-    )
+    trusted_actor = TrustedActor(tenant_id=tenant_id, user_id=user_id)
+    agent_controller = create_daily_plan_agent_controller(trusted_actor)
     patch_confirmation_controller = (
         create_daily_plan_patch_confirmation_controller(
             agent_controller=agent_controller,
@@ -203,41 +202,12 @@ async def daily_plan_page() -> None:
             ):
                 raise RuntimeError("agent_confirmation_target_stale")
 
-            async with AsyncSessionLocal() as session:
-                plan = await get_daily_plan_by_id_for_user(
-                    session,
-                    tenant_id=tenant_id,
-                    user_id=user_id,
-                    plan_id=target.plan_id,
-                )
-                if (
-                    plan is None
-                    or plan.plan_date != target.selected_date
-                    or plan.revision != confirmation.after_revision
-                ):
-                    raise RuntimeError("agent_confirmation_reload_mismatch")
-                authoritative = {
-                    "plan_id": plan.id,
-                    "revision": plan.revision,
-                    "activity_goal": plan.activity_goal or "",
-                    "activity_prep": plan.activity_prep or "",
-                    "activity_key": plan.activity_key or "",
-                    "activity_difficult": plan.activity_difficult or "",
-                    "activity_process_original": (
-                        plan.activity_process_original or ""
-                    ),
-                    "activity_process_adapted": (
-                        plan.activity_process_adapted or ""
-                    ),
-                    "morning_activity": plan.morning_activity or "",
-                    "morning_talk_topic": plan.morning_talk_topic or "",
-                    "morning_talk_questions": (
-                        plan.morning_talk_questions or ""
-                    ),
-                    "indoor_area": plan.indoor_area or "",
-                    "outdoor_activity": plan.outdoor_activity or "",
-                    "daily_reflection": plan.daily_reflection or "",
-                }
+            authoritative = await read_confirmed_daily_plan(
+                trusted_actor,
+                plan_id=target.plan_id,
+                selected_date=target.selected_date,
+                expected_revision=confirmation.after_revision,
+            )
 
             if (
                 await _require_live_session() is None
@@ -247,25 +217,25 @@ async def daily_plan_page() -> None:
 
             agent_panel.plan_changed(target.selected_date)
             form_generation.advance()
-            goal_area.value = authoritative["activity_goal"]
-            prep_area.value = authoritative["activity_prep"]
-            key_area.value = authoritative["activity_key"]
-            difficult_area.value = authoritative["activity_difficult"]
-            original_area.value = authoritative["activity_process_original"]
-            adapted_area.value = authoritative["activity_process_adapted"]
-            morning_activity_area.value = authoritative["morning_activity"]
-            morning_talk_area.value = authoritative["morning_talk_topic"]
-            area_game_area.value = authoritative["indoor_area"]
-            outdoor_activity_area.value = authoritative["outdoor_activity"]
-            daily_reflection_area.value = authoritative["daily_reflection"]
-            state["original_process"] = authoritative[
-                "activity_process_original"
-            ]
-            state["loaded_plan_id"] = authoritative["plan_id"]
-            state["loaded_revision"] = authoritative["revision"]
-            state["morning_talk_questions"] = authoritative[
-                "morning_talk_questions"
-            ]
+            goal_area.value = authoritative.activity_goal
+            prep_area.value = authoritative.activity_prep
+            key_area.value = authoritative.activity_key
+            difficult_area.value = authoritative.activity_difficult
+            original_area.value = authoritative.activity_process_original
+            adapted_area.value = authoritative.activity_process_adapted
+            morning_activity_area.value = authoritative.morning_activity
+            morning_talk_area.value = authoritative.morning_talk_topic
+            area_game_area.value = authoritative.indoor_area
+            outdoor_activity_area.value = authoritative.outdoor_activity
+            daily_reflection_area.value = authoritative.daily_reflection
+            state["original_process"] = (
+                authoritative.activity_process_original
+            )
+            state["loaded_plan_id"] = authoritative.plan_id
+            state["loaded_revision"] = authoritative.revision
+            state["morning_talk_questions"] = (
+                authoritative.morning_talk_questions
+            )
             save_msg.classes(
                 remove="text-red-500 text-orange-500",
                 add="text-green-600",

@@ -1,6 +1,8 @@
 # Agent WRITE 逐次确认冻结规格
 
-- 状态：W005/W006 已闭合；W007 稳定 RED 已固定在本地 `e5f7317…`，GREEN 候选已通过本地全量；W008 未进入，
+- 状态：W005/W006 已闭合；W007 GREEN commit 已存在，当前门是固定 SHA Review/finding RED；W008 未进入。
+  首轮 fixed-SHA Review 发现 Standards M2、Spec M1/L1，finding RED 已提交 `cf38725`；本修正候选已使四项
+  finding 测试 GREEN，下一门是对该候选的 fixed SHA 重新执行双轴 Review。push、CI、人工验收与 Issue 回写尚未闭合；
   merge、Issue 关闭与 release 未授权
 - 合入基线：`main@ca3b7bd922f838c0739ccf9ed0f58655d292dc2f`；W006 fixed SHA：
   `253d37d92f2983ea55f688340078380d41c78fd4`
@@ -24,10 +26,11 @@ ORM 与 migration、原子 CAS 和 commit-unknown 只读对账。W006 fixed SHA 
 0/0、本地 WRITE `78 passed`、Foundation `261 passed`、ordinary `847 passed`、精确 SHA Quality
 `32954156965`、Linux service-boundary `10/10` 与 Issue #52 回写。
 
-当前只进入 W007：本地 `e5f7317…` 已固定逐 Patch 确认 UI 稳定 RED，GREEN 候选已实现并通过本地全量。须先形成
-GREEN commit，再对该固定 SHA 双轴 Review；每项 finding 先形成 RED commit，修正 commit 后在新固定 SHA
-复审，再依序完成 push、精确 SHA CI、人工验收和 Issue 回写。这些门互不替代。W007 全部门禁闭合前不进入
-W008；最终 Linux 可见故障矩阵和真实 MySQL 8 仍未开始。默认停在 merge、Issue 关闭与 release 之前。
+当前只进入 W007：稳定 RED 与 GREEN commit 均已存在，首轮 fixed-SHA Review 发现 Standards M2、Spec M1/L1，
+finding RED 已提交 `cf38725`，本修正候选已使四项 finding 测试 GREEN。当前须先固定修正 commit，再对该 fixed SHA 双轴复审；
+若仍有 finding，继续先形成 RED commit、修正 commit 后复审。达到 0/0 后才依序完成 push、精确 SHA CI、
+人工验收和 Issue 回写。这些门互不替代。W007 全部门禁闭合前不进入 W008；最终 Linux 可见故障矩阵和真实
+MySQL 8 仍未开始。默认停在 merge、Issue 关闭与 release 之前。
 
 ## 3. 可信 UI session 契约
 
@@ -253,9 +256,10 @@ W004 的原始 59 节点 RED 连续两次均为 `1 passed / 58 failed`，node-on
 
 ## 11. W007/W008 后续验收
 
-W007 候选必须依序经过：最小 GREEN commit；对该固定 SHA 的 Standards/Spec 双轴 Review；每项 finding 的
-RED commit 与修正 commit；对新固定 SHA 复审；push、远端 Quality 精确 `headSha`、人工验收与脱敏 Issue
-证据各自闭合。随后才进入 W008：若产品/helper/test 未变化，可沿用同一 fixed SHA 运行最终双轴 Review、
+W007 已经过稳定 RED、GREEN commit、首轮 fixed-SHA Standards/Spec 双轴 Review，以及 finding RED
+`cf38725`；本修正候选已使四项 finding 测试 GREEN，当前须固定修正 commit 并对该 fixed SHA 复审。若仍有 finding，继续以独立 RED/修正 commit 固定
+并复审；达到 0/0 后，push、远端 Quality 精确 `headSha`、人工验收与脱敏 Issue 证据才可各自闭合。随后才进入
+W008：若产品/helper/test 未变化，可沿用同一 fixed SHA 运行最终双轴 Review、
 全量 Foundation/WRITE/ordinary、Linux 浏览器可见的逐次确认、双击、陈旧 revision、失败回滚、重新登录
 失效、commit-unknown 故障演练和真实 MySQL 8；若有任何变化，必须在新 fixed SHA 重跑全部门禁。最后仍只
 讨论下一授权，默认不 merge、不关闭 Issue、不 release。

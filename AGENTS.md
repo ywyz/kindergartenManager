@@ -106,12 +106,15 @@ multi-agent workflows require a separate ADR/spec/Issue and stable RED; do not a
 Foundation.
 
 The separate WRITE boundary is now frozen by
-`docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md` and `specs/agent-write/`. The current authorized
-slice ends after restoring a database-revalidated `TrustedUiSession`, adding monotonic `daily_plan.revision`, opening the
-new Issue, and proving the WRITE suite is stable RED. Until an explicit later GREEN gate, do not create
-`app.service.agent.confirmed_write`, a confirmation store, `daily_plan_operation_version`, `agent_write_audit`, a WRITE
-migration, confirmation UI, or any Provider WRITE tool. The existing four READ and two DRAFT tools remain the complete
-Provider capability surface.
+`docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md` and `specs/agent-write/`. W005/W006 are closed, and
+W007 has a committed current-page, one-Patch confirmation UI implementation, but its independent delivery gates remain
+open. W007 GREEN commit 已存在，当前门是固定 SHA Review/finding RED；W008 未进入。
+The first fixed-SHA Review found
+Standards M2 and Spec M1/L1; finding RED was committed as `cf38725`, and the corresponding repair candidate turns all
+four finding tests GREEN. That candidate must be reviewed again on its fixed SHA. Do not treat this as Standards/Spec 0/0 or as authorization for push, CI,
+manual acceptance, Issue closure, merge, or release. Do not add Provider WRITE, automatic retry, bulk or cross-page
+adoption, settings/files/Word/delete/create writes, long-term Patch persistence, new tools, or multi-Agent behavior. The
+existing four READ and two DRAFT tools remain the complete Provider capability surface.
 
 F009 adds no Agent capability. Its automated baseline is taken after initialization/seed and dynamically reflects every
 actual database table, protected configuration/export artifacts, caller-owned UI body, the independent audit logger, and

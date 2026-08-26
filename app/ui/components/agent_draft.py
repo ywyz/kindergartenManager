@@ -22,6 +22,9 @@ from app.service.agent.composition import (
 
 AGENT_ACTION_LABELS = ("运行", "取消", "丢弃建议")
 AGENT_FIXED_NOTICE = "仅生成建议，不会保存或修改当前计划。"
+AGENT_CONFIRMATION_NOTICE = (
+    "模型只生成建议；仅在你显式确认采用后，本地应用才会写入当前计划。"
+)
 
 _STATUS_COPY = {
     AgentPanelStatus.IDLE: "等待运行",
@@ -90,7 +93,12 @@ class DailyPlanAgentPanel:
             ui.label("每日计划 Agent（建议模式）").classes(
                 "text-base font-bold text-blue-700"
             )
-            ui.label(AGENT_FIXED_NOTICE).classes("text-sm text-orange-700")
+            notice = (
+                AGENT_FIXED_NOTICE
+                if patch_actions is None
+                else AGENT_CONFIRMATION_NOTICE
+            )
+            ui.label(notice).classes("text-sm text-orange-700")
             self._scope_label = ui.label("尚未选择日期").classes(
                 "text-sm text-gray-500"
             )

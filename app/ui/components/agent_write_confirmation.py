@@ -262,6 +262,7 @@ class DailyPlanPatchConfirmationPanel:
         self._closed = False
         self._abandoned_indeterminate = False
         self._issued_patch_id: UUID | None = None
+        self._issued_patch_sha256: str | None = None
         self._issued_target: DailyPlanUiTarget | None = None
         self._views: list[_PatchView] = []
 
@@ -299,6 +300,7 @@ class DailyPlanPatchConfirmationPanel:
         )
         self._generation += 1
         self._issued_patch_id = None
+        self._issued_patch_sha256 = None
         self._issued_target = None
         self._views.clear()
 
@@ -317,6 +319,7 @@ class DailyPlanPatchConfirmationPanel:
         self._abandoned_indeterminate = True
         self._generation += 1
         self._issued_patch_id = None
+        self._issued_patch_sha256 = None
         self._issued_target = None
         self._views.clear()
         await close_flow()
@@ -365,6 +368,11 @@ class DailyPlanPatchConfirmationPanel:
             return True
         return bool(
             click.patch.patch_id == self._issued_patch_id
+            and type(self._issued_patch_sha256) is str
+            and secrets.compare_digest(
+                click.patch.patch_sha256,
+                self._issued_patch_sha256,
+            )
             and target == self._issued_target
         )
 
@@ -412,6 +420,7 @@ class DailyPlanPatchConfirmationPanel:
         ):
             self._abandoned_indeterminate = True
             self._issued_patch_id = None
+            self._issued_patch_sha256 = None
             self._issued_target = None
             return _PublishGuard.INDETERMINATE_TARGET_STALE
         return _PublishGuard.TARGET_STALE
@@ -553,6 +562,31 @@ class DailyPlanPatchConfirmationPanel:
             on_click=trigger,
         ).props("outline dense").classes("text-blue-700")
 
+    def _render_occupied(
+        self,
+        view: _PatchView,
+        snapshot: PatchConfirmationSnapshotView,
+    ) -> None:
+        self._render_target(snapshot)
+        ui.label(
+            "另一份草案正在占用当前页面的确认；请先完成或取消该草案，"
+            "不能准备这一份草案。"
+        ).classes("text-xs font-medium text-orange-700")
+        trigger = self._operations.bind(
+            capture=lambda: self._capture_click(view),
+            run=lambda owner, click: self._run_action(
+                owner,
+                view,
+                click,
+                _Action.ISSUE,
+            ),
+        )
+        ui.button(
+            PATCH_CONFIRMATION_ACTION_LABELS[0],
+            icon="lock",
+            on_click=trigger,
+        ).props("outline dense").classes("text-gray-500").disable()
+
     def _render_pending(
         self,
         view: _PatchView,
@@ -658,6 +692,9 @@ class DailyPlanPatchConfirmationPanel:
                 )
                 return
             if not self._belongs_to_patch(snapshot, view.patch):
+                if _status_value(snapshot) in {"pending", "indeterminate"}:
+                    self._render_occupied(view, snapshot)
+                    return
                 self._render_prepare(view)
                 return
             status = _status_value(snapshot)
@@ -675,6 +712,7 @@ class DailyPlanPatchConfirmationPanel:
     def _reject_stale_click(self, view: _PatchView) -> None:
         self._controller.invalidate()
         self._issued_patch_id = None
+        self._issued_patch_sha256 = None
         self._issued_target = None
         if _status_value(self._controller.snapshot) == "indeterminate":
             self._abandoned_indeterminate = True
@@ -726,6 +764,14 @@ class DailyPlanPatchConfirmationPanel:
         action: _Action,
     ) -> None:
         require_issued_target = action is not _Action.ISSUE
+        current_snapshot = self._controller.snapshot
+        if (
+            action is _Action.ISSUE
+            and _status_value(current_snapshot) in {"pending", "indeterminate"}
+            and not self._belongs_to_patch(current_snapshot, click.patch)
+        ):
+            self._render_all_views(current_snapshot)
+            return
         if not self._click_is_current(
             view,
             click,
@@ -755,6 +801,7 @@ class DailyPlanPatchConfirmationPanel:
             if _status_value(self._controller.snapshot) == "indeterminate":
                 self._abandoned_indeterminate = True
                 self._issued_patch_id = None
+                self._issued_patch_sha256 = None
                 self._issued_target = None
                 self._render_abandoned_indeterminate(
                     view,
@@ -774,15 +821,27 @@ class DailyPlanPatchConfirmationPanel:
             return
 
         if action is _Action.ISSUE:
-            if _status_value(snapshot) == "pending":
+            if (
+                _status_value(snapshot) == "pending"
+                and self._belongs_to_patch(snapshot, click.patch)
+            ):
                 self._issued_patch_id = click.patch.patch_id
+                self._issued_patch_sha256 = click.patch.patch_sha256
                 self._issued_target = click.target
             else:
                 self._issued_patch_id = None
+                self._issued_patch_sha256 = None
                 self._issued_target = None
-        self._render_view(view, snapshot)
+        self._render_all_views(snapshot)
         if action is not _Action.ISSUE and _status_value(snapshot) == "applied":
             await self._publish_applied(view, snapshot, click.target)
+
+    def _render_all_views(
+        self,
+        snapshot: PatchConfirmationSnapshotView,
+    ) -> None:
+        for current_view in tuple(self._views):
+            self._render_view(current_view, snapshot)
 
     async def _publish_applied(
         self,
@@ -819,6 +878,7 @@ class DailyPlanPatchConfirmationPanel:
             return
         self._generation += 1
         self._issued_patch_id = None
+        self._issued_patch_sha256 = None
         self._issued_target = None
         self._views.clear()
         view.generation = self._generation

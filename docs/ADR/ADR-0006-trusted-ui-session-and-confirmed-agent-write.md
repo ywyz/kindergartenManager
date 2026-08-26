@@ -1,6 +1,6 @@
 # ADR-0006：可信 UI 会话、每日计划 revision 与逐次确认写入
 
-- 状态：接受（W005/W006 已闭合；W007 GREEN 候选已通过本地全量，独立交付门未闭合）
+- 状态：接受（W005/W006 已闭合；W007 首轮 Review findings 的修正候选已转 GREEN，等待 fixed-SHA 复审）
 - 日期：2026-08-25
 - 依赖：[ADR-0002](ADR-0002-single-user-ui-and-tenant-api.md)、[ADR-0003](ADR-0003-sqlite-default-mysql-optional-alembic.md)、[ADR-0005](ADR-0005-controlled-ai-agent-runtime.md)
 - 冻结规格：[Agent WRITE](../../specs/agent-write/spec.md)
@@ -15,9 +15,10 @@
 
 本 ADR 取代 ADR-0002 中“固定身份单用户 UI”这一产品现状，但不改变 API Key → tenant 的外部 API
 身份边界。它同时冻结最小 Agent WRITE 的本地应用层边界。W005 已实现确认契约/store，W006 已实现原子
-证据事务并闭合其独立门；这不等于产品 UI 或最终交付闭合。W007 当前只有稳定 RED，后续 GREEN、Review、
-finding RED/修正、commit、push、CI、人工验收、Issue 回写、
-合并与发布仍是彼此独立的门禁。
+证据事务并闭合其独立门；这不等于产品 UI 或最终交付闭合。W007 GREEN commit 已存在，当前门是固定 SHA Review/finding RED；W008 未进入。
+首轮 fixed-SHA Review 发现 Standards M2、Spec M1/L1，finding RED 已提交 `cf38725`；本修正候选已使四项
+finding 测试 GREEN，下一门是对该候选的 fixed SHA 重新执行双轴 Review。后续 push、CI、人工验收、Issue 回写、合并与发布仍是
+彼此独立的门禁，当前不得写成 Review 0/0 或已交付。
 
 ## 决策
 
@@ -144,9 +145,10 @@ W001-W004 已固定可信 UI session、revision、ADR/spec/Issue 与稳定 RED�
 Review、push、精确 SHA CI、service 验收和 Issue 回写。W006 已在 fixed SHA `253d37d…` 完成双轴 Review
 0/0、push、精确 SHA Quality `32954156965`、Linux service-boundary `10/10` 与 Issue #52 回写。
 
-W007 稳定 RED 已固定在本地 `e5f7317…`，GREEN 候选已通过本地全量；后续顺序保持：W007 GREEN commit → 对该
-fixed SHA 双轴 Review → finding RED commit/修正 commit → 对新 fixed SHA 复审 → push → 精确 CI `headSha`
-→ 人工验收 → Issue 证据。上述门全部闭合后才进入 W008；无代码/helper/test 变化时可沿用同一 fixed SHA，
+W007 GREEN commit 已存在；首轮 fixed-SHA 双轴 Review 已发现 Standards M2、Spec M1/L1，finding RED commit
+`cf38725` 已固定这些缺口，本修正候选已使四项 finding 测试 GREEN。当前顺序是固定修正 commit → 对该 fixed SHA 复审；若仍有 finding，
+继续以独立 RED commit/修正 commit 固定后复审，达到 0/0 后才依序 push → 精确 CI `headSha` → 人工验收 →
+Issue 证据。上述门全部闭合后才进入 W008；无代码/helper/test 变化时可沿用同一 fixed SHA，
 任何变化都必须在新 SHA 重跑最终 Review/CI/浏览器/真实 MySQL 8 证据，最后才讨论 merge/release。任何
 产品/helper/test 修改都会
 使 ADR-0005 F009 的既有人工证据只保留为其原 `tested_code_sha` 的历史证据，不能宣称覆盖当前代码。
