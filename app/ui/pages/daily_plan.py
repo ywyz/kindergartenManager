@@ -28,6 +28,7 @@ from app.repository.class_repository import get_class_config
 from app.repository.daily_plan_repository import (
     delete_daily_plan,
     get_daily_plan_by_date,
+    get_daily_plan_by_id_for_user,
     list_daily_plans_for_user,
     save_daily_plan,
 )
@@ -38,8 +39,15 @@ from app.service.diff_service import compute_diff
 from app.service.generate_service import generate_activity_content
 from app.service.lesson_plan_service import process_lesson_plan
 from app.service.agent.composition import create_daily_plan_agent_controller
+from app.service.agent.confirmation_flow import (
+    create_daily_plan_patch_confirmation_controller,
+)
 from app.service.agent.contracts import TrustedActor
 from app.ui.components.agent_draft import render_daily_plan_agent_panel
+from app.ui.components.agent_write_confirmation import (
+    DailyPlanPatchConfirmationPanel,
+    PatchConfirmationSnapshotView,
+)
 from app.ui.components.app_shell import render_shell
 from app.ui.components.date_panel import DatePanel, DateSelection
 from app.ui.auth_context import require_bound_ui_session, require_current_ui_session
@@ -85,6 +93,11 @@ async def daily_plan_page() -> None:
     agent_controller = create_daily_plan_agent_controller(
         TrustedActor(tenant_id=tenant_id, user_id=user_id)
     )
+    patch_confirmation_controller = (
+        create_daily_plan_patch_confirmation_controller(
+            agent_controller=agent_controller,
+        )
+    )
 
     async def _require_live_session():
         return await require_bound_ui_session(ui_session)
@@ -109,6 +122,7 @@ async def daily_plan_page() -> None:
         "original_process": "",  # 拆分原文（折叠展示用）
         "indoor_areas": "",  # 室内区域（来自 class_cfg）
         "outdoor_content": "",  # 户外内容（来自 class_cfg）
+        "morning_talk_questions": "",  # Agent 可更新但当前表单未单独编辑
         "loaded_plan_id": None,  # int | None，当前表单读取到的精确行
         "loaded_revision": None,  # int | None，保存时必须原样带回
     }
@@ -175,6 +189,94 @@ async def daily_plan_page() -> None:
                 form_generation=form_generation.capture(),
             )
 
+        async def _publish_confirmed_plan(
+            confirmation: PatchConfirmationSnapshotView,
+            target: DailyPlanUiTarget,
+        ) -> None:
+            """Reload one confirmed result; never replay it through legacy save."""
+            if (
+                await _require_live_session() is None
+                or not _is_current_plan_target(target)
+                or confirmation.daily_plan_id != target.plan_id
+                or confirmation.before_revision != target.revision
+                or confirmation.after_revision != target.revision + 1
+            ):
+                raise RuntimeError("agent_confirmation_target_stale")
+
+            async with AsyncSessionLocal() as session:
+                plan = await get_daily_plan_by_id_for_user(
+                    session,
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    plan_id=target.plan_id,
+                )
+                if (
+                    plan is None
+                    or plan.plan_date != target.selected_date
+                    or plan.revision != confirmation.after_revision
+                ):
+                    raise RuntimeError("agent_confirmation_reload_mismatch")
+                authoritative = {
+                    "plan_id": plan.id,
+                    "revision": plan.revision,
+                    "activity_goal": plan.activity_goal or "",
+                    "activity_prep": plan.activity_prep or "",
+                    "activity_key": plan.activity_key or "",
+                    "activity_difficult": plan.activity_difficult or "",
+                    "activity_process_original": (
+                        plan.activity_process_original or ""
+                    ),
+                    "activity_process_adapted": (
+                        plan.activity_process_adapted or ""
+                    ),
+                    "morning_activity": plan.morning_activity or "",
+                    "morning_talk_topic": plan.morning_talk_topic or "",
+                    "morning_talk_questions": (
+                        plan.morning_talk_questions or ""
+                    ),
+                    "indoor_area": plan.indoor_area or "",
+                    "outdoor_activity": plan.outdoor_activity or "",
+                    "daily_reflection": plan.daily_reflection or "",
+                }
+
+            if (
+                await _require_live_session() is None
+                or not _is_current_plan_target(target)
+            ):
+                raise RuntimeError("agent_confirmation_target_stale")
+
+            agent_panel.plan_changed(target.selected_date)
+            form_generation.advance()
+            goal_area.value = authoritative["activity_goal"]
+            prep_area.value = authoritative["activity_prep"]
+            key_area.value = authoritative["activity_key"]
+            difficult_area.value = authoritative["activity_difficult"]
+            original_area.value = authoritative["activity_process_original"]
+            adapted_area.value = authoritative["activity_process_adapted"]
+            morning_activity_area.value = authoritative["morning_activity"]
+            morning_talk_area.value = authoritative["morning_talk_topic"]
+            area_game_area.value = authoritative["indoor_area"]
+            outdoor_activity_area.value = authoritative["outdoor_activity"]
+            daily_reflection_area.value = authoritative["daily_reflection"]
+            state["original_process"] = authoritative[
+                "activity_process_original"
+            ]
+            state["loaded_plan_id"] = authoritative["plan_id"]
+            state["loaded_revision"] = authoritative["revision"]
+            state["morning_talk_questions"] = authoritative[
+                "morning_talk_questions"
+            ]
+            save_msg.classes(
+                remove="text-red-500 text-orange-500",
+                add="text-green-600",
+            )
+            save_msg.text = (
+                "✅ Agent 草案已确认采用"
+                f"（revision {confirmation.before_revision}"
+                f" → {confirmation.after_revision}）"
+            )
+            await refresh_history()
+
         def _on_date_selected(selection: DateSelection) -> None:
             """Invalidate old page/Agent state before holiday or DB awaits begin."""
             selection_state["current"] = selection
@@ -204,9 +306,17 @@ async def daily_plan_page() -> None:
             on_date_selected=_on_date_selected,
         )
         panel.render()
+        patch_confirmation_panel = DailyPlanPatchConfirmationPanel(
+            patch_confirmation_controller,
+            authorize_confirmation=_require_live_session,
+            capture_target=_capture_plan_target,
+            is_current_target=_is_current_plan_target,
+            on_applied=_publish_confirmed_plan,
+        )
         agent_panel = render_daily_plan_agent_panel(
             agent_controller,
             authorize_operation=_authorize_agent_operation,
+            patch_actions=patch_confirmation_panel,
         )
 
         # ══════════════════════════════════════════════════════════════════════

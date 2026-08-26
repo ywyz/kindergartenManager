@@ -1,8 +1,9 @@
 # Agent WRITE 逐次确认冻结规格
 
-- 状态：本轮只授权可信 UI session 与 `daily_plan.revision` 先决条件 GREEN、治理文件/Issue 和稳定 RED；
-  confirmation/version/audit/采用 UI 的生产 GREEN 尚未授权
-- 工作基线：`main@ca3b7bd922f838c0739ccf9ed0f58655d292dc2f`
+- 状态：W005/W006 已闭合；W007 稳定 RED 已固定在本地 `e5f7317…`，GREEN 候选已通过本地全量；W008 未进入，
+  merge、Issue 关闭与 release 未授权
+- 合入基线：`main@ca3b7bd922f838c0739ccf9ed0f58655d292dc2f`；W006 fixed SHA：
+  `253d37d92f2983ea55f688340078380d41c78fd4`
 - Issue：[GitHub #52](https://github.com/ywyz/kindergartenManager/issues/52)（保持 OPEN）
 - 权威决策：[ADR-0006](../../docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md)
 - 继承边界：[ADR-0005](../../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md)、[Agent Foundation spec](../agent-foundation/spec.md)
@@ -18,23 +19,20 @@ Provider、Prompt 和 Tool registry 在整个里程碑中仍只有 ADR-0005 的�
 
 ## 2. 当前阶段与停止边界
 
-本轮必须完成：
+W001-W006 已按独立门禁完成可信 UI session、`daily_plan.revision`、治理文件/Issue、确认 store、版本/审计
+ORM 与 migration、原子 CAS 和 commit-unknown 只读对账。W006 fixed SHA `253d37d…` 已取得 Standards/Spec
+0/0、本地 WRITE `78 passed`、Foundation `261 passed`、ordinary `847 passed`、精确 SHA Quality
+`32954156965`、Linux service-boundary `10/10` 与 Issue #52 回写。
 
-1. `TrustedUiSession`：JWT 签名/有效期/唯一 `jti` + active 用户数据库重读，移除固定 UI actor 和源码已知
-   默认管理员密码；
-2. `daily_plan.revision`：正整数、创建为 1、每次已提交的实际更新单调 `+1`、并发 stale 与回滚测试；
-3. ADR-0006、本 spec、tasks 与一个保持 OPEN 的 GitHub Issue；
-4. `specs/agent-write/tests/` 中只穿过下述公开 seam 的稳定 RED；连续两次 collection/执行得到相同失败
-   node ID，既有 Agent Foundation 与常规回归继续 GREEN；
-5. 到此停止。
-
-本轮禁止创建 `confirmed_write` 生产模块、confirmation store、版本/审计 ORM 与 migration、采用/确认 UI，
-也禁止由这些文档推导出 commit、push、CI、人工验收、Issue 关闭、merge 或 release 授权。
+当前只进入 W007：本地 `e5f7317…` 已固定逐 Patch 确认 UI 稳定 RED，GREEN 候选已实现并通过本地全量。须先形成
+GREEN commit，再对该固定 SHA 双轴 Review；每项 finding 先形成 RED commit，修正 commit 后在新固定 SHA
+复审，再依序完成 push、精确 SHA CI、人工验收和 Issue 回写。这些门互不替代。W007 全部门禁闭合前不进入
+W008；最终 Linux 可见故障矩阵和真实 MySQL 8 仍未开始。默认停在 merge、Issue 关闭与 release 之前。
 
 ## 3. 可信 UI session 契约
 
 生产用例接收 `app.ui.auth_context.TrustedUiSession`，不接收自由构造 dict、裸 tenant/user 或 Provider 数据。
-当前实现须在每次进入受保护页面时从 token 重新解析；未来 W007 UI adapter 还须在**每次调用**
+当前实现须在每次进入受保护页面时从 token 重新解析；W007 UI adapter 还须在**每次调用**
 `issue_confirmation`、`apply`、`reconcile` 前，对页面打开时捕获的 session 执行
 `require_bound_ui_session(opened_session)`：
 
@@ -180,7 +178,7 @@ revision 的引用和值一致：
 
 ## 8. 持久化与不可变性
 
-未来 GREEN 只新增两个 Agent WRITE 业务证据表；表名是契约：
+W006 GREEN 已新增且只新增两个 Agent WRITE 业务证据表；表名是契约：
 
 ### 8.1 `daily_plan_operation_version`
 
@@ -203,7 +201,7 @@ nonce hash 也必须唯一。相同 jti 的成功记录有相同规范 session S
 SQLite 日常 RED 运行真实 migration 后验证 SQL/ORM 拒绝；MySQL 离线 SQL generation 必须至少证明两表各有
 UPDATE/DELETE trigger。离线 DDL 不能替代 W008 在真实 MySQL 8 上的迁移往返与拒绝行为验收。
 
-## 9. 稳定 RED 固定矩阵
+## 9. 稳定 RED 固定矩阵与 W007 演进
 
 RED 只从 `specs/agent-write/tests/` 穿过第 5 节公开 seam；不读取 service 私有字段，不使用 sleep 推测并发，
 不连真实网络/模型，不读取真实凭据，不用 skip/xfail，也不预建生产占位模块。至少固定：
@@ -236,10 +234,13 @@ RED 门禁命令：
 .venv/bin/python -m pytest tests/ -q
 ```
 
-两次 RED 必须有完全相同的 collected/passed/failed 数量与失败 node ID；新增失败只因
-`app.service.agent.confirmed_write` 及其 version/audit persistence 尚未实现。先决条件、旧 Foundation 和常规
-测试必须 GREEN。最终数量、失败 node ID 摘要与当前未提交工作树事实必须在本轮结束前回填 Issue；不为得到
-稳定数字而放宽断言。
+W004 的原始 59 节点 RED 连续两次均为 `1 passed / 58 failed`，node-only SHA-256 为 `fe346fa3…`；它只
+记录 W005/W006 实现前的 lineage。W007 在 W006 闭合后新增针对 `confirmation_flow` 公共 seam 的 RED
+契约，并演进 Foundation UI 边界；本地 `e5f7317…` 的 21 个新模块节点连续两轮失败集合 hash 均为
+`8bad6854…`，完整 WRITE
+套件连续两轮均为 `77 passed / 22 failed`（node hash `e0898e89…`），Foundation 连续两轮均为
+`259 passed / 2 failed`（node hash `fb168e7a…`），ordinary `847 passed`。collection 无 skip/xfail/error；
+这些结果只固定 W007 RED，不预称 GREEN、Review、push、CI、人工验收或 Issue 回写。
 
 ## 10. 明确非目标
 
@@ -250,9 +251,11 @@ RED 门禁命令：
 - 持久化未确认 Patch、完整对话、Provider 响应或构建通用 event-sourcing/version 平台。
 - 由 RED、ADR 或 Issue 自动授权 GREEN、Review 修正、commit、push、CI、人工验收、merge 或 release。
 
-## 11. 后续验收（尚未授权）
+## 11. W007/W008 后续验收
 
-后续候选必须依序经过：最小 GREEN；Standards/Spec 双轴 Review；每项 finding 先 RED 后修正；固定候选 SHA；
-全量与 Foundation/WRITE 套件；commit 与 push 的单独授权；远端 Quality 精确 `headSha`；Linux 浏览器可见
-逐次确认、双击、陈旧 revision、失败回滚与重新登录失效；commit-unknown 故障演练；脱敏 Issue 证据；最后
-才讨论 merge/release。任何候选后的产品/helper/test 变化都会使人工证据失效并要求新 SHA 重跑。
+W007 候选必须依序经过：最小 GREEN commit；对该固定 SHA 的 Standards/Spec 双轴 Review；每项 finding 的
+RED commit 与修正 commit；对新固定 SHA 复审；push、远端 Quality 精确 `headSha`、人工验收与脱敏 Issue
+证据各自闭合。随后才进入 W008：若产品/helper/test 未变化，可沿用同一 fixed SHA 运行最终双轴 Review、
+全量 Foundation/WRITE/ordinary、Linux 浏览器可见的逐次确认、双击、陈旧 revision、失败回滚、重新登录
+失效、commit-unknown 故障演练和真实 MySQL 8；若有任何变化，必须在新 fixed SHA 重跑全部门禁。最后仍只
+讨论下一授权，默认不 merge、不关闭 Issue、不 release。

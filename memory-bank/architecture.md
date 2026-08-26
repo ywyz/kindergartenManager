@@ -454,5 +454,9 @@ callback 在外部 await 后的成功/异常写回前重验原 session；`daily_
 revision；该 revision 为 `b7d9e1f3a5c2`，`c1a8e4f6b2d9` 另修 SQLite `user.id` 自增兼容性，当前
 `e5f7a9c2d4b6` 新增且仅新增 `daily_plan_operation_version`、`agent_write_audit` 与跨方言不可变
 trigger。W005 已闭合确认契约/store；W006 已实现 version→CAS→audit 同事务、全回滚与 commit-unknown
-只读对账，当前目标矩阵为 WRITE `78 passed`、Foundation `261 passed`、ordinary `847 passed`。
-W006 修正后 Review/CI/验收/Issue 与 W007 UI 仍未闭合；Issue #52 保持 OPEN，merge/关闭/release 未授权。
+只读对账，并在 fixed SHA `253d37d…` 取得 Standards/Spec 0/0、WRITE `78 passed`、Foundation
+`261 passed`、ordinary `847 passed`、Quality `32954156965` 精确成功、Linux service-boundary `10/10`
+与 Issue #52 comment `5423617401`。W007 稳定 RED 已固定在本地 `e5f7317…`，两轮 WRITE 均为
+`77 passed / 22 failed`、Foundation 均为 `259 passed / 2 failed`；GREEN 候选现为 WRITE `99 passed`、
+Foundation `261 passed`、ordinary `847 passed`。W008 未进入，Issue #52
+保持 OPEN，merge/关闭/release 未授权。

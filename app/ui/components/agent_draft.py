@@ -1,17 +1,21 @@
-"""Read-only daily-plan Agent panel.
+"""READ/DRAFT daily-plan Agent panel with optional explicit Patch actions.
 
-The panel renders detached suggestions only. It deliberately exposes no path for
-adopting a patch, mutating page body fields, or persisting conversation state.
+The panel renders detached suggestions and owns no write implementation. A
+page-local adapter may add one-Patch actions through the narrow
+``AgentPatchActions`` interface; the panel never receives a repository, session,
+legacy save callback, or Provider WRITE capability.
 """
 
 from collections.abc import Awaitable, Callable
 from datetime import date
+from typing import Protocol
 
 from nicegui import context, ui
 
 from app.service.agent.composition import (
     AgentPanelSnapshot,
     AgentPanelStatus,
+    AgentPatchSnapshot,
     DailyPlanAgentController,
 )
 
@@ -44,6 +48,27 @@ _ERROR_COPY = {
 }
 
 
+class AgentPatchActions(Protocol):
+    """Optional page-local actions rendered beside one detached Patch view.
+
+    The Agent panel owns only this narrow rendering/lifecycle port. The port is
+    responsible for authorizing any confirmation operation and may not turn the
+    Foundation registry itself into a WRITE surface.
+    """
+
+    def render_patch_actions(self, patch: AgentPatchSnapshot) -> None:
+        """Render explicit actions for this one immutable Patch snapshot."""
+
+    def invalidate(self) -> None:
+        """Synchronously revoke any pending action before page state changes."""
+
+    async def disconnect(self) -> None:
+        """Discard connection-local confirmation state."""
+
+    async def close(self) -> None:
+        """Permanently close page-local confirmation state."""
+
+
 class DailyPlanAgentPanel:
     """NiceGUI rendering facade around one page-local Agent controller."""
 
@@ -52,11 +77,13 @@ class DailyPlanAgentPanel:
         controller: DailyPlanAgentController,
         *,
         authorize_operation: Callable[[], Awaitable[bool]] | None = None,
+        patch_actions: AgentPatchActions | None = None,
     ) -> None:
         if type(controller) is not DailyPlanAgentController:
             raise ValueError("agent_controller_invalid")
         self._controller = controller
         self._authorize_operation = authorize_operation
+        self._patch_actions = patch_actions
         self._closed = False
 
         with ui.card().classes("w-full"):
@@ -103,6 +130,9 @@ class DailyPlanAgentPanel:
         """Synchronously invalidate old work before date-side awaits begin."""
         if self._closed:
             return
+        patch_actions = getattr(self, "_patch_actions", None)
+        if patch_actions is not None:
+            patch_actions.invalidate()
         snapshot = self._controller.scope_changed(selected_date)
         self._render(snapshot)
 
@@ -110,6 +140,9 @@ class DailyPlanAgentPanel:
         """Invalidate suggestions based on an authoritative plan before mutation."""
         if self._closed:
             return
+        patch_actions = getattr(self, "_patch_actions", None)
+        if patch_actions is not None:
+            patch_actions.invalidate()
         snapshot = self._controller.plan_changed(changed_date)
         self._render(snapshot)
 
@@ -117,6 +150,9 @@ class DailyPlanAgentPanel:
         """Cancel connection-local work while keeping the controller reusable."""
         if self._closed:
             return
+        patch_actions = getattr(self, "_patch_actions", None)
+        if patch_actions is not None:
+            await patch_actions.disconnect()
         snapshot = await self._controller.disconnect()
         self._render(snapshot)
 
@@ -125,6 +161,9 @@ class DailyPlanAgentPanel:
         if self._closed:
             return
         self._closed = True
+        patch_actions = getattr(self, "_patch_actions", None)
+        if patch_actions is not None:
+            await patch_actions.close()
         await self._controller.close()
 
     async def _run(self) -> None:
@@ -146,6 +185,9 @@ class DailyPlanAgentPanel:
                 add="text-orange-700",
             )
             return
+        patch_actions = getattr(self, "_patch_actions", None)
+        if patch_actions is not None:
+            patch_actions.invalidate()
         self._render_running()
         snapshot = await self._controller.run(intent)
         if (
@@ -167,6 +209,9 @@ class DailyPlanAgentPanel:
     def _discard(self) -> None:
         if self._closed:
             return
+        patch_actions = getattr(self, "_patch_actions", None)
+        if patch_actions is not None:
+            patch_actions.invalidate()
         self._intent.value = ""
         self._render(self._controller.discard())
 
@@ -245,15 +290,20 @@ class DailyPlanAgentPanel:
                         ui.label(f"复核提示：{warning}").classes(
                             "text-xs text-orange-700"
                         )
+                    patch_actions = getattr(self, "_patch_actions", None)
+                    if patch_actions is not None:
+                        patch_actions.render_patch_actions(patch)
 
 
 def render_daily_plan_agent_panel(
     controller: DailyPlanAgentController,
     *,
     authorize_operation: Callable[[], Awaitable[bool]] | None = None,
+    patch_actions: AgentPatchActions | None = None,
 ) -> DailyPlanAgentPanel:
     """Render and return the non-writing daily-plan Agent panel."""
     return DailyPlanAgentPanel(
         controller,
         authorize_operation=authorize_operation,
+        patch_actions=patch_actions,
     )

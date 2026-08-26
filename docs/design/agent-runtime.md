@@ -351,7 +351,7 @@ Agent Foundation 不新增业务表或 Alembic migration。以下对象只存在
 
 独立 ADR/spec 已在 W005/W006 实现 `daily_plan` revision、短命确认 store、
 `daily_plan_operation_version` 与不可变 `agent_write_audit`；这些本地应用层证据不改变 Foundation
-READ/DRAFT 自身的零写入语义，也不授权 W007 UI 或 Provider WRITE。
+READ/DRAFT 自身的零写入语义，也不把 W007 局部实现变成 Provider WRITE 或已交付产品能力。
 
 ## 10. Prompt injection 与 Tool 安全
 
@@ -478,7 +478,7 @@ UI/全逻辑摘要分别保持 `f60b310f…` / `bdb45487…`。两者 compare �
    和独立 `evidence_closure_sha` 顺序闭合。任何后续产品代码变化都会使本组人工证据失效。
 6. Graphify/codebase-memory 更新只证明覆盖，不替代测试、Review 和人工验收。
 
-## 13. W005/W006 已实现边界与 W007 前置条件
+## 13. W005/W006 已闭合边界与 W007 实施门禁
 
 - 可信 actor/session 已恢复；W005 Confirmation 绑定 Patch hash、target、revision、session、turn、expiry 和
   一次性 nonce，确认材料只在有界进程内 store 短命保存。
@@ -487,5 +487,7 @@ UI/全逻辑摘要分别保持 `f60b310f…` / `bdb45487…`。两者 compare �
 - stale、Schema/业务校验、audit 或明确 commit 失败全部回滚；未知 commit 只读对账不重放。两张 evidence
   表由数据库 trigger 拒绝 UPDATE/DELETE，Repository 查询在 SQL 层绑定 tenant/user。
 - Provider、Tool registry、网络、Word、文件和备份不进入 WRITE 事务；Provider 仍恰好四 READ + 两 DRAFT。
-- W007 才能在每日计划当前页面接入单 Patch 确认 UI；在 W006 Review/CI/验收/Issue 门闭合前不得进入，且
-  不能增加自动重试、批量/跨页面采用或长期 Patch 持久化。
+- W006 fixed SHA `253d37d…` 已取得 Standards/Spec 0/0、本地/精确 SHA CI、Linux service-boundary `10/10`
+  与 Issue #52 证据；其独立门已闭合。
+- W007 稳定 RED 已固定在本地 `e5f7317…`，GREEN 候选只在每日计划当前页面接入单 Patch 确认 UI；
+  Review、push、CI、人工验收和 Issue 尚未闭合，且不能增加自动重试、批量/跨页面采用或长期 Patch 持久化。

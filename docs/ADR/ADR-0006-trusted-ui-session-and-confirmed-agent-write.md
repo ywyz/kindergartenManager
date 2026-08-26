@@ -1,6 +1,6 @@
 # ADR-0006：可信 UI 会话、每日计划 revision 与逐次确认写入
 
-- 状态：接受（W005/W006 已进入实现；W007 尚未进入，最终交付门未闭合）
+- 状态：接受（W005/W006 已闭合；W007 GREEN 候选已通过本地全量，独立交付门未闭合）
 - 日期：2026-08-25
 - 依赖：[ADR-0002](ADR-0002-single-user-ui-and-tenant-api.md)、[ADR-0003](ADR-0003-sqlite-default-mysql-optional-alembic.md)、[ADR-0005](ADR-0005-controlled-ai-agent-runtime.md)
 - 冻结规格：[Agent WRITE](../../specs/agent-write/spec.md)
@@ -15,7 +15,8 @@
 
 本 ADR 取代 ADR-0002 中“固定身份单用户 UI”这一产品现状，但不改变 API Key → tenant 的外部 API
 身份边界。它同时冻结最小 Agent WRITE 的本地应用层边界。W005 已实现确认契约/store，W006 已实现原子
-证据事务；这不等于产品 UI 或交付闭合。W007、修正后 Review、commit、push、CI、人工验收、Issue 回写、
+证据事务并闭合其独立门；这不等于产品 UI 或最终交付闭合。W007 当前只有稳定 RED，后续 GREEN、Review、
+finding RED/修正、commit、push、CI、人工验收、Issue 回写、
 合并与发布仍是彼此独立的门禁。
 
 ## 决策
@@ -26,7 +27,7 @@
 须校验签名、有效期和必要 claim，并按 token 中的 tenant/user 重新读取数据库中的用户。只有 tenant/user
 精确匹配且用户仍为 active 时，才可构造 `TrustedUiSession`。
 
-这里分成两个不可互相替代的边界：未来 W007 UI adapter 在每次调用 `issue_confirmation`、`apply` 或
+这里分成两个不可互相替代的边界：W007 UI adapter 在每次调用 `issue_confirmation`、`apply` 或
 `reconcile` **之前**，必须用页面打开时捕获的 session 调用 `require_bound_ui_session(opened_session)`，重新
 解析当前浏览器 token 并匹配精确 jti。冻结的 service 签名不接收 token 或浏览器 storage，所以 service 本身
 不声称重新验 JWT；它接收 adapter 刚重建的 `TrustedUiSession`，并在每个入口重新读取同 tenant/user 的当前
@@ -140,11 +141,13 @@ commit-unknown 对账提供幂等证据。普通应用日志不能替代这两�
 ### 6. 实施门禁
 
 W001-W004 已固定可信 UI session、revision、ADR/spec/Issue 与稳定 RED；W005 已固定确认契约/store 并完成
-Review、push、精确 SHA CI、service 验收和 Issue 回写。W006 已取得初始 GREEN，并完成首轮双轴 Review、
-finding RED 与本地修正；当前下一门是修正后 Review 0/0，而不是 W007。
+Review、push、精确 SHA CI、service 验收和 Issue 回写。W006 已在 fixed SHA `253d37d…` 完成双轴 Review
+0/0、push、精确 SHA Quality `32954156965`、Linux service-boundary `10/10` 与 Issue #52 回写。
 
-后续顺序保持：W006 修正后 Review → commit → push → 精确 CI `headSha` → service 故障验收 → Issue 证据 →
-W007 单 Patch UI → W008 最终固定 SHA/浏览器/真实 MySQL 8 证据 → merge/release。任何
+W007 稳定 RED 已固定在本地 `e5f7317…`，GREEN 候选已通过本地全量；后续顺序保持：W007 GREEN commit → 对该
+fixed SHA 双轴 Review → finding RED commit/修正 commit → 对新 fixed SHA 复审 → push → 精确 CI `headSha`
+→ 人工验收 → Issue 证据。上述门全部闭合后才进入 W008；无代码/helper/test 变化时可沿用同一 fixed SHA，
+任何变化都必须在新 SHA 重跑最终 Review/CI/浏览器/真实 MySQL 8 证据，最后才讨论 merge/release。任何
 产品/helper/test 修改都会
 使 ADR-0005 F009 的既有人工证据只保留为其原 `tested_code_sha` 的历史证据，不能宣称覆盖当前代码。
 

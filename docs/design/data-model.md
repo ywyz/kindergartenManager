@@ -1,8 +1,8 @@
 # KindergartenManager 数据模型
 
 > 合入基线：`main@ca3b7bd`；当前 `feat/agent-write` 工作树 Alembic head：`e5f7a9c2d4b6`。
-> W005 已通过远端精确 SHA CI；W006 当前为本地 Review finding 修正态，尚待修正后 Review、远端 CI、
-> 浏览器与真实 MySQL 8 验收。W007 尚未进入。
+> W005/W006 已通过各自远端精确 SHA CI；W006 fixed SHA 为 `253d37d…`。W007 稳定 RED 已固定在本地
+> `e5f7317…` 且 GREEN 候选已通过本地全量；W008 的最终浏览器与真实 MySQL 8 验收尚未进入。
 
 ## 1. 建模原则
 
@@ -119,8 +119,8 @@ tenant
 再由 ORM `version_id_col` 执行实际 UPDATE CAS。陈旧页面/并发写失败，调用方不能经字段参数覆写 revision；
 公开 ORM 属性只读，SQLite/MySQL trigger 还拒绝非 1 初始值、纯 revision bump 及不满足“内容变化且
 `OLD + 1`”的 UPDATE；MySQL 文本字段先 `CAST(... AS BINARY)` 再做 NULL-safe 比较，避免默认不区分大小写/
-重音的 collation 把字节级真实变化误判为 no-op。只读 API 已显式返回 revision。当前这个先决条件尚未
-提交/CI/人工验收。
+重音的 collation 把字节级真实变化误判为 no-op。只读 API 已显式返回 revision。该先决条件已随 W004-W006
+提交并通过精确 SHA CI 与 Linux service-boundary 验收；最终浏览器矩阵和真实 MySQL 8 验收仍属于 W008。
 
 删除同样不能只按日期：页面捕获实际加载的 plan id + revision，Repository 用 tenant/user/id/revision 单条
 条件 DELETE；未命中抛 stale 并回滚。这样旧标签页不能删除另一个标签后来更新或替换的记录。
@@ -212,8 +212,9 @@ SQLite `user.id` 自增类型，当前 head `e5f7a9c2d4b6` 只增加
 
 F009 自动矩阵曾在其固定 `tested_code_sha` 动态反射包含 Alembic 版本表在内的 17 张实际 SQLite 表，
 并验证成功、失败、取消、超时、stale、越权、断开和重启不产生 Agent 持久化。两类人工摘要也只对该 SHA
-有效。当前 W006 自动矩阵把两张新 evidence 空表纳入动态 baseline，并继续证明 Foundation READ/DRAFT
-对其零写入；这不刷新旧人工证据，旧结果仍只能作为历史证据。
+有效。W006 自动矩阵把两张新 evidence 空表纳入动态 baseline，并继续证明 Foundation READ/DRAFT
+对其零写入；其 fixed SHA `253d37d…` 已闭合本地/CI/service 验收与 Issue 门。这不刷新旧 Foundation
+人工证据，旧结果仍只能作为历史证据。
 
 以下对象只能作为当前 operation 的内存 DTO：
 
@@ -232,8 +233,9 @@ F009 自动矩阵曾在其固定 `tested_code_sha` 动态反射包含 Alembic �
 - `agent_write_audit` 保存最小不可变 action audit，不保存密钥、隐藏 Prompt、完整 Patch 或不必要的幼儿正文。
 - 确认必须逐次绑定 session/actor/Patch/turn/target/revision/before/expiry，并在短事务中原子完成版本、CAS 更新与审计；已知失败全回滚。
 
-当前 confirmation store 与生产 WRITE service 已实现；确认材料仍只在进程内短命保存。W007 采用 UI 尚不存在，
-Provider/Tool 仍恰好四 READ + 两 DRAFT，也没有 conversation、长期 Patch 或新的通用 WRITE 表。
+当前 confirmation store 与生产 WRITE service 已实现；确认材料仍只在进程内短命保存。W007 采用 UI 已固定
+稳定 RED 并正在 GREEN 实现，但尚未闭合 Review/CI/人工验收；Provider/Tool 仍恰好四 READ + 两 DRAFT，
+也没有 conversation、长期 Patch 或新的通用 WRITE 表。
 
 ## 14. 迁移链
 
@@ -268,5 +270,5 @@ W008 独立人工门。
 - 表时间戳类型/默认实现不完全统一。
 - `export_records` 没有 `updated_at`，属于明确的不可变例外；仓库总规则应承认该例外。
 - 可信 UI session 已恢复并进入分支/远端 CI，但当前会话不落独立 server-side session 表，后续撤销/运维策略需以独立需求收紧。
-- W005/W006 已实现逐次确认、操作前版本、不可变审计和原子 CAS；W007 产品 UI、真实 MySQL 8 与最终
-  固定 SHA 可见验收尚未闭合。
+- W005/W006 已闭合逐次确认、操作前版本、不可变审计和原子 CAS；W007 产品 UI 正在 GREEN 实现，真实
+  MySQL 8 与最终固定 SHA 可见验收仍属未进入的 W008。

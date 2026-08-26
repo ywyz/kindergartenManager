@@ -1,8 +1,8 @@
 # KindergartenManager 产品与工程路线图
 
 > 当前快照：2026-08-26；合入基线 `main@ca3b7bd922f838c0739ccf9ed0f58655d292dc2f`；
-> 当前 `feat/agent-write` 已闭合 W005，W006 正在收敛第二轮 Review findings；Alembic head 为
-> `e5f7a9c2d4b6`。W007 尚未进入，merge/Issue 关闭/release 未授权。
+> 当前 `feat/agent-write` 已闭合 W005/W006；Alembic head 为 `e5f7a9c2d4b6`。W007 稳定 RED 已固定在
+> 本地 `e5f7317…`，GREEN 候选已实现并通过本地全量；W008 未进入，merge/Issue 关闭/release 未授权。
 
 ## 1. 状态语义
 
@@ -121,8 +121,8 @@ R0 事实基线与图谱
   `ddca78d…` 依次固定异常净化、硬时限、终态 current-context/TTL、drain 竞态和 BaseException 边界。
   最终本地候选 `51443a3…` 为 Foundation `110 passed`、全量 `551 passed`、Standards `0`、Spec `0`、
   scope creep `0`；证据 SHA `2fb4e6f…` 的远端 Quality `32648599591` 精确匹配成功。
-- Foundation 固定验收时使用旧单用户边界；当前分支已恢复可信 UI 登录/session，并随 W005 通过精确 SHA
-  CI，但最终产品浏览器矩阵仍待 W008。
+- Foundation 固定验收时使用旧单用户边界；当前分支已恢复可信 UI 登录/session，并随 W005/W006 通过精确
+  SHA CI，但最终产品浏览器矩阵仍待 W008。
 - 当前继续保持模块化单体；服务拆分仍须独立 ADR 与运营理由，F009 不改变部署形态。
 - F004 已建立每日计划、班级设置和日历的 tenant+user 窄 Service 投影；F008 executor 只调用这些投影，
   Provider 不接触 Repository。
@@ -224,7 +224,7 @@ Review/Quality/远端/Issue 证据见 Issue #48。
 
 ## 9. R4B：Agent WRITE（独立里程碑）
 
-状态：`实现中`（W005 已闭合；W006 第二轮 finding RED 已固定并在本地修正；W007 尚未进入）。
+状态：`实现中`（W005/W006 已闭合；W007 稳定 RED 与本地 GREEN 候选已固定；W008 未进入）。
 
 [ADR-0006](ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md) 与
 [冻结规格](../specs/agent-write/spec.md)、[Issue #52](https://github.com/ywyz/kindergartenManager/issues/52)
@@ -238,10 +238,16 @@ SQLite/MySQL 四个 UPDATE/DELETE 拒绝 trigger。W005 的 `ConfirmedDailyPlanW
 `e4a7f3c…` 取得 Review 0/0、精确 SHA CI、service 验收和 Issue 回写；W006 已实现 version→CAS→audit
 同事务、全回滚、commit-unknown 只读 reconcile，并在 Review 后固定两轮 finding RED。
 
-W006 当前本地目标矩阵为 WRITE `78 passed`、Foundation `261 passed`、ordinary `847 passed`；修正后固定
-SHA Review、push、CI、service 故障验收与 Issue 回写仍待闭合。MySQL 离线 DDL 已证明方言分支结构，但真实
-MySQL 8 的迁移往返、四 trigger、revision CAS 与管理员行锁仍属 W008 独立验收。W007 确认 UI 尚不存在；
-后续门禁仍按 [tasks](../specs/agent-write/tasks.md) 顺序执行，默认停在 merge/Issue 关闭/release 之前。
+W006 已在 fixed SHA `253d37d92f2983ea55f688340078380d41c78fd4` 取得 Standards/Spec 0/0、本地
+WRITE `78 passed`、Foundation `261 passed`、ordinary `847 passed`、Linux service-boundary `10/10` PASS；
+Quality `32954156965` 精确匹配成功，Issue #52 comment `5423617401` 已回写且 Issue 保持 OPEN。
+
+W007 稳定 RED 已固定在尚未 push 的本地 commit `e5f7317…`：WRITE 套件连续两轮均为
+`77 passed / 22 failed`（node hash `e0898e89…`），Foundation 连续两轮均为 `259 passed / 2 failed`
+（node hash `fb168e7a…`），ordinary `847 passed`。当前 GREEN 候选为 WRITE `99 passed`、Foundation
+`261 passed`、ordinary `847 passed`，但不预宣称 fixed-SHA Review、push、CI、人工验收或 Issue 回写。
+MySQL 离线 DDL 已证明方言分支结构，但真实 MySQL 8 的迁移往返、四 trigger、
+revision CAS 与管理员行锁仍属尚未进入的 W008 独立验收；默认停在 merge/Issue 关闭/release 之前。
 
 ## 10. R5：发布与运维复核
 
