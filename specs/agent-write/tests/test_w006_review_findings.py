@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from sqlalchemy import event
 from sqlalchemy.exc import DisconnectionError, OperationalError
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Session
 
 from app.repository.confirmed_write_repository import (
@@ -28,6 +29,19 @@ from conftest import (
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+
+
+class _CancelAfterCommittedSessionExit(AsyncSession):
+    """Deliver cancellation only after a durable commit and clean session close."""
+
+    async def commit(self) -> None:
+        await super().commit()
+        self.info["w006_committed"] = True
+
+    async def __aexit__(self, exc_type, exc_value, traceback) -> None:
+        await super().__aexit__(exc_type, exc_value, traceback)
+        if self.info.pop("w006_committed", False):
+            raise asyncio.CancelledError
 
 
 def _service(api, database: WriteDatabase, clock: MutableClock):
@@ -107,6 +121,35 @@ async def test_external_cancellation_during_commit_keeps_reconcile_path(
 
 
 @pytest.mark.asyncio
+async def test_cancellation_during_post_commit_session_exit_keeps_reconcile_path(
+    write_database: WriteDatabase,
+) -> None:
+    api = write_api()
+    factory = async_sessionmaker(
+        write_database.engine,
+        class_=_CancelAfterCommittedSessionExit,
+        expire_on_commit=False,
+    )
+    service = api.ConfirmedDailyPlanWriteService(
+        session_factory=factory,
+        clock=MutableClock(),
+    )
+    ui_session = trusted_ui_session()
+    pending = await service.issue_confirmation(
+        ui_session,
+        build_patch(),
+        expected_revision=1,
+    )
+
+    with pytest.raises(asyncio.CancelledError):
+        await service.apply(ui_session, pending.confirmation_id)
+
+    reconciled = await service.reconcile(ui_session, pending.confirmation_id)
+    assert reconciled.before_revision == 1
+    assert reconciled.after_revision == 2
+
+
+@pytest.mark.asyncio
 async def test_applied_confirmation_reconciles_after_execution_ttl(
     write_database: WriteDatabase,
 ) -> None:
@@ -123,6 +166,29 @@ async def test_applied_confirmation_reconciles_after_execution_ttl(
     clock.move_to(pending.expires_at_utc + timedelta(microseconds=1))
 
     assert await service.reconcile(ui_session, pending.confirmation_id) == applied
+
+
+@pytest.mark.asyncio
+async def test_expired_repeat_apply_cannot_destroy_applied_reconciliation(
+    write_database: WriteDatabase,
+) -> None:
+    api = write_api()
+    clock = MutableClock()
+    service = _service(api, write_database, clock)
+    ui_session = trusted_ui_session()
+    pending = await service.issue_confirmation(
+        ui_session,
+        build_patch(),
+        expected_revision=1,
+    )
+    applied = await service.apply(ui_session, pending.confirmation_id)
+    clock.move_to(pending.expires_at_utc + timedelta(microseconds=1))
+
+    with pytest.raises(api.ConfirmedWriteRejected) as replay:
+        await service.apply(ui_session, pending.confirmation_id)
+
+    assert await service.reconcile(ui_session, pending.confirmation_id) == applied
+    _assert_rejected(api, replay.value, "confirmation_consumed")
 
 
 @pytest.mark.asyncio
@@ -248,6 +314,13 @@ def test_current_fact_docs_record_w006_without_authorizing_w007() -> None:
     data_model = (REPOSITORY_ROOT / "docs/design/data-model.md").read_text()
     context = (REPOSITORY_ROOT / "CONTEXT.md").read_text()
     tasks = (REPOSITORY_ROOT / "specs/agent-write/tasks.md").read_text()
+    roadmap = (REPOSITORY_ROOT / "docs/ROADMAP.md").read_text()
+    system_architecture = (
+        REPOSITORY_ROOT / "docs/design/system-architecture.md"
+    ).read_text()
+    agent_runtime = (REPOSITORY_ROOT / "docs/design/agent-runtime.md").read_text()
+    adr_index = (REPOSITORY_ROOT / "docs/ADR/README.md").read_text()
+    architecture_history = (REPOSITORY_ROOT / "memory-bank/architecture.md").read_text()
 
     assert "e5f7a9c2d4b6" in data_model
     assert "`daily_plan_operation_version` 和 `agent_write_audit` 表均不存在" not in (
@@ -261,3 +334,12 @@ def test_current_fact_docs_record_w006_without_authorizing_w007() -> None:
     assert "未授权" not in w005_row
     assert "未授权" not in w006_row
     assert "未进入" in w007_row
+    assert "e5f7a9c2d4b6" in roadmap
+    assert "生产 WRITE GREEN 未授权" not in roadmap
+    assert "daily_plan_operation_version" in system_architecture
+    assert "采用 UI 生产实现均不存在" not in system_architecture
+    assert "W005/W006" in agent_runtime
+    assert "后续 WRITE GREEN" not in agent_runtime
+    assert "W005/W006" in adr_index
+    assert "e5f7a9c2d4b6" in architecture_history
+    assert "未创建生产 WRITE seam" not in architecture_history
