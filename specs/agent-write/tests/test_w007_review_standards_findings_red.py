@@ -1,4 +1,4 @@
-"""Stable RED for the first W007 Standards Review findings."""
+"""Stable RED for the W007 Standards Review findings."""
 
 from __future__ import annotations
 
@@ -36,42 +36,72 @@ FIRST_REVIEW_REPAIR_BASELINE_FACT = (
 )
 SECOND_REVIEW_GATE_FACT = (
     "二轮 fixed-SHA Review 为 Standards M1、Spec M1/L1，finding RED 已由 "
-    "`40f25b7` 固定；本轮修复候选已转 GREEN，下一门是第三轮 fixed-SHA 双轴 Review"
+    "`40f25b7` 固定；`40f25b7` 后修正基线为 WRITE `112 passed`、Foundation "
+    "`261 passed`、ordinary `847 passed`"
 )
-THIRD_REVIEW_FIXED_GATE_FACT = (
-    "本轮修复已固定在当前 SHA，当前门是第三轮 fixed-SHA 双轴 Review"
+THIRD_REVIEW_GATE_FACT = (
+    "三轮 fixed-SHA Review 为 Standards M1、Spec M1，finding RED 已由 "
+    "`43636a0` 固定；`43636a0` 后修正基线为 WRITE `113 passed`、Foundation "
+    "`261 passed`、ordinary `847 passed`"
 )
-THIRD_REVIEW_GATE_FACT_FILES = (
+PRECOMMIT_IDENTITY_FINDING_FACT = (
+    "提交前终态 identity 审计发现 M1，finding RED 已由 `9972aab` 固定"
+)
+CURRENT_REPAIR_BASELINE_FACT = (
+    "本轮最终修复候选统一测试为 WRITE `115 passed`、Foundation `261 passed`、"
+    "ordinary `847 passed`"
+)
+FOURTH_REVIEW_FIXED_GATE_FACT = (
+    "本轮修复已固定在当前 SHA，当前门是第四轮 fixed-SHA 双轴 Review"
+)
+FOURTH_REVIEW_GATE_FACT_FILES = (
     "docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md",
     "specs/agent-write/spec.md",
+)
+STALE_CURRENT_CANDIDATE_FACT = (
+    "本轮修复候选经统一测试为 WRITE `113 passed`"
 )
 STALE_CURRENT_FACTS = {
     "AGENTS.md": (
         "The current authorized slice ends after",
         "Until an explicit later GREEN gate",
+        "下一门是第三轮 fixed-SHA 双轴 Review",
     ),
     "CONTEXT.md": (
         "W007 UI adapter 正在 GREEN 实现",
         "完成 W007 当前页面单 Patch 确认 UI 的最小 GREEN commit",
+        "下一门是第三轮 fixed-SHA 双轴 Review",
+        "等待第三轮 fixed-SHA 双轴 Review",
+        "第三轮 fixed-SHA 双轴 Review、push",
     ),
     "docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md": (
         "W007 当前只有稳定 RED",
         "W007 GREEN commit →",
         "固定本修正候选 commit",
+        "等待第三轮 fixed-SHA 双轴 Review",
+        "当前门是第三轮 fixed-SHA 双轴 Review",
+        "执行第三轮双轴 Review",
     ),
     "docs/design/data-model.md": (
         "稳定 RED 并正在 GREEN 实现",
         "W007 产品 UI 正在 GREEN 实现",
+        "仍须执行第三轮 fixed-SHA 双轴 Review",
+        "尚未获得第三轮 fixed-SHA Review",
     ),
     "docs/design/system-architecture.md": (
         "W007 UI 正在 GREEN 实现",
         "W007 仍只有稳定 RED 与进行中的 GREEN 实现",
         "当前门是 W007 单 Patch UI GREEN",
+        "等待第三轮 fixed-SHA 双轴 Review",
+        "须在 fixed SHA 执行第三轮双轴 Review",
+        "执行第三轮双轴 Review",
     ),
     "specs/agent-write/spec.md": (
         "须先形成 GREEN commit",
         "W007 候选必须依序经过：最小 GREEN commit",
         "固定本修正候选 commit",
+        "当前须先固定本修正候选 commit",
+        "执行第三轮双轴 Review",
     ),
 }
 STALE_DELIVERY_GATE_FACTS = {
@@ -80,23 +110,29 @@ STALE_DELIVERY_GATE_FACTS = {
         "不预宣称 fixed-SHA Review",
         "finding 修正候选当前本地 WRITE",
         "并等待 fixed-SHA 复审",
+        "下一门是第三轮 fixed-SHA 双轴 Review",
+        "等待第三轮 fixed-SHA 双轴 Review",
     ),
     "specs/agent-write/tasks.md": (
         "GREEN 候选：稳定 RED `e5f7317…` 后本地 WRITE 99",
         "待 fixed-SHA Review/push/CI/验收/Issue",
         "finding 修正候选当前本地 WRITE",
         "并等待 fixed-SHA 复审",
+        "下一门是第三轮 fixed-SHA 双轴 Review",
+        "待第三轮 fixed-SHA 双轴 Review",
     ),
     "specs/agent-write/tests/README.md": (
         "GREEN 候选现为 WRITE `99 passed`",
         "尚未取得 fixed-SHA Review",
         "finding 修正候选当前本地 WRITE",
         "并等待 fixed-SHA 复审",
+        "下一门是第三轮 fixed-SHA 双轴 Review",
     ),
     "memory-bank/architecture.md": (
         "GREEN 候选现为 WRITE `99 passed`",
         "finding 修正候选当前本地 WRITE",
         "并等待 fixed-SHA 复审",
+        "下一门是第三轮 fixed-SHA 双轴 Review",
     ),
 }
 
@@ -247,10 +283,10 @@ def test_w007_current_facts_name_the_committed_green_review_gate() -> None:
         for relative_path, text in normalized_docs.items()
         if CURRENT_GATE_FACT not in text
     ]
-    missing_third_review_gate_fact = [
+    missing_fourth_review_gate_fact = [
         relative_path
-        for relative_path in THIRD_REVIEW_GATE_FACT_FILES
-        if THIRD_REVIEW_FIXED_GATE_FACT not in normalized_docs[relative_path]
+        for relative_path in FOURTH_REVIEW_GATE_FACT_FILES
+        if FOURTH_REVIEW_FIXED_GATE_FACT not in normalized_docs[relative_path]
     ]
     stale_claims = {
         relative_path: [
@@ -266,10 +302,10 @@ def test_w007_current_facts_name_the_committed_green_review_gate() -> None:
         if claims
     }
 
-    assert missing_gate_fact == [] and missing_third_review_gate_fact == [], (
+    assert missing_gate_fact == [] and missing_fourth_review_gate_fact == [], (
         "current W007 gate fact missing from: "
         f"committed_green={missing_gate_fact}, "
-        f"third_review={missing_third_review_gate_fact}"
+        f"fourth_review={missing_fourth_review_gate_fact}"
     )
     assert stale_claims == {}, f"contradictory W007 current facts remain: {stale_claims}"
 
@@ -279,6 +315,28 @@ def test_w007_current_facts_name_the_committed_green_review_gate() -> None:
         )
         for relative_path in DELIVERY_GATE_FACT_FILES
     }
+    all_current_docs = normalized_docs | delivery_gate_docs
+    required_current_progress_facts = (
+        THIRD_REVIEW_GATE_FACT,
+        PRECOMMIT_IDENTITY_FINDING_FACT,
+        CURRENT_REPAIR_BASELINE_FACT,
+    )
+    missing_current_progress_facts = {
+        relative_path: [
+            fact for fact in required_current_progress_facts if fact not in text
+        ]
+        for relative_path, text in all_current_docs.items()
+    }
+    missing_current_progress_facts = {
+        relative_path: facts
+        for relative_path, facts in missing_current_progress_facts.items()
+        if facts
+    }
+    stale_current_candidates = [
+        relative_path
+        for relative_path, text in all_current_docs.items()
+        if STALE_CURRENT_CANDIDATE_FACT in text
+    ]
     required_delivery_facts = (
         INITIAL_GREEN_BASELINE_FACT,
         FIRST_REVIEW_REPAIR_BASELINE_FACT,
@@ -309,7 +367,14 @@ def test_w007_current_facts_name_the_committed_green_review_gate() -> None:
         if claims
     }
 
-    assert missing_delivery_facts == {} and stale_delivery_claims == {}, (
+    assert (
+        missing_current_progress_facts == {}
+        and stale_current_candidates == []
+        and missing_delivery_facts == {}
+        and stale_delivery_claims == {}
+    ), (
         "W007 delivery-gate current facts are stale: "
-        f"missing={missing_delivery_facts}, stale={stale_delivery_claims}"
+        f"missing_progress={missing_current_progress_facts}, "
+        f"stale_113_candidates={stale_current_candidates}, "
+        f"missing_history={missing_delivery_facts}, stale={stale_delivery_claims}"
     )

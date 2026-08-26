@@ -5,8 +5,11 @@
 > W007 初始 GREEN commit 本地基线为 WRITE `99 passed`、Foundation `261 passed`、ordinary `847 passed`。
 > 首轮 fixed-SHA Review 为 Standards M2、Spec M1/L1；`cf38725` 后修正基线为 WRITE `110 passed`、Foundation
 > `261 passed`、ordinary `847 passed`。二轮 fixed-SHA Review 为 Standards M1、Spec M1/L1，finding RED 已由
-> `40f25b7` 固定；本轮修复候选已转 GREEN，下一门是第三轮 fixed-SHA 双轴 Review。本轮修复候选经统一测试为
-> WRITE `112 passed`、Foundation `261 passed`、ordinary `847 passed`。push、CI、人工验收与 Issue 回写尚未闭合，
+> `40f25b7` 固定；`40f25b7` 后修正基线为 WRITE `112 passed`、Foundation `261 passed`、ordinary `847 passed`。
+> 三轮 fixed-SHA Review 为 Standards M1、Spec M1，finding RED 已由 `43636a0` 固定；`43636a0` 后修正基线为
+> WRITE `113 passed`、Foundation `261 passed`、ordinary `847 passed`。提交前终态 identity 审计发现 M1，finding RED
+> 已由 `9972aab` 固定。本轮修复已固定在当前 SHA，当前门是第四轮 fixed-SHA 双轴 Review。本轮最终修复候选统一测试为
+> WRITE `115 passed`、Foundation `261 passed`、ordinary `847 passed`。push、CI、人工验收与 Issue 回写尚未闭合，
 > 不得写成已发布能力。
 
 ## 1. 架构目标
@@ -265,7 +268,7 @@ AI Key 不应写入 `.env`、仓库或测试日志；数据库密文与原 `ENCR
 | 图片过大/方向异常 | 压缩、规格校验、横版归一 | 原图隐私和内存上限需持续验证 |
 | Agent Provider/Tool call | Runtime 本地校验、关闭 registry、有界 loop | Foundation 已合入；任何未知/WRITE Tool 仍必须拒绝 |
 | Agent 取消/上下文变化 | operation/scope/fingerprint 匹配，迟到结果丢弃 | 不得在页面切换后回填或保存 |
-| Agent 逐次确认 WRITE | W005/W006 已闭合；W007 二轮 Review findings 的修复候选已转 GREEN，等待第三轮 fixed-SHA 双轴 Review | `daily_plan_operation_version` + `agent_write_audit` 只由本地 service 写精确已有 plan；W007 尚未通过独立交付门，Provider/Tool 仍不可写 |
+| Agent 逐次确认 WRITE | W005/W006 已闭合；W007 提交前终态 identity finding 的修复已固定，等待第四轮 fixed-SHA 双轴 Review | `daily_plan_operation_version` + `agent_write_audit` 只由本地 service 写精确已有 plan；W007 尚未通过独立交付门，Provider/Tool 仍不可写 |
 
 ## 11. 可观测性与审计
 
@@ -289,7 +292,9 @@ AI Key 不应写入 `.env`、仓库或测试日志；数据库密文与原 `ENCR
   并证明所有路径零业务持久化。
 - Agent WRITE：W005/W006 公共 seam、绑定、原子事务与 finding 矩阵已闭合；W007 UI 已形成 GREEN commit，
   首轮 Standards M2、Spec M1/L1 findings 已由 `cf38725` 固定且修正基线为 WRITE `110 passed`；二轮
-  Standards M1、Spec M1/L1 findings 已由 `40f25b7` 固定并在本修正候选转 GREEN；真实 MySQL 8 与最终 fixed-SHA 可见
+  Standards M1、Spec M1/L1 findings 已由 `40f25b7` 固定且修正基线为 WRITE `112 passed`；三轮 Standards M1、
+  Spec M1 findings 已由 `43636a0` 固定且修正基线为 WRITE `113 passed`；提交前终态 identity 审计 M1 已由
+  `9972aab` 固定并在当前 SHA 修复，当前门是第四轮 fixed-SHA 双轴 Review；真实 MySQL 8 与最终 fixed-SHA 可见
   验收仍在 W008 分别证明，不把局部 GREEN 写成产品完成。
 - Word/打包：目标平台人工验收。
 
@@ -297,8 +302,11 @@ codebase-memory/Graphify 只能发现结构、热点和文档关系，不替代�
 当前分支的 UI session/revision/W005/W006 已进入远端精确 SHA CI；W006 Linux service-boundary `10/10`
 已闭合。W007 已有 GREEN commit；首轮 fixed-SHA Review 为 Standards M2、Spec M1/L1，`cf38725` 后修正基线
 为 WRITE `110 passed`、Foundation `261 passed`、ordinary `847 passed`；二轮 fixed-SHA Review 为 Standards M1、
-Spec M1/L1，finding RED 已由 `40f25b7` 固定。本修正候选经统一测试为 WRITE `112 passed`、Foundation
-`261 passed`、ordinary `847 passed`，须在 fixed SHA 执行第三轮双轴 Review。push、CI、人工验收与 Issue 回写均尚未闭合；旧
+Spec M1/L1，finding RED 已由 `40f25b7` 固定；`40f25b7` 后修正基线为 WRITE `112 passed`、Foundation
+`261 passed`、ordinary `847 passed`。三轮 fixed-SHA Review 为 Standards M1、Spec M1，finding RED 已由
+`43636a0` 固定；`43636a0` 后修正基线为 WRITE `113 passed`、Foundation `261 passed`、ordinary `847 passed`。
+提交前终态 identity 审计发现 M1，finding RED 已由 `9972aab` 固定。本轮修复已固定在当前 SHA，当前门是第四轮 fixed-SHA 双轴 Review。
+本轮最终修复候选统一测试为 WRITE `115 passed`、Foundation `261 passed`、ordinary `847 passed`。push、CI、人工验收与 Issue 回写均尚未闭合；旧
 F009 人工结果不能填补这些门禁。
 
 ## 13. 已知架构热点
@@ -315,5 +323,6 @@ F009 人工结果不能填补这些门禁。
 - 图片后端、备份恢复和数据保留策略。
 - Agent Foundation 已合入主线，仍固定为 4 READ + 2 DRAFT 且零 Agent 持久化。
 - Agent WRITE 的可信 actor、`daily_plan.revision`、逐次确认、操作前版本、短事务、不可变审计与全回滚已在
-  W005/W006 闭合；当前门是固定 W007 二轮 Review findings 的本修正候选并在新 fixed SHA 执行第三轮双轴 Review，随后才可进入独立
+  W005/W006 闭合；W007 三轮 Review finding `43636a0` 后修正基线已通过，提交前终态 identity finding
+  `9972aab` 已在当前 SHA 修复；当前门是第四轮 fixed-SHA 双轴 Review，随后才可进入独立
   push/CI/人工验收/Issue 门；W008 尚未进入，不能跳门。

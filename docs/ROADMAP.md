@@ -1,8 +1,8 @@
 # KindergartenManager 产品与工程路线图
 
 > 当前快照：2026-08-26；合入基线 `main@ca3b7bd922f838c0739ccf9ed0f58655d292dc2f`；
-> 当前 `feat/agent-write` 已闭合 W005/W006；Alembic head 为 `e5f7a9c2d4b6`。W007 二轮 Review finding RED
-> `40f25b7` 的修复候选已转 GREEN，下一门是第三轮 fixed-SHA 双轴 Review；W008 未进入，
+> 当前 `feat/agent-write` 已闭合 W005/W006；Alembic head 为 `e5f7a9c2d4b6`。W007 提交前终态 identity 审计
+> finding RED `9972aab` 的修复已固定在当前 SHA，下一门是第四轮 fixed-SHA 双轴 Review；W008 未进入，
 > merge/Issue 关闭/release 未授权。
 
 ## 1. 状态语义
@@ -225,7 +225,7 @@ Review/Quality/远端/Issue 证据见 Issue #48。
 
 ## 9. R4B：Agent WRITE（独立里程碑）
 
-状态：`实现中`（W005/W006 已闭合；W007 第二轮 Review finding 修复候选已转 GREEN，等待第三轮 fixed-SHA 双轴 Review；W008 未进入）。
+状态：`实现中`（W005/W006 已闭合；W007 提交前终态 identity finding 修复已固定，等待第四轮 fixed-SHA 双轴 Review；W008 未进入）。
 
 [ADR-0006](ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md) 与
 [冻结规格](../specs/agent-write/spec.md)、[Issue #52](https://github.com/ywyz/kindergartenManager/issues/52)
@@ -247,8 +247,10 @@ W007 稳定 RED 已固定在尚未 push 的本地 commit `e5f7317…`：WRITE �
 `77 passed / 22 failed`（node hash `e0898e89…`），Foundation 连续两轮均为 `259 passed / 2 failed`
 （node hash `fb168e7a…`），ordinary `847 passed`。W007 初始 GREEN commit 本地基线为 WRITE `99 passed`、Foundation `261 passed`、ordinary `847 passed`。
 首轮 fixed-SHA Review 为 Standards M2、Spec M1/L1；`cf38725` 后修正基线为 WRITE `110 passed`、Foundation `261 passed`、ordinary `847 passed`。
-二轮 fixed-SHA Review 为 Standards M1、Spec M1/L1，finding RED 已由 `40f25b7` 固定；本轮修复候选已转 GREEN，下一门是第三轮 fixed-SHA 双轴 Review。
-本轮修复候选经统一测试为 WRITE `112 passed`、Foundation `261 passed`、ordinary `847 passed`；当前不得视为 Standards/Spec 0/0、push、CI、人工验收或 Issue
+二轮 fixed-SHA Review 为 Standards M1、Spec M1/L1，finding RED 已由 `40f25b7` 固定；`40f25b7` 后修正基线为 WRITE `112 passed`、Foundation `261 passed`、ordinary `847 passed`。
+三轮 fixed-SHA Review 为 Standards M1、Spec M1，finding RED 已由 `43636a0` 固定；`43636a0` 后修正基线为 WRITE `113 passed`、Foundation `261 passed`、ordinary `847 passed`。
+提交前终态 identity 审计发现 M1，finding RED 已由 `9972aab` 固定。本轮修复已固定在当前 SHA，当前门是第四轮 fixed-SHA 双轴 Review。
+本轮最终修复候选统一测试为 WRITE `115 passed`、Foundation `261 passed`、ordinary `847 passed`；当前不得视为 Standards/Spec 0/0、push、CI、人工验收或 Issue
 回写已完成。
 MySQL 离线 DDL 已证明方言分支结构，但真实 MySQL 8 的迁移往返、四 trigger、
 revision CAS 与管理员行锁仍属尚未进入的 W008 独立验收；默认停在 merge/Issue 关闭/release 之前。

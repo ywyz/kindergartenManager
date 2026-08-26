@@ -5,8 +5,11 @@
 > W007 初始 GREEN commit 本地基线为 WRITE `99 passed`、Foundation `261 passed`、ordinary `847 passed`。
 > 首轮 fixed-SHA Review 为 Standards M2、Spec M1/L1；`cf38725` 后修正基线为 WRITE `110 passed`、Foundation
 > `261 passed`、ordinary `847 passed`。二轮 fixed-SHA Review 为 Standards M1、Spec M1/L1，finding RED 已由
-> `40f25b7` 固定；本轮修复候选已转 GREEN，下一门是第三轮 fixed-SHA 双轴 Review。本轮修复候选经统一测试为
-> WRITE `112 passed`、Foundation `261 passed`、ordinary `847 passed`。push、CI、人工验收与 Issue 回写尚未闭合。
+> `40f25b7` 固定；`40f25b7` 后修正基线为 WRITE `112 passed`、Foundation `261 passed`、ordinary `847 passed`。
+> 三轮 fixed-SHA Review 为 Standards M1、Spec M1，finding RED 已由 `43636a0` 固定；`43636a0` 后修正基线为
+> WRITE `113 passed`、Foundation `261 passed`、ordinary `847 passed`。提交前终态 identity 审计发现 M1，finding RED
+> 已由 `9972aab` 固定。本轮修复已固定在当前 SHA，当前门是第四轮 fixed-SHA 双轴 Review。本轮最终修复候选统一测试为
+> WRITE `115 passed`、Foundation `261 passed`、ordinary `847 passed`。push、CI、人工验收与 Issue 回写尚未闭合。
 
 ## 1. 建模原则
 
@@ -240,7 +243,10 @@ F009 自动矩阵曾在其固定 `tested_code_sha` 动态反射包含 Alembic �
 当前 confirmation store 与生产 WRITE service 已实现；确认材料仍只在进程内短命保存。W007 采用 UI 已形成
 GREEN commit；首轮 Review 的 Standards M2、Spec M1/L1 已由 finding RED `cf38725` 固定，首轮修正基线为
 WRITE `110 passed`、Foundation `261 passed`、ordinary `847 passed`。二轮 Review 的 Standards M1、Spec M1/L1
-已由 finding RED `40f25b7` 固定；本轮修复候选已转 GREEN，仍须执行第三轮 fixed-SHA 双轴 Review。Provider/Tool 仍恰好四 READ + 两 DRAFT，也没有 conversation、长期 Patch 或新的
+已由 finding RED `40f25b7` 固定；`40f25b7` 后修正基线为 WRITE `112 passed`、Foundation `261 passed`、
+ordinary `847 passed`。三轮 fixed-SHA Review 为 Standards M1、Spec M1，finding RED 已由 `43636a0` 固定；`43636a0` 后修正基线为 WRITE `113 passed`、Foundation `261 passed`、ordinary `847 passed`。
+提交前终态 identity 审计发现 M1，finding RED 已由 `9972aab` 固定；本轮修复已固定在当前 SHA，当前门是第四轮 fixed-SHA 双轴 Review。
+本轮最终修复候选统一测试为 WRITE `115 passed`、Foundation `261 passed`、ordinary `847 passed`。Provider/Tool 仍恰好四 READ + 两 DRAFT，也没有 conversation、长期 Patch 或新的
 通用 WRITE 表。
 
 ## 14. 迁移链
@@ -276,6 +282,7 @@ W008 独立人工门。
 - 表时间戳类型/默认实现不完全统一。
 - `export_records` 没有 `updated_at`，属于明确的不可变例外；仓库总规则应承认该例外。
 - 可信 UI session 已恢复并进入分支/远端 CI，但当前会话不落独立 server-side session 表，后续撤销/运维策略需以独立需求收紧。
-- W005/W006 已闭合逐次确认、操作前版本、不可变审计和原子 CAS；W007 GREEN commit 的二轮 Review findings
-  已由 `40f25b7` 固定并在本修正候选转 GREEN，尚未获得第三轮 fixed-SHA Review、push、CI、人工验收或 Issue 证据；真实 MySQL 8 与最终固定 SHA
+- W005/W006 已闭合逐次确认、操作前版本、不可变审计和原子 CAS；W007 GREEN commit 的三轮 Review finding
+  `43636a0` 后修正基线已通过，提交前终态 identity 审计 finding RED `9972aab` 已在当前 SHA 修复；尚未获得
+  第四轮 fixed-SHA Review、push、CI、人工验收或 Issue 证据；真实 MySQL 8 与最终固定 SHA
   可见验收仍属未进入的 W008。

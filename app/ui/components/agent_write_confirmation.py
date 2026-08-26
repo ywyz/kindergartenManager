@@ -114,6 +114,10 @@ _STATUS_COPY = {
     "reconciling": "正在只读对账，请勿重复点击……",
 }
 
+_KNOWN_TERMINAL_STATUSES = frozenset(
+    {"applied", "stale", "expired", "failed", "not_applied"}
+)
+
 
 class PatchConfirmationSnapshotView(Protocol):
     """Safe scalar projection published by the application confirmation flow."""
@@ -192,6 +196,13 @@ class _PatchView:
     container: Any
 
 
+@dataclass(frozen=True, slots=True)
+class _TerminalPatchRecord:
+    status: str
+    error_code: str | None = None
+    after_revision: int | None = None
+
+
 class _Action(str, Enum):
     ISSUE = "issue"
     APPLY = "apply"
@@ -266,6 +277,10 @@ class DailyPlanPatchConfirmationPanel:
         self._issued_patch_sha256: str | None = None
         self._issued_target: DailyPlanUiTarget | None = None
         self._views: list[_PatchView] = []
+        self._terminal_patch_ledger: dict[
+            tuple[UUID, str],
+            _TerminalPatchRecord,
+        ] = {}
 
     def render_patch_actions(self, patch: AgentPatchSnapshot) -> None:
         """Render explicit actions for exactly this displayed Patch row."""
@@ -301,6 +316,7 @@ class DailyPlanPatchConfirmationPanel:
             self._abandoned_indeterminate = (
                 _status_value(self._controller.snapshot) == "indeterminate"
             )
+        self._terminal_patch_ledger.clear()
         self._generation += 1
         self._issued_patch_id = None
         self._issued_patch_sha256 = None
@@ -325,6 +341,7 @@ class DailyPlanPatchConfirmationPanel:
         self._issued_patch_sha256 = None
         self._issued_target = None
         self._views.clear()
+        self._terminal_patch_ledger.clear()
         await close_flow()
 
     def _capture_click(self, view: _PatchView) -> _ConfirmationClick:
@@ -433,10 +450,13 @@ class DailyPlanPatchConfirmationPanel:
         self,
         view: _PatchView,
         guard: _PublishGuard,
+        snapshot: PatchConfirmationSnapshotView,
     ) -> None:
         if view.generation != self._generation:
             return
         if guard is _PublishGuard.SESSION_STALE:
+            if _status_value(snapshot) != "indeterminate":
+                self._remember_patch_terminal(view.patch, "stale")
             view.container.clear()
             with view.container:
                 ui.label("登录会话已变化，操作结果未在本页发布。").classes(
@@ -462,6 +482,7 @@ class DailyPlanPatchConfirmationPanel:
                 "提交结果不明且页面目标已变化；本页对账入口已放弃。",
             )
             return
+        self._remember_patch_terminal(view.patch, "stale")
         view.container.clear()
         with view.container:
             ui.label("页面目标已变化，操作结果未在本页发布。").classes(
@@ -501,6 +522,122 @@ class DailyPlanPatchConfirmationPanel:
             ui.label("不会自动重试；如需采用，请重新生成草案。").classes(
                 "text-xs text-gray-600"
             )
+
+    @staticmethod
+    def _patch_identity(patch: AgentPatchSnapshot) -> tuple[UUID, str]:
+        return (patch.patch_id, patch.patch_sha256)
+
+    @staticmethod
+    def _snapshot_identity(
+        snapshot: PatchConfirmationSnapshotView,
+    ) -> tuple[UUID, str] | None:
+        if (
+            type(snapshot.patch_id) is not UUID
+            or type(snapshot.patch_sha256) is not str
+        ):
+            return None
+        return (snapshot.patch_id, snapshot.patch_sha256)
+
+    def _remember_patch_terminal(
+        self,
+        patch: AgentPatchSnapshot,
+        status: str,
+        *,
+        error_code: str | None = None,
+        after_revision: int | None = None,
+    ) -> None:
+        """Close one exact Patch for the current Agent generation only."""
+        if status == "indeterminate":
+            return
+        self._terminal_patch_ledger.setdefault(
+            self._patch_identity(patch),
+            _TerminalPatchRecord(
+                status=status,
+                error_code=error_code,
+                after_revision=after_revision,
+            ),
+        )
+
+    def _remember_known_terminal(
+        self,
+        snapshot: PatchConfirmationSnapshotView,
+    ) -> None:
+        status = _status_value(snapshot)
+        if status not in _KNOWN_TERMINAL_STATUSES:
+            return
+        identity = self._snapshot_identity(snapshot)
+        if identity is None:
+            return
+        self._terminal_patch_ledger.setdefault(
+            identity,
+            _TerminalPatchRecord(
+                status=status,
+                error_code=snapshot.error_code,
+                after_revision=snapshot.after_revision,
+            ),
+        )
+
+    def _remember_action_terminal(
+        self,
+        patch: AgentPatchSnapshot,
+        snapshot: PatchConfirmationSnapshotView,
+    ) -> None:
+        """Close the clicked Patch when a terminal projection has bad identity."""
+        status = _status_value(snapshot)
+        if status not in _KNOWN_TERMINAL_STATUSES:
+            return
+        if self._snapshot_identity(snapshot) == self._patch_identity(patch):
+            self._remember_known_terminal(snapshot)
+            return
+        self._remember_patch_terminal(
+            patch,
+            "failed",
+            error_code="patch_not_current",
+        )
+        self._remember_known_terminal(snapshot)
+
+    def _render_remembered_terminal(
+        self,
+        record: _TerminalPatchRecord,
+    ) -> None:
+        if record.status == "cancelled":
+            ui.label("已取消这一份草案的确认；未执行写入。").classes(
+                "text-xs text-red-600"
+            )
+        elif record.status == "applied":
+            revision = (
+                f" 当前 revision 为 {record.after_revision}。"
+                if type(record.after_revision) is int
+                else ""
+            )
+            ui.label(f"{_STATUS_COPY['applied']}{revision}").classes(
+                "text-xs font-medium text-green-700"
+            )
+        else:
+            message = _ERROR_COPY.get(
+                record.error_code or "",
+                _STATUS_COPY.get(record.status, _STATUS_COPY["failed"]),
+            )
+            css = (
+                "text-orange-700"
+                if record.status == "not_applied"
+                else "text-red-600"
+            )
+            ui.label(message).classes(f"text-xs {css}")
+        ui.label("这一份草案已关闭，不会自动重试或重复采用；请重新生成草案。").classes(
+            "text-xs text-gray-600"
+        )
+
+    def _render_remembered_view(
+        self,
+        view: _PatchView,
+        record: _TerminalPatchRecord,
+    ) -> None:
+        if view.generation != self._generation:
+            return
+        view.container.clear()
+        with view.container:
+            self._render_remembered_terminal(record)
 
     def _latch_integrity_failure(
         self,
@@ -725,6 +862,15 @@ class DailyPlanPatchConfirmationPanel:
                     "text-xs text-gray-600"
                 )
                 return
+            self._remember_known_terminal(snapshot)
+            terminal = self._terminal_patch_ledger.get(
+                self._patch_identity(view.patch)
+            )
+            if terminal is not None:
+                if self._belongs_to_patch(snapshot, view.patch):
+                    self._render_target(snapshot)
+                self._render_remembered_terminal(terminal)
+                return
             if not self._belongs_to_patch(snapshot, view.patch):
                 if _status_value(snapshot) in {"pending", "indeterminate"}:
                     self._render_occupied(view, snapshot)
@@ -744,7 +890,9 @@ class DailyPlanPatchConfirmationPanel:
                 self._render_terminal(snapshot)
 
     def _reject_stale_click(self, view: _PatchView) -> None:
+        self._remember_known_terminal(self._controller.snapshot)
         self._controller.invalidate()
+        self._remember_known_terminal(self._controller.snapshot)
         self._issued_patch_id = None
         self._issued_patch_sha256 = None
         self._issued_target = None
@@ -755,6 +903,7 @@ class DailyPlanPatchConfirmationPanel:
                 "提交结果仍不确定且页面目标或登录会话已变化；本页对账入口已放弃。",
             )
             return
+        self._remember_patch_terminal(view.patch, "stale")
         self._render_local_closed(
             view,
             "页面目标或登录会话已变化，本次确认已关闭。",
@@ -803,6 +952,12 @@ class DailyPlanPatchConfirmationPanel:
             or click.generation != self._generation
         ):
             return
+        remembered = self._terminal_patch_ledger.get(
+            self._patch_identity(click.patch)
+        )
+        if remembered is not None:
+            self._render_remembered_view(view, remembered)
+            return
         require_issued_target = action is not _Action.ISSUE
         current_snapshot = self._controller.snapshot
         if self._latch_integrity_failure(current_snapshot):
@@ -840,6 +995,7 @@ class DailyPlanPatchConfirmationPanel:
                 action.value,
                 type(exc).__name__,
             )
+            self._remember_known_terminal(self._controller.snapshot)
             self._controller.invalidate()
             if _status_value(self._controller.snapshot) == "indeterminate":
                 self._abandoned_indeterminate = True
@@ -851,11 +1007,13 @@ class DailyPlanPatchConfirmationPanel:
                     "操作异常且提交结果不确定；本页对账入口已放弃。",
                 )
                 return
+            self._remember_patch_terminal(click.patch, "failed")
             self._render_local_closed(view, _ACTION_FAILURE_COPY[action])
             return
         if self._latch_integrity_failure(snapshot):
             self._render_all_views(snapshot)
             return
+        self._remember_action_terminal(click.patch, snapshot)
         publish_guard = await self._publish_guarded(
             view,
             click,
@@ -863,7 +1021,7 @@ class DailyPlanPatchConfirmationPanel:
             require_issued_target=require_issued_target,
         )
         if publish_guard is not _PublishGuard.CURRENT:
-            self._render_guard_rejection(view, publish_guard)
+            self._render_guard_rejection(view, publish_guard, snapshot)
             return
 
         if action is _Action.ISSUE:
@@ -921,10 +1079,18 @@ class DailyPlanPatchConfirmationPanel:
         if self._integrity_blocked:
             self._render_all_views(self._controller.snapshot)
             return
+        remembered = self._terminal_patch_ledger.get(
+            self._patch_identity(view.patch)
+        )
+        if remembered is not None:
+            self._render_remembered_view(view, remembered)
+            return
+        self._remember_known_terminal(self._controller.snapshot)
         self._controller.invalidate()
         if _status_value(self._controller.snapshot) == "indeterminate":
             self._render_all_views(self._controller.snapshot)
             return
+        self._remember_patch_terminal(view.patch, "cancelled")
         current_views = tuple(
             current_view
             for current_view in self._views
@@ -942,18 +1108,4 @@ class DailyPlanPatchConfirmationPanel:
             )
             for current_view in current_views
         ]
-        snapshot = self._controller.snapshot
-        for current_view in self._views:
-            if (
-                current_view.patch.patch_id == view.patch.patch_id
-                and secrets.compare_digest(
-                    current_view.patch.patch_sha256,
-                    view.patch.patch_sha256,
-                )
-            ):
-                self._render_local_closed(
-                    current_view,
-                    "已取消这一份草案的确认；未执行写入。",
-                )
-            else:
-                self._render_view(current_view, snapshot)
+        self._render_all_views(self._controller.snapshot)

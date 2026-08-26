@@ -1,6 +1,6 @@
 # ADR-0006：可信 UI 会话、每日计划 revision 与逐次确认写入
 
-- 状态：接受（W005/W006 已闭合；W007 二轮 Review finding 的修复候选已转 GREEN，等待第三轮 fixed-SHA 双轴 Review）
+- 状态：接受（W005/W006 已闭合；W007 提交前终态 identity finding 的修复已固定，等待第四轮 fixed-SHA 双轴 Review）
 - 日期：2026-08-25
 - 依赖：[ADR-0002](ADR-0002-single-user-ui-and-tenant-api.md)、[ADR-0003](ADR-0003-sqlite-default-mysql-optional-alembic.md)、[ADR-0005](ADR-0005-controlled-ai-agent-runtime.md)
 - 冻结规格：[Agent WRITE](../../specs/agent-write/spec.md)
@@ -19,8 +19,11 @@
 W007 初始 GREEN commit 本地基线为 WRITE `99 passed`、Foundation `261 passed`、ordinary `847 passed`。
 首轮 fixed-SHA Review 为 Standards M2、Spec M1/L1；`cf38725` 后修正基线为 WRITE `110 passed`、Foundation
 `261 passed`、ordinary `847 passed`。二轮 fixed-SHA Review 为 Standards M1、Spec M1/L1，finding RED 已由
-`40f25b7` 固定；本轮修复候选已转 GREEN，下一门是第三轮 fixed-SHA 双轴 Review。本轮修复候选经统一测试为
-WRITE `112 passed`、Foundation `261 passed`、ordinary `847 passed`。后续 push、CI、人工验收、Issue 回写、合并与发布仍是
+`40f25b7` 固定；`40f25b7` 后修正基线为 WRITE `112 passed`、Foundation `261 passed`、ordinary `847 passed`。
+三轮 fixed-SHA Review 为 Standards M1、Spec M1，finding RED 已由 `43636a0` 固定；`43636a0` 后修正基线为
+WRITE `113 passed`、Foundation `261 passed`、ordinary `847 passed`。提交前终态 identity 审计发现 M1，finding RED 已由
+`9972aab` 固定。本轮修复已固定在当前 SHA，当前门是第四轮 fixed-SHA 双轴 Review。本轮最终修复候选统一测试为
+WRITE `115 passed`、Foundation `261 passed`、ordinary `847 passed`。后续 push、CI、人工验收、Issue 回写、合并与发布仍是
 彼此独立的门禁，当前不得写成 Review 0/0 或已交付。
 
 ## 决策
@@ -150,8 +153,11 @@ Review、push、精确 SHA CI、service 验收和 Issue 回写。W006 已在 fix
 
 W007 GREEN commit 已存在；首轮 fixed-SHA Review 为 Standards M2、Spec M1/L1，`cf38725` 后修正基线为 WRITE
 `110 passed`、Foundation `261 passed`、ordinary `847 passed`。二轮 fixed-SHA Review 为 Standards M1、
-Spec M1/L1，finding RED 已由 `40f25b7` 固定；本轮修复候选经统一测试为 WRITE `112 passed`、Foundation
-`261 passed`、ordinary `847 passed`。当前顺序是固定本修正候选 commit → 对该 fixed SHA 执行第三轮双轴 Review；若仍有 finding，
+Spec M1/L1，finding RED 已由 `40f25b7` 固定；`40f25b7` 后修正基线为 WRITE `112 passed`、Foundation
+`261 passed`、ordinary `847 passed`。三轮 fixed-SHA Review 为 Standards M1、Spec M1，finding RED 已由
+`43636a0` 固定；`43636a0` 后修正基线为 WRITE `113 passed`、Foundation `261 passed`、ordinary `847 passed`。
+提交前终态 identity 审计发现 M1，finding RED 已由 `9972aab` 固定。本轮修复已固定在当前 SHA，当前门是第四轮 fixed-SHA 双轴 Review。
+本轮最终修复候选统一测试为 WRITE `115 passed`、Foundation `261 passed`、ordinary `847 passed`。若仍有 finding，
 继续以独立 RED commit/修正 commit 固定后复审，达到 0/0 后才依序 push → 精确 CI `headSha` → 人工验收 →
 Issue 证据。上述门全部闭合后才进入 W008；无代码/helper/test 变化时可沿用同一 fixed SHA，
 任何变化都必须在新 SHA 重跑最终 Review/CI/浏览器/真实 MySQL 8 证据，最后才讨论 merge/release。任何

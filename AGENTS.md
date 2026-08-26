@@ -112,8 +112,11 @@ open. W007 GREEN commit 已存在，当前门是固定 SHA Review/finding RED；
 W007 初始 GREEN commit 本地基线为 WRITE `99 passed`、Foundation `261 passed`、ordinary `847 passed`。
 首轮 fixed-SHA Review 为 Standards M2、Spec M1/L1；`cf38725` 后修正基线为 WRITE `110 passed`、Foundation
 `261 passed`、ordinary `847 passed`。二轮 fixed-SHA Review 为 Standards M1、Spec M1/L1，finding RED 已由
-`40f25b7` 固定；本轮修复候选已转 GREEN，下一门是第三轮 fixed-SHA 双轴 Review。本轮修复候选经统一测试为
-WRITE `112 passed`、Foundation `261 passed`、ordinary `847 passed`。Do not treat this as Standards/Spec 0/0 or
+`40f25b7` 固定；`40f25b7` 后修正基线为 WRITE `112 passed`、Foundation `261 passed`、ordinary `847 passed`。
+三轮 fixed-SHA Review 为 Standards M1、Spec M1，finding RED 已由 `43636a0` 固定；`43636a0` 后修正基线为
+WRITE `113 passed`、Foundation `261 passed`、ordinary `847 passed`。提交前终态 identity 审计发现 M1，finding RED
+已由 `9972aab` 固定。本轮修复已固定在当前 SHA，当前门是第四轮 fixed-SHA 双轴 Review。本轮最终修复候选统一测试为
+WRITE `115 passed`、Foundation `261 passed`、ordinary `847 passed`。Do not treat this as Standards/Spec 0/0 or
 as authorization for push, CI, manual acceptance, Issue closure, merge, or release. Do not add Provider WRITE, automatic retry, bulk or cross-page
 adoption, settings/files/Word/delete/create writes, long-term Patch persistence, new tools, or multi-Agent behavior. The
 existing four READ and two DRAFT tools remain the complete Provider capability surface.

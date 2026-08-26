@@ -335,10 +335,10 @@ def test_current_fact_docs_close_w006_and_track_w007_review_gate() -> None:
     assert "未授权" not in w005_row
     assert "未授权" not in w006_row
     assert "完成" in w006_row and "253d37d" in w006_row
-    assert "40f25b7" in w007_row and "第三轮" in w007_row
+    assert "9972aab" in w007_row and "第四轮" in w007_row
     assert "未进入" not in w007_row
     assert "未进入" in w008_row
-    assert "W007" in context and "40f25b7" in context
+    assert "W007" in context and "9972aab" in context and "第四轮" in context
     assert "e5f7a9c2d4b6" in roadmap
     assert "生产 WRITE GREEN 未授权" not in roadmap
     assert "daily_plan_operation_version" in system_architecture
