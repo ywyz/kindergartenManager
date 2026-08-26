@@ -405,6 +405,118 @@ class _IdentityTerminalController:
         return None
 
 
+@dataclass(slots=True)
+class _MalformedAppliedController:
+    """Public controller fake returning APPLIED with an invalid Patch identity."""
+
+    patch: AgentPatchSnapshot
+    action: str
+    identity_case: str
+    issue_calls: int = 0
+    apply_calls: int = 0
+    reconcile_calls: int = 0
+    _snapshot: PatchConfirmationSnapshot = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self._snapshot = PatchConfirmationSnapshot(
+            status=PatchConfirmationStatus.IDLE,
+        )
+
+    @property
+    def snapshot(self) -> PatchConfirmationSnapshot:
+        return self._snapshot
+
+    def _applied_snapshot(self) -> PatchConfirmationSnapshot:
+        patch_id: UUID | None = self.patch.patch_id
+        patch_sha256: str | None = self.patch.patch_sha256
+        if self.identity_case == "missing_id":
+            patch_id = None
+        elif self.identity_case == "missing_hash":
+            patch_sha256 = None
+        elif self.identity_case == "wrong_id":
+            patch_id = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        elif self.identity_case == "wrong_hash":
+            patch_sha256 = "0" * 64
+        else:  # pragma: no cover - parametrization is closed below
+            raise AssertionError(self.identity_case)
+        return PatchConfirmationSnapshot(
+            status=PatchConfirmationStatus.APPLIED,
+            patch_id=patch_id,
+            patch_sha256=patch_sha256,
+            daily_plan_id=PLAN_ID,
+            expected_revision=1,
+            before_revision=1,
+            after_revision=2,
+        )
+
+    async def issue(
+        self,
+        ui_session: object,
+        patch_id: UUID,
+        *,
+        expected_plan_id: int,
+        expected_revision: int,
+    ) -> PatchConfirmationSnapshot:
+        del ui_session
+        assert patch_id == self.patch.patch_id
+        assert expected_plan_id == PLAN_ID
+        assert expected_revision == 1
+        self.issue_calls += 1
+        self._snapshot = PatchConfirmationSnapshot(
+            status=PatchConfirmationStatus.PENDING,
+            patch_id=self.patch.patch_id,
+            patch_sha256=self.patch.patch_sha256,
+            daily_plan_id=PLAN_ID,
+            expected_revision=1,
+            expires_at_utc=NOW,
+            field_paths=tuple(
+                operation.field_path for operation in self.patch.operations
+            ),
+        )
+        return self._snapshot
+
+    async def apply(self, ui_session: object) -> PatchConfirmationSnapshot:
+        del ui_session
+        self.apply_calls += 1
+        if self.action == "reconcile":
+            self._snapshot = PatchConfirmationSnapshot(
+                status=PatchConfirmationStatus.INDETERMINATE,
+                patch_id=self.patch.patch_id,
+                patch_sha256=self.patch.patch_sha256,
+                daily_plan_id=PLAN_ID,
+                expected_revision=1,
+                error_code="commit_outcome_unknown",
+            )
+        else:
+            assert self.action == "apply"
+            self._snapshot = self._applied_snapshot()
+        return self._snapshot
+
+    async def reconcile(self, ui_session: object) -> PatchConfirmationSnapshot:
+        del ui_session
+        assert self.action == "reconcile"
+        self.reconcile_calls += 1
+        self._snapshot = self._applied_snapshot()
+        return self._snapshot
+
+    def invalidate(self) -> None:
+        snapshot = self._snapshot
+        self._snapshot = PatchConfirmationSnapshot(
+            status=PatchConfirmationStatus.STALE,
+            patch_id=snapshot.patch_id,
+            patch_sha256=snapshot.patch_sha256,
+            daily_plan_id=snapshot.daily_plan_id,
+            expected_revision=snapshot.expected_revision,
+            error_code="target_mismatch",
+        )
+
+    async def disconnect(self) -> None:
+        return None
+
+    async def close(self) -> None:
+        return None
+
+
 def _agent_controller(*patches: PlanPatch) -> DailyPlanAgentController:
     return DailyPlanAgentController(
         coordinator=_MultiPatchCoordinator(tuple(patches)),  # type: ignore[arg-type]
@@ -580,9 +692,7 @@ async def test_reconcile_integrity_failure_keeps_every_patch_blocked(
         "terminal_error_visible_on_a": any(
             "对账完整性检查失败" in label for label in labels_a
         ),
-        "blocking_copy_visible_on_b": any(
-            "人工核查" in label for label in labels_b
-        ),
+        "blocking_copy_visible_on_b": any("人工核查" in label for label in labels_b),
         "usable_prepare_count_on_b": len(usable_prepare_b),
         "issue_count_after_probe": len(writer.issue_patch_ids),
         "only_patch_a_issued": writer.issue_patch_ids == [patch_a.patch_id],
@@ -689,8 +799,7 @@ async def test_cancel_pending_patch_rerenders_all_current_patch_views(
     assert {
         "occupied_before_cancel": occupied_before_cancel,
         "cancelled_copy_visible_on_a": any(
-            "已取消这一份草案的确认" in label
-            for label in labels_a_after_cancel
+            "已取消这一份草案的确认" in label for label in labels_a_after_cancel
         ),
         "occupied_copy_after_cancel": any(
             "另一份草案正在占用" in label for label in labels_b_after_cancel
@@ -791,8 +900,7 @@ async def test_cancelled_patch_stays_closed_after_another_patch_is_cancelled(
 
     assert {
         "known_closed_copy_visible_on_a": any(
-            "已取消" in label or "已关闭" in label
-            for label in labels_a_after_b_cancel
+            "已取消" in label or "已关闭" in label for label in labels_a_after_b_cancel
         ),
         "must_regenerate_copy_visible_on_a": any(
             "重新生成草案" in label for label in labels_a_after_b_cancel
@@ -900,12 +1008,9 @@ async def test_identity_invalid_terminal_patch_stays_closed_after_next_owner(
 
     assert {
         "identity_failure_visible_on_a": any(
-            "草案身份校验失败" in label
-            for label in labels_a_after_identity_failure
+            "草案身份校验失败" in label for label in labels_a_after_identity_failure
         ),
-        "usable_prepare_count_on_a_after_failure": len(
-            usable_prepare_a_after_failure
-        ),
+        "usable_prepare_count_on_a_after_failure": len(usable_prepare_a_after_failure),
         "b_became_owner": b_became_owner,
         "b_cancelled_copy_visible": any(
             "已取消这一份草案" in label for label in labels_b_after_cancel
@@ -932,6 +1037,133 @@ async def test_identity_invalid_terminal_patch_stays_closed_after_next_owner(
         "usable_prepare_count_on_a_after_b_terminal": 0,
         "only_b_confirmation_invalidated": True,
         "patches_issued_without_a_b_a": [patch_a.patch_id, patch_b.patch_id],
+    }
+
+
+@pytest.mark.parametrize("action", ["apply", "reconcile"])
+@pytest.mark.parametrize(
+    "identity_case",
+    ["missing_id", "missing_hash", "wrong_id", "wrong_hash"],
+)
+@pytest.mark.asyncio
+async def test_identity_invalid_applied_terminal_never_publishes_success(
+    monkeypatch: pytest.MonkeyPatch,
+    action: str,
+    identity_case: str,
+) -> None:
+    confirmation_ui = __import__(
+        "app.ui.components.agent_write_confirmation",
+        fromlist=["DailyPlanPatchConfirmationPanel"],
+    )
+    patch = build_patch(
+        operation_id=OPERATION_ID,
+        turn_id=TURN_ID,
+        after_goal=f"{action} 返回身份异常 APPLIED 后必须关闭",
+    )
+    agent = _agent_controller(patch)
+    agent.scope_changed(PLAN_DATE)
+    turn = await agent.run("生成一份用于终态身份校验的草案")
+    patch_view = turn.patches[0]
+    controller = _MalformedAppliedController(
+        patch=patch_view,
+        action=action,
+        identity_case=identity_case,
+    )
+    target = DailyPlanUiTarget(
+        selection=DateSelection(generation=1, selected_date=PLAN_DATE),
+        plan_id=PLAN_ID,
+        revision=1,
+        form_generation=0,
+    )
+    session = trusted_ui_session()
+    page_events = {
+        "on_applied": 0,
+        "authoritative_reload": 0,
+        "success_publication": 0,
+    }
+
+    async def authorize() -> object:
+        return session
+
+    async def on_applied(_snapshot: object, frozen_target: object) -> None:
+        assert frozen_target == target
+        page_events["on_applied"] += 1
+        page_events["authoritative_reload"] += 1
+        page_events["success_publication"] += 1
+
+    fake_ui = _FakeUi()
+    monkeypatch.setattr(confirmation_ui, "ui", fake_ui)
+    panel = confirmation_ui.DailyPlanPatchConfirmationPanel(
+        controller,
+        authorize_confirmation=authorize,
+        capture_target=lambda: target,
+        is_current_target=lambda candidate: candidate == target,
+        on_applied=on_applied,
+    )
+
+    panel.render_patch_actions(patch_view)
+    view = fake_ui.latest_column()
+    await _press(fake_ui.latest_button("准备确认", within=view))
+    apply_button = fake_ui.latest_button("确认采用", within=view)
+    await _press(apply_button)
+    terminal_action_button = apply_button
+    if action == "reconcile":
+        terminal_action_button = fake_ui.latest_button("人工对账", within=view)
+        await _press(terminal_action_button)
+
+    action_calls_after_terminal = (
+        controller.apply_calls,
+        controller.reconcile_calls,
+    )
+    labels_after_terminal = fake_ui.active_label_texts(within=view)
+
+    panel.render_patch_actions(patch_view)
+    repeated_view = fake_ui.latest_column()
+    repeated_labels = fake_ui.active_label_texts(within=repeated_view)
+    repeated_action_controls = sum(
+        len(fake_ui.active_buttons(label, within=repeated_view, enabled=True))
+        for label in ("准备确认", "确认采用", "人工对账")
+    )
+    await _press(terminal_action_button)
+
+    assert {
+        "page_events": page_events,
+        "panel_success_copy_count": sum(
+            "这一份草案已确认采用" in label
+            for label in (*labels_after_terminal, *repeated_labels)
+        ),
+        "regeneration_required": any(
+            "重新生成草案" in label for label in repeated_labels
+        ),
+        "no_automatic_retry_copy": any(
+            "不会自动重试" in label for label in repeated_labels
+        ),
+        "repeated_action_controls": repeated_action_controls,
+        "issue_calls": controller.issue_calls,
+        "action_calls_after_terminal": action_calls_after_terminal,
+        "action_calls_after_stale_button_probe": (
+            controller.apply_calls,
+            controller.reconcile_calls,
+        ),
+    } == {
+        "page_events": {
+            "on_applied": 0,
+            "authoritative_reload": 0,
+            "success_publication": 0,
+        },
+        "panel_success_copy_count": 0,
+        "regeneration_required": True,
+        "no_automatic_retry_copy": True,
+        "repeated_action_controls": 0,
+        "issue_calls": 1,
+        "action_calls_after_terminal": (
+            1,
+            1 if action == "reconcile" else 0,
+        ),
+        "action_calls_after_stale_button_probe": (
+            1,
+            1 if action == "reconcile" else 0,
+        ),
     }
 
 

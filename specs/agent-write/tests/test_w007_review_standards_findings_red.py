@@ -3,7 +3,39 @@
 from __future__ import annotations
 
 import ast
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import timedelta
 from pathlib import Path
+from uuid import UUID
+
+import pytest
+
+from app.service.agent.composition import DailyPlanAgentController
+from app.service.agent.confirmed_write import (
+    ConfirmedDailyPlanWriteResult,
+    ConfirmedWriteRejected,
+    PendingPlanPatchConfirmation,
+)
+from app.service.agent.confirmation_flow import (
+    DailyPlanPatchConfirmationController,
+    PatchConfirmationStatus,
+)
+from app.service.agent.contracts import DailyPlanScope, TrustedActor
+from app.service.agent.patch import PlanPatch
+from app.service.agent.runtime import AgentTurnOutcome, AgentTurnStatus
+
+from conftest import (
+    ACTOR_TENANT_ID,
+    ACTOR_USER_ID,
+    NOW,
+    OPERATION_ID,
+    PLAN_DATE,
+    PLAN_ID,
+    TURN_ID,
+    build_patch,
+    trusted_ui_session,
+)
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -58,9 +90,7 @@ FOURTH_REVIEW_GATE_FACT_FILES = (
     "docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md",
     "specs/agent-write/spec.md",
 )
-STALE_CURRENT_CANDIDATE_FACT = (
-    "本轮修复候选经统一测试为 WRITE `113 passed`"
-)
+STALE_CURRENT_CANDIDATE_FACT = "本轮修复候选经统一测试为 WRITE `113 passed`"
 STALE_CURRENT_FACTS = {
     "AGENTS.md": (
         "The current authorized slice ends after",
@@ -136,6 +166,156 @@ STALE_DELIVERY_GATE_FACTS = {
     ),
 }
 
+SECOND_OPERATION_ID = UUID("abababab-abab-4bab-8bab-abababababab")
+SECOND_TURN_ID = UUID("cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd")
+
+
+@dataclass(slots=True)
+class _TwoPatchDraftCoordinator:
+    """Publish two authoritative Patches through the existing Agent seam."""
+
+    patches: tuple[PlanPatch, PlanPatch]
+
+    async def execute(
+        self,
+        *,
+        owner_id: UUID,
+        actor: TrustedActor,
+        scope: DailyPlanScope,
+        intent: str,
+        scope_reader: Callable[[], DailyPlanScope | None],
+    ) -> AgentTurnOutcome:
+        del owner_id, actor, intent
+        assert scope_reader() == scope
+        return AgentTurnOutcome(
+            status=AgentTurnStatus.DRAFT_READY,
+            assistant_content="同一页面 generation 的两份独立草案。",
+            patches=self.patches,
+        )
+
+    def invalidate(self, owner_id: UUID) -> None:
+        del owner_id
+
+    def plan_changed(self, actor: TrustedActor, scope: DailyPlanScope) -> None:
+        del actor, scope
+
+    async def cancel(self, owner_id: UUID) -> bool:
+        del owner_id
+        return True
+
+
+@dataclass(slots=True)
+class _RecordingConfirmedWritePort:
+    """Observe only calls crossing the frozen confirmed-write service port."""
+
+    apply_error_code: str | None = None
+    reconcile_error_code: str | None = None
+    issue_patch_ids: list[UUID] = field(default_factory=list)
+    apply_confirmation_ids: list[UUID] = field(default_factory=list)
+    reconcile_confirmation_ids: list[UUID] = field(default_factory=list)
+    _expected_revision_by_confirmation: dict[UUID, int] = field(
+        default_factory=dict,
+        repr=False,
+    )
+
+    async def issue_confirmation(
+        self,
+        ui_session: object,
+        patch: PlanPatch,
+        *,
+        expected_revision: int,
+    ) -> PendingPlanPatchConfirmation:
+        del ui_session
+        self.issue_patch_ids.append(patch.patch_id)
+        confirmation_id = UUID(int=100 + len(self.issue_patch_ids))
+        self._expected_revision_by_confirmation[confirmation_id] = expected_revision
+        return PendingPlanPatchConfirmation(
+            confirmation_id=confirmation_id,
+            expires_at_utc=NOW + timedelta(minutes=4),
+            daily_plan_id=patch.target.daily_plan_id,
+            expected_revision=expected_revision,
+            patch_id=patch.patch_id,
+            patch_sha256=patch.canonical_sha256,
+            field_paths=tuple(operation.field_path for operation in patch.operations),
+        )
+
+    async def apply(
+        self,
+        ui_session: object,
+        confirmation_id: UUID,
+    ) -> ConfirmedDailyPlanWriteResult:
+        del ui_session
+        self.apply_confirmation_ids.append(confirmation_id)
+        if self.apply_error_code is not None:
+            raise ConfirmedWriteRejected(self.apply_error_code)
+        expected_revision = self._expected_revision_by_confirmation[confirmation_id]
+        return ConfirmedDailyPlanWriteResult(
+            before_version_id=41,
+            audit_id=42,
+            before_revision=expected_revision,
+            after_revision=expected_revision + 1,
+        )
+
+    async def reconcile(
+        self,
+        ui_session: object,
+        confirmation_id: UUID,
+    ) -> ConfirmedDailyPlanWriteResult:
+        del ui_session
+        self.reconcile_confirmation_ids.append(confirmation_id)
+        if self.reconcile_error_code is not None:
+            raise ConfirmedWriteRejected(self.reconcile_error_code)
+        expected_revision = self._expected_revision_by_confirmation[confirmation_id]
+        return ConfirmedDailyPlanWriteResult(
+            before_version_id=41,
+            audit_id=42,
+            before_revision=expected_revision,
+            after_revision=expected_revision + 1,
+        )
+
+
+async def _two_patch_flow() -> tuple[
+    DailyPlanPatchConfirmationController,
+    _RecordingConfirmedWritePort,
+    PlanPatch,
+    PlanPatch,
+]:
+    patch_a = build_patch(
+        operation_id=OPERATION_ID,
+        turn_id=TURN_ID,
+        after_goal="应用层终态草案 A",
+    )
+    patch_b = build_patch(
+        operation_id=SECOND_OPERATION_ID,
+        turn_id=SECOND_TURN_ID,
+        after_goal="应用层终态草案 B",
+    )
+    assert patch_a.patch_id != patch_b.patch_id
+    agent_controller = DailyPlanAgentController(
+        coordinator=_TwoPatchDraftCoordinator((patch_a, patch_b)),  # type: ignore[arg-type]
+        actor=TrustedActor(
+            tenant_id=ACTOR_TENANT_ID,
+            user_id=ACTOR_USER_ID,
+        ),
+    )
+    agent_controller.scope_changed(PLAN_DATE)
+    panel = await agent_controller.run("生成同一页面的两份独立草案")
+    assert panel.status.value == "draft_ready"
+    assert tuple(patch.patch_id for patch in panel.patches) == (
+        patch_a.patch_id,
+        patch_b.patch_id,
+    )
+    writer = _RecordingConfirmedWritePort()
+    return (
+        DailyPlanPatchConfirmationController(
+            agent_controller=agent_controller,
+            write_service=writer,
+        ),
+        writer,
+        patch_a,
+        patch_b,
+    )
+
 
 def _normalized(text: str) -> str:
     return " ".join(text.split())
@@ -177,8 +357,7 @@ def _is_frozen_dataclass(class_node: ast.ClassDef) -> bool:
             continue
         decorator_name = decorator.func
         if not (
-            isinstance(decorator_name, ast.Name)
-            and decorator_name.id == "dataclass"
+            isinstance(decorator_name, ast.Name) and decorator_name.id == "dataclass"
         ):
             continue
         return any(
@@ -202,14 +381,10 @@ def _returns_frozen_dto(qualified_function: str) -> bool:
         return False
 
     return_names = {
-        node.id
-        for node in ast.walk(functions[0].returns)
-        if isinstance(node, ast.Name)
+        node.id for node in ast.walk(functions[0].returns) if isinstance(node, ast.Name)
     }
     service_classes = {
-        node.name: node
-        for node in service_tree.body
-        if isinstance(node, ast.ClassDef)
+        node.name: node for node in service_tree.body if isinstance(node, ast.ClassDef)
     }
     service_imports = _imports(service_tree)
 
@@ -261,10 +436,11 @@ def test_w007_authoritative_reload_uses_a_frozen_service_projection() -> None:
     }
 
     assert forbidden == {}, (
-        "W007 UI callback crosses the database/repository/ORM boundary: "
-        f"{forbidden}"
+        f"W007 UI callback crosses the database/repository/ORM boundary: {forbidden}"
     )
-    assert service_calls, "W007 authoritative reload must call an app.service projection"
+    assert service_calls, (
+        "W007 authoritative reload must call an app.service projection"
+    )
     assert any(_returns_frozen_dto(call) for call in service_calls), (
         "W007 authoritative reload service must return a frozen DTO: "
         f"{sorted(service_calls)}"
@@ -307,7 +483,9 @@ def test_w007_current_facts_name_the_committed_green_review_gate() -> None:
         f"committed_green={missing_gate_fact}, "
         f"fourth_review={missing_fourth_review_gate_fact}"
     )
-    assert stale_claims == {}, f"contradictory W007 current facts remain: {stale_claims}"
+    assert stale_claims == {}, (
+        f"contradictory W007 current facts remain: {stale_claims}"
+    )
 
     delivery_gate_docs = {
         relative_path: _normalized(
@@ -343,9 +521,7 @@ def test_w007_current_facts_name_the_committed_green_review_gate() -> None:
         SECOND_REVIEW_GATE_FACT,
     )
     missing_delivery_facts = {
-        relative_path: [
-            fact for fact in required_delivery_facts if fact not in text
-        ]
+        relative_path: [fact for fact in required_delivery_facts if fact not in text]
         for relative_path, text in delivery_gate_docs.items()
     }
     missing_delivery_facts = {
@@ -378,3 +554,85 @@ def test_w007_current_facts_name_the_committed_green_review_gate() -> None:
         f"stale_113_candidates={stale_current_candidates}, "
         f"missing_history={missing_delivery_facts}, stale={stale_delivery_claims}"
     )
+
+
+@pytest.mark.asyncio
+async def test_w007_flow_keeps_a_terminal_after_b_terminal() -> None:
+    """A page-local terminal Patch cannot regain a WRITE issue path via B."""
+    flow, writer, patch_a, patch_b = await _two_patch_flow()
+    ui_session = trusted_ui_session()
+    writer.apply_error_code = "write_failed"
+
+    for patch in (patch_a, patch_b):
+        pending = await flow.issue(
+            ui_session,
+            patch.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+        assert pending.status is PatchConfirmationStatus.PENDING
+        terminal = await flow.apply(ui_session)
+        assert terminal.status is PatchConfirmationStatus.FAILED
+        assert terminal.error_code == "write_failed"
+
+    reissued_a = await flow.issue(
+        ui_session,
+        patch_a.patch_id,
+        expected_plan_id=PLAN_ID,
+        expected_revision=1,
+    )
+
+    assert {
+        "status": reissued_a.status,
+        "patch_id": reissued_a.patch_id,
+        "error_code": reissued_a.error_code,
+        "writer_issue_patch_ids": tuple(writer.issue_patch_ids),
+    } == {
+        "status": PatchConfirmationStatus.FAILED,
+        "patch_id": patch_a.patch_id,
+        "error_code": "write_failed",
+        "writer_issue_patch_ids": (patch_a.patch_id, patch_b.patch_id),
+    }
+
+
+@pytest.mark.asyncio
+async def test_w007_flow_latches_integrity_failure_across_patches() -> None:
+    """Integrity failure closes every Patch at the application flow seam."""
+    flow, writer, patch_a, patch_b = await _two_patch_flow()
+    ui_session = trusted_ui_session()
+
+    pending = await flow.issue(
+        ui_session,
+        patch_a.patch_id,
+        expected_plan_id=PLAN_ID,
+        expected_revision=1,
+    )
+    assert pending.status is PatchConfirmationStatus.PENDING
+
+    writer.apply_error_code = "commit_outcome_unknown"
+    unknown = await flow.apply(ui_session)
+    assert unknown.status is PatchConfirmationStatus.INDETERMINATE
+
+    writer.reconcile_error_code = "reconcile_integrity_failure"
+    integrity_failure = await flow.reconcile(ui_session)
+    assert integrity_failure.status is PatchConfirmationStatus.FAILED
+    assert integrity_failure.error_code == "reconcile_integrity_failure"
+
+    blocked_b = await flow.issue(
+        ui_session,
+        patch_b.patch_id,
+        expected_plan_id=PLAN_ID,
+        expected_revision=1,
+    )
+
+    assert {
+        "status": blocked_b.status,
+        "patch_id": blocked_b.patch_id,
+        "error_code": blocked_b.error_code,
+        "writer_issue_patch_ids": tuple(writer.issue_patch_ids),
+    } == {
+        "status": PatchConfirmationStatus.FAILED,
+        "patch_id": patch_a.patch_id,
+        "error_code": "reconcile_integrity_failure",
+        "writer_issue_patch_ids": (patch_a.patch_id,),
+    }
