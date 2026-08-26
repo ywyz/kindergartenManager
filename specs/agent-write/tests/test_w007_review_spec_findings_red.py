@@ -19,6 +19,10 @@ from app.service.agent.confirmed_write import (
     ConfirmedWriteRejected,
     PendingPlanPatchConfirmation,
 )
+from app.service.agent.confirmation_flow import (
+    PatchConfirmationSnapshot,
+    PatchConfirmationStatus,
+)
 from app.service.agent.contracts import DailyPlanScope, TrustedActor
 from app.service.agent.patch import PlanPatch
 from app.service.agent.runtime import AgentTurnOutcome, AgentTurnStatus
@@ -309,6 +313,90 @@ class _NoopPatchActions:
 
     def invalidate(self) -> None:
         return None
+
+    async def disconnect(self) -> None:
+        return None
+
+    async def close(self) -> None:
+        return None
+
+
+@dataclass(slots=True)
+class _IdentityTerminalController:
+    """Public confirmation-controller fake for malformed terminal identity."""
+
+    patch_a: AgentPatchSnapshot
+    patch_b: AgentPatchSnapshot
+    terminal_patch_sha256: str | None
+    issue_patch_ids: list[UUID] = field(default_factory=list)
+    invalidated_patch_ids: list[UUID | None] = field(default_factory=list)
+    _snapshot: PatchConfirmationSnapshot = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self._snapshot = PatchConfirmationSnapshot(
+            status=PatchConfirmationStatus.IDLE,
+        )
+
+    @property
+    def snapshot(self) -> PatchConfirmationSnapshot:
+        return self._snapshot
+
+    async def issue(
+        self,
+        ui_session: object,
+        patch_id: UUID,
+        *,
+        expected_plan_id: int,
+        expected_revision: int,
+    ) -> PatchConfirmationSnapshot:
+        del ui_session
+        assert expected_plan_id == PLAN_ID
+        assert expected_revision == 1
+        self.issue_patch_ids.append(patch_id)
+        if patch_id == self.patch_a.patch_id:
+            self._snapshot = PatchConfirmationSnapshot(
+                status=PatchConfirmationStatus.FAILED,
+                patch_id=self.patch_a.patch_id,
+                patch_sha256=self.terminal_patch_sha256,
+                daily_plan_id=PLAN_ID,
+                expected_revision=1,
+                error_code="write_failed",
+            )
+            return self._snapshot
+        if patch_id == self.patch_b.patch_id:
+            self._snapshot = PatchConfirmationSnapshot(
+                status=PatchConfirmationStatus.PENDING,
+                patch_id=self.patch_b.patch_id,
+                patch_sha256=self.patch_b.patch_sha256,
+                daily_plan_id=PLAN_ID,
+                expected_revision=1,
+                expires_at_utc=NOW,
+                field_paths=tuple(
+                    operation.field_path for operation in self.patch_b.operations
+                ),
+            )
+            return self._snapshot
+        raise AssertionError("unexpected patch issue")
+
+    async def apply(self, ui_session: object) -> PatchConfirmationSnapshot:
+        del ui_session
+        raise AssertionError("this scenario never applies a confirmation")
+
+    async def reconcile(self, ui_session: object) -> PatchConfirmationSnapshot:
+        del ui_session
+        raise AssertionError("this scenario never reconciles a confirmation")
+
+    def invalidate(self) -> None:
+        snapshot = self._snapshot
+        self.invalidated_patch_ids.append(snapshot.patch_id)
+        self._snapshot = PatchConfirmationSnapshot(
+            status=PatchConfirmationStatus.STALE,
+            patch_id=snapshot.patch_id,
+            patch_sha256=snapshot.patch_sha256,
+            daily_plan_id=snapshot.daily_plan_id,
+            expected_revision=snapshot.expected_revision,
+            error_code="target_mismatch",
+        )
 
     async def disconnect(self) -> None:
         return None
@@ -716,6 +804,134 @@ async def test_cancelled_patch_stays_closed_after_another_patch_is_cancelled(
         "must_regenerate_copy_visible_on_a": True,
         "usable_prepare_count_on_a": 0,
         "patches_issued_after_old_a_probe": [patch_a.patch_id, patch_b.patch_id],
+    }
+
+
+@pytest.mark.parametrize(
+    "terminal_patch_sha256",
+    [
+        pytest.param(None, id="missing_hash"),
+        pytest.param("0" * 64, id="wrong_hash"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_identity_invalid_terminal_patch_stays_closed_after_next_owner(
+    monkeypatch: pytest.MonkeyPatch,
+    terminal_patch_sha256: str | None,
+) -> None:
+    confirmation_ui = __import__(
+        "app.ui.components.agent_write_confirmation",
+        fromlist=["DailyPlanPatchConfirmationPanel"],
+    )
+    patch_a = build_patch(
+        operation_id=OPERATION_ID,
+        turn_id=TURN_ID,
+        after_goal="身份异常后必须保持关闭的草案 A",
+    )
+    patch_b = build_patch(
+        operation_id=SECOND_OPERATION_ID,
+        turn_id=TURN_ID,
+        after_goal="随后成为 owner 并取消的草案 B",
+    )
+    agent = _agent_controller(patch_a, patch_b)
+    agent.scope_changed(PLAN_DATE)
+    turn = await agent.run("同一 generation 依次处理 A/B 两份草案")
+    patch_view_a, patch_view_b = turn.patches
+    controller = _IdentityTerminalController(
+        patch_a=patch_view_a,
+        patch_b=patch_view_b,
+        terminal_patch_sha256=terminal_patch_sha256,
+    )
+    target = DailyPlanUiTarget(
+        selection=DateSelection(generation=1, selected_date=PLAN_DATE),
+        plan_id=PLAN_ID,
+        revision=1,
+        form_generation=0,
+    )
+    session = trusted_ui_session()
+
+    async def authorize() -> object:
+        return session
+
+    async def on_applied(_snapshot: object, _target: object) -> None:
+        raise AssertionError("this scenario never applies a confirmation")
+
+    fake_ui = _FakeUi()
+    monkeypatch.setattr(confirmation_ui, "ui", fake_ui)
+    panel = confirmation_ui.DailyPlanPatchConfirmationPanel(
+        controller,
+        authorize_confirmation=authorize,
+        capture_target=lambda: target,
+        is_current_target=lambda candidate: candidate == target,
+        on_applied=on_applied,
+    )
+
+    panel.render_patch_actions(patch_view_a)
+    view_a = fake_ui.latest_column()
+    panel.render_patch_actions(patch_view_b)
+    view_b = fake_ui.latest_column()
+    await _press(fake_ui.latest_button("准备确认", within=view_a))
+    labels_a_after_identity_failure = fake_ui.active_label_texts(within=view_a)
+    usable_prepare_a_after_failure = fake_ui.active_buttons(
+        "准备确认",
+        within=view_a,
+        enabled=True,
+    )
+
+    await _press(fake_ui.latest_button("准备确认", within=view_b))
+    b_became_owner = (
+        controller.snapshot.status is PatchConfirmationStatus.PENDING
+        and controller.snapshot.patch_id == patch_b.patch_id
+        and controller.snapshot.patch_sha256 == patch_b.canonical_sha256
+    )
+    cancel_b = fake_ui.latest_button("取消确认", within=view_b)
+    assert callable(cancel_b.on_click)
+    assert cancel_b.on_click() is None
+
+    labels_a_after_b_terminal = fake_ui.active_label_texts(within=view_a)
+    labels_b_after_cancel = fake_ui.active_label_texts(within=view_b)
+    usable_prepare_a_after_b_terminal = fake_ui.active_buttons(
+        "准备确认",
+        within=view_a,
+        enabled=True,
+    )
+    for button in usable_prepare_a_after_b_terminal:
+        await _press(button)
+
+    assert {
+        "identity_failure_visible_on_a": any(
+            "草案身份校验失败" in label
+            for label in labels_a_after_identity_failure
+        ),
+        "usable_prepare_count_on_a_after_failure": len(
+            usable_prepare_a_after_failure
+        ),
+        "b_became_owner": b_became_owner,
+        "b_cancelled_copy_visible": any(
+            "已取消这一份草案" in label for label in labels_b_after_cancel
+        ),
+        "a_still_closed_after_b_terminal": any(
+            "关闭" in label for label in labels_a_after_b_terminal
+        ),
+        "a_requires_regeneration": any(
+            "重新生成草案" in label for label in labels_a_after_b_terminal
+        ),
+        "usable_prepare_count_on_a_after_b_terminal": len(
+            usable_prepare_a_after_b_terminal
+        ),
+        "only_b_confirmation_invalidated": controller.invalidated_patch_ids
+        == [patch_b.patch_id],
+        "patches_issued_without_a_b_a": controller.issue_patch_ids,
+    } == {
+        "identity_failure_visible_on_a": True,
+        "usable_prepare_count_on_a_after_failure": 0,
+        "b_became_owner": True,
+        "b_cancelled_copy_visible": True,
+        "a_still_closed_after_b_terminal": True,
+        "a_requires_regeneration": True,
+        "usable_prepare_count_on_a_after_b_terminal": 0,
+        "only_b_confirmation_invalidated": True,
+        "patches_issued_without_a_b_a": [patch_a.patch_id, patch_b.patch_id],
     }
 
 
