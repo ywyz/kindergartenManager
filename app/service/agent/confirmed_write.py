@@ -12,22 +12,61 @@ from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta, timezone
 from enum import Enum
+import hashlib
+import json
 import secrets
 from threading import Lock
 from typing import Callable
 from uuid import UUID, uuid4
 
+from sqlalchemy.exc import DisconnectionError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.models.daily_plan import DailyPlan
+from app.repository.confirmed_write_repository import (
+    append_agent_write_audit,
+    append_daily_plan_operation_version,
+    cas_apply_daily_plan_fields,
+    get_agent_write_audit_by_confirmation,
+    get_daily_plan_operation_version_by_id,
+)
 from app.repository.daily_plan_repository import get_daily_plan_by_id_for_user
 from app.repository.user_repository import get_user_by_id
-from app.service.agent.canonical import canonical_sha256
+from app.service.agent.canonical import canonical_json, canonical_sha256
 from app.service.agent.patch import PlanPatch, plan_patch_is_canonical
 from app.ui.auth_context import TrustedUiSession
 
 
 _DEFAULT_CONFIRMATION_TTL = timedelta(minutes=5)
 _DEFAULT_STORE_CAPACITY = 1_024
+_AUDIT_ACTION = "daily_plan.apply_confirmed_patch"
+_DAILY_PLAN_SNAPSHOT_FIELDS = frozenset(
+    {
+        "id",
+        "tenant_id",
+        "user_id",
+        "revision",
+        "plan_date",
+        "week_number",
+        "weekday_cn",
+        "grade",
+        "class_name",
+        "activity_goal",
+        "activity_prep",
+        "activity_key",
+        "activity_difficult",
+        "activity_process_original",
+        "activity_process_adapted",
+        "morning_activity",
+        "indoor_area",
+        "outdoor_activity",
+        "morning_talk_topic",
+        "morning_talk_questions",
+        "daily_reflection",
+        "created_at",
+        "updated_at",
+    }
+)
 
 
 class ConfirmedWriteRejected(ValueError):
@@ -67,6 +106,10 @@ class _ConfirmationState(str, Enum):
     APPLIED = "applied"
     FAILED = "failed"
     INDETERMINATE = "indeterminate"
+
+
+class _CommitOutcomeUnknown(Exception):
+    """Signal that commit was attempted but its durable outcome is unknown."""
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -174,6 +217,62 @@ def _session_snapshot(
         raise
     except Exception:
         _reject("ui_session_invalid")
+
+
+def _snapshot_datetime(value: object) -> str:
+    if type(value) is not datetime:
+        raise ValueError
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    else:
+        value = value.astimezone(timezone.utc)
+    return value.isoformat()
+
+
+def _daily_plan_snapshot(plan: DailyPlan) -> tuple[str, str]:
+    snapshot = {
+        "id": plan.id,
+        "tenant_id": plan.tenant_id,
+        "user_id": plan.user_id,
+        "revision": plan.revision,
+        "plan_date": plan.plan_date.isoformat(),
+        "week_number": plan.week_number,
+        "weekday_cn": plan.weekday_cn,
+        "grade": plan.grade,
+        "class_name": plan.class_name,
+        "activity_goal": plan.activity_goal,
+        "activity_prep": plan.activity_prep,
+        "activity_key": plan.activity_key,
+        "activity_difficult": plan.activity_difficult,
+        "activity_process_original": plan.activity_process_original,
+        "activity_process_adapted": plan.activity_process_adapted,
+        "morning_activity": plan.morning_activity,
+        "indoor_area": plan.indoor_area,
+        "outdoor_activity": plan.outdoor_activity,
+        "morning_talk_topic": plan.morning_talk_topic,
+        "morning_talk_questions": plan.morning_talk_questions,
+        "daily_reflection": plan.daily_reflection,
+        "created_at": _snapshot_datetime(plan.created_at),
+        "updated_at": _snapshot_datetime(plan.updated_at),
+    }
+    snapshot_json = canonical_json(snapshot)
+    snapshot_sha256 = hashlib.sha256(snapshot_json.encode("utf-8")).hexdigest()
+    return snapshot_json, snapshot_sha256
+
+
+def _nonce_sha256(nonce: bytes) -> str:
+    return hashlib.sha256(b"agent-write:nonce:v1\0" + nonce).hexdigest()
+
+
+def _session_sha256(session_id: UUID) -> str:
+    return hashlib.sha256(b"agent-write:session:v1\0" + session_id.bytes).hexdigest()
+
+
+async def _rollback_quietly(session: AsyncSession) -> None:
+    try:
+        await session.rollback()
+    except BaseException:
+        pass
 
 
 class _InMemoryConfirmationStore:
@@ -387,11 +486,14 @@ class ConfirmedDailyPlanWriteService:
     async def _require_active_actor(
         session: AsyncSession,
         actor: _UiSessionSnapshot,
+        *,
+        for_update: bool = False,
     ) -> None:
         user = await get_user_by_id(
             session,
             tenant_id=actor.tenant_id,
             user_id=actor.user_id,
+            for_update=for_update,
         )
         if (
             user is None
@@ -529,13 +631,133 @@ class ConfirmedDailyPlanWriteService:
             field_paths=record.field_paths,
         )
 
+    @staticmethod
+    async def _load_and_validate_plan(
+        session: AsyncSession,
+        record: _StoredConfirmation,
+    ) -> DailyPlan:
+        plan = await get_daily_plan_by_id_for_user(
+            session,
+            tenant_id=record.tenant_id,
+            user_id=record.user_id,
+            plan_id=record.daily_plan_id,
+        )
+        if plan is None:
+            _reject("target_not_found")
+        if plan.plan_date != record.plan_date:
+            _reject("target_mismatch")
+        if plan.revision != record.expected_revision:
+            _reject("revision_mismatch")
+        for operation in record.patch.operations:
+            current_value = getattr(plan, operation.field_path) or ""
+            if canonical_sha256(current_value) != operation.before_sha256:
+                _reject("before_mismatch")
+        return plan
+
     async def _apply_claimed(
         self,
-        _session: AsyncSession,
-        _claim: _ConfirmationClaim,
+        session: AsyncSession,
+        claim: _ConfirmationClaim,
+        actor: _UiSessionSnapshot,
     ) -> ConfirmedDailyPlanWriteResult:
-        """W006 seam: execute the version/CAS/audit transaction."""
-        _reject("write_not_available")
+        """Execute version, CAS, audit and commit in one bounded transaction."""
+        record = claim.record
+        try:
+            plan = await self._load_and_validate_plan(session, record)
+
+            # The first validation keeps stale/before rejection free of DML.
+            # Lock and re-read the actor only after those checks, then refresh
+            # the plan before the first evidence INSERT.
+            await self._require_active_actor(
+                session,
+                actor,
+                for_update=True,
+            )
+            session.expire(plan)
+            plan = await self._load_and_validate_plan(session, record)
+
+            created_at = self._now()
+            snapshot_json, snapshot_sha256 = _daily_plan_snapshot(plan)
+            field_paths_json = canonical_json(record.field_paths)
+            version = await append_daily_plan_operation_version(
+                session,
+                tenant_id=record.tenant_id,
+                user_id=record.user_id,
+                daily_plan_id=record.daily_plan_id,
+                confirmation_id=str(record.confirmation_id),
+                patch_id=str(record.patch_id),
+                patch_sha256=record.patch_sha256,
+                operation_id=str(record.operation_id),
+                turn_id=str(record.turn_id),
+                before_revision=record.expected_revision,
+                field_paths_json=field_paths_json,
+                snapshot_json=snapshot_json,
+                snapshot_sha256=snapshot_sha256,
+                created_at=created_at,
+            )
+            if type(version.id) is not int or version.id <= 0:
+                _reject("write_failed")
+
+            updated = await cas_apply_daily_plan_fields(
+                session,
+                tenant_id=record.tenant_id,
+                user_id=record.user_id,
+                daily_plan_id=record.daily_plan_id,
+                expected_revision=record.expected_revision,
+                field_values={
+                    operation.field_path: operation.after_value
+                    for operation in record.patch.operations
+                },
+                updated_at=created_at,
+            )
+            if not updated:
+                _reject("revision_mismatch")
+
+            audit = await append_agent_write_audit(
+                session,
+                confirmation_id=str(record.confirmation_id),
+                nonce_sha256=_nonce_sha256(record.nonce),
+                session_sha256=_session_sha256(record.session_id),
+                tenant_id=record.tenant_id,
+                user_id=record.user_id,
+                daily_plan_id=record.daily_plan_id,
+                patch_id=str(record.patch_id),
+                patch_sha256=record.patch_sha256,
+                operation_id=str(record.operation_id),
+                turn_id=str(record.turn_id),
+                field_paths_json=field_paths_json,
+                before_version_id=version.id,
+                before_revision=record.expected_revision,
+                after_revision=record.expected_revision + 1,
+                action=_AUDIT_ACTION,
+                created_at=created_at,
+            )
+            if type(audit.id) is not int or audit.id <= 0:
+                _reject("write_failed")
+
+            result = ConfirmedDailyPlanWriteResult(
+                before_version_id=version.id,
+                audit_id=audit.id,
+                before_revision=record.expected_revision,
+                after_revision=record.expected_revision + 1,
+            )
+            try:
+                await session.commit()
+            except DisconnectionError:
+                await _rollback_quietly(session)
+                raise _CommitOutcomeUnknown from None
+            return result
+        except _CommitOutcomeUnknown:
+            raise
+        except asyncio.CancelledError:
+            await _rollback_quietly(session)
+            raise
+        except ConfirmedWriteRejected:
+            await _rollback_quietly(session)
+            raise
+        except Exception:
+            await _rollback_quietly(session)
+            _reject("write_failed")
 
     async def apply(
         self,
@@ -552,7 +774,10 @@ class ConfirmedDailyPlanWriteService:
         try:
             async with self._session_factory() as session:
                 await self._require_active_actor(session, actor)
-                result = await self._apply_claimed(session, claim)
+                result = await self._apply_claimed(session, claim, actor)
+        except _CommitOutcomeUnknown:
+            self._store.finish_indeterminate(claim)
+            _reject("commit_outcome_unknown")
         except ConfirmedWriteRejected:
             self._store.finish_failed(claim)
             raise
@@ -567,13 +792,110 @@ class ConfirmedDailyPlanWriteService:
             _reject("write_failed")
         return result
 
-    async def _reconcile_indeterminate(
+    @staticmethod
+    def _version_snapshot_matches(
+        version,
+        record: _StoredConfirmation,
+    ) -> bool:
+        try:
+            if (
+                version.tenant_id != record.tenant_id
+                or version.user_id != record.user_id
+                or version.daily_plan_id != record.daily_plan_id
+                or version.confirmation_id != str(record.confirmation_id)
+                or version.patch_id != str(record.patch_id)
+                or version.patch_sha256 != record.patch_sha256
+                or version.operation_id != str(record.operation_id)
+                or version.turn_id != str(record.turn_id)
+                or version.before_revision != record.expected_revision
+                or version.field_paths_json != canonical_json(record.field_paths)
+                or hashlib.sha256(version.snapshot_json.encode("utf-8")).hexdigest()
+                != version.snapshot_sha256
+            ):
+                return False
+            snapshot = json.loads(version.snapshot_json)
+            if (
+                type(snapshot) is not dict
+                or set(snapshot) != _DAILY_PLAN_SNAPSHOT_FIELDS
+                or canonical_json(snapshot) != version.snapshot_json
+                or snapshot["id"] != record.daily_plan_id
+                or snapshot["tenant_id"] != record.tenant_id
+                or snapshot["user_id"] != record.user_id
+                or snapshot["revision"] != record.expected_revision
+                or snapshot["plan_date"] != record.plan_date.isoformat()
+            ):
+                return False
+            for operation in record.patch.operations:
+                before_value = snapshot[operation.field_path] or ""
+                if canonical_sha256(before_value) != operation.before_sha256:
+                    return False
+            return True
+        except Exception:
+            return False
+
+    async def _reconcile_evidence(
         self,
-        _session: AsyncSession,
-        _record: _StoredConfirmation,
+        session: AsyncSession,
+        record: _StoredConfirmation,
     ) -> ConfirmedDailyPlanWriteResult:
-        """W006 seam: reconcile immutable evidence without replaying Patch."""
-        _reject("confirmation_indeterminate")
+        """Reconcile immutable evidence in a new read-only transaction."""
+        audit = await get_agent_write_audit_by_confirmation(
+            session,
+            confirmation_id=str(record.confirmation_id),
+        )
+        if audit is None:
+            if record.state is _ConfirmationState.INDETERMINATE:
+                _reject("commit_not_applied")
+            _reject("reconcile_integrity_failure")
+
+        version = await get_daily_plan_operation_version_by_id(
+            session,
+            version_id=audit.before_version_id,
+        )
+        plan = await get_daily_plan_by_id_for_user(
+            session,
+            tenant_id=record.tenant_id,
+            user_id=record.user_id,
+            plan_id=record.daily_plan_id,
+        )
+        expected_field_paths_json = canonical_json(record.field_paths)
+        if (
+            version is None
+            or plan is None
+            or not self._version_snapshot_matches(version, record)
+            or audit.confirmation_id != str(record.confirmation_id)
+            or audit.nonce_sha256 != _nonce_sha256(record.nonce)
+            or audit.session_sha256 != _session_sha256(record.session_id)
+            or audit.tenant_id != record.tenant_id
+            or audit.user_id != record.user_id
+            or audit.daily_plan_id != record.daily_plan_id
+            or audit.patch_id != str(record.patch_id)
+            or audit.patch_sha256 != record.patch_sha256
+            or audit.operation_id != str(record.operation_id)
+            or audit.turn_id != str(record.turn_id)
+            or audit.field_paths_json != expected_field_paths_json
+            or audit.before_version_id != version.id
+            or audit.before_revision != record.expected_revision
+            or audit.after_revision != record.expected_revision + 1
+            or audit.action != _AUDIT_ACTION
+            or plan.plan_date != record.plan_date
+            or plan.revision != audit.after_revision
+            or any(
+                (getattr(plan, operation.field_path) or "") != operation.after_value
+                for operation in record.patch.operations
+            )
+        ):
+            _reject("reconcile_integrity_failure")
+
+        result = ConfirmedDailyPlanWriteResult(
+            before_version_id=version.id,
+            audit_id=audit.id,
+            before_revision=audit.before_revision,
+            after_revision=audit.after_revision,
+        )
+        if record.state is _ConfirmationState.APPLIED and record.result != result:
+            _reject("reconcile_integrity_failure")
+        return result
 
     async def reconcile(
         self,
@@ -590,12 +912,11 @@ class ConfirmedDailyPlanWriteService:
         try:
             async with self._session_factory() as session:
                 await self._require_active_actor(session, actor)
-                if record.state is _ConfirmationState.APPLIED:
-                    if record.result is None:
-                        _reject("reconcile_integrity_failure")
-                    return record.result
-                if record.state is _ConfirmationState.INDETERMINATE:
-                    return await self._reconcile_indeterminate(session, record)
+                if record.state in {
+                    _ConfirmationState.APPLIED,
+                    _ConfirmationState.INDETERMINATE,
+                }:
+                    return await self._reconcile_evidence(session, record)
         except ConfirmedWriteRejected:
             raise
         except asyncio.CancelledError:
