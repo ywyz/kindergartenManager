@@ -875,3 +875,83 @@ async def test_owner_cancel_before_shield_delivery_closes_same_key_issue_joiner(
         "joiner_matches_controller": True,
         "repeat_matches_controller": True,
     }
+
+
+@pytest.mark.asyncio
+async def test_completed_apply_joiner_keeps_its_result_when_next_issue_starts() -> None:
+    """A normal joiner receives its completed flight, not the next Patch state."""
+    flow, writer, _agent, patch_a, patch_b = await _two_patch_flow(
+        block_phase="apply",
+    )
+    ui_session = trusted_ui_session()
+    pending_a = await flow.issue(
+        ui_session,
+        patch_a.patch_id,
+        expected_plan_id=PLAN_ID,
+        expected_revision=1,
+    )
+    assert pending_a.status is PatchConfirmationStatus.PENDING
+
+    owner_terminals: list[object] = []
+
+    async def owner_apply_then_issue_b() -> object:
+        terminal = await flow.apply(ui_session)
+        owner_terminals.append(terminal)
+        return await flow.issue(
+            ui_session,
+            patch_b.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+
+    owner_task = asyncio.create_task(owner_apply_then_issue_b())
+    await writer.entered.wait()
+    joiner_started = asyncio.Event()
+
+    async def join_apply_a() -> object:
+        joiner_started.set()
+        return await flow.apply(ui_session)
+
+    joiner_task = asyncio.create_task(join_apply_a())
+    await joiner_started.wait()
+    await _event_loop_checkpoint()
+
+    apply_release = writer.release
+    writer.block_phase = "issue"
+    writer.block_call_number = 2
+    writer.entered = asyncio.Event()
+    writer.release = asyncio.Event()
+    apply_release.set()
+
+    await writer.entered.wait()
+    joiner_snapshot = await joiner_task
+    owner_terminal = owner_terminals[0]
+    controller_during_b = flow.snapshot
+
+    writer.release.set()
+    pending_b = await owner_task
+
+    assert {
+        "joiner_status": getattr(joiner_snapshot, "status", None),
+        "joiner_patch_id": getattr(joiner_snapshot, "patch_id", None),
+        "joiner_matches_owner_flight": joiner_snapshot == owner_terminal,
+        "owner_status": getattr(owner_terminal, "status", None),
+        "owner_patch_id": getattr(owner_terminal, "patch_id", None),
+        "controller_during_b": (
+            controller_during_b.status,
+            controller_during_b.patch_id,
+        ),
+        "pending_b": (pending_b.status, pending_b.patch_id),
+        "writer_issue_order": tuple(writer.issue_patch_ids),
+        "writer_apply_count": len(writer.apply_confirmation_ids),
+    } == {
+        "joiner_status": PatchConfirmationStatus.APPLIED,
+        "joiner_patch_id": patch_a.patch_id,
+        "joiner_matches_owner_flight": True,
+        "owner_status": PatchConfirmationStatus.APPLIED,
+        "owner_patch_id": patch_a.patch_id,
+        "controller_during_b": (PatchConfirmationStatus.IDLE, patch_b.patch_id),
+        "pending_b": (PatchConfirmationStatus.PENDING, patch_b.patch_id),
+        "writer_issue_order": (patch_a.patch_id, patch_b.patch_id),
+        "writer_apply_count": 1,
+    }
