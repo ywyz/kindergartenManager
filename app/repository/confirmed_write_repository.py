@@ -131,11 +131,15 @@ async def get_agent_write_audit_by_confirmation(
     session: AsyncSession,
     *,
     confirmation_id: str,
+    tenant_id: int,
+    user_id: int,
 ) -> AgentWriteAudit | None:
-    """Read the unique success audit for reconciliation."""
+    """Read the actor-scoped unique success audit for reconciliation."""
     result = await session.execute(
         select(AgentWriteAudit).where(
             AgentWriteAudit.confirmation_id == confirmation_id,
+            AgentWriteAudit.tenant_id == tenant_id,
+            AgentWriteAudit.user_id == user_id,
         )
     )
     return result.scalar_one_or_none()
@@ -145,6 +149,19 @@ async def get_daily_plan_operation_version_by_id(
     session: AsyncSession,
     *,
     version_id: int,
+    tenant_id: int,
+    user_id: int,
+    confirmation_id: str,
+    daily_plan_id: int,
 ) -> DailyPlanOperationVersion | None:
-    """Read one immutable operation-before snapshot by primary key."""
-    return await session.get(DailyPlanOperationVersion, version_id)
+    """Read one fully bound operation-before snapshot without crossing actors."""
+    result = await session.execute(
+        select(DailyPlanOperationVersion).where(
+            DailyPlanOperationVersion.id == version_id,
+            DailyPlanOperationVersion.tenant_id == tenant_id,
+            DailyPlanOperationVersion.user_id == user_id,
+            DailyPlanOperationVersion.confirmation_id == confirmation_id,
+            DailyPlanOperationVersion.daily_plan_id == daily_plan_id,
+        )
+    )
+    return result.scalar_one_or_none()

@@ -260,4 +260,4 @@ def test_current_fact_docs_record_w006_without_authorizing_w007() -> None:
     w007_row = next(line for line in tasks.splitlines() if line.startswith("| W007 |"))
     assert "未授权" not in w005_row
     assert "未授权" not in w006_row
-    assert "未授权" in w007_row
+    assert "未进入" in w007_row

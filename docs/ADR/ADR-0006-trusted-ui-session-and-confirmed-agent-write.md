@@ -1,6 +1,6 @@
 # ADR-0006：可信 UI 会话、每日计划 revision 与逐次确认写入
 
-- 状态：接受（实施授权当前只到先决条件 GREEN 与 Agent WRITE 稳定 RED）
+- 状态：接受（W005/W006 已进入实现；W007 尚未进入，最终交付门未闭合）
 - 日期：2026-08-25
 - 依赖：[ADR-0002](ADR-0002-single-user-ui-and-tenant-api.md)、[ADR-0003](ADR-0003-sqlite-default-mysql-optional-alembic.md)、[ADR-0005](ADR-0005-controlled-ai-agent-runtime.md)
 - 冻结规格：[Agent WRITE](../../specs/agent-write/spec.md)
@@ -14,9 +14,9 @@
 逐次确认、乐观锁、操作前版本和审计放在同一个原子边界内。
 
 本 ADR 取代 ADR-0002 中“固定身份单用户 UI”这一产品现状，但不改变 API Key → tenant 的外部 API
-身份边界。它同时冻结未来最小 Agent WRITE 的本地应用层边界。接受本决策不等于授权完成 WRITE；当前
-实施范围只有恢复可信 UI 会话、增加 `daily_plan.revision`、建立新 Issue/spec 和稳定 RED。后续 GREEN、
-Review、commit、push、CI、人工验收、合并与发布仍是彼此独立的门禁。
+身份边界。它同时冻结最小 Agent WRITE 的本地应用层边界。W005 已实现确认契约/store，W006 已实现原子
+证据事务；这不等于产品 UI 或交付闭合。W007、修正后 Review、commit、push、CI、人工验收、Issue 回写、
+合并与发布仍是彼此独立的门禁。
 
 ## 决策
 
@@ -120,7 +120,7 @@ tenant/user、plan、before version 与业务 revision 的引用和值，绝不�
 
 ### 5. 操作前版本与最小审计是不可变业务证据
 
-未来 GREEN 使用两个用途分离的 append-only 表 `daily_plan_operation_version` 与 `agent_write_audit`：
+W006 使用两个用途分离的 append-only 表 `daily_plan_operation_version` 与 `agent_write_audit`：
 
 - 操作前版本保存恢复/复核所需的完整、精确 `daily_plan` 业务快照及规范 hash，并绑定 actor-scoped plan id、
   旧 revision、confirmation/patch/operation/turn。它不只是本次被修改字段的 diff。
@@ -139,17 +139,13 @@ commit-unknown 对账提供幂等证据。普通应用日志不能替代这两�
 
 ### 6. 实施门禁
 
-当前里程碑按以下边界收口：
+W001-W004 已固定可信 UI session、revision、ADR/spec/Issue 与稳定 RED；W005 已固定确认契约/store 并完成
+Review、push、精确 SHA CI、service 验收和 Issue 回写。W006 已取得初始 GREEN，并完成首轮双轴 Review、
+finding RED 与本地修正；当前下一门是修正后 Review 0/0，而不是 W007。
 
-1. 恢复可信 UI session，移除固定 actor 和固定密码 bootstrap；
-2. 增加显式单调 `daily_plan.revision` 与迁移/并发/回滚测试；
-3. 新建本 ADR、独立 spec 与 GitHub Issue；
-4. 只通过未来公开 seam 建立稳定 RED，连续两次得到相同失败 node ID，且旧 Foundation 与常规回归保持
-   GREEN；
-5. 停止，不创建 confirmation/version/audit 生产实现，不增加确认 UI，不 commit/push，不进入 CI/人工验收。
-
-后续每一阶段仍须显式授权：最小 GREEN → Standards/Spec 双轴 Review → finding RED/修正 → commit → push →
-精确 CI `headSha` → Linux 浏览器并发/失败验收 → Issue 证据 → merge/release。任何产品/helper/test 修改都会
+后续顺序保持：W006 修正后 Review → commit → push → 精确 CI `headSha` → service 故障验收 → Issue 证据 →
+W007 单 Patch UI → W008 最终固定 SHA/浏览器/真实 MySQL 8 证据 → merge/release。任何
+产品/helper/test 修改都会
 使 ADR-0005 F009 的既有人工证据只保留为其原 `tested_code_sha` 的历史证据，不能宣称覆盖当前代码。
 
 ## 后果

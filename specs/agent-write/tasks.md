@@ -7,14 +7,14 @@
 | ID | 任务 | 前置 | 当前状态 |
 |---|---|---|---|
 | W000 | 读取 main、Issue #48、现有 ADR/design、代码/迁移/测试与图谱，固定事实基线 | 无 | 完成（`main@ca3b7bd…`） |
-| W001 | 恢复 JWT `jti` + active DB 重读的 `TrustedUiSession`，移除固定 actor/固定密码 bootstrap | W000 | 本轮本地 GREEN，待全量验证与交付收口 |
-| W002 | 为 `daily_plan` 增加正整数单调 revision、迁移、CAS 并发与回滚测试 | W001 | 本轮本地 GREEN（revision migration `b7d9e1f3a5c2`；当前 head `c1a8e4f6b2d9` 另修 SQLite user ID），未提交 |
+| W001 | 恢复 JWT `jti` + active DB 重读的 `TrustedUiSession`，移除固定 actor/固定密码 bootstrap | W000 | 完成并随 W004/W005 进入分支与精确 SHA CI；最终浏览器矩阵仍属 W008 |
+| W002 | 为 `daily_plan` 增加正整数单调 revision、迁移、CAS 并发与回滚测试 | W001 | 完成；revision migration `b7d9e1f3a5c2`，`c1a8e4f6b2d9` 另修 SQLite user ID |
 | W003 | 新建 ADR-0006、Agent WRITE spec/tasks 与一个保持 OPEN 的 GitHub Issue | W000 | 完成（Issue #52 OPEN） |
 | W004 | 建立逐次绑定、revision/before、操作前版本、短事务、不可变审计、全回滚与 commit-unknown 稳定 RED | W001-W003 | 完成：59 clean；连续两次均 `1 passed, 58 failed`，node-only SHA-256 均为 `fe346fa3…` |
-| W005 | 实现 `confirmed_write` 契约与短命一次性 confirmation store | W004 固定 RED + 明确 GREEN 授权 | 未授权 |
-| W006 | 实现 `daily_plan_operation_version`、`agent_write_audit`、DB immutability trigger 与原子 CAS 写事务 | W005 GREEN + Review | 未授权 |
-| W007 | 在每日计划页增加逐 Patch 确认/过期/失败/对账 UI，保持 Provider READ/DRAFT | W006 GREEN + Review | 未授权 |
-| W008 | 双轴 Review、finding RED/修正、固定 SHA、本地全量、commit、push、精确 CI、人工故障验收与 Issue 证据 | W007 GREEN + 逐门授权 | 未授权 |
+| W005 | 实现 `confirmed_write` 契约与短命一次性 confirmation store | W004 固定 RED + 明确 GREEN 授权 | 完成：fixed SHA `e4a7f3c…`，Review 0/0、本地/CI/service 验收与 Issue 回写均闭合 |
+| W006 | 实现 `daily_plan_operation_version`、`agent_write_audit`、DB immutability trigger 与原子 CAS 写事务 | W005 GREEN + Review | 进行中：初始 GREEN `d406d97…`、finding RED `0cb9b63…`；本地修正 GREEN，待复审/commit/push/CI/验收/Issue |
+| W007 | 在每日计划页增加逐 Patch 确认/过期/失败/对账 UI，保持 Provider READ/DRAFT | W006 GREEN + Review | 未进入：等待 W006 独立门禁闭合 |
+| W008 | 双轴 Review、finding RED/修正、固定 SHA、本地全量、commit、push、精确 CI、人工故障验收与 Issue 证据 | W007 GREEN + 逐门授权 | 未进入 |
 | W009 | merge、Issue 关闭与发布 | W008 全门禁闭合 + 单独授权 | 未授权 |
 
 ## 本轮 W004 执行顺序
@@ -37,7 +37,7 @@
 - W007 UI adapter 调用三个 seam 前以页面打开 session 执行 `require_bound_ui_session`；service 接收刚重建的
   `TrustedUiSession`，每个入口重读 active User，`apply`/`reconcile` 再精确绑定 confirmation 的 JWT `jti`；
 - store 原子消费，错误 actor/session/过期/重复在写 session 前拒绝；
-- 固定 GREEN 后先做双轴 Review，finding 必须先补 RED；未经授权不进入 W006。
+- 固定 GREEN 后先做双轴 Review，finding 必须先补 RED；Review 与 W005 交付门闭合前不进入 W006。
 
 ### W006：原子持久化
 
@@ -47,7 +47,7 @@
 - apply 短事务内完成 actor/revision/before 复核、操作前版本、CAS `N→N+1`、最小审计与同 commit；
 - 已知失败全 rollback；commit unknown 只允许按 confirmation/nonce 新事务只读 reconcile；
 - `ConfirmedDailyPlanWriteResult` 仅有 version/audit id 和 before/after revision；
-- 固定 GREEN 后先做双轴 Review，finding 必须先补 RED；未经授权不进入 W007。
+- 固定 GREEN 后先做双轴 Review，finding 必须先补 RED；W006 独立交付门闭合前不进入 W007。
 
 ### W007：采用 UI
 
@@ -56,7 +56,7 @@
 - 显示精确 plan、revision、字段差异、过期/陈旧/失败/结果不明，并要求重新生成确认；
 - 双击、A→B→A、页面断开、退出/重新登录、另一个标签和并发人工保存均 fail closed；
 - Provider/Tool 面仍恰好四 READ + 两 DRAFT，无“总是允许”、批量或自动采用；
-- 固定 GREEN 后先做双轴 Review，finding 必须先补 RED；未经授权不进入 W008。
+- 固定 GREEN 后先做双轴 Review，finding 必须先补 RED；W007 独立交付门闭合前不进入 W008。
 
 ### W008：交付证据
 
@@ -70,7 +70,7 @@
 5. 脱敏证据回写 OPEN Issue；Review 0/0、CI success 与人工 PASS 互不替代。
 6. W008 的停止条件是固定 SHA 的全部证据闭合；默认不 merge、不关闭 Issue、不 release。
 
-## 建议的下一个长 goal（仅提案，不是授权）
+## 当前长 goal（已授权，仍按逐门顺序执行）
 
 **Agent WRITE 最小 GREEN 到固定 SHA 验收闭合**：在 W004 已稳定 RED 后，依序完成 W005-W008，但把
 W005/W006/W007 的 GREEN、每轮 Review/finding RED、commit、push、CI、人工验收和 Issue 回写保留为可见的

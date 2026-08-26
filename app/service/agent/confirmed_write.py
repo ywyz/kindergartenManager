@@ -1,8 +1,8 @@
-"""One-patch confirmation boundary for future atomic daily-plan writes.
+"""One-patch confirmation boundary for atomic daily-plan writes.
 
-W005 owns only the closed contract, authoritative issue-time validation, and a
-short-lived process-local confirmation store.  The successful persistence and
-evidence paths remain behind the private W006 seams in this module.
+W005 owns the closed contract, authoritative issue-time validation, and a
+short-lived process-local confirmation store. W006 owns the bounded
+version/CAS/audit transaction and read-only reconciliation path.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from threading import Lock
 from typing import Callable
 from uuid import UUID, uuid4
 
-from sqlalchemy.exc import DisconnectionError
+from sqlalchemy.exc import DBAPIError, DisconnectionError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.models.daily_plan import DailyPlan
@@ -110,6 +110,14 @@ class _ConfirmationState(str, Enum):
 
 class _CommitOutcomeUnknown(Exception):
     """Signal that commit was attempted but its durable outcome is unknown."""
+
+
+class _CommitCancelledUnknown(Exception):
+    """Carry an external cancellation whose commit outcome needs reconciliation."""
+
+    def __init__(self, cancellation: asyncio.CancelledError) -> None:
+        self.cancellation = cancellation
+        super().__init__()
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -290,12 +298,14 @@ class _InMemoryConfirmationStore:
         record: _StoredConfirmation,
         actor: _UiSessionSnapshot,
         now: datetime,
+        *,
+        enforce_expiry: bool = True,
     ) -> str | None:
         if record.tenant_id != actor.tenant_id or record.user_id != actor.user_id:
             return "confirmation_actor_mismatch"
         if record.session_id != actor.session_id:
             return "confirmation_session_mismatch"
-        if now >= record.expires_at_utc:
+        if enforce_expiry and now >= record.expires_at_utc:
             return "confirmation_expired"
         return None
 
@@ -399,7 +409,16 @@ class _InMemoryConfirmationStore:
             )
             if record is None:
                 _reject("confirmation_indeterminate")
-            binding_error = self._binding_error(record, actor, now)
+            binding_error = self._binding_error(
+                record,
+                actor,
+                now,
+                enforce_expiry=record.state
+                not in {
+                    _ConfirmationState.APPLIED,
+                    _ConfirmationState.INDETERMINATE,
+                },
+            )
             if binding_error is not None:
                 _reject(binding_error)
             return record
@@ -743,11 +762,22 @@ class ConfirmedDailyPlanWriteService:
             )
             try:
                 await session.commit()
+            except asyncio.CancelledError as cancellation:
+                current_task = asyncio.current_task()
+                await _rollback_quietly(session)
+                if current_task is not None and current_task.cancelling():
+                    raise _CommitCancelledUnknown(cancellation) from None
+                raise
             except DisconnectionError:
                 await _rollback_quietly(session)
                 raise _CommitOutcomeUnknown from None
+            except DBAPIError as error:
+                if error.connection_invalidated:
+                    await _rollback_quietly(session)
+                    raise _CommitOutcomeUnknown from None
+                raise
             return result
-        except _CommitOutcomeUnknown:
+        except (_CommitOutcomeUnknown, _CommitCancelledUnknown):
             raise
         except asyncio.CancelledError:
             await _rollback_quietly(session)
@@ -775,6 +805,9 @@ class ConfirmedDailyPlanWriteService:
             async with self._session_factory() as session:
                 await self._require_active_actor(session, actor)
                 result = await self._apply_claimed(session, claim, actor)
+        except _CommitCancelledUnknown as outcome:
+            self._store.finish_indeterminate(claim)
+            raise outcome.cancellation
         except _CommitOutcomeUnknown:
             self._store.finish_indeterminate(claim)
             _reject("commit_outcome_unknown")
@@ -842,6 +875,8 @@ class ConfirmedDailyPlanWriteService:
         audit = await get_agent_write_audit_by_confirmation(
             session,
             confirmation_id=str(record.confirmation_id),
+            tenant_id=record.tenant_id,
+            user_id=record.user_id,
         )
         if audit is None:
             if record.state is _ConfirmationState.INDETERMINATE:
@@ -851,6 +886,10 @@ class ConfirmedDailyPlanWriteService:
         version = await get_daily_plan_operation_version_by_id(
             session,
             version_id=audit.before_version_id,
+            tenant_id=record.tenant_id,
+            user_id=record.user_id,
+            confirmation_id=str(record.confirmation_id),
+            daily_plan_id=record.daily_plan_id,
         )
         plan = await get_daily_plan_by_id_for_user(
             session,
