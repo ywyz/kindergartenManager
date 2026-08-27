@@ -165,7 +165,13 @@ flight/shutdown Task 不得继承并长期保留 caller `ContextVar` capability�
 `0dc9d39` 固定，3 个节点连续两轮均为 `3 failed`，node hash
 `1bfea83fcc37e6ea981feccc5f9e711abaaf8b400a27c5a71c2e898b078e8420`。
 
-当前第六轮 finding 修复候选已本地 GREEN，尚未取得新 fixed-SHA Review 0/0。新增 finding 节点
-`3 passed`、全部 W007 `112 passed`、完整 WRITE `190 passed`、Foundation `261 passed`、ordinary
+第六轮 finding 修复候选 commit `4f31e1e3762b20ab4742b7a4e8aa48cbbd47aa78` 的第七轮 fixed-SHA 双轴
+Review 结果为 Standards H0/M1/L1、Spec H0/M0/L0。前述 `Context` 与 best-effort logger 两项 M2 已闭合；
+新 findings 是九份当前状态文档与既有测试锁死过时 Review 轮次/SHA，以及第六轮测试读取 service 私有
+`_shutdown_task`。finding RED 已由 `1a080908e28dcc3debb5e41e70b5770d981994a0` 固定，2 个节点连续两轮
+均为 `2 failed`，node hash `ca535f495b0bba8f4bef9c5038101f6ab887d957660b3996e87cdb10d5f5507d`。
+
+当前第七轮 finding 修复候选已本地 GREEN，尚未取得新 fixed-SHA Review 0/0。相关治理矩阵
+`18 passed`、全部 W007 `114 passed`、完整 WRITE `192 passed`、Foundation `261 passed`、ordinary
 `847 passed`，Ruff/format/diff 检查通过且变更范围 Pyright 为 0。尚未 push、CI、人工验收或 Issue 回写，
 W008 未进入，也不得据此宣称 Standards/Spec 0/0、merge、Issue 关闭或 release。

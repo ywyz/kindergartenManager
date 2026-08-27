@@ -455,7 +455,6 @@ commit-unknown 只读对账已经闭合。
 
 W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
 Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。不得增加 Provider WRITE、自动重试、批量或跨页面采用、
-设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。第五轮 finding RED 固定在
-`68e4c340e0188f456ff8bc1caca5181f07410b15`；第五轮 finding 修复候选已本地 GREEN，尚未取得 fixed-SHA Review 0/0；尚未 push、CI、人工验收或
-Issue 回写，W008 未进入。完整 W007 RED/GREEN/Review/precheck SHA、计数与 node hash 统一保存在
-`specs/agent-write/tests/README.md`；Issue #52 保持 OPEN，merge、Issue 关闭与 release 未授权。
+设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。当前 W007 的精确交付状态、Review
+轮次、SHA 与证据仅以 `specs/agent-write/tests/README.md` 和 Issue #52 实时回读为准；本文不复制逐轮事实。
+merge、Issue 关闭与 release 仍须单独授权。

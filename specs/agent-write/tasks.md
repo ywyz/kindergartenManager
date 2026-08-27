@@ -13,14 +13,14 @@
 | W004 | 建立逐次绑定、revision/before、操作前版本、短事务、不可变审计、全回滚与 commit-unknown 稳定 RED | W001-W003 | 完成：59 clean；连续两次均 `1 passed, 58 failed`，node-only SHA-256 均为 `fe346fa3…` |
 | W005 | 实现 `confirmed_write` 契约与短命一次性 confirmation store | W004 固定 RED + 明确 GREEN 授权 | 完成：fixed SHA `e4a7f3c…`，Review 0/0、本地/CI/service 验收与 Issue 回写均闭合 |
 | W006 | 实现 `daily_plan_operation_version`、`agent_write_audit`、DB immutability trigger 与原子 CAS 写事务 | W005 GREEN + Review | 完成：fixed SHA `253d37d…`，Review 0/0、本地/CI、Linux service-boundary 10/10 与 Issue 回写均闭合 |
-| W007 | 在每日计划页增加逐 Patch 确认/过期/失败/对账 UI，保持 Provider READ/DRAFT | W006 GREEN + Review | 第五轮 finding 修复候选已本地 GREEN，尚未取得 fixed-SHA Review 0/0；尚未 push/CI/人工验收/Issue 回写，W008 未进入 |
+| W007 | 在每日计划页增加逐 Patch 确认/过期/失败/对账 UI，保持 Provider READ/DRAFT | W006 GREEN + Review | 交付门进行中；精确状态见 canonical ledger 与 Issue #52 |
 | W008 | 最终固定 SHA 双轴 Review、本地全量、精确 CI、人工故障验收与 Issue 证据；如有改动则 finding RED/修正并全部重跑 | W007 GREEN/Review/commit/push/CI/人工验收/Issue 全部门禁闭合 | 未进入 |
 | W009 | merge、Issue 关闭与发布 | W008 全门禁闭合 + 单独授权 | 未授权 |
 
 W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
-Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。第五轮 finding RED 固定在
-`68e4c340e0188f456ff8bc1caca5181f07410b15`；第五轮 finding 修复候选已本地 GREEN，尚未取得 fixed-SHA Review 0/0；尚未 push、CI、人工验收或
-Issue 回写，W008 未进入。不得增加 Provider WRITE、自动重试、批量或跨页面采用、
+Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确交付状态、Review 轮次、SHA 与
+证据仅以 `specs/agent-write/tests/README.md` 和 Issue #52 实时回读为准；本文不复制逐轮事实。
+不得增加 Provider WRITE、自动重试、批量或跨页面采用、
 设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。完整 W007 RED/GREEN/Review/precheck
 SHA、计数与 node hash 只记录在 `specs/agent-write/tests/README.md`。
 

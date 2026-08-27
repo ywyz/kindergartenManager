@@ -54,11 +54,9 @@ CAPABILITY_FACT_FILES = (
 )
 EVIDENCE_LEDGER_PATH = "specs/agent-write/tests/README.md"
 CURRENT_GATE_FACTS = (
-    "`68e4c340e0188f456ff8bc1caca5181f07410b15`",
-    "第五轮 finding 修复候选已本地 GREEN，尚未取得 fixed-SHA Review 0/0",
-    "尚未 push、CI、人工验收",
-    "Issue 回写",
-    "W008 未进入",
+    "Issue #52 实时回读为准",
+    "不复制",
+    "逐轮事实",
 )
 CURRENT_BOUNDARY_FACTS = (
     "Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT",

@@ -2,9 +2,9 @@
 
 > 合入基线为 `main@ca3b7bd`，Agent Foundation 已合入主线；当前 `feat/agent-write` 已闭合 W005/W006。
 > W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
-> Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。第五轮 finding RED 固定在
-> `68e4c340e0188f456ff8bc1caca5181f07410b15`；第五轮 finding 修复候选已本地 GREEN，尚未取得 fixed-SHA Review 0/0；尚未 push、CI、人工验收或
-> Issue 回写，W008 未进入。不得增加 Provider WRITE、自动重试、批量或跨页面采用、
+> Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确交付状态、Review 轮次、SHA 与
+> 证据仅以 `specs/agent-write/tests/README.md` 和 Issue #52 实时回读为准；本文不复制逐轮事实。
+> 不得增加 Provider WRITE、自动重试、批量或跨页面采用、
 > 设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。完整 W007 证据仅见
 > `specs/agent-write/tests/README.md`。
 
@@ -264,7 +264,7 @@ AI Key 不应写入 `.env`、仓库或测试日志；数据库密文与原 `ENCR
 | 图片过大/方向异常 | 压缩、规格校验、横版归一 | 原图隐私和内存上限需持续验证 |
 | Agent Provider/Tool call | Runtime 本地校验、关闭 registry、有界 loop | Foundation 已合入；任何未知/WRITE Tool 仍必须拒绝 |
 | Agent 取消/上下文变化 | operation/scope/fingerprint 匹配，迟到结果丢弃 | 不得在页面切换后回填或保存 |
-| Agent 逐次确认 WRITE | W005/W006 已闭合；W007 第五轮 finding 修复候选已本地 GREEN，尚未取得 fixed-SHA Review 0/0 | `daily_plan_operation_version` + `agent_write_audit` 只由本地 service 写精确已有 plan；W007 尚未通过独立交付门，Provider/Tool 仍不可写 |
+| Agent 逐次确认 WRITE | W005/W006 已闭合；W007 精确交付状态见 canonical ledger | `daily_plan_operation_version` + `agent_write_audit` 只由本地 service 写精确已有 plan；Provider/Tool 仍不可写 |
 
 ## 11. 可观测性与审计
 
@@ -287,14 +287,14 @@ AI Key 不应写入 `.env`、仓库或测试日志；数据库密文与原 `ENCR
 - Agent Foundation：契约/Schema、未知和 WRITE Tool 拒绝、tenant/user 裁剪、有界 loop、取消/超时/迟到丢弃，
   并证明所有路径零业务持久化。
 - Agent WRITE：W005/W006 公共 seam、绑定、原子事务与 finding 矩阵已闭合；W007 当前只允许每日计划
-  当前页面的一份 Patch 经显式确认后由本地应用层采用。第五轮 finding 正在修复，后续固定 SHA 复审与
-  交付证据仍开放；详细 lineage 仅见 `specs/agent-write/tests/README.md`。
+  当前页面的一份 Patch 经显式确认后由本地应用层采用。固定 SHA 复审与交付证据的精确状态及详细
+  lineage 仅见 `specs/agent-write/tests/README.md`。
 - Word/打包：目标平台人工验收。
 
 codebase-memory/Graphify 只能发现结构、热点和文档关系，不替代这些测试。
 当前分支的 UI session/revision/W005/W006 已进入远端精确 SHA CI；W006 Linux service-boundary `10/10`
-已闭合。W007 的第五轮 finding 修复、提交前独立 precheck、fixed-SHA 双轴复审、push、CI、人工验收与
-Issue 回写仍是独立门禁；旧 F009 人工结果不能填补这些门禁。完整证据只记录在
+已闭合。W007 的 finding RED、最小修复、本地 GREEN、fixed-SHA 双轴复审、push、CI、人工验收与 Issue
+回写仍是独立门禁；旧 F009 人工结果不能填补这些门禁。完整证据只记录在
 `specs/agent-write/tests/README.md`。
 
 ## 13. 已知架构热点
@@ -311,5 +311,5 @@ Issue 回写仍是独立门禁；旧 F009 人工结果不能填补这些门禁�
 - 图片后端、备份恢复和数据保留策略。
 - Agent Foundation 已合入主线，仍固定为 4 READ + 2 DRAFT 且零 Agent 持久化。
 - Agent WRITE 的可信 actor、`daily_plan.revision`、逐次确认、操作前版本、短事务、不可变审计与全回滚已在
-  W005/W006 闭合；W007 第五轮 finding 修复与后续交付门仍开放，完整历史以
-  `specs/agent-write/tests/README.md` 为准；W008 尚未进入，不能跳门。
+  W005/W006 闭合；W007/W008 的精确交付门状态和完整历史以
+  `specs/agent-write/tests/README.md` 与 Issue #52 为准，不能跳门。

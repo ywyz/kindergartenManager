@@ -1,10 +1,10 @@
 # KindergartenManager 产品与工程路线图
 
 > 当前快照：2026-08-27；合入基线 `main@ca3b7bd922f838c0739ccf9ed0f58655d292dc2f`；
-> 当前 `feat/agent-write` 已闭合 W005/W006，W007 finding RED 固定在
-> `68e4c340e0188f456ff8bc1caca5181f07410b15`。W007 当前能力仅为每日计划当前页面、单一 Patch、
+> 当前 `feat/agent-write` 已闭合 W005/W006。W007 当前能力仅为每日计划当前页面、单一 Patch、
 > 用户显式确认后的本地应用层 WRITE；Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。
-> 第五轮 finding 修复候选已本地 GREEN，尚未取得 fixed-SHA Review 0/0；尚未 push、CI、人工验收或 Issue 回写，W008 未进入。不得增加 Provider WRITE、
+> 当前 W007 的精确交付状态、Review 轮次、SHA 与证据仅以
+> `specs/agent-write/tests/README.md` 和 Issue #52 实时回读为准；本文不复制逐轮事实。不得增加 Provider WRITE、
 > 自动重试、批量或跨页面采用、设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。
 > 完整 W007 lineage/evidence ledger 仅见 `specs/agent-write/tests/README.md`。
 
@@ -228,7 +228,7 @@ Review/Quality/远端/Issue 证据见 Issue #48。
 
 ## 9. R4B：Agent WRITE（独立里程碑）
 
-状态：`实现中`（W005/W006 已闭合；W007 第五轮 finding 修复候选已本地 GREEN，尚未取得 fixed-SHA Review 0/0；尚未 push/CI/人工验收/Issue 回写；W008 未进入）。
+状态：`实现中`（W005/W006 已闭合；W007/W008 精确门状态见 canonical ledger 与 Issue #52）。
 
 [ADR-0006](ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md) 与
 [冻结规格](../specs/agent-write/spec.md)、[Issue #52](https://github.com/ywyz/kindergartenManager/issues/52)
@@ -247,9 +247,9 @@ WRITE `78 passed`、Foundation `261 passed`、ordinary `847 passed`、Linux serv
 Quality `32954156965` 精确匹配成功，Issue #52 comment `5423617401` 已回写且 Issue 保持 OPEN。
 
 W007 当前只开放每日计划当前页面的一份 Patch，经用户显式确认后由本地应用层采用；Provider/Tool
-能力面不变。第五轮 Review finding 修复候选已本地 GREEN，尚未取得 fixed-SHA Review 0/0；后续 push、精确 SHA CI、
-人工验收与 Issue 回写仍是独立门禁，不得相互替代。完整 RED/GREEN/Review/precheck SHA、计数和 node hash
-统一记录在 `specs/agent-write/tests/README.md`。真实 MySQL 8 与最终可见矩阵仍属于尚未进入的 W008；
+能力面不变。Review、push、精确 SHA CI、人工验收与 Issue 回写仍是独立门禁，不得相互替代。完整
+RED/GREEN/Review/precheck SHA、计数和 node hash 统一记录在 `specs/agent-write/tests/README.md`。
+真实 MySQL 8 与最终可见矩阵属于 W008；
 默认停在 merge、Issue 关闭和 release 之前。
 
 ## 10. R5：发布与运维复核

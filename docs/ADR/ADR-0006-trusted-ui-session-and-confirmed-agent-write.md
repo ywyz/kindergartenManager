@@ -1,6 +1,6 @@
 # ADR-0006：可信 UI 会话、每日计划 revision 与逐次确认写入
 
-- 状态：接受（W005/W006 已闭合；W007 第五轮 finding 修复候选已本地 GREEN，尚未取得 fixed-SHA Review 0/0，独立交付门仍开放）
+- 状态：接受（W005/W006 已闭合；W007/W008 精确交付状态见 canonical ledger 与 Issue #52）
 - 日期：2026-08-25
 - 依赖：[ADR-0002](ADR-0002-single-user-ui-and-tenant-api.md)、[ADR-0003](ADR-0003-sqlite-default-mysql-optional-alembic.md)、[ADR-0005](ADR-0005-controlled-ai-agent-runtime.md)
 - 冻结规格：[Agent WRITE](../../specs/agent-write/spec.md)
@@ -19,10 +19,9 @@
 
 W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
 Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。不得增加 Provider WRITE、自动重试、批量或跨页面采用、
-设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。第五轮 finding RED 固定在
-`68e4c340e0188f456ff8bc1caca5181f07410b15`；第五轮 finding 修复候选已本地 GREEN，尚未取得 fixed-SHA Review 0/0；尚未 push、CI、人工验收或
-Issue 回写，W008 未进入。完整 W007 RED/GREEN/Review/precheck SHA、计数与 node hash 仅见
-`specs/agent-write/tests/README.md`。
+设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。当前 W007 的精确交付状态、
+Review 轮次、SHA 与证据仅以 `specs/agent-write/tests/README.md` 和 Issue #52 实时回读为准；本文不复制
+逐轮事实。
 
 ## 决策
 
@@ -149,8 +148,8 @@ W001-W004 已固定可信 UI session、revision、ADR/spec/Issue 与稳定 RED�
 Review、push、精确 SHA CI、service 验收和 Issue 回写。W006 已在 fixed SHA `253d37d…` 完成双轴 Review
 0/0、push、精确 SHA Quality `32954156965`、Linux service-boundary `10/10` 与 Issue #52 回写。
 
-W007 采用 UI 已存在，但第五轮 Review finding 仍在修复；当前不得宣称 Standards/Spec 0/0。修复后的
-提交前独立 precheck、fixed-SHA 双轴复审、push、精确 SHA CI、人工验收与 Issue 回写仍须依次作为独立门禁，
+W007 采用 UI 已存在；当前门禁结论只从 canonical ledger 与 Issue #52 回读，不得由局部 GREEN 推导。
+finding RED、最小修复、本地 GREEN、fixed-SHA 双轴复审、push、精确 SHA CI、人工验收与 Issue 回写仍须依次作为独立门禁，
 全部闭合后才可进入 W008。完整历史只记录在 `specs/agent-write/tests/README.md`；任何
 产品/helper/test 变化都要求在新 SHA 重跑受影响证据，最后才另行讨论 merge、Issue 关闭或 release。
 

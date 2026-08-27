@@ -1,12 +1,11 @@
 # Agent WRITE 逐次确认冻结规格
 
-- 状态：W005/W006 已闭合；W007 第五轮 finding RED 固定在
-  `68e4c340e0188f456ff8bc1caca5181f07410b15`，第五轮 finding 修复候选已本地 GREEN，尚未取得 fixed-SHA Review 0/0；尚未 push、CI、人工验收或
-  Issue 回写，W008 未进入。
+- 状态：W005/W006 已闭合；W007/W008 精确交付状态见 canonical ledger 与 Issue #52。
 - 当前能力边界：每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
   Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。不得增加 Provider WRITE、自动重试、批量或跨页面采用、
   设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。
-- 完整 W007 lineage/evidence ledger：`specs/agent-write/tests/README.md`
+- 当前 W007 的精确交付状态、Review 轮次、SHA 与证据仅以
+  `specs/agent-write/tests/README.md` 和 Issue #52 实时回读为准；本文不复制逐轮事实。
 - 合入基线：`main@ca3b7bd922f838c0739ccf9ed0f58655d292dc2f`；W006 fixed SHA：
   `253d37d92f2983ea55f688340078380d41c78fd4`
 - Issue：[GitHub #52](https://github.com/ywyz/kindergartenManager/issues/52)（保持 OPEN）
@@ -29,8 +28,8 @@ ORM 与 migration、原子 CAS 和 commit-unknown 只读对账。W006 fixed SHA 
 0/0、本地 WRITE `78 passed`、Foundation `261 passed`、ordinary `847 passed`、精确 SHA Quality
 `32954156965`、Linux service-boundary `10/10` 与 Issue #52 回写。
 
-当前只进入 W007 的第五轮 finding 修复。W007 产品能力仍局限于当前页面的一份 Patch 经用户显式确认后
-由本地应用层采用；Provider、Prompt 与 Tool registry 不获得 WRITE。修复后的提交前独立 precheck、
+W007 产品能力仍局限于当前页面的一份 Patch 经用户显式确认后由本地应用层采用；Provider、Prompt 与
+Tool registry 不获得 WRITE。finding RED、最小修复、本地 GREEN、
 fixed-SHA 双轴复审、push、精确 SHA CI、人工验收与 Issue 回写必须依次保持为独立门禁，全部闭合前不进入
 W008。完整历史证据仅见 `specs/agent-write/tests/README.md`。默认停在 merge、Issue 关闭与 release 之前。
 
@@ -253,9 +252,9 @@ W004/W007 的逐轮 RED/GREEN/Review/precheck SHA、计数和 node hash 只保�
 
 ## 11. W007/W008 后续验收
 
-W007 第五轮 finding 修复候选已本地 GREEN，尚未取得 fixed-SHA Review 0/0。后续仍须按独立门禁执行固定 SHA 双轴复审、
-push、远端 Quality 精确 `headSha`、Linux 可见人工验收与脱敏 Issue 证据；这些门不能互相替代，也不能由
-当前局部 GREEN 预先宣称。完整 lineage 以 `specs/agent-write/tests/README.md` 为唯一 ledger。
+W007 仍须按独立门禁执行 finding RED、最小修复、本地 GREEN、固定 SHA 双轴复审、push、远端 Quality
+精确 `headSha`、Linux 可见人工验收与脱敏 Issue 证据；这些门不能互相替代，也不能由局部 GREEN 预先
+宣称。完整 lineage 以 `specs/agent-write/tests/README.md` 为唯一 ledger。
 
 上述 W007 门全部闭合后才进入 W008。只有产品/helper/test 没有变化时，后续门才可绑定同一 fixed SHA；
 任何变化都必须在新 SHA 重跑相应 Review、CI、Linux 浏览器故障矩阵和真实 MySQL 8 证据。最终仍只讨论

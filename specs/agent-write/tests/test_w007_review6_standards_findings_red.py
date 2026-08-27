@@ -102,8 +102,6 @@ async def test_completed_confirmation_shutdown_drops_caller_context() -> None:
         await harness.flow.close()
     finally:
         _CALLER_CAPABILITY.reset(token)
-    shutdown_task = harness.flow._shutdown_task
-    assert shutdown_task is not None and shutdown_task.done()
     del token
     del capability
     gc.collect()

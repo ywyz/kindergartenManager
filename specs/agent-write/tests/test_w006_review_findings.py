@@ -335,7 +335,7 @@ def test_current_fact_docs_close_w006_and_track_w007_review_gate() -> None:
     assert "未授权" not in w005_row
     assert "未授权" not in w006_row
     assert "完成" in w006_row and "253d37d" in w006_row
-    assert "第五轮" in w007_row
+    assert "canonical ledger" in w007_row
     assert "W007 未进入" not in w007_row
     assert "未进入" in w008_row
     current_w007_docs = (

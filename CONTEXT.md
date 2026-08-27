@@ -3,8 +3,9 @@
 > 状态快照：2026-08-27；合入基线：`main@ca3b7bd922f838c0739ccf9ed0f58655d292dc2f`；
 > 当前分支：`feat/agent-write`。W005/W006 已闭合；W007 当前能力仅为每日计划当前页面、单一 Patch、
 > 用户显式确认后的本地应用层 WRITE。Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。
-> 第五轮 finding RED 固定在 `68e4c340e0188f456ff8bc1caca5181f07410b15`，第五轮 finding 修复候选已本地 GREEN，尚未取得 fixed-SHA Review 0/0；
-> 尚未 push、CI、人工验收或 Issue 回写，W008 未进入。不得增加 Provider WRITE、自动重试、批量或跨页面采用、
+> 当前 W007 的精确交付状态、Review 轮次、SHA 与证据仅以
+> `specs/agent-write/tests/README.md` 和 Issue #52 实时回读为准；本文不复制逐轮事实。
+> 不得增加 Provider WRITE、自动重试、批量或跨页面采用、
 > 设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。完整 W007 证据仅见
 > `specs/agent-write/tests/README.md`。
 
@@ -110,9 +111,8 @@ UI 登录用户与 API 的租户服务主体仍是两个不同边界，不得混
   `feat/agent-write` 已到 W006 fixed SHA `253d37d…`，`main` 以 `--no-ff` 语义保留 Agent Foundation
   的 RED/GREEN ancestry。
 - W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
-  Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。第五轮 finding 修复候选已本地 GREEN，尚未取得 fixed-SHA Review 0/0；尚未 push、CI、
-  人工验收或 Issue 回写，W008 未进入。完整 lineage 与测试证据仅见
-  `specs/agent-write/tests/README.md`。
+  Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确交付状态、Review 轮次、SHA 与
+  证据仅以 `specs/agent-write/tests/README.md` 和 Issue #52 实时回读为准；本文不复制逐轮事实。
 - F009 产品验收仍只绑定 `tested_code_sha=a50c6f6b9aa941996052c59a301a7a40bdbd706f`，closure 证据绑定
   `0ec2e944…`，详见 Issue #48；后续产品/helper/test 变化不能由该历史人工证据覆盖。
 - 当前没有 PR、merge、Issue 关闭或 release 授权；Issue #48 与 Issue #52 均保持 OPEN。
@@ -211,16 +211,16 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
 5. **发布证据漂移**：Linux 本地结果不能代替 Windows 安装、浏览器打开、模板 Word 保真和真实 AI/MySQL 验收。
 6. **远端质量证据需按 SHA 回读**：F005-F009 的既有 push Quality 均已按各自 `headSha` 回读；最终
    `evidence_closure_sha` 仍必须使用自身 Review/CI/远端证据，不能沿用 `tested_code_sha` 的旧 CI。
-7. **会话与 WRITE 门禁**：可信页面入口与敏感 callback 必须保持 exact-jti 绑定；W007 当前为第五轮
-   finding 修复中，不能从局部 GREEN 推导交付闭合。Provider 与 Tool 保持 READ/DRAFT，完整门禁证据只见
+7. **会话与 WRITE 门禁**：可信页面入口与敏感 callback 必须保持 exact-jti 绑定；W007 不能从局部
+   GREEN 推导交付闭合。Provider 与 Tool 保持 READ/DRAFT，完整门禁证据只见
    `specs/agent-write/tests/README.md`。
 
 ## 10. 当前共同下一步
 
 当前共同下一步是：
 
-1. 先完成第五轮 finding RED 的最小修复与本地 GREEN，再把提交前独立 precheck、固定 SHA 双轴复审、
-   push、精确 SHA CI、人工验收和 Issue #52 回写作为可见的后续独立门禁；当前未授权提前执行或宣称完成。
+1. 按 canonical ledger 的当前门依次完成 finding RED、最小修复、本地 GREEN、固定 SHA 双轴复审、push、
+   精确 SHA CI、人工验收和 Issue #52 回写；各门保持可见且不得提前宣称完成。
 2. W007 上述门全部闭合后才进入 W008；任何产品/helper/test 变化都要求在新 SHA 重跑对应 Review、CI 和
    平台证据。
 3. 默认停止在 merge、Issue 关闭和 release 之前；不得给 Provider 增加 WRITE、自动重试、批量/跨页面采用、

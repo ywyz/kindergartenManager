@@ -111,10 +111,9 @@ W007 current capability is limited to one current-page Patch applied by the loca
 confirmation; Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。不得增加 Provider WRITE、自动重试、批量或跨页面采用、
 设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。
 
-第五轮 fixed-SHA Review 已完成，finding RED 固定在
-`68e4c340e0188f456ff8bc1caca5181f07410b15`；第五轮 finding 修复候选已本地 GREEN，尚未取得 fixed-SHA Review 0/0；尚未 push、CI、人工验收或 Issue 回写，
-W008 未进入。完整 W007 RED/GREEN/Review/precheck SHA、计数与 node hash 只记录在
-`specs/agent-write/tests/README.md`，不得从当前局部 GREEN 推导 Standards/Spec 0/0、merge、Issue 关闭或 release。
+当前 W007 的精确交付状态、Review 轮次、SHA 与证据仅以
+`specs/agent-write/tests/README.md` 和 Issue #52 实时回读为准；本文不复制逐轮事实。不得从局部 GREEN
+推导 Standards/Spec 0/0、merge、Issue 关闭或 release。
 
 F009 adds no Agent capability. Its automated baseline is taken after initialization/seed and dynamically reflects every
 actual database table, protected configuration/export artifacts, caller-owned UI body, the independent audit logger, and
