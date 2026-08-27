@@ -141,3 +141,53 @@ def test_confirmation_flow_private_guard_ignores_unrelated_names(
     source: str,
 ) -> None:
     assert _confirmation_flow_private_reads(source) == set()
+
+
+@pytest.mark.parametrize(
+    "source",
+    (
+        (
+            "try:\n"
+            "    subject = harness.flow\n"
+            "except RuntimeError:\n"
+            "    subject = object()\n"
+            "subject._pending\n"
+        ),
+        (
+            "subject = harness.flow\n"
+            "while condition:\n"
+            "    subject = object()\n"
+            "subject._pending\n"
+        ),
+        ("flow = harness.flow\nclass Fixture:\n    flow = object()\nflow._pending\n"),
+    ),
+)
+def test_confirmation_flow_private_guard_joins_paths_and_isolates_class_scope(
+    source: str,
+) -> None:
+    assert _confirmation_flow_private_reads(source) == {"_pending"}
+
+
+@pytest.mark.parametrize(
+    "source",
+    (
+        (
+            "subject = harness.flow\n"
+            "for subject in unrelated_items:\n"
+            "    subject._cache\n"
+        ),
+        ("subject = harness.flow\nwith resource() as subject:\n    subject._cache\n"),
+        (
+            "subject = harness.flow\n"
+            "try:\n"
+            "    pass\n"
+            "except RuntimeError as subject:\n"
+            "    subject._cache\n"
+        ),
+        ("subject = harness.flow\n[subject._cache for subject in unrelated_items]\n"),
+    ),
+)
+def test_confirmation_flow_private_guard_shadows_binding_targets(
+    source: str,
+) -> None:
+    assert _confirmation_flow_private_reads(source) == set()
