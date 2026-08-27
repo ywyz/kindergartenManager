@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from test_w007_review7_standards_findings_red import (
+    _confirmation_flow_private_reads,
+    _w007_status_problems,
+)
+
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-REVIEW7_GUARD = (
-    REPOSITORY_ROOT
-    / "specs/agent-write/tests/test_w007_review7_standards_findings_red.py"
-)
 STATUS_DOCS = (
     "AGENTS.md",
     "CONTEXT.md",
@@ -55,14 +56,29 @@ def test_w007_status_docs_keep_one_local_authority_and_separate_issue_gate() -> 
     )
 
 
-def test_w007_review_guard_is_general_instead_of_incident_specific() -> None:
-    """The guard must cover any review round/SHA and flow-private attribute."""
-    source = REVIEW7_GUARD.read_text(encoding="utf-8")
+def test_w007_status_guard_follows_a_markdown_section_across_blank_lines() -> None:
+    """A W007 heading governs its body until the next peer heading."""
+    review_sha = "1234567890abcdef1234567890abcdef12345678"
+    content = f"## W007\n\n当前为第九轮 Review，SHA {review_sha}。\n"
 
-    assert "第五轮 finding" not in source
-    assert "68e4c340e0188f456ff8bc1caca5181f07410b15" not in source
-    assert 'node.attr == "_shutdown_task"' not in source
-    assert "REVIEW_ROUND_PATTERN" in source
-    assert "FULL_SHA_PATTERN" in source
-    assert 'node.attr.startswith("_")' in source
-    assert "test_w007_review*.py" in source
+    assert _w007_status_problems(content) == [
+        "duplicated W007 review round",
+        f"duplicated W007 review SHA: {review_sha}",
+    ]
+
+
+def test_confirmation_flow_private_guard_follows_aliases_and_getattr() -> None:
+    """Receiver spelling cannot bypass the confirmation-flow boundary."""
+    source = """
+subject = harness.flow
+subject._confirmation_id
+controller = confirmation_flow
+controller._pending
+getattr(flow, "_shutdown_task")
+"""
+
+    assert _confirmation_flow_private_reads(source) == {
+        "_confirmation_id",
+        "_pending",
+        "_shutdown_task",
+    }
