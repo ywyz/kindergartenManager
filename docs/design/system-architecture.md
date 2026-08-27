@@ -2,8 +2,9 @@
 
 > 合入基线为 `main@ca3b7bd`，Agent Foundation 已合入主线；当前 `feat/agent-write` 已闭合 W005/W006。
 > W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
-> Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确交付状态、Review 轮次、SHA 与
-> 证据仅以 `specs/agent-write/tests/README.md` 和 Issue #52 实时回读为准；本文不复制逐轮事实。
+> Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确本地交付状态、Review 轮次、
+> SHA 与测试证据仅以 `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后作为外部证据；
+> 本文不复制逐轮事实。
 > 不得增加 Provider WRITE、自动重试、批量或跨页面采用、
 > 设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。完整 W007 证据仅见
 > `specs/agent-write/tests/README.md`。
@@ -311,5 +312,5 @@ codebase-memory/Graphify 只能发现结构、热点和文档关系，不替代�
 - 图片后端、备份恢复和数据保留策略。
 - Agent Foundation 已合入主线，仍固定为 4 READ + 2 DRAFT 且零 Agent 持久化。
 - Agent WRITE 的可信 actor、`daily_plan.revision`、逐次确认、操作前版本、短事务、不可变审计与全回滚已在
-  W005/W006 闭合；W007/W008 的精确交付门状态和完整历史以
-  `specs/agent-write/tests/README.md` 与 Issue #52 为准，不能跳门。
+  W005/W006 闭合；W007/W008 的精确本地交付门状态和完整历史以
+  `specs/agent-write/tests/README.md` 为准，Issue #52 仅记录已回写外部门，不能跳门。

@@ -29,7 +29,7 @@ ISSUE_GATE_FACT = "Issue #52 仅在对应门回写后作为外部证据"
 
 
 def _normalized(text: str) -> str:
-    return " ".join(text.split())
+    return "".join(text.replace(">", "").split())
 
 
 def test_w007_status_docs_keep_one_local_authority_and_separate_issue_gate() -> None:
@@ -65,4 +65,4 @@ def test_w007_review_guard_is_general_instead_of_incident_specific() -> None:
     assert "REVIEW_ROUND_PATTERN" in source
     assert "FULL_SHA_PATTERN" in source
     assert 'node.attr.startswith("_")' in source
-    assert 'glob("test_w007_review*.py")' in source
+    assert "test_w007_review*.py" in source

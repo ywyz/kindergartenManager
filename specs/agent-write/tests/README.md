@@ -175,3 +175,15 @@ Review 结果为 Standards H0/M1/L1、Spec H0/M0/L0。前述 `Context` 与 best-
 `18 passed`、全部 W007 `114 passed`、完整 WRITE `192 passed`、Foundation `261 passed`、ordinary
 `847 passed`，Ruff/format/diff 检查通过且变更范围 Pyright 为 0。尚未 push、CI、人工验收或 Issue 回写，
 W008 未进入，也不得据此宣称 Standards/Spec 0/0、merge、Issue 关闭或 release。
+
+第七轮 finding 修复候选 commit `3d1f6e9bd3642f34c048c682af8a3eb0345f6142` 的第八轮 fixed-SHA 双轴
+Review 结果为 Standards H0/M1/L1、Spec H0/M0/L0。新 findings 是把尚未回写 W007 的 Issue #52 与
+canonical ledger 并列成精确状态双权威，以及第七轮守卫只匹配特定“第五轮”/SHA/`_shutdown_task` 事故而
+不能覆盖后续轮次或其他 confirmation-flow 私有字段。finding RED 已由
+`ec098ab04d17cb3985a2ecea5eab793d12e0f9c6` 固定，2 个节点连续两轮均为 `2 failed`，node hash
+`30c5fdc405b62ecf40b46e2679906d76adfa0a64ff2caae5dfc990182b242ede`。
+
+当前第八轮 finding 修复候选已本地 GREEN，尚未取得新 fixed-SHA Review 0/0。治理守卫矩阵
+`10 passed`、全部 W007 `118 passed`、完整 WRITE `196 passed`、Foundation `261 passed`、ordinary
+`847 passed`，Ruff/format/diff 检查通过且变更范围 Pyright 为 0。尚未 push、CI、人工验收或 Issue 回写，
+W008 未进入，也不得据此宣称 Standards/Spec 0/0、merge、Issue 关闭或 release。

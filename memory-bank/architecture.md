@@ -455,6 +455,6 @@ commit-unknown 只读对账已经闭合。
 
 W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
 Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。不得增加 Provider WRITE、自动重试、批量或跨页面采用、
-设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。当前 W007 的精确交付状态、Review
-轮次、SHA 与证据仅以 `specs/agent-write/tests/README.md` 和 Issue #52 实时回读为准；本文不复制逐轮事实。
-merge、Issue 关闭与 release 仍须单独授权。
+设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。当前 W007 的精确本地交付状态、
+Review 轮次、SHA 与测试证据仅以 `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后
+作为外部证据；本文不复制逐轮事实。merge、Issue 关闭与 release 仍须单独授权。

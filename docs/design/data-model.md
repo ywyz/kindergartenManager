@@ -2,8 +2,9 @@
 
 > 合入基线：`main@ca3b7bd`；当前 `feat/agent-write` Alembic head：`e5f7a9c2d4b6`。
 > W005/W006 已闭合。W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
-> Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确交付状态、Review 轮次、SHA 与
-> 证据仅以 `specs/agent-write/tests/README.md` 和 Issue #52 实时回读为准；本文不复制逐轮事实。
+> Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确本地交付状态、Review 轮次、
+> SHA 与测试证据仅以 `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后作为外部证据；
+> 本文不复制逐轮事实。
 > 不得增加 Provider WRITE、自动重试、批量或跨页面采用、
 > 设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。完整 W007 证据仅见
 > `specs/agent-write/tests/README.md`。
@@ -275,5 +276,6 @@ W008 独立人工门。
 - 表时间戳类型/默认实现不完全统一。
 - `export_records` 没有 `updated_at`，属于明确的不可变例外；仓库总规则应承认该例外。
 - 可信 UI session 已恢复并进入分支/远端 CI，但当前会话不落独立 server-side session 表，后续撤销/运维策略需以独立需求收紧。
-- W005/W006 已闭合逐次确认、操作前版本、不可变审计和原子 CAS；W007 后续交付门的精确状态以
-  `specs/agent-write/tests/README.md` 与 Issue #52 为准；真实 MySQL 8 与最终固定 SHA 可见验收属于 W008。
+- W005/W006 已闭合逐次确认、操作前版本、不可变审计和原子 CAS；W007 后续交付门的精确本地状态以
+  `specs/agent-write/tests/README.md` 为准，Issue #52 仅记录已回写外部门；真实 MySQL 8 与最终固定 SHA
+  可见验收属于 W008。

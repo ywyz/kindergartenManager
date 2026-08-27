@@ -1,6 +1,6 @@
 # ADR-0006：可信 UI 会话、每日计划 revision 与逐次确认写入
 
-- 状态：接受（W005/W006 已闭合；W007/W008 精确交付状态见 canonical ledger 与 Issue #52）
+- 状态：接受（W005/W006 已闭合；W007/W008 精确本地状态见 canonical ledger，Issue #52 仅记录已回写外部门）
 - 日期：2026-08-25
 - 依赖：[ADR-0002](ADR-0002-single-user-ui-and-tenant-api.md)、[ADR-0003](ADR-0003-sqlite-default-mysql-optional-alembic.md)、[ADR-0005](ADR-0005-controlled-ai-agent-runtime.md)
 - 冻结规格：[Agent WRITE](../../specs/agent-write/spec.md)
@@ -19,9 +19,9 @@
 
 W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
 Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。不得增加 Provider WRITE、自动重试、批量或跨页面采用、
-设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。当前 W007 的精确交付状态、
-Review 轮次、SHA 与证据仅以 `specs/agent-write/tests/README.md` 和 Issue #52 实时回读为准；本文不复制
-逐轮事实。
+设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。当前 W007 的精确本地交付状态、
+Review 轮次、SHA 与测试证据仅以 `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后
+作为外部证据；本文不复制逐轮事实。
 
 ## 决策
 

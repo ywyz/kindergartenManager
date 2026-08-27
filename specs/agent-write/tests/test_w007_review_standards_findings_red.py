@@ -54,7 +54,9 @@ CAPABILITY_FACT_FILES = (
 )
 EVIDENCE_LEDGER_PATH = "specs/agent-write/tests/README.md"
 CURRENT_GATE_FACTS = (
-    "Issue #52 实时回读为准",
+    "精确本地交付状态",
+    "Review 轮次、SHA 与测试证据仅以",
+    "Issue #52 仅在对应门回写后作为外部证据",
     "不复制",
     "逐轮事实",
 )
@@ -226,7 +228,7 @@ async def _two_patch_flow() -> tuple[
 
 
 def _normalized(text: str) -> str:
-    return " ".join(text.split())
+    return "".join(text.replace(">", "").split())
 
 
 def _imports(tree: ast.AST) -> dict[str, str]:
