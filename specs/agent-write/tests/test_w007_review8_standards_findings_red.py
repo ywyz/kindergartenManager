@@ -67,13 +67,11 @@ def test_w007_status_guard_follows_a_markdown_section_across_blank_lines() -> No
     ]
 
 
-def test_confirmation_flow_private_guard_follows_aliases_and_getattr() -> None:
-    """Receiver spelling cannot bypass the confirmation-flow boundary."""
+def test_confirmation_flow_private_guard_covers_direct_getattr() -> None:
+    """The syntax-local smoke guard covers direct ``getattr`` access."""
     source = """
-subject = harness.flow
-subject._confirmation_id
-controller = confirmation_flow
-controller._pending
+confirmation_flow._confirmation_id
+harness.flow._pending
 getattr(flow, "_shutdown_task")
 """
 

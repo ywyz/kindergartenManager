@@ -30,6 +30,7 @@ ALLOWED_STATUS_SHAS = {
     "253d37d92f2983ea55f688340078380d41c78fd4",
     "a50c6f6b9aa941996052c59a301a7a40bdbd706f",
 }
+DIRECT_FLOW_NAMES = frozenset({"flow", "confirmation_flow"})
 
 
 def _w007_status_sections(content: str) -> list[str]:
@@ -117,417 +118,58 @@ def test_w007_status_guard_covers_any_review_round_and_sha() -> None:
     ]
 
 
-class _LexicalBindingVisitor(ast.NodeVisitor):
-    def __init__(self) -> None:
-        self.names: set[str] = set()
-
-    def visit_Name(self, node: ast.Name) -> None:
-        if isinstance(node.ctx, (ast.Store, ast.Del)):
-            self.names.add(node.id)
-
-    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        self.names.add(node.name)
-
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
-        self.names.add(node.name)
-
-    def visit_ClassDef(self, node: ast.ClassDef) -> None:
-        self.names.add(node.name)
-
-    def visit_Lambda(self, node: ast.Lambda) -> None:
-        del node
-
-    def visit_Import(self, node: ast.Import) -> None:
-        self.names.update(
-            alias.asname or alias.name.split(".")[0] for alias in node.names
-        )
-
-    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        self.names.update(alias.asname or alias.name for alias in node.names)
-
-
-class _ConfirmationFlowPrivateReadVisitor(ast.NodeVisitor):
-    def __init__(self) -> None:
-        self.private_reads: set[str] = set()
-        self._flow_aliases = {"flow", "confirmation_flow"}
-        self._getattr_aliases = {"getattr"}
-        self._harness_aliases = {"harness"}
-
-    def _is_harness_reference(self, node: ast.expr) -> bool:
-        if isinstance(node, ast.Name):
-            return node.id in self._harness_aliases
-        if isinstance(node, ast.Attribute):
-            return node.attr == "harness"
-        if isinstance(node, ast.Subscript):
-            return self._is_harness_reference(node.value)
-        if isinstance(node, ast.Call):
-            function = node.func
-            if isinstance(function, ast.Name):
-                return function.id == "_new_harness"
-            if isinstance(function, ast.Attribute):
-                return function.attr == "new_harness"
-        if isinstance(node, ast.IfExp):
-            return self._is_harness_reference(node.body) or self._is_harness_reference(
-                node.orelse
-            )
-        return False
-
-    def _is_getattr_reference(self, node: ast.expr) -> bool:
-        if isinstance(node, ast.Name):
-            return node.id in self._getattr_aliases
-        return bool(
-            isinstance(node, ast.Attribute)
-            and isinstance(node.value, ast.Name)
-            and node.value.id == "builtins"
-            and node.attr == "getattr"
-        )
-
-    def _is_flow_reference(self, node: ast.expr) -> bool:
-        if isinstance(node, ast.Name):
-            return node.id in self._flow_aliases
-        if isinstance(node, ast.Attribute):
-            return node.attr == "flow" and self._is_harness_reference(node.value)
-        if isinstance(node, ast.IfExp):
-            return self._is_flow_reference(node.body) or self._is_flow_reference(
-                node.orelse
-            )
-        return bool(
-            isinstance(node, ast.Call)
-            and self._is_getattr_reference(node.func)
-            and len(node.args) >= 2
-            and self._is_harness_reference(node.args[0])
-            and isinstance(node.args[1], ast.Constant)
-            and node.args[1].value == "flow"
-        )
-
-    def _state(self) -> tuple[set[str], set[str], set[str]]:
-        return (
-            set(self._flow_aliases),
-            set(self._getattr_aliases),
-            set(self._harness_aliases),
-        )
-
-    def _set_state(self, state: tuple[set[str], set[str], set[str]]) -> None:
-        self._flow_aliases = set(state[0])
-        self._getattr_aliases = set(state[1])
-        self._harness_aliases = set(state[2])
-
-    @staticmethod
-    def _merged_states(
-        *states: tuple[set[str], set[str], set[str]],
-    ) -> tuple[set[str], set[str], set[str]]:
-        return (
-            set().union(*(state[0] for state in states)),
-            set().union(*(state[1] for state in states)),
-            set().union(*(state[2] for state in states)),
-        )
-
-    def _visit_block_from(
-        self,
-        body: list[ast.stmt],
-        state: tuple[set[str], set[str], set[str]],
-    ) -> tuple[set[str], set[str], set[str]]:
-        saved = self._state()
-        self._set_state(state)
-        for statement in body:
-            self.visit(statement)
-        result = self._state()
-        self._set_state(saved)
-        return result
-
-    def _bind_target(self, target: ast.expr, value: ast.expr) -> None:
-        if isinstance(target, (ast.List, ast.Tuple)) and isinstance(
-            value, (ast.List, ast.Tuple)
-        ):
-            if len(target.elts) == len(value.elts):
-                for target_element, value_element in zip(
-                    target.elts, value.elts, strict=True
-                ):
-                    self._bind_target(target_element, value_element)
-                return
-        if isinstance(target, (ast.List, ast.Tuple)):
-            for element in target.elts:
-                self._discard_target(element)
-            return
-        if not isinstance(target, ast.Name):
-            return
-        if self._is_flow_reference(value):
-            self._flow_aliases.add(target.id)
-        else:
-            self._flow_aliases.discard(target.id)
-        if self._is_getattr_reference(value):
-            self._getattr_aliases.add(target.id)
-        else:
-            self._getattr_aliases.discard(target.id)
-        if self._is_harness_reference(value):
-            self._harness_aliases.add(target.id)
-        else:
-            self._harness_aliases.discard(target.id)
-
-    def _discard_target(self, target: ast.expr) -> None:
-        if isinstance(target, ast.Name):
-            self._flow_aliases.discard(target.id)
-            self._getattr_aliases.discard(target.id)
-            self._harness_aliases.discard(target.id)
-        elif isinstance(target, (ast.List, ast.Tuple)):
-            for element in target.elts:
-                self._discard_target(element)
-
-    @staticmethod
-    def _argument_names(arguments: ast.arguments) -> set[str]:
-        positional = (*arguments.posonlyargs, *arguments.args, *arguments.kwonlyargs)
-        names = {argument.arg for argument in positional}
-        if arguments.vararg is not None:
-            names.add(arguments.vararg.arg)
-        if arguments.kwarg is not None:
-            names.add(arguments.kwarg.arg)
-        return names
-
-    @staticmethod
-    def _local_names(body: list[ast.stmt]) -> set[str]:
-        collector = _LexicalBindingVisitor()
-        for statement in body:
-            collector.visit(statement)
-        return collector.names
-
-    def _visit_function_metadata(
-        self,
-        node: ast.FunctionDef | ast.AsyncFunctionDef,
-    ) -> None:
-        for decorator in node.decorator_list:
-            self.visit(decorator)
-        for default in (*node.args.defaults, *node.args.kw_defaults):
-            if default is not None:
-                self.visit(default)
-        if node.returns is not None:
-            self.visit(node.returns)
-
-    def _visit_function_scope(
-        self,
-        body: list[ast.stmt],
-        arguments: ast.arguments,
-    ) -> None:
-        outer = self._state()
-        local_names = self._local_names(body) | self._argument_names(arguments)
-        self._flow_aliases = outer[0] - local_names
-        self._getattr_aliases = outer[1] - local_names
-        self._harness_aliases = outer[2] - local_names
-        if "harness" in self._argument_names(arguments):
-            self._harness_aliases.add("harness")
-        for statement in body:
-            self.visit(statement)
-        self._set_state(outer)
-
-    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        self._visit_function_metadata(node)
-        self._visit_function_scope(node.body, node.args)
-        self._discard_target(ast.Name(id=node.name, ctx=ast.Store()))
-
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
-        self._visit_function_metadata(node)
-        self._visit_function_scope(node.body, node.args)
-        self._discard_target(ast.Name(id=node.name, ctx=ast.Store()))
-
-    def visit_Lambda(self, node: ast.Lambda) -> None:
-        outer = self._state()
-        local_names = self._argument_names(node.args)
-        self._flow_aliases = outer[0] - local_names
-        self._getattr_aliases = outer[1] - local_names
-        self._harness_aliases = outer[2] - local_names
-        if "harness" in local_names:
-            self._harness_aliases.add("harness")
-        self.visit(node.body)
-        self._set_state(outer)
-
-    def visit_If(self, node: ast.If) -> None:
-        self.visit(node.test)
-        initial = self._state()
-        body_state = self._visit_block_from(node.body, initial)
-        else_state = (
-            self._visit_block_from(node.orelse, initial) if node.orelse else initial
-        )
-        self._set_state(self._merged_states(body_state, else_state))
-
-    def _visit_try(
-        self,
-        node: ast.Try | ast.TryStar,
-    ) -> None:
-        initial = self._state()
-        body_state = self._visit_block_from(node.body, initial)
-        handler_entry = self._merged_states(initial, body_state)
-        handler_states: list[tuple[set[str], set[str], set[str]]] = []
-        for handler in node.handlers:
-            saved = self._state()
-            self._set_state(handler_entry)
-            if handler.type is not None:
-                self.visit(handler.type)
-            if handler.name is not None:
-                self._discard_target(ast.Name(id=handler.name, ctx=ast.Store()))
-            for statement in handler.body:
-                self.visit(statement)
-            handler_states.append(self._state())
-            self._set_state(saved)
-        normal_state = (
-            self._visit_block_from(node.orelse, body_state)
-            if node.orelse
-            else body_state
-        )
-        exits = self._merged_states(normal_state, *handler_states)
-        final_state = (
-            self._visit_block_from(node.finalbody, exits) if node.finalbody else exits
-        )
-        self._set_state(final_state)
-
-    def visit_Try(self, node: ast.Try) -> None:
-        self._visit_try(node)
-
-    def visit_TryStar(self, node: ast.TryStar) -> None:
-        self._visit_try(node)
-
-    def _visit_loop(
-        self,
-        body: list[ast.stmt],
-        orelse: list[ast.stmt],
-        initial: tuple[set[str], set[str], set[str]],
-        target: ast.expr | None = None,
-    ) -> None:
-        loop_state = initial
-        while True:
-            saved = self._state()
-            self._set_state(loop_state)
-            if target is not None:
-                self._discard_target(target)
-            body_entry = self._state()
-            self._set_state(saved)
-            body_state = self._visit_block_from(body, body_entry)
-            joined = self._merged_states(initial, body_state)
-            if joined == loop_state:
-                break
-            loop_state = joined
-        exit_state = (
-            self._visit_block_from(orelse, loop_state) if orelse else loop_state
-        )
-        self._set_state(exit_state)
-
-    def visit_While(self, node: ast.While) -> None:
-        self.visit(node.test)
-        self._visit_loop(node.body, node.orelse, self._state())
-
-    def visit_For(self, node: ast.For) -> None:
-        self.visit(node.iter)
-        self.visit(node.target)
-        self._visit_loop(node.body, node.orelse, self._state(), node.target)
-
-    def visit_AsyncFor(self, node: ast.AsyncFor) -> None:
-        self.visit(node.iter)
-        self.visit(node.target)
-        self._visit_loop(node.body, node.orelse, self._state(), node.target)
-
-    def _visit_with(self, node: ast.With | ast.AsyncWith) -> None:
-        for item in node.items:
-            self.visit(item.context_expr)
-            if item.optional_vars is not None:
-                self.visit(item.optional_vars)
-                self._bind_target(item.optional_vars, item.context_expr)
-        for statement in node.body:
-            self.visit(statement)
-
-    def visit_With(self, node: ast.With) -> None:
-        self._visit_with(node)
-
-    def visit_AsyncWith(self, node: ast.AsyncWith) -> None:
-        self._visit_with(node)
-
-    def visit_ClassDef(self, node: ast.ClassDef) -> None:
-        for decorator in node.decorator_list:
-            self.visit(decorator)
-        for base in node.bases:
-            self.visit(base)
-        for keyword in node.keywords:
-            self.visit(keyword.value)
-        outer = self._state()
-        for statement in node.body:
-            self.visit(statement)
-        self._set_state(outer)
-        self._discard_target(ast.Name(id=node.name, ctx=ast.Store()))
-
-    def _visit_comprehension_scope(
-        self,
-        generators: list[ast.comprehension],
-        values: tuple[ast.expr, ...],
-    ) -> None:
-        outer = self._state()
-        for generator in generators:
-            self.visit(generator.iter)
-            self.visit(generator.target)
-            self._discard_target(generator.target)
-            for condition in generator.ifs:
-                self.visit(condition)
-        for value in values:
-            self.visit(value)
-        self._set_state(outer)
-
-    def visit_ListComp(self, node: ast.ListComp) -> None:
-        self._visit_comprehension_scope(node.generators, (node.elt,))
-
-    def visit_SetComp(self, node: ast.SetComp) -> None:
-        self._visit_comprehension_scope(node.generators, (node.elt,))
-
-    def visit_GeneratorExp(self, node: ast.GeneratorExp) -> None:
-        self._visit_comprehension_scope(node.generators, (node.elt,))
-
-    def visit_DictComp(self, node: ast.DictComp) -> None:
-        self._visit_comprehension_scope(node.generators, (node.key, node.value))
-
-    def visit_Assign(self, node: ast.Assign) -> None:
-        self.visit(node.value)
-        for target in node.targets:
-            self.visit(target)
-            self._bind_target(target, node.value)
-
-    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
-        if node.value is not None:
-            self.visit(node.value)
-            self.visit(node.target)
-            self._bind_target(node.target, node.value)
-
-    def visit_NamedExpr(self, node: ast.NamedExpr) -> None:
-        self.visit(node.value)
-        self.visit(node.target)
-        self._bind_target(node.target, node.value)
-
-    def visit_Attribute(self, node: ast.Attribute) -> None:
-        if node.attr.startswith("_") and self._is_flow_reference(node.value):
-            self.private_reads.add(node.attr)
-        self.visit(node.value)
-
-    def visit_Call(self, node: ast.Call) -> None:
-        if (
-            self._is_getattr_reference(node.func)
-            and len(node.args) >= 2
-            and self._is_flow_reference(node.args[0])
-        ):
-            attribute = node.args[1]
-            if (
-                isinstance(attribute, ast.Constant)
-                and isinstance(attribute.value, str)
-                and attribute.value.startswith("_")
-            ):
-                self.private_reads.add(attribute.value)
-        self.generic_visit(node)
+def _is_direct_confirmation_flow_reference(node: ast.expr) -> bool:
+    if isinstance(node, ast.Name):
+        return node.id in DIRECT_FLOW_NAMES
+    return bool(
+        isinstance(node, ast.Attribute)
+        and node.attr == "flow"
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "harness"
+    )
 
 
 def _confirmation_flow_private_reads(source: str) -> set[str]:
-    visitor = _ConfirmationFlowPrivateReadVisitor()
-    visitor.visit(ast.parse(source))
-    return visitor.private_reads
+    """Find syntax-local private reads under the W007 review naming convention."""
+    private_reads: set[str] = set()
+    for node in ast.walk(ast.parse(source)):
+        if (
+            isinstance(node, ast.Attribute)
+            and node.attr.startswith("_")
+            and _is_direct_confirmation_flow_reference(node.value)
+        ):
+            private_reads.add(node.attr)
+            continue
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "getattr"
+            and len(node.args) >= 2
+            and _is_direct_confirmation_flow_reference(node.args[0])
+        ):
+            continue
+        attribute = node.args[1]
+        if (
+            isinstance(attribute, ast.Constant)
+            and isinstance(attribute.value, str)
+            and attribute.value.startswith("_")
+        ):
+            private_reads.add(attribute.value)
+    return private_reads
 
 
-def test_confirmation_flow_private_read_guard_covers_any_private_attribute() -> None:
-    source = "harness.flow._confirmation_id\nflow._shutdown_task\n"
+def test_confirmation_flow_private_read_guard_covers_direct_receivers() -> None:
+    source = (
+        "harness.flow._confirmation_id\n"
+        "flow._shutdown_task\n"
+        "confirmation_flow._pending\n"
+        'getattr(harness.flow, "_active_action")\n'
+    )
 
     assert _confirmation_flow_private_reads(source) == {
+        "_active_action",
         "_confirmation_id",
+        "_pending",
         "_shutdown_task",
     }
 

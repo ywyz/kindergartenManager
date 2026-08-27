@@ -238,3 +238,12 @@ confirmation-flow 私有读取守卫已膨胀为手写 Python 数据流分析器
 依赖图和刻意保持 syntax-local 的守卫边界固定这两项：2 个节点连续两轮均为 `2 failed`，node hash
 `54f775b5fd3260e33b0efcaf07c578b37b58cc80a7da0100284a16c40ec31f0e`。当前仍不得进入 push、CI、
 人工验收或 Issue 回写。
+
+第十轮 finding RED 已由 `4944b45be000fa949e651f5b8d397d8c5a5a4301` 固定。最小修复把
+`markdown-it-py` 加入无版本约束的 dev 依赖并增量锁定 `markdown-it-py 4.2.0`、`mdurl 0.1.2`；私有读取
+守卫收缩为直接 `flow` / `confirmation_flow` / `harness.flow` 接收者的 syntax-local AST smoke guard，删除
+只验证 alias、闭包、分支、循环、with、class 与 comprehension 的通用分析器契约。finding 节点连续两轮
+均为 `2 passed`，相关治理矩阵 `16 passed`、全部 W007 `128 passed`、完整 WRITE `206 passed`、
+Foundation `261 passed`、ordinary `847 passed`；`uv lock --check`、隔离 locked dev import、
+Ruff/format/diff、Pyright 与 `pip check` 均通过。当前修复候选尚未取得新的 fixed-SHA 双轴 Review 0/0，
+仍不得进入 push、CI、人工验收或 Issue 回写。
