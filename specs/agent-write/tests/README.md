@@ -230,3 +230,11 @@ for/with/except/comprehension target 遮蔽仍有漏报/误报。该 finding 尚
 `144 passed`、完整 WRITE `222 passed`、Foundation `261 passed`、ordinary `847 passed`，
 Ruff/format/diff、Pyright 与 `pip check` 通过。当前候选尚未取得新的 fixed-SHA Review 0/0，不得进入
 push、CI、人工验收或 Issue 回写。
+
+第九轮修复候选 `ab27c7fa8541e707da4ca2ae0a841fb6ed32fd78` 的第十轮 fixed-SHA 双轴 Review
+结果为 Standards H0/M1/L1、Spec H0/M0/L0。Standards findings 是测试专用
+`markdown-it-py` 只进入 `requirements.txt` 而未进入 `pyproject.toml` dev 依赖与 `uv.lock`，以及
+confirmation-flow 私有读取守卫已膨胀为手写 Python 数据流分析器。第十轮 finding RED 以可复现 dev
+依赖图和刻意保持 syntax-local 的守卫边界固定这两项：2 个节点连续两轮均为 `2 failed`，node hash
+`54f775b5fd3260e33b0efcaf07c578b37b58cc80a7da0100284a16c40ec31f0e`。当前仍不得进入 push、CI、
+人工验收或 Issue 回写。
