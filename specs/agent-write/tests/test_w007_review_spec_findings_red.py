@@ -315,10 +315,27 @@ class _NoopPatchActions:
     def invalidate(self) -> None:
         return None
 
-    async def disconnect(self) -> None:
+    def capture_lifecycle_origin(self) -> None:
         return None
 
-    async def close(self) -> None:
+    def owns_lifecycle_origin(self, lifecycle_origin: object) -> bool:
+        del lifecycle_origin
+        return False
+
+    async def disconnect(
+        self,
+        *,
+        lifecycle_origin: object | None = None,
+    ) -> None:
+        del lifecycle_origin
+        return None
+
+    async def close(
+        self,
+        *,
+        lifecycle_origin: object | None = None,
+    ) -> None:
+        del lifecycle_origin
         return None
 
 

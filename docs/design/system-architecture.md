@@ -1,71 +1,12 @@
 # KindergartenManager 系统架构设计
 
-> 合入基线为 `main@ca3b7bd`，Agent Foundation 已合入主线。当前 `feat/agent-write` 已恢复可信 UI
-> session 与 `daily_plan.revision`，W005/W006 已闭合。W007 第四轮 Review 与多轮独立 precheck finding RED 已固定，当前仍待最终提交前独立 precheck 与第五轮 fixed-SHA 双轴 Review；W008 未进入。
-> W007 初始 GREEN commit 本地基线为 WRITE `99 passed`、Foundation `261 passed`、ordinary `847 passed`。
-> 首轮 fixed-SHA Review 为 Standards M2、Spec M1/L1；`cf38725` 后修正基线为 WRITE `110 passed`、Foundation
-> `261 passed`、ordinary `847 passed`。二轮 fixed-SHA Review 为 Standards M1、Spec M1/L1，finding RED 已由
-> `40f25b7` 固定；`40f25b7` 后修正基线为 WRITE `112 passed`、Foundation `261 passed`、ordinary `847 passed`。
-> 三轮 fixed-SHA Review 为 Standards M1、Spec M1，finding RED 已由 `43636a0` 固定；`43636a0` 后修正基线为
-> WRITE `113 passed`、Foundation `261 passed`、ordinary `847 passed`。提交前终态 identity 审计发现 M1，finding RED
-> 已由 `9972aab` 固定。第四轮 fixed-SHA 双轴 Review 绑定 `bc742d6c64744234f2702622fd4dbb1988b5650d`，结果为
-> Standards H0/M1/L0、Spec H0/M1/L0：权威 terminal ledger/integrity latch 不应只在 UI，且畸形 APPLIED identity
-> 不得发布成功。`bc742d6c64744234f2702622fd4dbb1988b5650d` 的统一测试基线为 WRITE `115 passed`、Foundation
-> `261 passed`、ordinary `847 passed`。finding RED 已由 `a58c719796e9136a55932c59c930f1f0c98f14b9` 固定，
-> 稳定为 `10 failed / 9 passed`，node hash `eae4be37be04be28ba2647bac31e1ff57d871810fd29c1437e5c100c2261b7a5`。
-> `a58c719796e9136a55932c59c930f1f0c98f14b9` 后第一版修复候选统一测试为 WRITE `125 passed`、Foundation
-> `261 passed`、ordinary `847 passed`。提交前只读 precheck 发现 3M/1L（异 Patch 并发 issue、
-> wrong-plan/invalid-revision exact identity、session guard 迟发 success、close/capability cleanup）；finding RED 已由
-> `e8722f843f99aea4eb3321b06ad8074728adfd4a` 固定，连续两轮为 `6 failed / 15 passed`，combined node hash
-> `157c6a8aed7025a7963af47ef1bcf5f0f332b44be37867fe006d4084de5d796a`。
-> `e8722f843f99aea4eb3321b06ad8074728adfd4a` 后第二版修复候选统一测试为 WRITE `131 passed`、Foundation
-> `261 passed`、ordinary `847 passed`。取消/会话 precheck 复核发现 3M（same-key joiner cancel 取消
-> owner/shared task；cancelled close/disconnect 跳过 cleanup；commit-unknown 后 session 变化仍重开旧 reconcile）；
-> finding RED 已由 `ce8b7756eb1fc1069f4d31109d49dd6d7cccc14f` 固定，连续两轮为 `5 failed / 21 passed`，
-> combined node hash `56d901193c517d284526b39f61a1f0286587ca20d7276838bc0c4a7859ece345`。
-> `ce8b7756eb1fc1069f4d31109d49dd6d7cccc14f` 后第三版修复候选统一测试为 WRITE `136 passed`、Foundation
-> `261 passed`、ordinary `847 passed`。独立取消状态审计为 H0/M2：owner cancel 若 inner 吞取消/抛 BaseException
-> 可迟发 APPLIED 或留 PENDING 重放；controller/UI 并发 close/disconnect 无共享 completion barrier。finding RED 已由
-> `149d45e0fb4a1b7110c3fb3676a4e44d495e810c` 固定，连续两轮为 `8 failed / 26 passed`，combined node hash
-> `e12d635b2fa86999ce626d2763a81f4b9063c5ad83c42176f913b399464ce29b`。
-> `149d45e0fb4a1b7110c3fb3676a4e44d495e810c` 后第四版修复候选统一测试为 WRITE `144 passed`、Foundation
-> `261 passed`、ordinary `847 passed`。独立 GREEN precheck 结果为 Standards H0/M0、Spec H0/M1：inner issue
-> 已完成但 owner cancel 在 shield 投递前使 same-key joiner 拿旧 PENDING。finding RED 已由
-> `c20aaa2f2b0c276bf985bb3d8ecf3fca4b364504` 固定，单节点连续两轮均为 `1 failed`，node hash
-> `1a6cf115cba623fcef1e99cd11d5d3d1cdd8698717f01ec9d4b9971389e49a35`。
-> `c20aaa2f2b0c276bf985bb3d8ecf3fca4b364504` 后第五版修复候选统一测试为 WRITE `145 passed`、Foundation
-> `261 passed`、ordinary `847 passed`。后继 Patch identity 独立 precheck 结果为 Standards H0/M0、Spec H0/M1：
-> 无条件 current snapshot 让旧 apply/reconcile joiner 收到后继 Patch B。finding RED 已由
-> `827b1113f1679b9b5af4736652c91d6742a63fc4` 固定，代表节点连续两轮均为 `1 failed`，node hash
-> `29b35e46c1ee8f3bc872b09eaf1fcb23fa959e8d4c61b8b5b5b93f9506f551c5`。当前修复使用 per-flight cancellation override；
-> 两个新节点 `2 passed`、finding 两文件 `36 passed`。
-> `827b1113f1679b9b5af4736652c91d6742a63fc4` 后第六版修复候选统一测试为 WRITE `146 passed`、Foundation
-> `261 passed`、ordinary `847 passed`。后续独立 precheck 发现 Spec M1：done-but-undelivered issue waiter 在
-> explicit invalidate/close 后仍发布旧 PENDING。finding RED 已由 `b2f91e7c604e92f1ae8461e709399c3842ac6c43`
-> 固定，invalidate/close 两参数连续两轮均为 `2 failed`，combined node hash
-> `f0f3a9b8ea6c99674746d7b8c8fc9d80342b097b5b21c097be40e09a833146b8`。当前修复使用
-> live per-flight waiter registry + lifecycle override；新增 `2 passed`、finding 两文件 `38 passed`。
-> `b2f91e7c604e92f1ae8461e709399c3842ac6c43` 后第七版修复候选统一测试为 WRITE `148 passed`、Foundation
-> `261 passed`、ordinary `847 passed`。独立 lifecycle/cancel 审计为 H0/M2：pre-start cancel non-caller 分支把旧 A
-> waiter 投到后继 B；close/disconnect 的 BaseException 穿透并由 traceback 保留 writer。finding RED 已由
-> `7d51d63994ceaf939833fc9679db31de3f21baf7` 固定，3 节点连续两轮均为 `3 failed`，combined node hash
-> `d66294717711ef2581d15bcaa1ebe76754267d7d825acdb847574c16da01cf42`。当前 suppress_failure 区分显式
-> lifecycle/cancel override 与 spontaneous BaseException；`3 passed`、finding 两文件 `41 passed`。
-> `7d51d63994ceaf939833fc9679db31de3f21baf7` 后第八版修复候选统一测试为 WRITE `151 passed`、Foundation
-> `261 passed`、ordinary `847 passed`。joiner-cancel 后 shield loop handler 原始异常泄漏，审计 H0/M1。finding RED
-> 已由 `bb539771f477e068d86e5bc3790f2a503e275ce9` 固定，单节点连续两轮均为 `1 failed`，node hash
-> `915ad0796ad3b8ca96ae4c2efe0e8f2ed4946d0c4e4c5875dfafd19920f866ba`。修复以 asyncio.wait + task.result
-> 替代 per-waiter shield，保留 owner spontaneous BaseException；新增 `1 passed`、finding 两文件 `42 passed`。
-> `bb539771f477e068d86e5bc3790f2a503e275ce9` 后第九版修复候选统一测试为 WRITE `152 passed`、Foundation
-> `261 passed`、ordinary `847 passed`。owner identity 独立审计为 H0/M1：joiner cancel 先 finally 清全局
-> `_inflight_owner`，随后 owner cancel 无法收敛，controller/repeat 留 PENDING（20/20）。finding RED 已由
-> `21c0a9e6a4ed4f8e7a6e91584d4b8cdba37a2d24` 固定，单节点连续两轮均为 `1 failed`，node hash
-> `95dba951ab937642ec1518f5af44dcc5e58ec3d9c146e7c210339bd2d533dfd2`。当前修复使用 `_FlightState.owner` +
-> 仅 owner finally 释放 current flight；代表节点 `1 passed`、finding 两文件 `43 passed`。
-> 本轮修复已固定在当前 SHA，当前仍待最终提交前独立 precheck 与第五轮 fixed-SHA 双轴 Review。
-> 本轮最终修复候选统一测试为 WRITE `153 passed`、
-> Foundation `261 passed`、ordinary `847 passed`。push、CI、人工验收与 Issue 回写尚未闭合，
-> 不得写成已发布能力。
+> 合入基线为 `main@ca3b7bd`，Agent Foundation 已合入主线；当前 `feat/agent-write` 已闭合 W005/W006。
+> W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
+> Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。第五轮 finding RED 固定在
+> `68e4c340e0188f456ff8bc1caca5181f07410b15`；第五轮 finding 修复候选已本地 GREEN，尚未取得 fixed-SHA Review 0/0；尚未 push、CI、人工验收或
+> Issue 回写，W008 未进入。不得增加 Provider WRITE、自动重试、批量或跨页面采用、
+> 设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。完整 W007 证据仅见
+> `specs/agent-write/tests/README.md`。
 
 ## 1. 架构目标
 
@@ -323,7 +264,7 @@ AI Key 不应写入 `.env`、仓库或测试日志；数据库密文与原 `ENCR
 | 图片过大/方向异常 | 压缩、规格校验、横版归一 | 原图隐私和内存上限需持续验证 |
 | Agent Provider/Tool call | Runtime 本地校验、关闭 registry、有界 loop | Foundation 已合入；任何未知/WRITE Tool 仍必须拒绝 |
 | Agent 取消/上下文变化 | operation/scope/fingerprint 匹配，迟到结果丢弃 | 不得在页面切换后回填或保存 |
-| Agent 逐次确认 WRITE | W005/W006 已闭合；W007 第四轮与多轮独立 precheck finding RED 已固定，等待下一次提交前独立 precheck 与第五轮 fixed-SHA 双轴 Review | `daily_plan_operation_version` + `agent_write_audit` 只由本地 service 写精确已有 plan；W007 尚未通过独立交付门，Provider/Tool 仍不可写 |
+| Agent 逐次确认 WRITE | W005/W006 已闭合；W007 第五轮 finding 修复候选已本地 GREEN，尚未取得 fixed-SHA Review 0/0 | `daily_plan_operation_version` + `agent_write_audit` 只由本地 service 写精确已有 plan；W007 尚未通过独立交付门，Provider/Tool 仍不可写 |
 
 ## 11. 可观测性与审计
 
@@ -345,82 +286,16 @@ AI Key 不应写入 `.env`、仓库或测试日志；数据库密文与原 `ENCR
 - UI：纯 helper 自动测试 + 浏览器/人工主流程。
 - Agent Foundation：契约/Schema、未知和 WRITE Tool 拒绝、tenant/user 裁剪、有界 loop、取消/超时/迟到丢弃，
   并证明所有路径零业务持久化。
-- Agent WRITE：W005/W006 公共 seam、绑定、原子事务与 finding 矩阵已闭合；W007 UI 已形成 GREEN commit，
-  首轮 Standards M2、Spec M1/L1 findings 已由 `cf38725` 固定且修正基线为 WRITE `110 passed`；二轮
-  Standards M1、Spec M1/L1 findings 已由 `40f25b7` 固定且修正基线为 WRITE `112 passed`；三轮 Standards M1、
-  Spec M1 findings 已由 `43636a0` 固定且修正基线为 WRITE `113 passed`；提交前终态 identity 审计 M1 已由
-  `9972aab` 固定并修复；第四轮受审 SHA `bc742d6…` 的 Standards/Spec M1 findings 已由 `a58c719…` 固定，
-  提交前预审 findings 已由 `e8722f8…`、`ce8b775…` 依序固定，独立取消状态审计与 GREEN precheck finding RED
-  已由 `149d45e…`、`c20aaa2…`、`827b111…`、`b2f91e7…`、`7d51d63…`、`bb53977…`、`21c0a9e…` 依序固定，
-  当前仍待最终提交前独立 precheck 与第五轮 fixed-SHA 双轴 Review；真实 MySQL 8 与最终 fixed-SHA 可见
-  验收仍在 W008 分别证明，不把局部 GREEN 写成产品完成。
+- Agent WRITE：W005/W006 公共 seam、绑定、原子事务与 finding 矩阵已闭合；W007 当前只允许每日计划
+  当前页面的一份 Patch 经显式确认后由本地应用层采用。第五轮 finding 正在修复，后续固定 SHA 复审与
+  交付证据仍开放；详细 lineage 仅见 `specs/agent-write/tests/README.md`。
 - Word/打包：目标平台人工验收。
 
 codebase-memory/Graphify 只能发现结构、热点和文档关系，不替代这些测试。
 当前分支的 UI session/revision/W005/W006 已进入远端精确 SHA CI；W006 Linux service-boundary `10/10`
-已闭合。W007 已有 GREEN commit；首轮 fixed-SHA Review 为 Standards M2、Spec M1/L1，`cf38725` 后修正基线
-为 WRITE `110 passed`、Foundation `261 passed`、ordinary `847 passed`；二轮 fixed-SHA Review 为 Standards M1、
-Spec M1/L1，finding RED 已由 `40f25b7` 固定；`40f25b7` 后修正基线为 WRITE `112 passed`、Foundation
-`261 passed`、ordinary `847 passed`。三轮 fixed-SHA Review 为 Standards M1、Spec M1，finding RED 已由
-`43636a0` 固定；`43636a0` 后修正基线为 WRITE `113 passed`、Foundation `261 passed`、ordinary `847 passed`。
-提交前终态 identity 审计发现 M1，finding RED 已由 `9972aab` 固定。第四轮 fixed-SHA 双轴 Review 绑定
-`bc742d6c64744234f2702622fd4dbb1988b5650d`，结果为 Standards H0/M1/L0、Spec H0/M1/L0：权威 terminal
-ledger/integrity latch 不应只在 UI，且畸形 APPLIED identity 不得发布成功。
-`bc742d6c64744234f2702622fd4dbb1988b5650d` 的统一测试基线为 WRITE `115 passed`、Foundation `261 passed`、ordinary
-`847 passed`。finding RED 已由 `a58c719796e9136a55932c59c930f1f0c98f14b9` 固定，稳定为 `10 failed / 9 passed`，
-node hash `eae4be37be04be28ba2647bac31e1ff57d871810fd29c1437e5c100c2261b7a5`。
-`a58c719796e9136a55932c59c930f1f0c98f14b9` 后第一版修复候选统一测试为 WRITE `125 passed`、Foundation
-`261 passed`、ordinary `847 passed`。提交前只读 precheck 发现 3M/1L（异 Patch 并发 issue、
-wrong-plan/invalid-revision exact identity、session guard 迟发 success、close/capability cleanup）；finding RED 已由
-`e8722f843f99aea4eb3321b06ad8074728adfd4a` 固定，连续两轮为 `6 failed / 15 passed`，combined node hash
-`157c6a8aed7025a7963af47ef1bcf5f0f332b44be37867fe006d4084de5d796a`。
-`e8722f843f99aea4eb3321b06ad8074728adfd4a` 后第二版修复候选统一测试为 WRITE `131 passed`、Foundation
-`261 passed`、ordinary `847 passed`。取消/会话 precheck 复核发现 3M（same-key joiner cancel 取消
-owner/shared task；cancelled close/disconnect 跳过 cleanup；commit-unknown 后 session 变化仍重开旧 reconcile）；
-finding RED 已由 `ce8b7756eb1fc1069f4d31109d49dd6d7cccc14f` 固定，连续两轮为 `5 failed / 21 passed`，
-combined node hash `56d901193c517d284526b39f61a1f0286587ca20d7276838bc0c4a7859ece345`。
-`ce8b7756eb1fc1069f4d31109d49dd6d7cccc14f` 后第三版修复候选统一测试为 WRITE `136 passed`、Foundation
-`261 passed`、ordinary `847 passed`。独立取消状态审计为 H0/M2：owner cancel 若 inner 吞取消/抛 BaseException
-可迟发 APPLIED 或留 PENDING 重放；controller/UI 并发 close/disconnect 无共享 completion barrier。finding RED 已由
-`149d45e0fb4a1b7110c3fb3676a4e44d495e810c` 固定，连续两轮为 `8 failed / 26 passed`，combined node hash
-`e12d635b2fa86999ce626d2763a81f4b9063c5ad83c42176f913b399464ce29b`。
-`149d45e0fb4a1b7110c3fb3676a4e44d495e810c` 后第四版修复候选统一测试为 WRITE `144 passed`、Foundation
-`261 passed`、ordinary `847 passed`。独立 GREEN precheck 结果为 Standards H0/M0、Spec H0/M1：inner issue
-已完成但 owner cancel 在 shield 投递前使 same-key joiner 拿旧 PENDING。finding RED 已由
-`c20aaa2f2b0c276bf985bb3d8ecf3fca4b364504` 固定，单节点连续两轮均为 `1 failed`，node hash
-`1a6cf115cba623fcef1e99cd11d5d3d1cdd8698717f01ec9d4b9971389e49a35`。
-`c20aaa2f2b0c276bf985bb3d8ecf3fca4b364504` 后第五版修复候选统一测试为 WRITE `145 passed`、Foundation
-`261 passed`、ordinary `847 passed`。后继 Patch identity 独立 precheck 结果为 Standards H0/M0、Spec H0/M1：
-无条件 current snapshot 让旧 apply/reconcile joiner 收到后继 Patch B。finding RED 已由
-`827b1113f1679b9b5af4736652c91d6742a63fc4` 固定，代表节点连续两轮均为 `1 failed`，node hash
-`29b35e46c1ee8f3bc872b09eaf1fcb23fa959e8d4c61b8b5b5b93f9506f551c5`。当前修复使用 per-flight cancellation override；
-两个新节点 `2 passed`、finding 两文件 `36 passed`。
-`827b1113f1679b9b5af4736652c91d6742a63fc4` 后第六版修复候选统一测试为 WRITE `146 passed`、Foundation
-`261 passed`、ordinary `847 passed`。后续独立 precheck 发现 Spec M1：done-but-undelivered issue waiter 在
-explicit invalidate/close 后仍发布旧 PENDING。finding RED 已由 `b2f91e7c604e92f1ae8461e709399c3842ac6c43`
-固定，invalidate/close 两参数连续两轮均为 `2 failed`，combined node hash
-`f0f3a9b8ea6c99674746d7b8c8fc9d80342b097b5b21c097be40e09a833146b8`。当前修复使用
-live per-flight waiter registry + lifecycle override；新增 `2 passed`、finding 两文件 `38 passed`。
-`b2f91e7c604e92f1ae8461e709399c3842ac6c43` 后第七版修复候选统一测试为 WRITE `148 passed`、Foundation
-`261 passed`、ordinary `847 passed`。独立 lifecycle/cancel 审计为 H0/M2：pre-start cancel non-caller 分支把旧 A
-waiter 投到后继 B；close/disconnect 的 BaseException 穿透并由 traceback 保留 writer。finding RED 已由
-`7d51d63994ceaf939833fc9679db31de3f21baf7` 固定，3 节点连续两轮均为 `3 failed`，combined node hash
-`d66294717711ef2581d15bcaa1ebe76754267d7d825acdb847574c16da01cf42`。当前 suppress_failure 区分显式
-lifecycle/cancel override 与 spontaneous BaseException；`3 passed`、finding 两文件 `41 passed`。
-`7d51d63994ceaf939833fc9679db31de3f21baf7` 后第八版修复候选统一测试为 WRITE `151 passed`、Foundation
-`261 passed`、ordinary `847 passed`。joiner-cancel 后 shield loop handler 原始异常泄漏，审计 H0/M1。finding RED
-已由 `bb539771f477e068d86e5bc3790f2a503e275ce9` 固定，单节点连续两轮均为 `1 failed`，node hash
-`915ad0796ad3b8ca96ae4c2efe0e8f2ed4946d0c4e4c5875dfafd19920f866ba`。修复以 asyncio.wait + task.result
-替代 per-waiter shield，保留 owner spontaneous BaseException；新增 `1 passed`、finding 两文件 `42 passed`。
-`bb539771f477e068d86e5bc3790f2a503e275ce9` 后第九版修复候选统一测试为 WRITE `152 passed`、Foundation
-`261 passed`、ordinary `847 passed`。owner identity 独立审计为 H0/M1：joiner cancel 先 finally 清全局
-`_inflight_owner`，随后 owner cancel 无法收敛，controller/repeat 留 PENDING（20/20）。finding RED 已由
-`21c0a9e6a4ed4f8e7a6e91584d4b8cdba37a2d24` 固定，单节点连续两轮均为 `1 failed`，node hash
-`95dba951ab937642ec1518f5af44dcc5e58ec3d9c146e7c210339bd2d533dfd2`。当前修复使用 `_FlightState.owner` +
-仅 owner finally 释放 current flight；代表节点 `1 passed`、finding 两文件 `43 passed`。
-本轮修复已固定在当前 SHA，当前仍待最终提交前独立 precheck 与第五轮 fixed-SHA 双轴 Review。
-本轮最终修复候选统一测试为 WRITE `153 passed`、Foundation `261 passed`、ordinary `847 passed`。push、CI、人工验收与 Issue 回写均尚未闭合；旧
-F009 人工结果不能填补这些门禁。
+已闭合。W007 的第五轮 finding 修复、提交前独立 precheck、fixed-SHA 双轴复审、push、CI、人工验收与
+Issue 回写仍是独立门禁；旧 F009 人工结果不能填补这些门禁。完整证据只记录在
+`specs/agent-write/tests/README.md`。
 
 ## 13. 已知架构热点
 
@@ -436,9 +311,5 @@ F009 人工结果不能填补这些门禁。
 - 图片后端、备份恢复和数据保留策略。
 - Agent Foundation 已合入主线，仍固定为 4 READ + 2 DRAFT 且零 Agent 持久化。
 - Agent WRITE 的可信 actor、`daily_plan.revision`、逐次确认、操作前版本、短事务、不可变审计与全回滚已在
-  W005/W006 闭合；W007 三轮 Review finding `43636a0` 后修正基线已通过，提交前终态 identity finding
-  `9972aab` 已修复；第四轮受审 SHA `bc742d6…` 的 finding RED 已由 `a58c719…` 固定；提交前预审 finding RED
-  已由 `e8722f8…`、`ce8b775…` 依序固定，独立取消状态审计与 GREEN precheck finding RED 已由
-  `149d45e…`、`c20aaa2…`、`827b111…`、`b2f91e7…`、`7d51d63…`、`bb53977…`、`21c0a9e…` 依序固定；当前仍待最终提交前独立 precheck 与第五轮
-  fixed-SHA 双轴 Review，随后才可进入独立
-  push/CI/人工验收/Issue 门；W008 尚未进入，不能跳门。
+  W005/W006 闭合；W007 第五轮 finding 修复与后续交付门仍开放，完整历史以
+  `specs/agent-write/tests/README.md` 为准；W008 尚未进入，不能跳门。

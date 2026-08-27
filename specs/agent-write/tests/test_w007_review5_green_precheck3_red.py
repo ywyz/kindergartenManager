@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Coroutine
 from contextvars import ContextVar
 import gc
 from types import SimpleNamespace
+from typing import Any, cast
 import weakref
 
 import pytest
@@ -91,7 +93,7 @@ async def test_confirmation_completed_shutdown_task_drops_caller_context(
     capability = _LifecycleCapability()
     capability_ref = weakref.ref(capability)
     capability_holder: list[object] = [capability]
-    panel = None
+    panel: Any = None
 
     async def authorize() -> object:
         return session
@@ -113,10 +115,12 @@ async def test_confirmation_completed_shutdown_task_drops_caller_context(
     panel.render_patch_actions(patch)
     view = fake_ui.latest_column()
     await _press(fake_ui.latest_button("准备确认", within=view))
-    result = fake_ui.latest_button("确认采用", within=view).on_click()
+    apply_button = fake_ui.latest_button("确认采用", within=view)
+    assert callable(apply_button.on_click)
+    result = apply_button.on_click()
     assert result is not None
     with pytest.raises(asyncio.CancelledError):
-        await result
+        await cast(Awaitable[None], result)
 
     capability_holder.clear()
     del capability
@@ -188,7 +192,7 @@ async def test_spawned_close_cancels_action_before_any_late_publication(
     session = trusted_ui_session()
     spawned: list[asyncio.Task[None]] = []
     publications = 0
-    panel = None
+    panel: Any = None
 
     async def authorize() -> object:
         return session
@@ -210,9 +214,13 @@ async def test_spawned_close_cancels_action_before_any_late_publication(
     panel.render_patch_actions(patch)
     view = fake_ui.latest_column()
     await _press(fake_ui.latest_button("准备确认", within=view))
-    action_result = fake_ui.latest_button("确认采用", within=view).on_click()
+    apply_button = fake_ui.latest_button("确认采用", within=view)
+    assert callable(apply_button.on_click)
+    action_result = apply_button.on_click()
     assert action_result is not None
-    action = asyncio.create_task(action_result)
+    action = asyncio.create_task(
+        cast(Coroutine[Any, Any, None], action_result),
+    )
     while not spawned:
         await asyncio.sleep(0)
     action_outcome, close_outcome = await asyncio.gather(

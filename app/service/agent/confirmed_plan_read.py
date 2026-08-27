@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -19,18 +19,18 @@ class ConfirmedDailyPlanProjection:
     plan_id: int
     plan_date: date
     revision: int
-    activity_goal: str
-    activity_prep: str
-    activity_key: str
-    activity_difficult: str
-    activity_process_original: str
-    activity_process_adapted: str
-    morning_activity: str
-    morning_talk_topic: str
-    morning_talk_questions: str
-    indoor_area: str
-    outdoor_activity: str
-    daily_reflection: str
+    activity_goal: str = field(repr=False)
+    activity_prep: str = field(repr=False)
+    activity_key: str = field(repr=False)
+    activity_difficult: str = field(repr=False)
+    activity_process_original: str = field(repr=False)
+    activity_process_adapted: str = field(repr=False)
+    morning_activity: str = field(repr=False)
+    morning_talk_topic: str = field(repr=False)
+    morning_talk_questions: str = field(repr=False)
+    indoor_area: str = field(repr=False)
+    outdoor_activity: str = field(repr=False)
+    daily_reflection: str = field(repr=False)
 
 
 class ConfirmedDailyPlanReloadMismatch(RuntimeError):

@@ -62,9 +62,13 @@ ordinary：847 passed
 三组 RED 均 collection clean，无 skip/xfail/error；失败只固定尚未满足的页面本地单 Patch confirmation flow、
 基础面板可选动作端口和每日计划页安全接线。Provider registry 仍恰好四 READ + 两 DRAFT，测试不授权 Provider
 WRITE、自动重试、批量/跨页面采用、设置/文件/Word/删除/创建写入或长期 Patch 持久化。该证据只固定 W007
-RED。W007 初始 GREEN commit 本地基线为 WRITE `99 passed`、Foundation `261 passed`、ordinary `847 passed`。
-首轮 fixed-SHA Review 为 Standards M2、Spec M1/L1；`cf38725` 后修正基线为 WRITE `110 passed`、Foundation `261 passed`、ordinary `847 passed`。
-二轮 fixed-SHA Review 为 Standards M1、Spec M1/L1，finding RED 已由 `40f25b7` 固定；`40f25b7` 后修正基线为 WRITE `112 passed`、Foundation `261 passed`、ordinary `847 passed`。
+RED。W007 初始 GREEN commit `63ff0d31bac36ec5191eca19e59e7b8e54dbddda` 本地基线为 WRITE
+`99 passed`、Foundation `261 passed`、ordinary `847 passed`。首轮 fixed-SHA Review 为 Standards M2、
+Spec M1/L1；`cf38725` 后修正 commit `706aa2e889ee719d622bf6a16774606fc2e51393` 基线为 WRITE
+`110 passed`、Foundation `261 passed`、ordinary `847 passed`。二轮 fixed-SHA Review 为 Standards M1、
+Spec M1/L1，finding RED 已由 `40f25b7` 固定；`40f25b7` 后修正 commit
+`b2b312e6c89b9470d5e29815db37bc89a0ca0e6e` 基线为 WRITE `112 passed`、Foundation `261 passed`、
+ordinary `847 passed`。
 三轮 fixed-SHA Review 为 Standards M1、Spec M1，finding RED 已由 `43636a0` 固定；`43636a0` 后修正基线为 WRITE `113 passed`、Foundation `261 passed`、ordinary `847 passed`。
 提交前终态 identity 审计发现 M1，finding RED 已由 `9972aab` 固定。第四轮 fixed-SHA 双轴 Review 绑定
 `bc742d6c64744234f2702622fd4dbb1988b5650d`，结果为 Standards H0/M1/L0、Spec H0/M1/L0：权威 terminal
@@ -121,6 +125,40 @@ lifecycle/cancel override 与 spontaneous BaseException；`3 passed`、finding �
 `21c0a9e6a4ed4f8e7a6e91584d4b8cdba37a2d24` 固定，单节点连续两轮均为 `1 failed`，node hash
 `95dba951ab937642ec1518f5af44dcc5e58ec3d9c146e7c210339bd2d533dfd2`。当前修复使用 `_FlightState.owner` +
 仅 owner finally 释放 current flight；代表节点 `1 passed`、finding 两文件 `43 passed`。
-本轮修复已固定在当前 SHA，当前仍待最终提交前独立 precheck 与第五轮 fixed-SHA 双轴 Review。
-本轮最终修复候选统一测试为 WRITE `153 passed`、Foundation `261 passed`、ordinary `847 passed`，也尚未取得 Standards/Spec 0/0、push、CI、人工验收或 Issue
-回写；W008 未进入。
+`21c0a9e6a4ed4f8e7a6e91584d4b8cdba37a2d24` 后第十版修复候选统一测试为 WRITE `153 passed`、Foundation
+`261 passed`、ordinary `847 passed`。第五轮 fixed-SHA 双轴 Review 绑定
+`7bd5c11ccee6af26d55959803a0594ff0a277ccc`，结果为 Standards H0/M3/L1、Spec H0/M0/L0：Standards findings
+覆盖 projection `repr` 正文隐私、UI Protocol 的只读真实 stub/类型契约、W007 lineage 单一 canonical ledger，
+以及复合 lifecycle cleanup 与 gated APPLIED 发布边界；Spec 无 finding。finding RED 已由
+`68e4c340e0188f456ff8bc1caca5181f07410b15` 固定，连续两轮均为 `7 failed`，node hash
+`980d2c23c873546843b385700cbb1d4f4680d8aa5213eeccc5da02af2ef56052`。
+
+第五轮 finding RED 之后的提交前只读审计继续按独立门固定如下；每一项均连续复现两次，且只提交测试：
+
+- `0b03fab4791aefa1e066b2fe59a7c2001684d572`：self-close cycle、pre-start cancel、ledger、raw traceback 与
+  loop-handler 泄漏共 `5 failed`，node hash
+  `8b0c909bff9138b55a4c2fe78ac198ca5505bcae71ea1e285451cf3681ec7c3b`。
+- `4f7e91f7cd36d831892f19dd237aa45ee5c07e65`：external/finally 与 composite cycle、abandoned operation、
+  scheduler/pre-start failure 共 `5 failed`，node hash
+  `a12cf1153dc44fddaff3a73d928472e6e2e95c8b2eb6cbb4e49baaa6db776342`。
+- `2dc21889a615475b72860b63545befe4b4b87374`：completed lifecycle Task 的 caller context/capability
+  滞留及 spawned close 迟发发布共 `3 failed`，node hash
+  `248089196799c54e12a495301e8b269c1d19ff1366db10beb429618c0b833641`。
+- `49d4aa7332313f886de34b076451fd3af6677e1e`：single-flight Handle lease 的契约与证据过时，`1 failed`，
+  node hash `e23a7939725d35eaa67d41750c6b9aba115d9d7e3358538994f502b02286ac7b`。
+- `b4f27c2f72ecbd6edfa5a60dfdd96bf48c3deca6`：origin capture failure cycle 与 caller-local cancel 污染
+  repeated/external joiner 共 `3 failed`，node hash
+  `4c1df7ed032bc04662393a89c1858bcb2c1dbb4ddb0c36a76e116a67010786e8`。
+- `6e83fd988343fd639456c9e7928277f2db7f336d`：confirmation/Agent cleanup failure precedence、composite
+  external/finally cycle、logger failure raw retention/non-fail-fast 共 `5 failed`，node hash
+  `bc86542aaca96dc6696e6630c5827e1b8ce2e4654f9fad997634ec612e489436`。
+- `b768d3effc5ce8bb44c3a5a2b065d276a8e52814`：capture failure 把普通 external joiner 误判为 origin，
+  `1 failed`，node hash `9242724607ede9ac5acd74fa43127e898129c15beeb09a61e857c1c8bce7fd1c`。
+- `5f22728b49f8f85219eb12a6e83c5cd71484526d`：capture 与 validator 同时失败时 self-close 半关闭、
+  external-close-finally 环共 `2 failed`，node hash
+  `f3e11ad28b12315df216e4c394a8ded53b7be7a0504b94950ea2629e0920fe66`。
+
+当前第五轮 finding 修复候选已本地 GREEN，尚未取得 fixed-SHA Review 0/0。提交前限定生命周期复审为
+H0/M0/L0；第五轮矩阵 `34 passed`、全部 W007 `109 passed`、完整 WRITE `187 passed`、Foundation
+`261 passed`、ordinary `847 passed`，Ruff/format 通过且变更范围 Pyright 为 0。尚未 push、CI、人工验收或
+Issue 回写，W008 未进入，也不得据此宣称 Standards/Spec 0/0、merge、Issue 关闭或 release。

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
+from contextvars import Context
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
@@ -22,10 +23,23 @@ from nicegui import ui
 from app.core.logging import get_logger
 from app.service.agent.composition import AgentPatchSnapshot
 from app.ui.auth_context import TrustedUiSession
-from app.ui.daily_plan_target import DailyPlanUiTarget, UiSingleFlightSlot
+from app.ui.daily_plan_target import (
+    DailyPlanUiTarget,
+    UiActionOriginCancelled,
+    UiSingleFlightSlot,
+)
 
 
 logger = get_logger(__name__)
+
+
+def _log_lifecycle_error(message: str) -> None:
+    """Emit best-effort diagnostics without poisoning a shared cleanup Task."""
+    try:
+        logger.error(message)
+    except BaseException:
+        pass
+
 
 PATCH_CONFIRMATION_ACTION_LABELS = (
     "准备确认",
@@ -124,16 +138,35 @@ _KNOWN_TERMINAL_STATUSES = frozenset(
 class PatchConfirmationSnapshotView(Protocol):
     """Safe scalar projection published by the application confirmation flow."""
 
-    status: object
-    patch_id: UUID | None
-    patch_sha256: str | None
-    daily_plan_id: int | None
-    expected_revision: int | None
-    expires_at_utc: datetime | None
-    field_paths: tuple[str, ...]
-    before_revision: int | None
-    after_revision: int | None
-    error_code: str | None
+    @property
+    def status(self) -> object: ...
+
+    @property
+    def patch_id(self) -> UUID | None: ...
+
+    @property
+    def patch_sha256(self) -> str | None: ...
+
+    @property
+    def daily_plan_id(self) -> int | None: ...
+
+    @property
+    def expected_revision(self) -> int | None: ...
+
+    @property
+    def expires_at_utc(self) -> datetime | None: ...
+
+    @property
+    def field_paths(self) -> tuple[str, ...]: ...
+
+    @property
+    def before_revision(self) -> int | None: ...
+
+    @property
+    def after_revision(self) -> int | None: ...
+
+    @property
+    def error_code(self) -> str | None: ...
 
 
 class PatchConfirmationController(Protocol):
@@ -142,6 +175,8 @@ class PatchConfirmationController(Protocol):
     @property
     def snapshot(self) -> PatchConfirmationSnapshotView:
         """Return the latest safe, immutable projection."""
+
+        ...
 
     async def issue(
         self,
@@ -153,11 +188,15 @@ class PatchConfirmationController(Protocol):
     ) -> PatchConfirmationSnapshotView:
         """Prepare one confirmation for the exact current page target."""
 
+        ...
+
     async def apply(
         self,
         ui_session: TrustedUiSession,
     ) -> PatchConfirmationSnapshotView:
         """Apply the one already prepared confirmation."""
+
+        ...
 
     async def reconcile(
         self,
@@ -165,14 +204,22 @@ class PatchConfirmationController(Protocol):
     ) -> PatchConfirmationSnapshotView:
         """Explicitly inspect an indeterminate commit outcome."""
 
-    def invalidate(self) -> None:
+        ...
+
+    def invalidate(self) -> PatchConfirmationSnapshotView:
         """Synchronously revoke page-local authority and cancel late publication."""
 
-    async def disconnect(self) -> None:
+        ...
+
+    async def disconnect(self) -> PatchConfirmationSnapshotView:
         """Close confirmation state for a disconnected client."""
 
-    async def close(self) -> None:
+        ...
+
+    async def close(self) -> PatchConfirmationSnapshotView:
         """Permanently close confirmation state for a deleted page."""
+
+        ...
 
 
 ConfirmationAuthorizer = Callable[[], Awaitable[TrustedUiSession | None]]
@@ -271,6 +318,8 @@ class DailyPlanPatchConfirmationPanel:
         self._is_current_target = is_current_target
         self._on_applied = on_applied
         self._operations = UiSingleFlightSlot[_ConfirmationClick]()
+        self._active_action: asyncio.Task[None] | None = None
+        self._active_lifecycle_origin: object | None = None
         self._generation = 0
         self._closed = False
         self._abandoned_indeterminate = False
@@ -279,7 +328,7 @@ class DailyPlanPatchConfirmationPanel:
         self._issued_patch_sha256: str | None = None
         self._issued_target: DailyPlanUiTarget | None = None
         self._views: list[_PatchView] = []
-        self._shutdown_task: asyncio.Task[None] | None = None
+        self._shutdown_task: asyncio.Task[str | None] | None = None
         # UI-only render/event cache; the controller owns terminal authority.
         self._terminal_patch_ledger: dict[
             tuple[UUID, str],
@@ -327,28 +376,87 @@ class DailyPlanPatchConfirmationPanel:
         self._issued_target = None
         self._views.clear()
 
-    async def disconnect(self) -> None:
+    def capture_lifecycle_origin(self) -> object | None:
+        """Return a one-action origin only to that exact running action."""
+        caller = asyncio.current_task()
+        if caller is None or caller is not self._active_action:
+            return None
+        return self._active_lifecycle_origin
+
+    def owns_lifecycle_origin(self, lifecycle_origin: object) -> bool:
+        """Validate only the exact active action or its opaque origin token."""
+        active_action = self._active_action
+        return bool(
+            active_action is not None
+            and (
+                lifecycle_origin is active_action
+                or lifecycle_origin is self._active_lifecycle_origin
+            )
+        )
+
+    async def disconnect(
+        self,
+        *,
+        lifecycle_origin: object | None = None,
+    ) -> None:
         """Close all connection-local controls and cancel their exact operation."""
-        await self._shutdown(self._controller.disconnect)
+        await self._shutdown(
+            self._controller.disconnect,
+            lifecycle_origin=lifecycle_origin,
+        )
 
-    async def close(self) -> None:
+    async def close(
+        self,
+        *,
+        lifecycle_origin: object | None = None,
+    ) -> None:
         """Permanently close controls and cancel their exact operation."""
-        await self._shutdown(self._controller.close)
+        await self._shutdown(
+            self._controller.close,
+            lifecycle_origin=lifecycle_origin,
+        )
 
-    async def _shutdown(self, close_flow: Callable[[], Awaitable[None]]) -> None:
+    async def _shutdown(
+        self,
+        close_flow: Callable[[], Awaitable[PatchConfirmationSnapshotView]],
+        *,
+        lifecycle_origin: object | None,
+    ) -> None:
+        caller = asyncio.current_task()
+        active_action = self._active_action
+        initiated_by_active_action = active_action is not None and (
+            caller is active_action
+            or lifecycle_origin is active_action
+            or (
+                lifecycle_origin is not None
+                and lifecycle_origin is self._active_lifecycle_origin
+            )
+        )
         task = self._shutdown_task
+        if task is not None and initiated_by_active_action and not task.done():
+            raise UiActionOriginCancelled
         if task is None:
+            self._seal_for_shutdown(cancel_active=not initiated_by_active_action)
             task = asyncio.create_task(
-                self._run_shutdown(close_flow),
+                self._run_shutdown(
+                    close_flow,
+                    drain_active=not initiated_by_active_action,
+                ),
                 name="daily-plan-patch-confirmation-shutdown",
+                context=Context(),
             )
             self._shutdown_task = task
-        await self._await_shutdown_barrier(task)
+        failure, caller_cancelled = await self._await_shutdown_barrier(task)
+        if caller_cancelled is not None:
+            raise caller_cancelled
+        if failure == "cancelled":
+            raise asyncio.CancelledError
+        if failure is not None:
+            raise RuntimeError("patch_confirmation_lifecycle_failed") from None
+        if initiated_by_active_action:
+            raise UiActionOriginCancelled
 
-    async def _run_shutdown(
-        self,
-        close_flow: Callable[[], Awaitable[None]],
-    ) -> None:
+    def _seal_for_shutdown(self, *, cancel_active: bool) -> None:
         self._closed = True
         self._abandoned_indeterminate = True
         self._generation += 1
@@ -357,27 +465,72 @@ class DailyPlanPatchConfirmationPanel:
         self._issued_target = None
         self._views.clear()
         self._terminal_patch_ledger.clear()
-        await close_flow()
+        action = self._active_action
+        if cancel_active and action is not None and not action.done():
+            action.cancel()
+
+    async def _run_shutdown(
+        self,
+        close_flow: Callable[[], Awaitable[PatchConfirmationSnapshotView]],
+        *,
+        drain_active: bool,
+    ) -> str | None:
+        failure: str | None = None
+        if drain_active:
+            try:
+                await self._cancel_and_drain_active_action()
+            except asyncio.CancelledError:
+                failure = "cancelled"
+            except BaseException:
+                _log_lifecycle_error(
+                    "patch_confirmation_action_drain_failed",
+                )
+                failure = "failed"
+        try:
+            await close_flow()
+        except asyncio.CancelledError:
+            if failure is None:
+                failure = "cancelled"
+        except BaseException:
+            _log_lifecycle_error("patch_confirmation_shutdown_failed")
+            failure = "failed"
+        return failure
+
+    async def _cancel_and_drain_active_action(self) -> None:
+        task = self._active_action
+        if task is None or task is asyncio.current_task():
+            return
+        if not task.done():
+            task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        except BaseException:
+            _log_lifecycle_error("patch_confirmation_action_drain_failed")
+        finally:
+            if self._active_action is task:
+                self._active_action = None
 
     @staticmethod
-    async def _await_shutdown_barrier(task: asyncio.Task[None]) -> None:
+    async def _await_shutdown_barrier(
+        task: asyncio.Task[str | None],
+    ) -> tuple[str | None, asyncio.CancelledError | None]:
         cancelled: asyncio.CancelledError | None = None
-        while True:
+        while not task.done():
             try:
-                await asyncio.shield(task)
+                await asyncio.wait((task,))
             except asyncio.CancelledError as exc:
                 if cancelled is None:
                     cancelled = exc
-                if not task.done():
-                    continue
-            except BaseException:
-                if cancelled is None:
-                    raise
-            break
-        if cancelled is not None:
-            if not task.cancelled():
-                task.exception()
-            raise cancelled
+                continue
+        try:
+            failure = task.result()
+        except asyncio.CancelledError:
+            failure = "cancelled"
+        except BaseException:
+            failure = "failed"
+        return failure, cancelled
 
     def _capture_click(self, view: _PatchView) -> _ConfirmationClick:
         try:
@@ -782,19 +935,51 @@ class DailyPlanPatchConfirmationPanel:
         if expiry is not None:
             ui.label(f"确认有效期至：{expiry}").classes("text-xs text-gray-600")
 
+    def _bind_action(
+        self,
+        view: _PatchView,
+        action: _Action,
+    ) -> Callable[..., Awaitable[None] | None]:
+        return self._operations.bind(
+            capture=lambda: self._capture_click(view),
+            run=lambda owner, click: self._run_tracked_action(
+                owner,
+                view,
+                click,
+                action,
+            ),
+        )
+
+    async def _run_tracked_action(
+        self,
+        owner: object,
+        view: _PatchView,
+        click: _ConfirmationClick,
+        action: _Action,
+    ) -> None:
+        if self._closed:
+            return
+        task = asyncio.current_task()
+        if task is None or (
+            self._active_action is not None and self._active_action is not task
+        ):
+            return
+        self._active_action = task
+        lifecycle_origin = object()
+        self._active_lifecycle_origin = lifecycle_origin
+        try:
+            await self._run_action(owner, view, click, action)
+        finally:
+            if self._active_action is task:
+                self._active_action = None
+                if self._active_lifecycle_origin is lifecycle_origin:
+                    self._active_lifecycle_origin = None
+
     def _render_prepare(self, view: _PatchView) -> None:
         ui.label(
             f"目标计划：#{view.patch.daily_plan_id} · 点击时将重新核对当前 revision"
         ).classes("text-xs text-gray-600")
-        trigger = self._operations.bind(
-            capture=lambda: self._capture_click(view),
-            run=lambda owner, click: self._run_action(
-                owner,
-                view,
-                click,
-                _Action.ISSUE,
-            ),
-        )
+        trigger = self._bind_action(view, _Action.ISSUE)
         ui.button(
             PATCH_CONFIRMATION_ACTION_LABELS[0],
             icon="fact_check",
@@ -811,15 +996,7 @@ class DailyPlanPatchConfirmationPanel:
             "另一份草案正在占用当前页面的确认；请先完成或取消该草案，"
             "不能准备这一份草案。"
         ).classes("text-xs font-medium text-orange-700")
-        trigger = self._operations.bind(
-            capture=lambda: self._capture_click(view),
-            run=lambda owner, click: self._run_action(
-                owner,
-                view,
-                click,
-                _Action.ISSUE,
-            ),
-        )
+        trigger = self._bind_action(view, _Action.ISSUE)
         ui.button(
             PATCH_CONFIRMATION_ACTION_LABELS[0],
             icon="lock",
@@ -833,15 +1010,7 @@ class DailyPlanPatchConfirmationPanel:
     ) -> None:
         self._render_target(snapshot)
         ui.label(_STATUS_COPY["pending"]).classes("text-xs text-orange-700")
-        apply_trigger = self._operations.bind(
-            capture=lambda: self._capture_click(view),
-            run=lambda owner, click: self._run_action(
-                owner,
-                view,
-                click,
-                _Action.APPLY,
-            ),
-        )
+        apply_trigger = self._bind_action(view, _Action.APPLY)
         with ui.row().classes("gap-2"):
             ui.button(
                 PATCH_CONFIRMATION_ACTION_LABELS[1],
@@ -869,15 +1038,7 @@ class DailyPlanPatchConfirmationPanel:
         ui.label("离开或重新生成会销毁本页面内的人工对账入口。").classes(
             "text-xs text-orange-700"
         )
-        trigger = self._operations.bind(
-            capture=lambda: self._capture_click(view),
-            run=lambda owner, click: self._run_action(
-                owner,
-                view,
-                click,
-                _Action.RECONCILE,
-            ),
-        )
+        trigger = self._bind_action(view, _Action.RECONCILE)
         ui.button(
             PATCH_CONFIRMATION_ACTION_LABELS[3],
             icon="manage_search",

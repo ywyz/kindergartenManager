@@ -251,10 +251,27 @@ class _CancellationSafePatchActions:
     def invalidate(self) -> None:
         return None
 
-    async def disconnect(self) -> None:
+    def capture_lifecycle_origin(self) -> None:
+        return None
+
+    def owns_lifecycle_origin(self, lifecycle_origin: object) -> bool:
+        del lifecycle_origin
+        return False
+
+    async def disconnect(
+        self,
+        *,
+        lifecycle_origin: object | None = None,
+    ) -> None:
+        del lifecycle_origin
         await self._shutdown("disconnect")
 
-    async def close(self) -> None:
+    async def close(
+        self,
+        *,
+        lifecycle_origin: object | None = None,
+    ) -> None:
+        del lifecycle_origin
         await self._shutdown("close")
 
     async def _shutdown(self, lifecycle: str) -> None:

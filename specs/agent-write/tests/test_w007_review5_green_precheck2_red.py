@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+from contextvars import Context
 import gc
-import inspect
 from pathlib import Path
 import subprocess
 import sys
@@ -18,7 +18,6 @@ from app.ui.daily_plan_target import UiSingleFlightSlot
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-PRESTART_GUARD_TASK_NAME = "daily-plan-ui-single-flight-prestart"
 
 
 def test_external_close_and_callback_self_close_have_no_task_cycle() -> None:
@@ -243,8 +242,8 @@ def test_applied_callback_can_close_composite_agent_panel_without_cycle() -> Non
 
 
 @pytest.mark.asyncio
-async def test_cancelled_prestart_guard_cannot_wedge_the_next_click() -> None:
-    """Guard cancellation before its first step must release the exact owner."""
+async def test_abandoned_operation_expires_without_a_background_task() -> None:
+    """The Handle lease closes an unstarted operation without a guard Task."""
 
     slot = UiSingleFlightSlot[str]()
     effects: list[str] = []
@@ -254,22 +253,56 @@ async def test_cancelled_prestart_guard_cannot_wedge_the_next_click() -> None:
         effects.append(payload)
 
     trigger = slot.bind(capture=lambda: next(payloads), run=run)
+    background_before = asyncio.all_tasks()
     first = trigger()
     assert first is not None
-    guards = tuple(
-        task
-        for task in asyncio.all_tasks()
-        if task is not asyncio.current_task()
-        and task.get_name() == PRESTART_GUARD_TASK_NAME
-    )
-    for guard in guards:
-        guard.cancel()
-    if guards:
-        await asyncio.gather(*guards, return_exceptions=True)
-    first.close()
+    assert asyncio.all_tasks() == background_before
     await asyncio.sleep(0)
     await asyncio.sleep(0)
+    with pytest.raises(RuntimeError):
+        await first
 
+    retry = trigger()
+    assert retry is not None
+    await retry
+    assert effects == ["retry"]
+
+
+@pytest.mark.asyncio
+async def test_second_stage_lease_schedule_failure_is_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Failure to arm expiry closes the operation and releases its owner."""
+
+    slot = UiSingleFlightSlot[str]()
+    effects: list[str] = []
+    payloads = iter(("rejected", "retry"))
+    loop = asyncio.get_running_loop()
+    real_call_soon = loop.call_soon
+
+    async def run(_owner: object, payload: str) -> None:
+        effects.append(payload)
+
+    def reject_second_stage(
+        callback: Any,
+        *args: object,
+        context: Context | None = None,
+    ) -> asyncio.Handle:
+        if getattr(callback, "__name__", "") == "_release_unstarted_owner":
+            raise RuntimeError("second_stage_lease_schedule_failed")
+        return real_call_soon(callback, *args, context=context)
+
+    trigger = slot.bind(capture=lambda: next(payloads), run=run)
+    with monkeypatch.context() as context:
+        context.setattr(loop, "call_soon", reject_second_stage)
+        first = trigger()
+        assert first is not None
+        first_task = asyncio.create_task(first)
+        await asyncio.sleep(0)
+    outcome = await asyncio.gather(first_task, return_exceptions=True)
+
+    assert len(outcome) == 1 and isinstance(outcome[0], RuntimeError)
+    assert effects == []
     retry = trigger()
     assert retry is not None
     await retry
@@ -284,37 +317,38 @@ async def test_guard_setup_failure_releases_owner_and_closes_coroutine(
 
     slot = UiSingleFlightSlot[str]()
     effects: list[str] = []
-    rejected_guards: list[Any] = []
     payloads = iter(("rejected", "retry"))
 
     async def run(_owner: object, payload: str) -> None:
         effects.append(payload)
 
-    def reject_guard(coroutine: Any, **_kwargs: object) -> asyncio.Task[Any]:
-        rejected_guards.append(coroutine)
+    def reject_guard_setup() -> asyncio.AbstractEventLoop:
         raise RuntimeError("prestart_guard_setup_failed")
 
     trigger = slot.bind(capture=lambda: next(payloads), run=run)
-    first = None
-    with monkeypatch.context() as context:
-        context.setattr(asyncio, "create_task", reject_guard)
-        try:
-            first = trigger()
-        except RuntimeError as error:
-            assert str(error) == "prestart_guard_setup_failed"
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", RuntimeWarning)
+        with monkeypatch.context() as context:
+            context.setattr(asyncio, "get_running_loop", reject_guard_setup)
+            with pytest.raises(
+                RuntimeError,
+                match="prestart_guard_setup_failed",
+            ):
+                trigger()
+        gc.collect()
+        await asyncio.sleep(0)
 
-    states = tuple(inspect.getcoroutinestate(item) for item in rejected_guards)
-    if first is not None:
-        first.close()
-    for rejected in rejected_guards:
-        rejected.close()
-    await asyncio.sleep(0)
-    await asyncio.sleep(0)
+    leaked = tuple(
+        str(item.message)
+        for item in caught
+        if "UiSingleFlightSlot._run" in str(item.message)
+        and "was never awaited" in str(item.message)
+    )
 
     retry = trigger()
     if retry is not None:
         await retry
-    assert all(state == inspect.CORO_CLOSED for state in states)
+    assert leaked == ()
     assert retry is not None
     assert effects == ["retry"]
 

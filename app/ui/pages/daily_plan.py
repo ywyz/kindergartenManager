@@ -191,20 +191,35 @@ async def daily_plan_page() -> None:
             target: DailyPlanUiTarget,
         ) -> None:
             """Reload one confirmed result; never replay it through legacy save."""
+            target_plan_id = target.plan_id
+            target_revision = target.revision
+            confirmation_plan_id = confirmation.daily_plan_id
+            before_revision = confirmation.before_revision
+            after_revision = confirmation.after_revision
             if (
                 await _require_live_session() is None
                 or not _is_current_plan_target(target)
-                or confirmation.daily_plan_id != target.plan_id
-                or confirmation.before_revision != target.revision
-                or confirmation.after_revision != target.revision + 1
+                or type(target_plan_id) is not int
+                or target_plan_id <= 0
+                or type(target_revision) is not int
+                or target_revision <= 0
+                or type(confirmation_plan_id) is not int
+                or confirmation_plan_id <= 0
+                or type(before_revision) is not int
+                or before_revision <= 0
+                or type(after_revision) is not int
+                or after_revision <= 0
+                or confirmation_plan_id != target_plan_id
+                or before_revision != target_revision
+                or after_revision != target_revision + 1
             ):
                 raise RuntimeError("agent_confirmation_target_stale")
 
             authoritative = await read_confirmed_daily_plan(
                 trusted_actor,
-                plan_id=target.plan_id,
+                plan_id=target_plan_id,
                 selected_date=target.selected_date,
-                expected_revision=confirmation.after_revision,
+                expected_revision=after_revision,
             )
 
             if await _require_live_session() is None or not _is_current_plan_target(

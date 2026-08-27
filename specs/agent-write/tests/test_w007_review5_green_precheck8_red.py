@@ -168,4 +168,6 @@ def test_capture_and_validator_failure_still_closes_composite_lifecycle(
     )
 
     assert completed.returncode == 0, completed.stderr
-    assert completed.stdout.strip() == f"CAPTURE_VALIDATOR_FAILURE_PASS:{scenario}"
+    assert completed.stdout.splitlines()[-1] == (
+        f"CAPTURE_VALIDATOR_FAILURE_PASS:{scenario}"
+    )

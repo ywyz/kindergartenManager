@@ -96,7 +96,9 @@ async def test_origin_cancel_preserves_cleanup_failure_for_later_joiners(
     patch_actions.render_patch_actions(patch)
     view = fake_ui.latest_column()
     await _press(fake_ui.latest_button("准备确认", within=view))
-    action_result = fake_ui.latest_button("确认采用", within=view).on_click()
+    apply_button = fake_ui.latest_button("确认采用", within=view)
+    assert callable(apply_button.on_click)
+    action_result = apply_button.on_click()
     assert action_result is not None
     await asyncio.gather(
         cast(Coroutine[Any, Any, None], action_result),
@@ -112,7 +114,14 @@ async def test_origin_cancel_preserves_cleanup_failure_for_later_joiners(
     assert coordinator.cancellations == 1
 
 
-def test_external_composite_close_and_callback_finally_close_have_no_cycle() -> None:
+@pytest.mark.parametrize(
+    "origin_capture_failure",
+    [False, True],
+    ids=["capture-ok", "capture-failed"],
+)
+def test_external_composite_close_and_callback_finally_close_have_no_cycle(
+    origin_capture_failure: bool,
+) -> None:
     """An externally started composite close cannot drain an action waiting on it."""
 
     probe = textwrap.dedent(
@@ -140,6 +149,8 @@ def test_external_composite_close_and_callback_finally_close_have_no_cycle() -> 
                 await task
             except asyncio.CancelledError:
                 return "cancelled"
+            except RuntimeError as error:
+                return str(error)
             return "returned"
 
         async def main():
@@ -197,6 +208,11 @@ def test_external_composite_close_and_callback_finally_close_have_no_cycle() -> 
                 is_current_target=lambda candidate: candidate == target,
                 on_applied=on_applied,
             )
+            if {origin_capture_failure!r}:
+                def fail_origin_capture():
+                    raise RuntimeError("origin_capture_failed")
+
+                patch_actions.capture_lifecycle_origin = fail_origin_capture
             outer_panel = draft_ui.DailyPlanAgentPanel(
                 agent_controller,
                 patch_actions=patch_actions,
@@ -217,7 +233,12 @@ def test_external_composite_close_and_callback_finally_close_have_no_cycle() -> 
                 outcome(close_task),
                 outcome(apply_task),
             )
-            assert close_outcome == "returned"
+            expected_close_outcome = (
+                "agent_panel_lifecycle_failed"
+                if {origin_capture_failure!r}
+                else "returned"
+            )
+            assert close_outcome == expected_close_outcome
             assert apply_outcome == "cancelled"
             assert confirmation_controller.shutdown_calls == ["close"]
             assert coordinator.invalidations == 1

@@ -53,7 +53,7 @@ def _service(api, database: WriteDatabase, clock: MutableClock):
 
 def _assert_rejected(api, error: BaseException, code: str) -> None:
     assert type(error) is api.ConfirmedWriteRejected
-    assert error.code == code
+    assert getattr(error, "code", None) == code
 
 
 @pytest.mark.asyncio
@@ -335,8 +335,8 @@ def test_current_fact_docs_close_w006_and_track_w007_review_gate() -> None:
     assert "未授权" not in w005_row
     assert "未授权" not in w006_row
     assert "完成" in w006_row and "253d37d" in w006_row
-    assert all(marker in w007_row for marker in ("bc742d6", "21c0a9e", "第五轮"))
-    assert "未进入" not in w007_row
+    assert "第五轮" in w007_row
+    assert "W007 未进入" not in w007_row
     assert "未进入" in w008_row
     current_w007_docs = (
         data_model,
@@ -346,35 +346,37 @@ def test_current_fact_docs_close_w006_and_track_w007_review_gate() -> None:
         system_architecture,
         architecture_history,
     )
+    evidence_ledger_ref = "specs/agent-write/tests/README.md"
+    evidence_ledger = (REPOSITORY_ROOT / evidence_ledger_ref).read_text(
+        encoding="utf-8"
+    )
+    assert all(evidence_ledger_ref in text for text in current_w007_docs)
     assert all(
-        all(
-            marker in text
-            for marker in (
-                "bc742d6",
-                "a58c719",
-                "e8722f8",
-                "ce8b775",
-                "149d45e",
-                "c20aaa2",
-                "827b111",
-                "b2f91e7",
-                "7d51d63",
-                "bb53977",
-                "21c0a9e",
-                "第五轮",
-                "125 passed",
-                "131 passed",
-                "136 passed",
-                "144 passed",
-                "145 passed",
-                "146 passed",
-                "148 passed",
-                "151 passed",
-                "152 passed",
-                "153 passed",
-            )
+        marker in evidence_ledger
+        for marker in (
+            "bc742d6",
+            "a58c719",
+            "e8722f8",
+            "ce8b775",
+            "149d45e",
+            "c20aaa2",
+            "827b111",
+            "b2f91e7",
+            "7d51d63",
+            "bb53977",
+            "21c0a9e",
+            "第五轮",
+            "125 passed",
+            "131 passed",
+            "136 passed",
+            "144 passed",
+            "145 passed",
+            "146 passed",
+            "148 passed",
+            "151 passed",
+            "152 passed",
+            "153 passed",
         )
-        for text in current_w007_docs
     )
     assert all(
         "本轮最终修复候选统一测试为 WRITE `115 passed`" not in text

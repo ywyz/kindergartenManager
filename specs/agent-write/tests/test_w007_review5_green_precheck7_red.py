@@ -32,6 +32,10 @@ class _CaptureFailingPatchActions:
     def capture_lifecycle_origin(self) -> object | None:
         raise RuntimeError("origin_capture_failed")
 
+    def owns_lifecycle_origin(self, lifecycle_origin: object) -> bool:
+        del lifecycle_origin
+        return False
+
     async def disconnect(
         self,
         *,

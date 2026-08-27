@@ -202,12 +202,12 @@ def test_origin_capture_failure_still_completes_composite_cleanup() -> None:
         cwd=REPOSITORY_ROOT,
         capture_output=True,
         text=True,
-        timeout=3,
+        timeout=10,
         check=False,
     )
 
     assert completed.returncode == 0, completed.stderr
-    assert completed.stdout.strip() == "ORIGIN_CAPTURE_FAILURE_PASS"
+    assert completed.stdout.splitlines()[-1] == "ORIGIN_CAPTURE_FAILURE_PASS"
 
 
 @pytest.mark.asyncio

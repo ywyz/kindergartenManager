@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable, Coroutine
+from contextvars import Context
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Generic, TypeVar
@@ -13,13 +15,18 @@ from app.ui.components.date_panel import DateSelection
 PayloadT = TypeVar("PayloadT")
 
 
+class UiActionOriginCancelled(asyncio.CancelledError):
+    """Cancel only the UI action that originated a composite lifecycle."""
+
+
 class UiSingleFlightSlot(Generic[PayloadT]):
     """Synchronously freeze one click and run only its exact slot owner."""
 
-    __slots__ = ("_owner",)
+    __slots__ = ("_owner", "_prestart_lease")
 
     def __init__(self) -> None:
         self._owner: object | None = None
+        self._prestart_lease: asyncio.Handle | None = None
 
     def owns(self, owner: object) -> bool:
         return self._owner is owner
@@ -30,7 +37,12 @@ class UiSingleFlightSlot(Generic[PayloadT]):
         capture: Callable[[], PayloadT],
         run: Callable[[object, PayloadT], Awaitable[None]],
     ) -> Callable[..., Coroutine[Any, Any, None] | None]:
-        """Return a normal handler that captures before yielding a coroutine."""
+        """Capture synchronously, then lease one operation to the UI wrapper.
+
+        The handler gives NiceGUI one event-loop wrapper turn to start the
+        coroutine. Expiry closes the unstarted operation without side effects;
+        only a new explicit trigger may retry.
+        """
 
         def trigger(*_event_args: object) -> Coroutine[Any, Any, None] | None:
             if self._owner is not None:
@@ -43,7 +55,20 @@ class UiSingleFlightSlot(Generic[PayloadT]):
                 if self.owns(owner):
                     self._owner = None
                 raise
-            return self._run(owner, payload, run)
+            operation = self._run(owner, payload, run)
+            try:
+                self._prestart_lease = asyncio.get_running_loop().call_soon(
+                    self._arm_prestart_release,
+                    owner,
+                    operation,
+                    context=Context(),
+                )
+            except BaseException:
+                operation.close()
+                if self.owns(owner):
+                    self._owner = None
+                raise
+            return operation
 
         return trigger
 
@@ -53,11 +78,51 @@ class UiSingleFlightSlot(Generic[PayloadT]):
         payload: PayloadT,
         run: Callable[[object, PayloadT], Awaitable[None]],
     ) -> None:
+        if not self.owns(owner):
+            return
+        lease = self._prestart_lease
+        self._prestart_lease = None
+        if lease is not None:
+            lease.cancel()
         try:
             await run(owner, payload)
         finally:
             if self.owns(owner):
                 self._owner = None
+
+    def _arm_prestart_release(
+        self,
+        owner: object,
+        operation: Coroutine[Any, Any, None],
+    ) -> None:
+        """Give the UI wrapper one loop turn to start the captured operation."""
+        if not self.owns(owner):
+            return
+        try:
+            lease = asyncio.get_running_loop().call_soon(
+                self._release_unstarted_owner,
+                owner,
+                operation,
+                context=Context(),
+            )
+        except BaseException:
+            self._release_unstarted_owner(owner, operation)
+            return
+        if self.owns(owner):
+            self._prestart_lease = lease
+        else:
+            lease.cancel()
+
+    def _release_unstarted_owner(
+        self,
+        owner: object,
+        operation: Coroutine[Any, Any, None],
+    ) -> None:
+        """Fail closed if the returned coroutine never reaches its first step."""
+        if self.owns(owner):
+            operation.close()
+            self._owner = None
+            self._prestart_lease = None
 
 
 class UiGenerationGuard:

@@ -6,7 +6,10 @@ page-local adapter may add one-Patch actions through the narrow
 legacy save callback, or Provider WRITE capability.
 """
 
+import asyncio
 from collections.abc import Awaitable, Callable
+from contextvars import Context
+from dataclasses import dataclass
 from datetime import date
 from typing import Protocol
 
@@ -18,6 +21,7 @@ from app.service.agent.composition import (
     AgentPatchSnapshot,
     DailyPlanAgentController,
 )
+from app.ui.daily_plan_target import UiActionOriginCancelled
 
 
 AGENT_ACTION_LABELS = ("运行", "取消", "丢弃建议")
@@ -65,11 +69,36 @@ class AgentPatchActions(Protocol):
     def invalidate(self) -> None:
         """Synchronously revoke any pending action before page state changes."""
 
-    async def disconnect(self) -> None:
+    def capture_lifecycle_origin(self) -> object | None:
+        """Return an opaque origin only to the exact active action caller."""
+
+    def owns_lifecycle_origin(self, lifecycle_origin: object) -> bool:
+        """Validate a fallback candidate against the exact active action."""
+
+        ...
+
+    async def disconnect(
+        self,
+        *,
+        lifecycle_origin: object | None = None,
+    ) -> None:
         """Discard connection-local confirmation state."""
 
-    async def close(self) -> None:
+    async def close(
+        self,
+        *,
+        lifecycle_origin: object | None = None,
+    ) -> None:
         """Permanently close page-local confirmation state."""
+
+
+@dataclass(frozen=True, slots=True)
+class _AgentLifecycleResult:
+    """Capability-free shared result for one composite lifecycle barrier."""
+
+    snapshot: AgentPanelSnapshot | None
+    failure: str | None
+    origin_cancelled: bool
 
 
 class DailyPlanAgentPanel:
@@ -88,6 +117,8 @@ class DailyPlanAgentPanel:
         self._authorize_operation = authorize_operation
         self._patch_actions = patch_actions
         self._closed = False
+        self._lifecycle_task: asyncio.Task[_AgentLifecycleResult] | None = None
+        self._lifecycle_kind: str | None = None
 
         with ui.card().classes("w-full"):
             ui.label("每日计划 Agent（建议模式）").classes(
@@ -156,23 +187,232 @@ class DailyPlanAgentPanel:
 
     async def disconnect(self) -> None:
         """Cancel connection-local work while keeping the controller reusable."""
-        if self._closed:
-            return
-        patch_actions = getattr(self, "_patch_actions", None)
-        if patch_actions is not None:
-            await patch_actions.disconnect()
-        snapshot = await self._controller.disconnect()
-        self._render(snapshot)
+        snapshot = await self._run_lifecycle(permanent=False)
+        if snapshot is not None and not self._closed:
+            self._render(snapshot)
 
     async def close(self) -> None:
         """Release page-local state and cancel its exact in-flight operation."""
-        if self._closed:
-            return
-        self._closed = True
+        await self._run_lifecycle(permanent=True)
+
+    def _select_lifecycle_task(
+        self,
+        *,
+        permanent: bool,
+    ) -> tuple[
+        asyncio.Task[_AgentLifecycleResult],
+        str,
+        bool,
+        object | None,
+    ]:
+        if permanent:
+            self._closed = True
         patch_actions = getattr(self, "_patch_actions", None)
+        lifecycle_origin: object | None = None
+        origin_capture_failed = False
+        origin_validation_failed = False
+        caller_owns_origin = False
         if patch_actions is not None:
-            await patch_actions.close()
-        await self._controller.close()
+            try:
+                lifecycle_origin = patch_actions.capture_lifecycle_origin()
+                caller_owns_origin = lifecycle_origin is not None
+            except BaseException:
+                origin_capture_failed = True
+                lifecycle_origin = asyncio.current_task()
+                if lifecycle_origin is not None:
+                    try:
+                        caller_owns_origin = patch_actions.owns_lifecycle_origin(
+                            lifecycle_origin,
+                        )
+                    except BaseException:
+                        origin_validation_failed = True
+                        caller_owns_origin = False
+
+        task = self._lifecycle_task
+        kind = self._lifecycle_kind
+        if task is not None and kind is not None:
+            if caller_owns_origin and not task.done():
+                raise UiActionOriginCancelled
+            unverified_origin = (
+                lifecycle_origin
+                if origin_validation_failed and not task.done()
+                else None
+            )
+            return task, kind, caller_owns_origin, unverified_origin
+
+        kind = "close" if self._closed else "disconnect"
+        task = asyncio.create_task(
+            self._cleanup_lifecycle(
+                kind,
+                lifecycle_origin=lifecycle_origin,
+                origin_capture_failed=origin_capture_failed,
+                origin_cancelled=(caller_owns_origin and not origin_capture_failed),
+            ),
+            name=f"daily-plan-agent-panel-{kind}",
+            context=Context(),
+        )
+        self._lifecycle_task = task
+        self._lifecycle_kind = kind
+        return task, kind, caller_owns_origin, None
+
+    async def _run_lifecycle(
+        self,
+        *,
+        permanent: bool,
+    ) -> AgentPanelSnapshot | None:
+        caller_cancelled: asyncio.CancelledError | None = None
+        cleanup_failure: str | None = None
+        origin_cancelled = False
+        snapshot: AgentPanelSnapshot | None = None
+
+        while True:
+            (
+                task,
+                kind,
+                caller_owns_origin,
+                unverified_origin,
+            ) = self._select_lifecycle_task(permanent=permanent)
+            if unverified_origin is not None:
+                try:
+                    await self._join_unverified_lifecycle_origin(
+                        kind,
+                        unverified_origin,
+                    )
+                except UiActionOriginCancelled:
+                    raise
+                except asyncio.CancelledError as error:
+                    caller = asyncio.current_task()
+                    if (
+                        caller_cancelled is None
+                        and caller is not None
+                        and caller.cancelling()
+                    ):
+                        caller_cancelled = error
+                    elif cleanup_failure is None:
+                        cleanup_failure = "cancelled"
+                except BaseException:
+                    cleanup_failure = "failed"
+            result, cancelled = await self._observe_lifecycle_task(task)
+            if caller_cancelled is None:
+                caller_cancelled = cancelled
+            if result.origin_cancelled and caller_owns_origin:
+                origin_cancelled = True
+            if result.failure == "failed":
+                cleanup_failure = "failed"
+            elif cleanup_failure is None and result.failure is not None:
+                cleanup_failure = result.failure
+            if result.snapshot is not None:
+                snapshot = result.snapshot
+
+            if kind == "disconnect" and self._lifecycle_task is task:
+                self._lifecycle_task = None
+                self._lifecycle_kind = None
+            if self._closed and kind != "close":
+                continue
+            break
+
+        if caller_cancelled is not None:
+            raise caller_cancelled
+        if origin_cancelled:
+            raise asyncio.CancelledError
+        if cleanup_failure == "cancelled":
+            raise asyncio.CancelledError
+        if cleanup_failure is not None:
+            raise RuntimeError("agent_panel_lifecycle_failed") from None
+        return snapshot
+
+    async def _join_unverified_lifecycle_origin(
+        self,
+        kind: str,
+        lifecycle_origin: object,
+    ) -> None:
+        """Let the confirmation barrier arbitrate a failed origin validator."""
+        patch_actions = getattr(self, "_patch_actions", None)
+        if patch_actions is None:
+            return
+        if kind == "close":
+            await patch_actions.close(lifecycle_origin=lifecycle_origin)
+        else:
+            await patch_actions.disconnect(lifecycle_origin=lifecycle_origin)
+
+    async def _cleanup_lifecycle(
+        self,
+        kind: str,
+        *,
+        lifecycle_origin: object | None,
+        origin_capture_failed: bool,
+        origin_cancelled: bool,
+    ) -> _AgentLifecycleResult:
+        patch_actions = getattr(self, "_patch_actions", None)
+        failure = "failed" if origin_capture_failed else None
+        if patch_actions is not None:
+            try:
+                if kind == "close":
+                    await patch_actions.close(lifecycle_origin=lifecycle_origin)
+                else:
+                    await patch_actions.disconnect(
+                        lifecycle_origin=lifecycle_origin,
+                    )
+            except UiActionOriginCancelled:
+                if not origin_capture_failed:
+                    origin_cancelled = True
+            except asyncio.CancelledError:
+                if failure is None:
+                    failure = "cancelled"
+            except BaseException:
+                failure = "failed"
+
+        snapshot: AgentPanelSnapshot | None = None
+        try:
+            if kind == "close":
+                await self._controller.close()
+            else:
+                snapshot = await self._controller.disconnect()
+        except asyncio.CancelledError:
+            if failure is None:
+                failure = "cancelled"
+        except BaseException:
+            failure = "failed"
+
+        return _AgentLifecycleResult(
+            snapshot=snapshot,
+            failure=failure,
+            origin_cancelled=origin_cancelled,
+        )
+
+    @staticmethod
+    async def _observe_lifecycle_task(
+        task: asyncio.Task[_AgentLifecycleResult],
+    ) -> tuple[_AgentLifecycleResult, asyncio.CancelledError | None]:
+        caller_cancelled: asyncio.CancelledError | None = None
+        while not task.done():
+            try:
+                await asyncio.wait((task,))
+            except asyncio.CancelledError as error:
+                caller = asyncio.current_task()
+                if (
+                    caller_cancelled is None
+                    and caller is not None
+                    and caller.cancelling()
+                ):
+                    caller_cancelled = error
+                continue
+
+        try:
+            result = task.result()
+        except asyncio.CancelledError:
+            result = _AgentLifecycleResult(
+                snapshot=None,
+                failure="cancelled",
+                origin_cancelled=False,
+            )
+        except BaseException:
+            result = _AgentLifecycleResult(
+                snapshot=None,
+                failure="failed",
+                origin_cancelled=False,
+            )
+        return result, caller_cancelled
 
     async def _run(self) -> None:
         if self._closed:
