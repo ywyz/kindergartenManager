@@ -187,3 +187,16 @@ canonical ledger 并列成精确状态双权威，以及第七轮守卫只匹配
 `10 passed`、全部 W007 `118 passed`、完整 WRITE `196 passed`、Foundation `261 passed`、ordinary
 `847 passed`，Ruff/format/diff 检查通过且变更范围 Pyright 为 0。尚未 push、CI、人工验收或 Issue 回写，
 W008 未进入，也不得据此宣称 Standards/Spec 0/0、merge、Issue 关闭或 release。
+
+第八轮 finding 修复候选 commit `d80252482cc2ab8c1c88d4df5b1696af130e4b74` 的第九轮 fixed-SHA 双轴
+Review 结果为 Standards H0/M2/L1、Spec H0/M0/L0。新 findings 是 W007 Markdown heading 与状态正文跨段
+时漏检、confirmation-flow 私有读取守卫依赖 receiver 拼写而漏掉 alias/`getattr`，以及第八轮测试以源码
+片段而非行为反例锁定实现。finding RED 已由 `c0da4c19679b2ac826f6c8002b32131a778a2eba` 固定，
+2 个节点连续两轮均为 `2 failed / 1 passed`，node hash
+`837a9d94542f33841e70565c8f76b3686558ee7ebad05beed0bfa3700d7822c5`。
+
+第九轮 Review finding 修复已本地 GREEN：行为守卫 `7 passed`、全部 W007 `119 passed`、完整 WRITE
+`197 passed`、Foundation `261 passed`、ordinary `847 passed`。但提交前独立对抗 precheck 已另报
+H0/M2/L0：fenced/nested Markdown scope 与跨段状态仍有漏报/误报，AST alias 分析仍漏掉结构赋值和
+`getattr` alias 且可能跨作用域误报。该 precheck finding 尚待独立稳定 RED；当前候选不得进入 fixed-SHA
+Review、push、CI、人工验收或 Issue 回写。
