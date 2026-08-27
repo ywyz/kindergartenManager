@@ -82,3 +82,62 @@ def test_confirmation_flow_private_guard_avoids_unrelated_scope_false_positives(
     source: str,
 ) -> None:
     assert _confirmation_flow_private_reads(source) == set()
+
+
+def test_w007_status_guard_does_not_close_fence_on_an_info_string() -> None:
+    content = (
+        "## 其他\n\n```markdown\n```python\n## W007\n"
+        f"当前为第九轮 Review，SHA {REVIEW_SHA}。\n```\n"
+    )
+
+    assert _w007_status_problems(content) == []
+
+
+def test_w007_status_guard_treats_four_space_fence_as_indented_code() -> None:
+    content = f"## W007\n\n    ```markdown\n\n当前为第九轮 Review，SHA {REVIEW_SHA}。\n"
+
+    assert _w007_status_problems(content) == EXPECTED_STATUS_PROBLEMS
+
+
+def test_w007_status_guard_honors_indented_peer_heading() -> None:
+    content = (
+        "  ## W007\n\n当前能力见 ledger。\n\n  ## W008\n\n"
+        f"当前为第九轮 Review，SHA {REVIEW_SHA}。\n"
+    )
+
+    assert _w007_status_problems(content) == []
+
+
+@pytest.mark.parametrize(
+    "source",
+    (
+        "def check(value=flow._confirmation_id):\n    return value\n",
+        "@mark(harness.flow._pending)\ndef check():\n    return None\n",
+        ("subject = harness.flow\ndef check():\n    return subject._pending\n"),
+        (
+            "if condition:\n"
+            "    subject = harness.flow\n"
+            "else:\n"
+            "    subject = object()\n"
+            "subject._pending\n"
+        ),
+        ('lookup = getattr\ndef check():\n    return lookup(flow, "_pending")\n'),
+    ),
+)
+def test_confirmation_flow_private_guard_covers_metadata_closure_and_branches(
+    source: str,
+) -> None:
+    assert _confirmation_flow_private_reads(source)
+
+
+@pytest.mark.parametrize(
+    "source",
+    (
+        "def check(flow):\n    return flow._velocity\n",
+        "network_harness.flow._socket\n",
+    ),
+)
+def test_confirmation_flow_private_guard_ignores_unrelated_names(
+    source: str,
+) -> None:
+    assert _confirmation_flow_private_reads(source) == set()
