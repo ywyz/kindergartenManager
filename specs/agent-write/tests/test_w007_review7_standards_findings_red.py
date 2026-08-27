@@ -6,6 +6,8 @@ import ast
 from pathlib import Path
 import re
 
+from markdown_it import MarkdownIt
+
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 EVIDENCE_LEDGER_PATH = "specs/agent-write/tests/README.md"
@@ -22,8 +24,7 @@ STATUS_DOCS = (
 )
 REVIEW_ROUND_PATTERN = re.compile(r"第[一二三四五六七八九十百0-9]+轮")
 FULL_SHA_PATTERN = re.compile(r"(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])")
-MARKDOWN_HEADING_PATTERN = re.compile(r"^(#{1,6})\s+(.+)$")
-MARKDOWN_FENCE_PATTERN = re.compile(r"^\s*(`{3,}|~{3,})")
+MARKDOWN_PARSER = MarkdownIt("commonmark")
 ALLOWED_STATUS_SHAS = {
     "ca3b7bd922f838c0739ccf9ed0f58655d292dc2f",
     "253d37d92f2983ea55f688340078380d41c78fd4",
@@ -36,7 +37,6 @@ def _w007_status_sections(content: str) -> list[str]:
     current: list[str] = []
     w007_heading_level: int | None = None
     w007_prose_active = False
-    fence: str | None = None
 
     def flush_section() -> None:
         nonlocal current
@@ -45,41 +45,35 @@ def _w007_status_sections(content: str) -> list[str]:
         sections.append("\n".join(current))
         current = []
 
-    for line in content.splitlines():
-        fence_match = MARKDOWN_FENCE_PATTERN.match(line)
-        if fence is not None:
-            if (
-                fence_match is not None
-                and fence_match.group(1)[0] == fence[0]
-                and len(fence_match.group(1)) >= len(fence)
-            ):
-                fence = None
-            continue
-        if fence_match is not None:
-            fence = fence_match.group(1)
-            continue
-
-        heading = MARKDOWN_HEADING_PATTERN.match(line)
-        if heading is not None:
-            level = len(heading.group(1))
+    tokens = MARKDOWN_PARSER.parse(content)
+    for index, token in enumerate(tokens):
+        if token.type == "heading_open":
+            inline = tokens[index + 1]
+            if inline.type != "inline":
+                continue
+            level = int(token.tag.removeprefix("h"))
             if w007_prose_active:
                 flush_section()
                 w007_prose_active = False
             if w007_heading_level is not None and level <= w007_heading_level:
                 flush_section()
                 w007_heading_level = None
-            if w007_heading_level is None and "W007" in heading.group(2):
+            if w007_heading_level is None and "W007" in inline.content:
                 w007_heading_level = level
             if w007_heading_level is not None:
-                current.append(line)
+                current.append(inline.content)
             continue
-
+        if token.type != "paragraph_open":
+            continue
+        inline = tokens[index + 1]
+        if inline.type != "inline":
+            continue
         if w007_heading_level is not None or w007_prose_active:
-            current.append(line)
+            current.append(inline.content)
             continue
-        if "W007" in line:
+        if "W007" in inline.content:
             w007_prose_active = True
-            current.append(line)
+            current.append(inline.content)
     flush_section()
     return sections
 
@@ -123,44 +117,123 @@ def test_w007_status_guard_covers_any_review_round_and_sha() -> None:
     ]
 
 
+class _LexicalBindingVisitor(ast.NodeVisitor):
+    def __init__(self) -> None:
+        self.names: set[str] = set()
+
+    def visit_Name(self, node: ast.Name) -> None:
+        if isinstance(node.ctx, (ast.Store, ast.Del)):
+            self.names.add(node.id)
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        self.names.add(node.name)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        self.names.add(node.name)
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        self.names.add(node.name)
+
+    def visit_Lambda(self, node: ast.Lambda) -> None:
+        del node
+
+    def visit_Import(self, node: ast.Import) -> None:
+        self.names.update(
+            alias.asname or alias.name.split(".")[0] for alias in node.names
+        )
+
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        self.names.update(alias.asname or alias.name for alias in node.names)
+
+
 class _ConfirmationFlowPrivateReadVisitor(ast.NodeVisitor):
     def __init__(self) -> None:
         self.private_reads: set[str] = set()
         self._flow_aliases = {"flow", "confirmation_flow"}
         self._getattr_aliases = {"getattr"}
+        self._harness_aliases = {"harness"}
 
-    @staticmethod
-    def _looks_like_harness(node: ast.expr) -> bool:
+    def _is_harness_reference(self, node: ast.expr) -> bool:
         if isinstance(node, ast.Name):
-            return node.id == "harness" or node.id.endswith("_harness")
+            return node.id in self._harness_aliases
         if isinstance(node, ast.Attribute):
-            return node.attr == "harness" or node.attr.endswith("_harness")
+            return node.attr == "harness"
         if isinstance(node, ast.Subscript):
-            return _ConfirmationFlowPrivateReadVisitor._looks_like_harness(node.value)
+            return self._is_harness_reference(node.value)
         if isinstance(node, ast.Call):
             function = node.func
             if isinstance(function, ast.Name):
-                return "harness" in function.id
+                return function.id == "_new_harness"
             if isinstance(function, ast.Attribute):
-                return "harness" in function.attr
+                return function.attr == "new_harness"
+        if isinstance(node, ast.IfExp):
+            return self._is_harness_reference(node.body) or self._is_harness_reference(
+                node.orelse
+            )
         return False
 
     def _is_getattr_reference(self, node: ast.expr) -> bool:
-        return isinstance(node, ast.Name) and node.id in self._getattr_aliases
+        if isinstance(node, ast.Name):
+            return node.id in self._getattr_aliases
+        return bool(
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "builtins"
+            and node.attr == "getattr"
+        )
 
     def _is_flow_reference(self, node: ast.expr) -> bool:
         if isinstance(node, ast.Name):
             return node.id in self._flow_aliases
         if isinstance(node, ast.Attribute):
-            return node.attr == "flow" and self._looks_like_harness(node.value)
+            return node.attr == "flow" and self._is_harness_reference(node.value)
+        if isinstance(node, ast.IfExp):
+            return self._is_flow_reference(node.body) or self._is_flow_reference(
+                node.orelse
+            )
         return bool(
             isinstance(node, ast.Call)
             and self._is_getattr_reference(node.func)
             and len(node.args) >= 2
-            and self._looks_like_harness(node.args[0])
+            and self._is_harness_reference(node.args[0])
             and isinstance(node.args[1], ast.Constant)
             and node.args[1].value == "flow"
         )
+
+    def _state(self) -> tuple[set[str], set[str], set[str]]:
+        return (
+            set(self._flow_aliases),
+            set(self._getattr_aliases),
+            set(self._harness_aliases),
+        )
+
+    def _set_state(self, state: tuple[set[str], set[str], set[str]]) -> None:
+        self._flow_aliases = set(state[0])
+        self._getattr_aliases = set(state[1])
+        self._harness_aliases = set(state[2])
+
+    @staticmethod
+    def _merged_states(
+        *states: tuple[set[str], set[str], set[str]],
+    ) -> tuple[set[str], set[str], set[str]]:
+        return (
+            set().union(*(state[0] for state in states)),
+            set().union(*(state[1] for state in states)),
+            set().union(*(state[2] for state in states)),
+        )
+
+    def _visit_block_from(
+        self,
+        body: list[ast.stmt],
+        state: tuple[set[str], set[str], set[str]],
+    ) -> tuple[set[str], set[str], set[str]]:
+        saved = self._state()
+        self._set_state(state)
+        for statement in body:
+            self.visit(statement)
+        result = self._state()
+        self._set_state(saved)
+        return result
 
     def _bind_target(self, target: ast.expr, value: ast.expr) -> None:
         if isinstance(target, (ast.List, ast.Tuple)) and isinstance(
@@ -186,42 +259,94 @@ class _ConfirmationFlowPrivateReadVisitor(ast.NodeVisitor):
             self._getattr_aliases.add(target.id)
         else:
             self._getattr_aliases.discard(target.id)
+        if self._is_harness_reference(value):
+            self._harness_aliases.add(target.id)
+        else:
+            self._harness_aliases.discard(target.id)
 
     def _discard_target(self, target: ast.expr) -> None:
         if isinstance(target, ast.Name):
             self._flow_aliases.discard(target.id)
             self._getattr_aliases.discard(target.id)
+            self._harness_aliases.discard(target.id)
         elif isinstance(target, (ast.List, ast.Tuple)):
             for element in target.elts:
                 self._discard_target(element)
 
+    @staticmethod
+    def _argument_names(arguments: ast.arguments) -> set[str]:
+        positional = (*arguments.posonlyargs, *arguments.args, *arguments.kwonlyargs)
+        names = {argument.arg for argument in positional}
+        if arguments.vararg is not None:
+            names.add(arguments.vararg.arg)
+        if arguments.kwarg is not None:
+            names.add(arguments.kwarg.arg)
+        return names
+
+    @staticmethod
+    def _local_names(body: list[ast.stmt]) -> set[str]:
+        collector = _LexicalBindingVisitor()
+        for statement in body:
+            collector.visit(statement)
+        return collector.names
+
+    def _visit_function_metadata(
+        self,
+        node: ast.FunctionDef | ast.AsyncFunctionDef,
+    ) -> None:
+        for decorator in node.decorator_list:
+            self.visit(decorator)
+        for default in (*node.args.defaults, *node.args.kw_defaults):
+            if default is not None:
+                self.visit(default)
+        if node.returns is not None:
+            self.visit(node.returns)
+
     def _visit_function_scope(
         self,
         body: list[ast.stmt],
+        arguments: ast.arguments,
     ) -> None:
-        outer_flow_aliases = self._flow_aliases
-        outer_getattr_aliases = self._getattr_aliases
-        self._flow_aliases = {"flow", "confirmation_flow"}
-        self._getattr_aliases = {"getattr"}
+        outer = self._state()
+        local_names = self._local_names(body) | self._argument_names(arguments)
+        self._flow_aliases = outer[0] - local_names
+        self._getattr_aliases = outer[1] - local_names
+        self._harness_aliases = outer[2] - local_names
+        if "harness" in self._argument_names(arguments):
+            self._harness_aliases.add("harness")
         for statement in body:
             self.visit(statement)
-        self._flow_aliases = outer_flow_aliases
-        self._getattr_aliases = outer_getattr_aliases
+        self._set_state(outer)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        self._visit_function_scope(node.body)
+        self._visit_function_metadata(node)
+        self._visit_function_scope(node.body, node.args)
+        self._discard_target(ast.Name(id=node.name, ctx=ast.Store()))
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
-        self._visit_function_scope(node.body)
+        self._visit_function_metadata(node)
+        self._visit_function_scope(node.body, node.args)
+        self._discard_target(ast.Name(id=node.name, ctx=ast.Store()))
 
     def visit_Lambda(self, node: ast.Lambda) -> None:
-        outer_flow_aliases = self._flow_aliases
-        outer_getattr_aliases = self._getattr_aliases
-        self._flow_aliases = {"flow", "confirmation_flow"}
-        self._getattr_aliases = {"getattr"}
+        outer = self._state()
+        local_names = self._argument_names(node.args)
+        self._flow_aliases = outer[0] - local_names
+        self._getattr_aliases = outer[1] - local_names
+        self._harness_aliases = outer[2] - local_names
+        if "harness" in local_names:
+            self._harness_aliases.add("harness")
         self.visit(node.body)
-        self._flow_aliases = outer_flow_aliases
-        self._getattr_aliases = outer_getattr_aliases
+        self._set_state(outer)
+
+    def visit_If(self, node: ast.If) -> None:
+        self.visit(node.test)
+        initial = self._state()
+        body_state = self._visit_block_from(node.body, initial)
+        else_state = (
+            self._visit_block_from(node.orelse, initial) if node.orelse else initial
+        )
+        self._set_state(self._merged_states(body_state, else_state))
 
     def visit_Assign(self, node: ast.Assign) -> None:
         self.visit(node.value)

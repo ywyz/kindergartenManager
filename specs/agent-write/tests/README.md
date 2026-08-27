@@ -209,3 +209,15 @@ Foundation `261 passed`、ordinary `847 passed`。但第二次独立 recheck 已
 closing/缩进 heading 仍有漏报/误报，函数默认值、decorator、闭包、分支 join 仍可绕过 AST 守卫，且普通
 `flow` 参数/无关 harness 名称会误报。该 finding 尚待独立稳定 RED；当前候选仍不得进入 fixed-SHA Review、
 push、CI、人工验收或 Issue 回写。
+
+第二次 precheck finding RED 已由 `9228bd7d7e1f4043b35e64206c6100fa6fa7e527` 固定：CommonMark closing、
+四空格 indented code、缩进 peer heading，以及函数默认值/decorator/闭包/If join/无关名称共 10 个节点，
+连续两轮均为 `10 failed / 8 passed`，node hash
+`16e2dc258797698788f7b23e8122ff5c077d85241c1d7e1713140acf28dd10a4`。第二版修复改用显式依赖的
+CommonMark parser，并按词法作用域、参数遮蔽、结构赋值和 If path join 分析 AST；本地为守卫
+`25 passed`、全部 W007 `137 passed`、完整 WRITE `215 passed`、Foundation `261 passed`、ordinary
+`847 passed`，Ruff/format/diff、Pyright 与 `pip check` 通过。
+
+第三次独立 recheck 已另报 H0/M2/L1：`try`/`while` path join、class 独立词法状态，以及
+for/with/except/comprehension target 遮蔽仍有漏报/误报。该 finding 尚待独立稳定 RED；当前候选仍不得
+进入 fixed-SHA Review、push、CI、人工验收或 Issue 回写。
