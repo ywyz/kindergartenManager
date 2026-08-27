@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
+from contextvars import Context
 from dataclasses import dataclass, replace
 from datetime import datetime
 from enum import Enum
@@ -430,7 +431,8 @@ class DailyPlanPatchConfirmationController:
                     phase=phase,
                     operation=operation,
                     flight_state=flight_state,
-                )
+                ),
+                context=Context(),
             )
             self._inflight = task
             self._inflight_state = flight_state
@@ -899,7 +901,10 @@ class DailyPlanPatchConfirmationController:
     async def _close_page(self) -> PatchConfirmationSnapshot:
         shutdown_task = self._shutdown_task
         if shutdown_task is None:
-            shutdown_task = asyncio.create_task(self._run_shutdown())
+            shutdown_task = asyncio.create_task(
+                self._run_shutdown(),
+                context=Context(),
+            )
             self._shutdown_task = shutdown_task
         try:
             return await asyncio.shield(shutdown_task)

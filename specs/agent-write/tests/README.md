@@ -158,7 +158,14 @@ lifecycle/cancel override 与 spontaneous BaseException；`3 passed`、finding �
   external-close-finally 环共 `2 failed`，node hash
   `f3e11ad28b12315df216e4c394a8ded53b7be7a0504b94950ea2629e0920fe66`。
 
-当前第五轮 finding 修复候选已本地 GREEN，尚未取得 fixed-SHA Review 0/0。提交前限定生命周期复审为
-H0/M0/L0；第五轮矩阵 `34 passed`、全部 W007 `109 passed`、完整 WRITE `187 passed`、Foundation
-`261 passed`、ordinary `847 passed`，Ruff/format 通过且变更范围 Pyright 为 0。尚未 push、CI、人工验收或
-Issue 回写，W008 未进入，也不得据此宣称 Standards/Spec 0/0、merge、Issue 关闭或 release。
+第五轮 finding 修复候选 commit `74e0ec591e6b1432eaa0fde29d812b206f6f827c` 的第六轮 fixed-SHA 双轴
+Review 结果为 Standards H0/M2/L0、Spec H0/M0/L0。Standards findings 分别固定内部 confirmation
+flight/shutdown Task 不得继承并长期保留 caller `ContextVar` capability，以及安全 guard 的诊断日志故障不得
+覆盖已经提交的终态或让 UI 停在 busy。finding RED 已由
+`0dc9d39` 固定，3 个节点连续两轮均为 `3 failed`，node hash
+`1bfea83fcc37e6ea981feccc5f9e711abaaf8b400a27c5a71c2e898b078e8420`。
+
+当前第六轮 finding 修复候选已本地 GREEN，尚未取得新 fixed-SHA Review 0/0。新增 finding 节点
+`3 passed`、全部 W007 `112 passed`、完整 WRITE `190 passed`、Foundation `261 passed`、ordinary
+`847 passed`，Ruff/format/diff 检查通过且变更范围 Pyright 为 0。尚未 push、CI、人工验收或 Issue 回写，
+W008 未进入，也不得据此宣称 Standards/Spec 0/0、merge、Issue 关闭或 release。

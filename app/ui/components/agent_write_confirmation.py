@@ -33,10 +33,10 @@ from app.ui.daily_plan_target import (
 logger = get_logger(__name__)
 
 
-def _log_lifecycle_error(message: str) -> None:
-    """Emit best-effort diagnostics without poisoning a shared cleanup Task."""
+def _log_error(message: str, *args: object) -> None:
+    """Emit best-effort diagnostics without changing the safety outcome."""
     try:
-        logger.error(message)
+        logger.error(message, *args)
     except BaseException:
         pass
 
@@ -482,7 +482,7 @@ class DailyPlanPatchConfirmationPanel:
             except asyncio.CancelledError:
                 failure = "cancelled"
             except BaseException:
-                _log_lifecycle_error(
+                _log_error(
                     "patch_confirmation_action_drain_failed",
                 )
                 failure = "failed"
@@ -492,7 +492,7 @@ class DailyPlanPatchConfirmationPanel:
             if failure is None:
                 failure = "cancelled"
         except BaseException:
-            _log_lifecycle_error("patch_confirmation_shutdown_failed")
+            _log_error("patch_confirmation_shutdown_failed")
             failure = "failed"
         return failure
 
@@ -507,7 +507,7 @@ class DailyPlanPatchConfirmationPanel:
         except asyncio.CancelledError:
             pass
         except BaseException:
-            _log_lifecycle_error("patch_confirmation_action_drain_failed")
+            _log_error("patch_confirmation_action_drain_failed")
         finally:
             if self._active_action is task:
                 self._active_action = None
@@ -536,7 +536,7 @@ class DailyPlanPatchConfirmationPanel:
         try:
             target = self._capture_target()
         except Exception as exc:
-            logger.error(
+            _log_error(
                 "patch_confirmation_target_capture_failed error_type=%s",
                 type(exc).__name__,
             )
@@ -566,7 +566,7 @@ class DailyPlanPatchConfirmationPanel:
         try:
             current = self._is_current_target(target)
         except Exception as exc:
-            logger.error(
+            _log_error(
                 "patch_confirmation_target_check_failed error_type=%s",
                 type(exc).__name__,
             )
@@ -589,7 +589,7 @@ class DailyPlanPatchConfirmationPanel:
         try:
             session = await self._authorize_confirmation()
         except Exception as exc:
-            logger.error(
+            _log_error(
                 "patch_confirmation_authorization_failed error_type=%s",
                 type(exc).__name__,
             )
@@ -646,7 +646,7 @@ class DailyPlanPatchConfirmationPanel:
         try:
             await self._controller.close()
         except Exception as exc:
-            logger.error(
+            _log_error(
                 "patch_confirmation_abandon_close_failed error_type=%s",
                 type(exc).__name__,
             )
@@ -1219,7 +1219,7 @@ class DailyPlanPatchConfirmationPanel:
         try:
             snapshot = await self._invoke_action(action, current_session, click)
         except Exception as exc:
-            logger.error(
+            _log_error(
                 "patch_confirmation_%s_failed error_type=%s",
                 action.value,
                 type(exc).__name__,
@@ -1289,7 +1289,7 @@ class DailyPlanPatchConfirmationPanel:
         try:
             await self._on_applied(snapshot, target)
         except Exception as exc:
-            logger.error(
+            _log_error(
                 "patch_confirmation_reload_failed error_type=%s",
                 type(exc).__name__,
             )
