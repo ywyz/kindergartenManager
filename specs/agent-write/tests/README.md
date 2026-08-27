@@ -200,3 +200,12 @@ Review 结果为 Standards H0/M2/L1、Spec H0/M0/L0。新 findings 是 W007 Mark
 H0/M2/L0：fenced/nested Markdown scope 与跨段状态仍有漏报/误报，AST alias 分析仍漏掉结构赋值和
 `getattr` alias 且可能跨作用域误报。该 precheck finding 尚待独立稳定 RED；当前候选不得进入 fixed-SHA
 Review、push、CI、人工验收或 Issue 回写。
+
+上述提交前 precheck finding RED 已由 `141f238e66151f5e01685ecf829c1e352ba9e726` 固定：Markdown 跨段、
+nested/fenced scope 和 AST `getattr` alias、结构赋值、无关 `.flow`、跨函数污染共 8 个节点，连续两轮均为
+`8 failed`，node hash `b623a654fdfec07ee3d00d6c093c09f46ca145d51ca23a895e61dc3f8b21d7d6`。
+第一版修复已本地 GREEN：行为守卫 `15 passed`、全部 W007 `127 passed`、完整 WRITE `205 passed`、
+Foundation `261 passed`、ordinary `847 passed`。但第二次独立 recheck 已另报 H0/M2/L1：CommonMark
+closing/缩进 heading 仍有漏报/误报，函数默认值、decorator、闭包、分支 join 仍可绕过 AST 守卫，且普通
+`flow` 参数/无关 harness 名称会误报。该 finding 尚待独立稳定 RED；当前候选仍不得进入 fixed-SHA Review、
+push、CI、人工验收或 Issue 回写。

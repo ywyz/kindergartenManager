@@ -23,6 +23,7 @@ STATUS_DOCS = (
 REVIEW_ROUND_PATTERN = re.compile(r"第[一二三四五六七八九十百0-9]+轮")
 FULL_SHA_PATTERN = re.compile(r"(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])")
 MARKDOWN_HEADING_PATTERN = re.compile(r"^(#{1,6})\s+(.+)$")
+MARKDOWN_FENCE_PATTERN = re.compile(r"^\s*(`{3,}|~{3,})")
 ALLOWED_STATUS_SHAS = {
     "ca3b7bd922f838c0739ccf9ed0f58655d292dc2f",
     "253d37d92f2983ea55f688340078380d41c78fd4",
@@ -32,37 +33,54 @@ ALLOWED_STATUS_SHAS = {
 
 def _w007_status_sections(content: str) -> list[str]:
     sections: list[str] = []
-    paragraph: list[str] = []
-    paragraph_in_w007_section = False
+    current: list[str] = []
     w007_heading_level: int | None = None
+    w007_prose_active = False
+    fence: str | None = None
 
-    def flush_paragraph() -> None:
-        nonlocal paragraph, paragraph_in_w007_section
-        if not paragraph:
+    def flush_section() -> None:
+        nonlocal current
+        if not current:
             return
-        text = "\n".join(paragraph)
-        if paragraph_in_w007_section or "W007" in text:
-            sections.append(text)
-        paragraph = []
-        paragraph_in_w007_section = w007_heading_level is not None
+        sections.append("\n".join(current))
+        current = []
 
     for line in content.splitlines():
+        fence_match = MARKDOWN_FENCE_PATTERN.match(line)
+        if fence is not None:
+            if (
+                fence_match is not None
+                and fence_match.group(1)[0] == fence[0]
+                and len(fence_match.group(1)) >= len(fence)
+            ):
+                fence = None
+            continue
+        if fence_match is not None:
+            fence = fence_match.group(1)
+            continue
+
         heading = MARKDOWN_HEADING_PATTERN.match(line)
         if heading is not None:
-            flush_paragraph()
             level = len(heading.group(1))
+            if w007_prose_active:
+                flush_section()
+                w007_prose_active = False
             if w007_heading_level is not None and level <= w007_heading_level:
+                flush_section()
                 w007_heading_level = None
-            if "W007" in heading.group(2):
+            if w007_heading_level is None and "W007" in heading.group(2):
                 w007_heading_level = level
-            paragraph_in_w007_section = w007_heading_level is not None
-        if not line.strip():
-            flush_paragraph()
+            if w007_heading_level is not None:
+                current.append(line)
             continue
-        if not paragraph:
-            paragraph_in_w007_section = w007_heading_level is not None
-        paragraph.append(line)
-    flush_paragraph()
+
+        if w007_heading_level is not None or w007_prose_active:
+            current.append(line)
+            continue
+        if "W007" in line:
+            w007_prose_active = True
+            current.append(line)
+    flush_section()
     return sections
 
 
@@ -105,79 +123,148 @@ def test_w007_status_guard_covers_any_review_round_and_sha() -> None:
     ]
 
 
-def _is_confirmation_flow_reference(node: ast.expr, aliases: set[str]) -> bool:
-    if isinstance(node, ast.Name):
-        return node.id in aliases
-    if isinstance(node, ast.Attribute):
-        return node.attr == "flow"
-    if (
-        isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "getattr"
-        and len(node.args) >= 2
-        and isinstance(node.args[1], ast.Constant)
-        and node.args[1].value == "flow"
-    ):
-        return True
-    return False
+class _ConfirmationFlowPrivateReadVisitor(ast.NodeVisitor):
+    def __init__(self) -> None:
+        self.private_reads: set[str] = set()
+        self._flow_aliases = {"flow", "confirmation_flow"}
+        self._getattr_aliases = {"getattr"}
 
+    @staticmethod
+    def _looks_like_harness(node: ast.expr) -> bool:
+        if isinstance(node, ast.Name):
+            return node.id == "harness" or node.id.endswith("_harness")
+        if isinstance(node, ast.Attribute):
+            return node.attr == "harness" or node.attr.endswith("_harness")
+        if isinstance(node, ast.Subscript):
+            return _ConfirmationFlowPrivateReadVisitor._looks_like_harness(node.value)
+        if isinstance(node, ast.Call):
+            function = node.func
+            if isinstance(function, ast.Name):
+                return "harness" in function.id
+            if isinstance(function, ast.Attribute):
+                return "harness" in function.attr
+        return False
 
-def _assigned_names(target: ast.expr) -> set[str]:
-    if isinstance(target, ast.Name):
-        return {target.id}
-    if isinstance(target, (ast.List, ast.Tuple)):
-        return {name for element in target.elts for name in _assigned_names(element)}
-    return set()
+    def _is_getattr_reference(self, node: ast.expr) -> bool:
+        return isinstance(node, ast.Name) and node.id in self._getattr_aliases
+
+    def _is_flow_reference(self, node: ast.expr) -> bool:
+        if isinstance(node, ast.Name):
+            return node.id in self._flow_aliases
+        if isinstance(node, ast.Attribute):
+            return node.attr == "flow" and self._looks_like_harness(node.value)
+        return bool(
+            isinstance(node, ast.Call)
+            and self._is_getattr_reference(node.func)
+            and len(node.args) >= 2
+            and self._looks_like_harness(node.args[0])
+            and isinstance(node.args[1], ast.Constant)
+            and node.args[1].value == "flow"
+        )
+
+    def _bind_target(self, target: ast.expr, value: ast.expr) -> None:
+        if isinstance(target, (ast.List, ast.Tuple)) and isinstance(
+            value, (ast.List, ast.Tuple)
+        ):
+            if len(target.elts) == len(value.elts):
+                for target_element, value_element in zip(
+                    target.elts, value.elts, strict=True
+                ):
+                    self._bind_target(target_element, value_element)
+                return
+        if isinstance(target, (ast.List, ast.Tuple)):
+            for element in target.elts:
+                self._discard_target(element)
+            return
+        if not isinstance(target, ast.Name):
+            return
+        if self._is_flow_reference(value):
+            self._flow_aliases.add(target.id)
+        else:
+            self._flow_aliases.discard(target.id)
+        if self._is_getattr_reference(value):
+            self._getattr_aliases.add(target.id)
+        else:
+            self._getattr_aliases.discard(target.id)
+
+    def _discard_target(self, target: ast.expr) -> None:
+        if isinstance(target, ast.Name):
+            self._flow_aliases.discard(target.id)
+            self._getattr_aliases.discard(target.id)
+        elif isinstance(target, (ast.List, ast.Tuple)):
+            for element in target.elts:
+                self._discard_target(element)
+
+    def _visit_function_scope(
+        self,
+        body: list[ast.stmt],
+    ) -> None:
+        outer_flow_aliases = self._flow_aliases
+        outer_getattr_aliases = self._getattr_aliases
+        self._flow_aliases = {"flow", "confirmation_flow"}
+        self._getattr_aliases = {"getattr"}
+        for statement in body:
+            self.visit(statement)
+        self._flow_aliases = outer_flow_aliases
+        self._getattr_aliases = outer_getattr_aliases
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        self._visit_function_scope(node.body)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        self._visit_function_scope(node.body)
+
+    def visit_Lambda(self, node: ast.Lambda) -> None:
+        outer_flow_aliases = self._flow_aliases
+        outer_getattr_aliases = self._getattr_aliases
+        self._flow_aliases = {"flow", "confirmation_flow"}
+        self._getattr_aliases = {"getattr"}
+        self.visit(node.body)
+        self._flow_aliases = outer_flow_aliases
+        self._getattr_aliases = outer_getattr_aliases
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        self.visit(node.value)
+        for target in node.targets:
+            self.visit(target)
+            self._bind_target(target, node.value)
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        if node.value is not None:
+            self.visit(node.value)
+            self.visit(node.target)
+            self._bind_target(node.target, node.value)
+
+    def visit_NamedExpr(self, node: ast.NamedExpr) -> None:
+        self.visit(node.value)
+        self.visit(node.target)
+        self._bind_target(node.target, node.value)
+
+    def visit_Attribute(self, node: ast.Attribute) -> None:
+        if node.attr.startswith("_") and self._is_flow_reference(node.value):
+            self.private_reads.add(node.attr)
+        self.visit(node.value)
+
+    def visit_Call(self, node: ast.Call) -> None:
+        if (
+            self._is_getattr_reference(node.func)
+            and len(node.args) >= 2
+            and self._is_flow_reference(node.args[0])
+        ):
+            attribute = node.args[1]
+            if (
+                isinstance(attribute, ast.Constant)
+                and isinstance(attribute.value, str)
+                and attribute.value.startswith("_")
+            ):
+                self.private_reads.add(attribute.value)
+        self.generic_visit(node)
 
 
 def _confirmation_flow_private_reads(source: str) -> set[str]:
-    tree = ast.parse(source)
-    aliases = {"flow", "confirmation_flow"}
-    assignments = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, (ast.Assign, ast.AnnAssign, ast.NamedExpr))
-    ]
-    changed = True
-    while changed:
-        changed = False
-        for assignment in assignments:
-            if isinstance(assignment, ast.Assign):
-                targets = assignment.targets
-                value = assignment.value
-            else:
-                targets = [assignment.target]
-                value = assignment.value
-            if value is None or not _is_confirmation_flow_reference(value, aliases):
-                continue
-            assigned = {name for target in targets for name in _assigned_names(target)}
-            new_aliases = assigned - aliases
-            if new_aliases:
-                aliases.update(new_aliases)
-                changed = True
-
-    private_reads: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Attribute) and node.attr.startswith("_"):
-            if _is_confirmation_flow_reference(node.value, aliases):
-                private_reads.add(node.attr)
-            continue
-        if not (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "getattr"
-            and len(node.args) >= 2
-            and _is_confirmation_flow_reference(node.args[0], aliases)
-        ):
-            continue
-        attribute = node.args[1]
-        if (
-            isinstance(attribute, ast.Constant)
-            and isinstance(attribute.value, str)
-            and attribute.value.startswith("_")
-        ):
-            private_reads.add(attribute.value)
-    return private_reads
+    visitor = _ConfirmationFlowPrivateReadVisitor()
+    visitor.visit(ast.parse(source))
+    return visitor.private_reads
 
 
 def test_confirmation_flow_private_read_guard_covers_any_private_attribute() -> None:
