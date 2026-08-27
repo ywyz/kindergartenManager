@@ -348,6 +348,137 @@ class _ConfirmationFlowPrivateReadVisitor(ast.NodeVisitor):
         )
         self._set_state(self._merged_states(body_state, else_state))
 
+    def _visit_try(
+        self,
+        node: ast.Try | ast.TryStar,
+    ) -> None:
+        initial = self._state()
+        body_state = self._visit_block_from(node.body, initial)
+        handler_entry = self._merged_states(initial, body_state)
+        handler_states: list[tuple[set[str], set[str], set[str]]] = []
+        for handler in node.handlers:
+            saved = self._state()
+            self._set_state(handler_entry)
+            if handler.type is not None:
+                self.visit(handler.type)
+            if handler.name is not None:
+                self._discard_target(ast.Name(id=handler.name, ctx=ast.Store()))
+            for statement in handler.body:
+                self.visit(statement)
+            handler_states.append(self._state())
+            self._set_state(saved)
+        normal_state = (
+            self._visit_block_from(node.orelse, body_state)
+            if node.orelse
+            else body_state
+        )
+        exits = self._merged_states(normal_state, *handler_states)
+        final_state = (
+            self._visit_block_from(node.finalbody, exits) if node.finalbody else exits
+        )
+        self._set_state(final_state)
+
+    def visit_Try(self, node: ast.Try) -> None:
+        self._visit_try(node)
+
+    def visit_TryStar(self, node: ast.TryStar) -> None:
+        self._visit_try(node)
+
+    def _visit_loop(
+        self,
+        body: list[ast.stmt],
+        orelse: list[ast.stmt],
+        initial: tuple[set[str], set[str], set[str]],
+        target: ast.expr | None = None,
+    ) -> None:
+        loop_state = initial
+        while True:
+            saved = self._state()
+            self._set_state(loop_state)
+            if target is not None:
+                self._discard_target(target)
+            body_entry = self._state()
+            self._set_state(saved)
+            body_state = self._visit_block_from(body, body_entry)
+            joined = self._merged_states(initial, body_state)
+            if joined == loop_state:
+                break
+            loop_state = joined
+        exit_state = (
+            self._visit_block_from(orelse, loop_state) if orelse else loop_state
+        )
+        self._set_state(exit_state)
+
+    def visit_While(self, node: ast.While) -> None:
+        self.visit(node.test)
+        self._visit_loop(node.body, node.orelse, self._state())
+
+    def visit_For(self, node: ast.For) -> None:
+        self.visit(node.iter)
+        self.visit(node.target)
+        self._visit_loop(node.body, node.orelse, self._state(), node.target)
+
+    def visit_AsyncFor(self, node: ast.AsyncFor) -> None:
+        self.visit(node.iter)
+        self.visit(node.target)
+        self._visit_loop(node.body, node.orelse, self._state(), node.target)
+
+    def _visit_with(self, node: ast.With | ast.AsyncWith) -> None:
+        for item in node.items:
+            self.visit(item.context_expr)
+            if item.optional_vars is not None:
+                self.visit(item.optional_vars)
+                self._bind_target(item.optional_vars, item.context_expr)
+        for statement in node.body:
+            self.visit(statement)
+
+    def visit_With(self, node: ast.With) -> None:
+        self._visit_with(node)
+
+    def visit_AsyncWith(self, node: ast.AsyncWith) -> None:
+        self._visit_with(node)
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        for decorator in node.decorator_list:
+            self.visit(decorator)
+        for base in node.bases:
+            self.visit(base)
+        for keyword in node.keywords:
+            self.visit(keyword.value)
+        outer = self._state()
+        for statement in node.body:
+            self.visit(statement)
+        self._set_state(outer)
+        self._discard_target(ast.Name(id=node.name, ctx=ast.Store()))
+
+    def _visit_comprehension_scope(
+        self,
+        generators: list[ast.comprehension],
+        values: tuple[ast.expr, ...],
+    ) -> None:
+        outer = self._state()
+        for generator in generators:
+            self.visit(generator.iter)
+            self.visit(generator.target)
+            self._discard_target(generator.target)
+            for condition in generator.ifs:
+                self.visit(condition)
+        for value in values:
+            self.visit(value)
+        self._set_state(outer)
+
+    def visit_ListComp(self, node: ast.ListComp) -> None:
+        self._visit_comprehension_scope(node.generators, (node.elt,))
+
+    def visit_SetComp(self, node: ast.SetComp) -> None:
+        self._visit_comprehension_scope(node.generators, (node.elt,))
+
+    def visit_GeneratorExp(self, node: ast.GeneratorExp) -> None:
+        self._visit_comprehension_scope(node.generators, (node.elt,))
+
+    def visit_DictComp(self, node: ast.DictComp) -> None:
+        self._visit_comprehension_scope(node.generators, (node.key, node.value))
+
     def visit_Assign(self, node: ast.Assign) -> None:
         self.visit(node.value)
         for target in node.targets:

@@ -221,3 +221,12 @@ CommonMark parser，并按词法作用域、参数遮蔽、结构赋值和 If pa
 第三次独立 recheck 已另报 H0/M2/L1：`try`/`while` path join、class 独立词法状态，以及
 for/with/except/comprehension target 遮蔽仍有漏报/误报。该 finding 尚待独立稳定 RED；当前候选仍不得
 进入 fixed-SHA Review、push、CI、人工验收或 Issue 回写。
+
+第三次 precheck finding RED 已由 `f0ec4387db198dacf7c12078f0e9246628ce5524` 固定：try/while/class 的
+漏报及 for/with/except/comprehension 的 target 误报共 7 个节点，连续两轮均为
+`7 failed / 18 passed`，node hash
+`653c0b354826bca8f2795c56750cb9ad33ef0720085643ad7782be86544c83cc`。第三版修复以 path-state union、
+独立 class scope 与显式 binding target 遮蔽收敛常见控制流；本地为守卫 `32 passed`、全部 W007
+`144 passed`、完整 WRITE `222 passed`、Foundation `261 passed`、ordinary `847 passed`，
+Ruff/format/diff、Pyright 与 `pip check` 通过。当前候选尚未取得新的 fixed-SHA Review 0/0，不得进入
+push、CI、人工验收或 Issue 回写。
