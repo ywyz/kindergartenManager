@@ -151,9 +151,11 @@ W008_MYSQL_DATABASE_URL="$MYSQL_URL" \
   "$ABS_PYTHON" specs/agent-write/manual/w008_mysql.py --tested-sha TESTED_SHA
 ```
 
-固定虚构 Key 只阻止配置层生成 secrets；POSIX lifecycle lock 只会落在
-`MYSQL_MIGRATION_RUNTIME`，不会污染或放宽 fixed-SHA worktree。函数使用 subshell，因此每次 migration 后
-自动返回 worktree 根；live helper 随后仍会拒绝 worktree 内任何 `.env`/secrets/lock。
+固定虚构 Key 只阻止配置层生成 secrets；migration 的 POSIX lifecycle lock 只会落在
+`MYSQL_MIGRATION_RUNTIME`。函数使用 subshell，因此每次 migration 后自动返回 worktree 根。前序本地/浏览器门
+可能留下 owner-only、`0600`、零内容的
+`.kindergarten_secrets.lock`；live helper 不读取该锁，且在任何 application import 前安装 file-free synthetic
+config，因此允许它存在，但仍拒绝 worktree 内任何 `.env` 或 `.kindergarten_secrets`。
 
 三个 `current` 必须依序为 `e5f7a9c2d4b6`、`a6c4d8e2f9b1`、`e5f7a9c2d4b6`。live helper 单次验证：
 

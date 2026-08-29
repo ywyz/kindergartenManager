@@ -679,7 +679,6 @@ def prepare_run(args: argparse.Namespace) -> dict[str, object]:
         protected_names=(
             ".env",
             ".kindergarten_secrets",
-            ".kindergarten_secrets.lock",
         ),
     )
     _activate_worktree_imports(root)
