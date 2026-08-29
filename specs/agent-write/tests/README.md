@@ -568,7 +568,7 @@ evidence-closure SHA 仍须取得自身的固定 SHA Standards/Spec 双轴 0/0/0
 自动 Review；之后才可核对最新 main 漂移并以 `--no-ff` 集成，merge SHA 仍须重新完成 Review/CI，才能关闭
 Issue #52、发布与部署。
 
-证据闭合候选 `521418aa0710ca0dd1292db4e99d3c68e90c384a` 的 fixed-SHA Review 为 Spec
+证据闭合候选 `521418aa1df2dfa30d7e57b8a536ead41b8e5d07` 的 fixed-SHA Review 为 Spec
 H0/M0/L0、Standards H1/M0/L0：Windows 发布说明把 frozen 应用的 `.env` 错写为安装目录，而当前实现从
 `%LOCALAPPDATA%\KindergartenManager\.env` 读取。对应文档合同 RED 由
 `231d5dd5a8677658d798ee6abed4ee636a860029` 固定；最小 GREEN
