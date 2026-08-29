@@ -38,6 +38,15 @@ def test_release_instructions_use_explicit_admin_bootstrap() -> None:
     assert "-v kg-data:/app" not in workflow
 
 
+def test_release_notes_windows_packaged_env_file_is_data_path() -> None:
+    """Packaged Windows release notes must target a user-data .env path."""
+    workflow = (_ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+
+    assert "在安装目录创建 `.env`" not in workflow
+    assert "%LOCALAPPDATA%\\KindergartenManager\\.env" in workflow
+    assert "MySQL 模式" in workflow
+
+
 def test_debian_init_instructions_run_as_the_service_user() -> None:
     """Every published Debian init command must preserve the service identity."""
     missing_user_property: list[str] = []
