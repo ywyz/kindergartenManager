@@ -223,11 +223,15 @@ def test_mysql_migration_roundtrip_keeps_config_files_outside_worktree() -> None
     assert 'DATABASE_URL="$MYSQL_URL" "$ABS_PYTHON" -m alembic' not in (migration_block)
 
 
-def test_w008_ledger_does_not_report_a_committed_green_as_uncommitted() -> None:
+def test_w008_ledger_does_not_report_completed_gates_as_pending() -> None:
     ledger = (Path(__file__).parent / "README.md").read_text(encoding="utf-8")
     w008_history = ledger[ledger.index("W008 验收基础设施 RED") :]
 
-    assert "当前仍只是未提交 GREEN 候选" not in w008_history
+    for stale_status in (
+        "当前仍只是未提交 GREEN 候选",
+        "该 finding 尚待稳定 RED 与修正",
+    ):
+        assert stale_status not in w008_history
 
 
 def test_mysql8_container_allows_app_owned_trigger_migrations_explicitly() -> None:
