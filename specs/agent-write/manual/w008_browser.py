@@ -138,7 +138,7 @@ class _OneShotFault:
 def _table_name(value: object) -> str | None:
     table = getattr(value, "__table__", None)
     name = getattr(table, "name", None)
-    return name if type(name) is str else None
+    return str(name) if isinstance(name, str) else None
 
 
 class _WriterSession:

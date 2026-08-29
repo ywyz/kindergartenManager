@@ -324,3 +324,17 @@ Standards H0/M0/L1、Spec H0/M1/L0。两轴共同 finding 是上一段在已经�
 本轮连续两次均为 `1 failed`，失败 node 完全一致，node hash
 `cf19c9d1d43de29ae375accbe3baae62766997086da008ca68aa8632416baea3`，并由
 `bf0dc52551c067b4e9561093bf103549bfc07df6` 固定；旧 Review 不能作为后续修正文档 SHA 的 0/0 证据。
+
+状态收敛 commit `2539f104fe2d41ad6f11fb731501c4845183652a` 的 fixed-SHA 双轴 Review、完整本地门、
+真实 MySQL 8 与精确 `headSha` CI 曾分别达到 0/0 与 GREEN；但随后 Linux Chrome 可见故障矩阵在
+`after_version` 首个注入场景发现 helper 未触发故障：页面错误显示采用成功，目标 revision 由 1 变为 2，
+version/audit 各新增 1 行，writer 计数为 `1/1/0`。矩阵在 finding 后立即停止，旧 SHA 的终点证据随即失效。
+
+真实 Alembic/SQLite 公共 writer 路径的 finding RED 已由
+`3e6d4c2bf33cc1e642b0aad23ccab59113417115` 固定：同一节点连续两轮均为 `1 failed`，失败均为
+`DID NOT RAISE ConfirmedWriteRejected`，node hash
+`9d28c8d1f28b57e005ff5a2a2af5843d9e1846a0b8802c65f6d12c1431bd2345`。根因是 helper 只接受 exact
+`str` 表名，而真实 ORM 表名为 `str` 子类 `quoted_name`，使 `after_version` 与 `after_audit` 均无法登记。
+最小修复候选只放宽该测试态表名识别；目标节点、全部 W008 合同与完整 WRITE 分别为
+`1/27/233 passed`，Ruff/format/diff、变更范围 Pyright 与 `pip check` 通过。该候选尚无 fixed SHA；不得据此恢复旧 Review、CI、
+MySQL、浏览器或 Issue 门，也不得宣称 W008 闭合、merge、Issue 关闭或 release。
