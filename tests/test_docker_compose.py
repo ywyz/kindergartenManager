@@ -55,5 +55,7 @@ def test_production_caddy_requires_a_domain_and_explicit_tls() -> None:
     ]
 
     assert "${CADDY_DOMAIN:?" in str(caddy_environment.get("CADDY_DOMAIN", ""))
-    assert "https://{$CADDY_DOMAIN}" in active_lines
+    assert any(
+        line.startswith("https://{$CADDY_DOMAIN}") for line in active_lines
+    )
     assert ":80" not in active_lines
