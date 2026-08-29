@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import re
 from dataclasses import fields
+from datetime import timedelta
 
 import pytest
 from sqlalchemy import event, text
@@ -567,3 +568,72 @@ async def test_commit_unknown_without_audit_reconciles_not_applied_and_never_rep
             await service.apply(ui_session, pending.confirmation_id)
     _assert_rejected(api, replay.value, "confirmation_indeterminate")
     assert replay_statements == []
+
+
+@pytest.mark.parametrize("commit_outcome", ["applied", "not-applied"])
+@pytest.mark.asyncio
+async def test_definitive_reconcile_releases_expired_confirmation_capacity(
+    write_database: WriteDatabase,
+    commit_outcome: str,
+) -> None:
+    api = write_api()
+    clock = MutableClock()
+    service = api.ConfirmedDailyPlanWriteService(
+        session_factory=write_database.session_factory,
+        clock=clock,
+        store_capacity=1,
+    )
+    ui_session = trusted_ui_session()
+    pending = await service.issue_confirmation(
+        ui_session,
+        build_patch(),
+        expected_revision=1,
+    )
+
+    if commit_outcome == "applied":
+
+        def disconnect(_session: Session) -> None:
+            raise DisconnectionError("synthetic disconnect after commit")
+
+        event.listen(Session, "after_commit", disconnect)
+        listener_target = Session
+        listener_name = "after_commit"
+        next_revision = 2
+        next_before = AFTER_GOAL
+    else:
+
+        def disconnect(_connection) -> None:
+            raise DisconnectionError("synthetic disconnect before commit")
+
+        event.listen(write_database.engine.sync_engine, "commit", disconnect)
+        listener_target = write_database.engine.sync_engine
+        listener_name = "commit"
+        next_revision = 1
+        next_before = BEFORE_GOAL
+
+    try:
+        with pytest.raises(api.ConfirmedWriteRejected) as unknown:
+            await service.apply(ui_session, pending.confirmation_id)
+    finally:
+        event.remove(listener_target, listener_name, disconnect)
+    _assert_rejected(api, unknown.value, "commit_outcome_unknown")
+
+    if commit_outcome == "applied":
+        result = await service.reconcile(ui_session, pending.confirmation_id)
+        assert result.after_revision == 2
+    else:
+        with pytest.raises(api.ConfirmedWriteRejected) as reconciled:
+            await service.reconcile(ui_session, pending.confirmation_id)
+        _assert_rejected(api, reconciled.value, "commit_not_applied")
+
+    clock.move_to(pending.expires_at_utc + timedelta(microseconds=1))
+    replacement = await service.issue_confirmation(
+        ui_session,
+        build_patch(
+            before_goal=next_before,
+            after_goal=f"{AFTER_GOAL}-replacement",
+        ),
+        expected_revision=next_revision,
+    )
+
+    assert replacement.confirmation_id != pending.confirmation_id
