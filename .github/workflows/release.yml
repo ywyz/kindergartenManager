@@ -226,9 +226,15 @@ jobs:
 
             1. 下载 `KindergartenManager-Setup-${{ steps.ver.outputs.version }}.exe`
             2. 双击运行安装向导，按提示完成安装
-            3. 从开始菜单或桌面快捷方式启动
-            4. 程序自动打开浏览器至 http://localhost:8080
-            5. 访问 http://localhost:8080/setup 创建管理员账号
+            3. 安装结束时不要启动应用；若已自动启动请先关闭，再在 PowerShell 中显式创建管理员（密码交互输入，不回显）：
+
+               ```powershell
+               cd "$env:ProgramFiles\KindergartenManager"
+               .\KindergartenManager.exe --init
+               ```
+
+            4. 从开始菜单或桌面快捷方式启动
+            5. 访问 http://localhost:8080/login 登录
 
             > ⚠️ **Windows 安全提示**：首次运行可能触发 Windows Defender 警告，点击"更多信息" → "仍要运行"即可。
 
@@ -244,8 +250,15 @@ jobs:
             # 下载 .deb 并安装
             sudo dpkg -i kindergarten-manager_${{ steps.ver.outputs.version }}_amd64.deb
 
-            # 服务自动启动，访问：
-            # http://localhost:8080/setup
+            # 首次创建管理员：停止应用，复用 systemd 的受保护配置交互初始化
+            sudo systemctl stop kindergarten-manager
+            sudo systemd-run --wait --pty --collect \
+              --property=EnvironmentFile=/etc/kindergarten-manager/env \
+              --property=WorkingDirectory=/var/lib/kindergarten-manager \
+              /opt/kindergarten-manager/KindergartenManager --init
+            sudo systemctl start kindergarten-manager
+
+            # 登录：http://localhost:8080/login
             ```
 
             配置文件：`/etc/kindergarten-manager/env`（安装时自动生成随机密钥）
@@ -266,18 +279,24 @@ jobs:
             # 使用仓库中的 docker-compose.yml（含 MySQL 8）
             docker compose up -d
 
+            # 首次创建管理员（密码交互输入，不回显）
+            docker compose exec app python -m app.jobs.bootstrap_admin --init
+
             # 或直接拉取镜像（使用外部 MySQL）
             docker pull ghcr.io/ywyz/kindergartenmanager:${{ steps.ver.outputs.version }}
             ```
 
             **最简 Docker 启动（SQLite，演示用）**：
             ```bash
-            docker run -d \
+            docker run -d --name kindergarten-manager \
               -p 8080:8080 \
               -e ENCRYPTION_KEY="$(head -c 32 /dev/urandom | base64)" \
               -e JWT_SECRET="$(head -c 64 /dev/urandom | base64)" \
               -v kg-data:/app \
               ghcr.io/ywyz/kindergartenmanager:${{ steps.ver.outputs.version }}
+
+            docker exec -it kindergarten-manager \
+              python -m app.jobs.bootstrap_admin --init
             ```
 
             ---

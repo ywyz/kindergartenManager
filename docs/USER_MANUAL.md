@@ -2,8 +2,8 @@
 
 ## 1. 使用前须知
 
-当前工作树已恢复本地账号登录：启动后进入 `/login`，业务页面按当前 active 用户隔离。该改动尚未提交、
-发布或完成人工验收；使用安装包时仍以对应 release 的说明为准。
+应用启动后进入 `/login`，业务页面按当前 active 用户隔离。全新空库不会匿名注册或自动创建默认管理员；
+首次管理员必须在应用主机上通过受控命令显式初始化。
 
 - Windows/Linux 打包版默认用于本机使用。
 - 源码和 Docker 模式可能监听局域网；即使已有登录，也不要在未配置 TLS、强密码和网络访问控制时直接暴露公网。
@@ -34,13 +34,42 @@ python3 -m venv .venv
 
 ```bash
 docker compose up -d
+docker compose exec app python -m app.jobs.bootstrap_admin --init
 ```
 
-生产或共享环境必须先修改 `.env` 中的数据库密码和密钥，并限制 UI 的网络访问。
+初始化命令会交互读取管理员密码且不回显。生产或共享环境必须先修改 `.env` 中的数据库密码和密钥，
+并限制 UI 的网络访问。
 
 ### Windows/Linux 安装包
 
 从与目标版本 tag 对应的 GitHub Release 获取。首次运行可能需要允许防火墙/Defender 提示；应核对发布来源和版本。
+
+Windows 安装版在安装结束时先不要启动应用；若已自动启动请关闭，再在 PowerShell 中运行（便携包则在解压目录运行同名程序）：
+
+```powershell
+cd "$env:ProgramFiles\KindergartenManager"
+.\KindergartenManager.exe --init
+```
+
+Linux 便携包在解压目录运行：
+
+```bash
+./KindergartenManager --init
+```
+
+Debian 安装版需要先停服务，再复用 systemd 的受保护配置运行同一个初始化入口：
+
+```bash
+sudo systemctl stop kindergarten-manager
+sudo systemd-run --wait --pty --collect \
+  --property=EnvironmentFile=/etc/kindergarten-manager/env \
+  --property=WorkingDirectory=/var/lib/kindergarten-manager \
+  /opt/kindergarten-manager/KindergartenManager --init
+sudo systemctl start kindergarten-manager
+```
+
+以上初始化方式都交互读取密码，不要把管理员密码写入 URL、命令参数、脚本或聊天记录。完成后从
+`http://localhost:8080/login` 登录。
 
 ## 3. 首次配置
 
