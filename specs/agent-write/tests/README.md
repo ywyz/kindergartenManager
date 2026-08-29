@@ -359,7 +359,8 @@ browser helper 在应用导入前移除继承 proxy 并固定双写 loopback `NO
 `5 failed, 19 passed`，失败节点完全一致，node hash
 `51117cf0ab127871ceab6be424f792336eaa5b3e99f9a693171a6d21118516ac`；中间候选不得进入复审或外部门。
 
-最小修复候选把 disposable schema 改为无 grant 通配字符的 `kmw008`，URL gate 拒绝非字母数字 schema，
-classifier 按大小写精确匹配并只接受正确转义的历史 wildcard grant。全部 W008/WRITE 分别为
-`42/248 passed`，Ruff/format/diff、变更范围 Pyright 与 `pip check` 通过。该候选尚无 fixed SHA，
-不得据此宣称 Review 0/0、真实 MySQL、push/CI、Chrome 矩阵、Issue 回写或 W008 闭合。
+最小修复已由 `595394cca283c1e710bb98583d3f9d742a490c7a` 提交：disposable schema 改为无 grant
+通配字符的 `kmw008`，URL gate 拒绝非字母数字 schema，classifier 按大小写精确匹配并只接受正确转义的
+历史 wildcard grant。全部 W008/WRITE 分别为 `42/248 passed`，Ruff/format/diff、变更范围 Pyright 与
+`pip check` 通过。该修复尚未复审；不得据此宣称 Review 0/0、真实 MySQL、push/CI、Chrome 矩阵、
+Issue 回写或 W008 闭合。
