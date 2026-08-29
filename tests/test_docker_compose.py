@@ -29,3 +29,15 @@ def test_mysql_healthcheck_uses_the_configured_root_password() -> None:
 
     assert "kg_root_2024" not in rendered
     assert "$${MYSQL_ROOT_PASSWORD}" in rendered
+
+
+def test_compose_requires_explicit_database_passwords() -> None:
+    """The supported server topology must not silently deploy known passwords."""
+    compose = yaml.safe_load((_ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
+    app_database_url = compose["services"]["app"]["environment"]["DATABASE_URL"]
+    database_environment = compose["services"]["db"]["environment"]
+
+    assert "kg_pass_2024" not in app_database_url
+    assert "${MYSQL_PASSWORD:?" in app_database_url
+    assert "${MYSQL_ROOT_PASSWORD:?" in database_environment["MYSQL_ROOT_PASSWORD"]
+    assert "${MYSQL_PASSWORD:?" in database_environment["MYSQL_PASSWORD"]
