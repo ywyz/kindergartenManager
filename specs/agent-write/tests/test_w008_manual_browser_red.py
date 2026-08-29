@@ -15,6 +15,15 @@ import pytest
 from sqlalchemy import column, table, update
 from sqlalchemy.exc import DisconnectionError
 
+from conftest import (
+    MutableClock,
+    WriteDatabase,
+    build_patch,
+    database_snapshot,
+    trusted_ui_session,
+    write_api,
+)
+
 
 HELPER_PATH = Path(__file__).parents[1] / "manual" / "w008_browser.py"
 TESTED_SHA = "a" * 40
@@ -191,6 +200,34 @@ async def test_known_faults_are_injected_once_only_in_writer_sessions(
     else:
         assert injected_base.commit_calls == base_calls
     assert ordinary.commit_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_after_version_fault_hits_real_writer_path_and_rolls_back(
+    migrated_write_database: WriteDatabase,
+) -> None:
+    helper = _load_helper()
+    api = write_api()
+    service = api.ConfirmedDailyPlanWriteService(
+        session_factory=helper.writer_session_factory(
+            migrated_write_database.session_factory,
+            helper.FaultPoint.AFTER_VERSION,
+        ),
+        clock=MutableClock(),
+    )
+    ui_session = trusted_ui_session()
+    pending = await service.issue_confirmation(
+        ui_session,
+        build_patch(),
+        expected_revision=1,
+    )
+    baseline = await database_snapshot(migrated_write_database)
+
+    with pytest.raises(api.ConfirmedWriteRejected) as raised:
+        await service.apply(ui_session, pending.confirmation_id)
+
+    assert raised.value.code == "write_failed"
+    assert await database_snapshot(migrated_write_database) == baseline
 
 
 @pytest.mark.parametrize(
