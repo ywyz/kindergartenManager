@@ -383,3 +383,11 @@ fixed-SHA、Git、linked-worktree/clean 与 import activation 信任根，同时
 文件策略。finding 节点与全部 W008 合同为 `2/44 passed`，完整 WRITE 为 `250 passed`；Ruff/format/diff
 与变更范围 Pyright 通过。该 GREEN commit 尚未取得自身的 fixed-SHA 双轴 Review；包含本段的后续 SHA
 也必须重新 Review，且不得预先宣称真实 MySQL、push/CI、Chrome、Issue 或 W008 闭合。
+
+状态收敛 SHA `c0d7210892063ad8b7c94423f68f0014d40373d1` 的 fixed-SHA Review 为 Standards
+H0/M1/L0、Spec H0/M0/L0。先前 duplicated-code finding 已关闭；剩余 Medium finding 是
+`CONTEXT.md` 的“当前共同下一步”仍称 W007 闭合后才进入 W008，与同文件分支状态及 canonical ledger
+矛盾。对应 finding RED 已由 `009e842f98bacd43b9c13b523fbf7cae64f727fe` 固定：目标文件连续两轮均为
+`1 failed, 2 passed`，失败节点完全一致，node hash
+`a1687b69f353c4795b2aaf117a3c1060b13ac81afde8ff7d902755fb7a3dd83e`。该轮 Spec 0/0 不能替代
+Standards finding；修复后生成的新 SHA 仍须取得自身双轴 Review，且所有后续门保持未闭合。

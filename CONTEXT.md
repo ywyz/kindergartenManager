@@ -223,8 +223,8 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
 
 1. 按 canonical ledger 的当前门依次完成 finding RED、最小修复、本地 GREEN、固定 SHA 双轴复审、push、
    精确 SHA CI、人工验收和 Issue #52 回写；各门保持可见且不得提前宣称完成。
-2. W007 上述门全部闭合后才进入 W008；任何产品/helper/test 变化都要求在新 SHA 重跑对应 Review、CI 和
-   平台证据。
+2. W007 已闭合；当前按 canonical ledger 完成 W008 的剩余门。任何产品/helper/test 变化都要求在新 SHA
+   重跑对应 Review、CI 和平台证据。
 3. 默认停止在 merge、Issue 关闭和 release 之前；不得给 Provider 增加 WRITE、自动重试、批量/跨页面采用、
    设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。
 4. Windows/Word/MySQL 和其他业务模块人工回归仍是独立工作，不与 Agent 结果互相替代。
