@@ -113,7 +113,8 @@ after_revision: int
 ```
 
 成功结果不含计划正文、Patch、字段 before/after 值、session、Prompt、Provider 输出或凭据。拒绝、stale、
-not-applied、indeterminate 与 integrity failure 通过关闭的应用错误码表达，错误正文不得携带业务内容或原异常。
+indeterminate 与 integrity failure 通过关闭的应用错误码表达，错误正文不得携带业务内容或原异常。现有 UI
+保留 not-applied 关闭状态，但当前 service 没有数据库级负证据可安全地产生该终态。
 
 ## 6. 逐次确认绑定
 
@@ -173,7 +174,9 @@ confirmation + nonce hash 查询唯一审计，逐项校验 patch、session、te
 revision 的引用和值一致：
 
 - 完整匹配：重构并返回与原 apply 相同的 `ConfirmedDailyPlanWriteResult`；
-- 明确不存在：返回 not-applied；
+- 当前查询看不到 audit：以 `confirmation_indeterminate` 拒绝，保留同一 confirmation 的显式重试对账入口；
+  即使客户端观察到 rollback，也不能把它冒充为数据库持久负证据；若长期不确定占满有界 store，必须
+  fail closed，不能丢弃旧 confirmation 或重放 Patch；
 - audit、before version 或当前业务行发生证据冲突：以
   `reconcile_integrity_failure` 拒绝并要求人工处置；store 中 confirmation/nonce 材料丢失或仍无法确定时以
   `confirmation_indeterminate` 拒绝。
@@ -224,7 +227,8 @@ RED 只从 `specs/agent-write/tests/` 穿过第 5 节公开 seam；不读取 ser
 6. **失败全回滚**：分别在 snapshot 后、业务 UPDATE 后、audit 后、commit 前注入确定性失败，并在全部 DML
    后、commit 前注入任务取消；业务字段、revision、version 与 audit 全部回到 baseline，确认不可自动重试。
 7. **commit unknown**：apply 不返回伪成功、不重放；同 confirmation/nonce 的 reconcile 只读返回同一四字段
-   success result，或明确 not-applied/indeterminate/integrity failure。
+   success result，或 indeterminate/integrity failure；暂时不存在 audit 仍是 indeterminate，不得误报
+   not-applied。
 8. **关闭能力面**：Foundation registry 仍恰好四 READ + 两 DRAFT；Provider payload/Tool 参数没有 WRITE、
    confirmation、nonce、session 或事务数据；设置、删除、创建、Word、文件、导出等仍不可写。
 

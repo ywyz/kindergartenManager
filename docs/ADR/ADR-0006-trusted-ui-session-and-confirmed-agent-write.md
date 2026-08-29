@@ -119,9 +119,10 @@ snapshot/audit 失败或明确 commit 失败都 rollback 全部三类变化。�
 成功审计，也不得自动重放 WRITE。
 
 若 commit 调用结果未知，确认进入 `indeterminate`；应用只能在新只读事务中用唯一 `confirmation_id` 查询
-不可变审计并对账，返回 applied 或 not-applied/仍不确定。`reconcile` 必须逐项核对 store nonce、patch、session、
-tenant/user、plan、before version 与业务 revision 的引用和值，绝不再次应用 Patch。任一证据不一致都返回
-完整性失败并停止人工处置。
+不可变审计并对账，返回 applied 或仍不确定。一次查询暂时看不到成功审计，不是数据库级负证据，必须保留
+同一 confirmation 的显式重试对账入口，不能误报 not-applied。`reconcile` 必须逐项核对 store nonce、patch、
+session、tenant/user、plan、before version 与业务 revision 的引用和值，绝不再次应用 Patch。任一证据不一致
+都返回完整性失败并停止人工处置。
 
 ### 5. 操作前版本与最小审计是不可变业务证据
 

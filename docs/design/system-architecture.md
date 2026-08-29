@@ -243,6 +243,9 @@ DRAFT 只返回内存 `PlanPatch`，不修改 UI 正文、数据库、版本、p
 - `DATABASE_URL` 留空时使用 SQLite。
 - `ENCRYPTION_KEY`、`JWT_SECRET` 留空时自动生成；源码模式的自动密钥写入当前工作目录的
   `.kindergarten_secrets`，打包模式才写入平台用户数据目录，显式的 `KINDERGARTEN_DATA_DIR` 可覆盖数据根。
+  POSIX 显式/打包数据根逐路径组件拒绝 symlink 与不可信可写祖先，并在使用前收敛为当前用户的 `0700`；
+  `.env` 通过同一已验证目录 FD 以 `0600` 原子读写。默认 `Settings` 直接消费该安全读取快照，环境变量仍高于
+  dotenv，不能在安全检查后按路径二次打开。
 - `API_KEYS` 留空时业务 API 关闭。
 - `API_SIGNING_SECRET` 非空时强制 HMAC。
 - `IMAGE_STORAGE_BACKEND` 当前默认 `mysql_blob`。

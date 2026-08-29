@@ -18,7 +18,7 @@ ConfirmedDailyPlanWriteService
 | 文件 | 固定行为 |
 |---|---|
 | `test_confirmation_binding_red.py` | 安全 Pending DTO、Patch 完整性、actor/tenant/user/jti、三个入口重读 active User、reconcile 精确 jti、target、revision、before、expiry、store 丢失、逐 Patch 确认、一次消费与并发双击 |
-| `test_transaction_atomicity_red.py` | apply 前全部 operation 校验零 DML、等待期无连接、单短事务、精确 id+旧 revision CAS、snapshot/update/audit/commit 四个已知失败点及 commit 前任务取消全回滚、commit-unknown applied/not-applied 对账；reconcile 逐项绑定 nonce/patch/session/actor/plan/version/business 且永不重放 |
+| `test_transaction_atomicity_red.py` | apply 前全部 operation 校验零 DML、等待期无连接、单短事务、精确 id+旧 revision CAS、snapshot/update/audit/commit 四个已知失败点及 commit 前任务取消全回滚、commit-unknown applied/indeterminate 对账；reconcile 逐项绑定 nonce/patch/session/actor/plan/version/business 且永不重放 |
 | `test_immutable_evidence_red.py` | 完整精确的操作前 daily-plan 快照及规范 hash、全 no-op 拒绝与 mixed no-op+真实变化的多字段成功、四字段 Result、最小脱敏审计、confirmation 数据库唯一约束、同/异 jti 的 nonce/session 单向 hash、SQLite migration trigger 的 ORM/直接 SQL 不可变性、MySQL 离线 DDL 四 trigger、Foundation 仍仅六个 READ/DRAFT Tool |
 | `test_w007_confirmation_ui_red.py` | 页面本地单 Patch capability、安全只读 snapshot、逐次 issue/apply/reconcile、single-flight、生命周期失效、过期/stale/失败关闭、commit-unknown 只允许用户显式对账且不自动重试 |
 
@@ -510,3 +510,19 @@ fresh mock 上按独立进程/数据库顺序完成 13 场景，mock 精确接�
 全部合成 secret、临时数据库/目录、MySQL tmpfs 容器、应用/mock 进程与浏览器标签已删除或停止。
 包含本段的 evidence-closure SHA 仍须取得自身的双轴 Review、push/PR CI，之后才可进入
 `--no-ff` merge 与 merge-SHA 后续门。
+
+PR #53 的远端自动 Review 随后在 `2e056d2979a0b1569efb5dcef74ea1a26a8f5f14` 发现三项新问题：显式
+`KINDERGARTEN_DATA_DIR/.env` 写入后启动仍从 cwd 读取；已有宽权限数据目录未在运行文件访问前收敛；
+commit-unknown 的原 COMMIT 仍在执行时，首次 audit 阴性读取会被 UI 永久终结为 not-applied。对应第一组
+纯测试 RED `7de8547` 连续两轮均为 `7 failed`。路径首版 GREEN 的独立 Review 又发现安全快照后按路径二次
+打开、显式 subclass dotenv 被覆盖、中间 symlink/不可信可写祖先与目录项未 fsync 四项缺口；第二组纯测试
+RED `a630805` 连续两轮均为 `5 failed`。
+
+commit-unknown 最小修复 `a45198f` 取消无数据库负证据的 `RECONCILED_NOT_APPLIED` 终态：audit 暂不可见时
+同一 confirmation 保持 indeterminate、可重复只读 reconcile 且永不重放，后续完整证据可见才收敛 applied；
+有界 store 压力下 fail closed。路径最小修复 `0d2547f` 逐组件安全打开 POSIX 数据根，在同一目录 FD 上完成
+`.env` 的 `0600` 读取、原子替换与目录 fsync，并让默认 Settings 直接消费安全 dotenv 快照，同时保留标准
+source 优先级和显式 override。Main 复跑路径/config `58 passed`、commit-unknown service/UI `93 passed`；
+两组独立 GREEN Review 均为 H0/M0/L0。上述产品/helper/test 变化已使 `bba33dc…` 的完整 MySQL 与浏览器证据
+失效；包含本段的后续候选必须重新执行全部本地、MySQL、13 场景浏览器、fixed-SHA Review 与 PR CI 门，本文
+不预先宣称这些后续门通过。

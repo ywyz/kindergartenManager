@@ -68,8 +68,9 @@ secrets lock 与 loopback 端口。fault 仅包装 `ConfirmedDailyPlanWriteServi
 5. **页面边界回归**：A→B→A、另一标签、reload/disconnect 均不恢复或跨页采用旧 Patch。
 6. **确定性事务故障**：分别使用 `after_version`、`after_cas`、`after_audit`、
    `known_before_commit`；页面显示关闭失败，业务正文/revision/version/audit 全回 baseline，apply 恰一次。
-7. **commit unknown / not applied**：`unknown_before_commit` 后只能显式点“人工对账”；显示未生效，
-   reconcile 恰一次，数据库全回 baseline。
+7. **commit unknown / audit 暂不可见**：`unknown_before_commit` 后只能显式点“人工对账”；本轮点一次后仍显示
+   结果不确定并保留同一页面内对账入口，reconcile 恰一次，数据库全回 baseline；不得把当前 audit 缺失误报为
+   未生效，也不得重放 Patch。
 8. **commit unknown / applied**：`unknown_after_commit` 后显式人工对账；显示已采用，revision `N → N+1`，
    version/audit 各恰一行；不得再次 apply。
 

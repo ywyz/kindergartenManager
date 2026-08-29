@@ -570,7 +570,7 @@ async def test_commit_unknown_without_audit_stays_indeterminate_and_never_replay
     assert replay_statements == []
 
 
-@pytest.mark.parametrize("commit_outcome", ["applied", "not-applied"])
+@pytest.mark.parametrize("commit_outcome", ["applied", "indeterminate"])
 @pytest.mark.asyncio
 async def test_applied_reconcile_releases_capacity_but_indeterminate_fails_closed(
     write_database: WriteDatabase,
