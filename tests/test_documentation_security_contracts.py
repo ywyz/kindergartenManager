@@ -141,3 +141,51 @@ def test_current_migration_head_is_consistent_across_operator_docs() -> None:
     ]
 
     assert not missing, f"current Alembic head missing from: {missing}"
+
+
+def test_all_authoritative_docs_distinguish_source_and_packaged_data_dirs() -> None:
+    """Every operator entry point must describe the same runtime path behavior."""
+    required = {
+        "README.md": "源码模式默认为当前工作目录",
+        "docs/ADR/ADR-0003-sqlite-default-mysql-optional-alembic.md": (
+            "源码模式使用当前工作目录"
+        ),
+        "docs/design/system-architecture.md": (
+            "源码模式的自动密钥写入当前工作目录"
+        ),
+    }
+    missing = [
+        relative_path
+        for relative_path, expected in required.items()
+        if expected not in (_ROOT / relative_path).read_text(encoding="utf-8")
+    ]
+
+    assert not missing, f"source/package data directory split missing from: {missing}"
+
+
+def test_developer_status_points_to_the_canonical_agent_write_ledger() -> None:
+    """The developer guide must not describe the current branch as uncommitted RED."""
+    developer = (_ROOT / "docs/DEVELOPER.md").read_text(encoding="utf-8")
+
+    assert "正在实现尚未提交" not in developer
+    assert "specs/agent-write/tests/README.md" in developer
+
+
+def test_compose_bootstrap_docs_use_an_explicit_one_shot_remote_override() -> None:
+    """Compose bootstrap reaches db without enabling remote bootstrap at runtime."""
+    required_command = (
+        "docker compose exec -e BOOTSTRAP_ADMIN_ALLOW_REMOTE=true app "
+        "python -m app.jobs.bootstrap_admin --init"
+    )
+    missing = [
+        relative_path
+        for relative_path in (
+            "README.md",
+            "docs/USER_MANUAL.md",
+            ".github/workflows/release.yml",
+        )
+        if required_command
+        not in (_ROOT / relative_path).read_text(encoding="utf-8")
+    ]
+
+    assert not missing, f"safe Compose bootstrap command missing from: {missing}"

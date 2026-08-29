@@ -52,6 +52,7 @@ def test_app_service_does_not_receive_mysql_root_credentials() -> None:
     assert "MYSQL_ROOT_PASSWORD" in database_environment
     assert "env_file" not in application
     assert "MYSQL_ROOT_PASSWORD" not in application["environment"]
+    assert "BOOTSTRAP_ADMIN_ALLOW_REMOTE" not in application["environment"]
 
 
 def test_production_caddy_requires_a_domain_and_explicit_tls() -> None:
