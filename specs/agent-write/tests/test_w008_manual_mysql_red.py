@@ -142,54 +142,99 @@ def test_mysql_url_loader_rejects_the_root_principal(username: str) -> None:
     assert password not in repr(raised.value)
 
 
+@pytest.mark.parametrize("database", ("w008_db", "w008%db"))
+def test_mysql_url_loader_rejects_wildcard_prone_database_names(
+    database: str,
+) -> None:
+    helper = _load_helper()
+
+    with pytest.raises(helper.ManualHelperError, match="database"):
+        helper.load_mysql_url(
+            {
+                "W008_MYSQL_DATABASE_URL": (
+                    "mysql+aiomysql://kmw008:synthetic-password"
+                    f"@127.0.0.1:3306/{database}"
+                )
+            }
+        )
+
+
 @pytest.mark.parametrize(
-    ("principal", "grants", "expected"),
+    ("principal", "database", "grants", "expected"),
     (
         (
             "km_w008@%",
+            "w008db",
             (
                 "GRANT USAGE ON *.* TO `km_w008`@`%`",
-                "GRANT ALL PRIVILEGES ON `w008_db`.* TO `km_w008`@`%`",
+                "GRANT ALL PRIVILEGES ON `w008db`.* TO `km_w008`@`%`",
             ),
             True,
         ),
         (
+            "km_w008@%",
+            "w008_db",
+            ("GRANT ALL ON `w008\\_db`.* TO `km_w008`@`%`",),
+            True,
+        ),
+        (
             "root@localhost",
+            "w008db",
             ("GRANT ALL PRIVILEGES ON *.* TO `root`@`localhost`",),
             False,
         ),
         (
             "km_w008@%",
+            "w008db",
             ("GRANT ALL PRIVILEGES ON *.* TO `km_w008`@`%`",),
             False,
         ),
         (
             "km_w008@%",
-            ("GRANT ALL ON `other_db`.* TO `km_w008`@`%`",),
+            "w008_db",
+            ("GRANT ALL ON `w008_db`.* TO `km_w008`@`%`",),
             False,
         ),
         (
             "km_w008@%",
-            ("GRANT ALL ON `w008_db`.* TO `km_w008`@`%` WITH GRANT OPTION",),
+            "w008db",
+            ("GRANT ALL ON `otherdb`.* TO `km_w008`@`%`",),
             False,
         ),
         (
             "km_w008@%",
+            "w008db",
+            ("GRANT ALL ON `W008DB`.* TO `km_w008`@`%`",),
+            False,
+        ),
+        (
+            "km_w008@%",
+            "w008db",
+            ("GRANT ALL ON `w008db`.* TO `km_w008`@`%` WITH GRANT OPTION",),
+            False,
+        ),
+        (
+            "km_w008@%",
+            "w008db",
             ("GRANT `w008_role`@`%` TO `km_w008`@`%`",),
             False,
         ),
     ),
     ids=(
         "schema-only",
+        "escaped-wildcard",
         "root",
         "global",
+        "unescaped-wildcard",
         "other-schema",
+        "case-mismatch",
         "grant-option",
         "role",
     ),
 )
 def test_mysql_principal_classifier_accepts_only_one_schema(
     principal: str,
+    database: str,
     grants: tuple[str, ...],
     expected: bool,
 ) -> None:
@@ -199,7 +244,7 @@ def test_mysql_principal_classifier_accepts_only_one_schema(
         helper._principal_grants_are_schema_scoped(
             principal=principal,
             expected_username="km_w008",
-            expected_database="w008_db",
+            expected_database=database,
             grants=grants,
         )
         is expected
