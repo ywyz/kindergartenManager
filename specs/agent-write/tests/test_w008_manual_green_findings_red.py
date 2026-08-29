@@ -232,6 +232,17 @@ def test_w008_ledger_does_not_report_a_committed_green_as_uncommitted() -> None:
 
 def test_mysql8_container_allows_app_owned_trigger_migrations_explicitly() -> None:
     procedure = MANUAL_README.read_text(encoding="utf-8")
+    docker_start = procedure.index("sudo -n docker run")
+    docker_end = procedure.index("```", docker_start)
+    docker_block = procedure[docker_start:docker_end]
 
-    assert "--log-bin-trust-function-creators=1" in procedure
-    assert "@@log_bin_trust_function_creators" in procedure
+    option = "--log-bin-trust-function-creators=1"
+    assert docker_block.count(option) == 1
+    assert docker_block.index("mysql:8") < docker_block.index(option)
+    assert "--skip-log-bin" not in docker_block
+    assert (
+        "SELECT VERSION(), @@GLOBAL.log_bin, "
+        "@@GLOBAL.log_bin_trust_function_creators" in procedure
+    )
+    assert "MYSQL_ROOT_URL" not in procedure
+    assert 'W008_MYSQL_DATABASE_URL="$MYSQL_URL"' in procedure

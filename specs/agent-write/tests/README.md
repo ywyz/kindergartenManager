@@ -293,9 +293,19 @@ MySQL/浏览器验收或 Issue 回写；Spec 0/0 不能替代 Standards findings
 Standards H0/M0/L0、Spec H0/M0/L0；本地 revision/WRITE/Foundation/ordinary 分别为
 `12/231/261/847 passed`，静态门与依赖审计 GREEN。首次真实 MySQL 8 单次验收使用官方 image digest
 `sha256:e9027fe4d91c0153429607251656806cc784e914937271037f7738bd5b8e7709`，fresh 空库与
-MySQL `8.0.27` 已确认，但 app migration 在 `b7d9e1f3a5c2` 创建首个 trigger 时被 errno `1419` 拒绝；
-只读诊断为 `@@log_bin=1`、`@@log_bin_trust_function_creators=0`、head 仍为 `a6c4d8e2f9b1`、trigger 为 0。
+MySQL `8.0.27` 已确认，但 app migration 在 revision b7d9e1f3a5c2 创建首个 trigger 时被 errno `1419` 拒绝；
+只读诊断为 `@@log_bin=1`、`@@log_bin_trust_function_creators=0`、head 仍为 a6c4d8e2f9b1、trigger 为 0。
 失败后未重跑、未执行 live helper；容器保留完成只读诊断后按精确名称停止，`--rm + tmpfs` 已移除合成库。
 该 finding 合同连续两轮均为 `1 failed, 6 passed`，失败 node 完全一致，node hash
-`2bd8936f94bd9a89eec6e27e0413824c5fd391d7c9acada292338ee0f59f97c0`；旧 Review/本地证据均不得
-作为后续新 SHA 的最终证据。
+`2bd8936f94bd9a89eec6e27e0413824c5fd391d7c9acada292338ee0f59f97c0`，并由
+`44bdf21a34b45f9ac6c1fcab1f851c9b080e0d9f` 固定；旧 Review/本地证据均不得作为后续新 SHA 的
+最终证据。
+
+修复候选的完整 WRITE precheck 另发现上述 W008 migration revision 的反引号记法会被既有 W007
+唯一-ledger 守卫当作 W007 commit lineage；对应既有守卫节点连续两轮均为 `1 failed`，node hash
+`2bbe8db6e0ec5fc1d0956d69726d876e69852aa1c7bd819a6b0458123c251217`。该 RED 已包含在 `44bdf21…`
+ancestry；最小修正只把 migration revision 改成非 commit 引用记法，不放宽 W007 守卫。
+
+提交前最小修正候选的 MySQL 前提合同为 `7 passed`，W007 唯一-ledger 守卫恢复 GREEN，完整 WRITE 为
+`232 passed`。实际 fixed SHA 只由包含本段的后续 commit 决定；这些 precheck 不预先宣称新 SHA 的
+Review、本地全门、真实 MySQL、浏览器、CI 或 Issue 门通过。

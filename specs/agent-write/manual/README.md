@@ -105,11 +105,24 @@ sudo -n docker run --detach --rm --name "$MYSQL_CONTAINER" \
   --env MYSQL_PASSWORD="$MYSQL_APP_PASSWORD" \
   --health-cmd='MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqladmin ping --silent -h 127.0.0.1 -uroot' \
   --health-interval=1s --health-timeout=5s --health-retries=120 \
-  mysql:8
+  mysql:8 \
+  --log-bin-trust-function-creators=1
 ```
 
-容器 healthy 后记录官方 image digest 与 `SELECT VERSION()`，并先证明 `km_w008` 没有任何表。随后用随机
-app 密码只在进程环境中组装 URL；不得把 URL 作为 CLI 参数或贴入证据：
+该 server 参数只适用于本次 loopback/tmpfs disposable 验收容器：保留默认 binary log，但显式允许没有全局
+`SUPER` 的 schema-scoped app user 创建 migration 定义的 trigger；不得外推为共享生产 MySQL 的默认配置，
+也不得以 `--skip-log-bin`、root migration URL 或 app `SUPER` 代替。容器 healthy 后记录官方 image digest，
+并只读确认 MySQL major 8、`@@GLOBAL.log_bin=1`、`@@GLOBAL.log_bin_trust_function_creators=1` 与 fresh schema
+table count `0`：
+
+```text
+sudo -n docker exec "$MYSQL_CONTAINER" sh -lc \
+  'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -N -B -h127.0.0.1 -uroot -D km_w008 \
+  -e "SELECT VERSION(), @@GLOBAL.log_bin, @@GLOBAL.log_bin_trust_function_creators; SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE();"'
+```
+
+随后用随机 app 密码只在进程环境中组装 URL；Alembic 与 live helper 都不得使用 root/SUPER principal，
+不得把 URL 作为 CLI 参数或贴入证据：
 
 ```text
 MYSQL_URL="mysql+aiomysql://km_w008:$MYSQL_APP_PASSWORD@127.0.0.1:$MYSQL_PORT/km_w008?charset=utf8mb4"
