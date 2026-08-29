@@ -222,8 +222,9 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
 
 当前共同下一步是：
 
-1. 先为 PR #53 回流的 Compose trigger 前提与确定对账容量 finding 保留稳定 RED lineage，完成最小修复；
-   再按 canonical ledger 在新 SHA 重跑本地、双轴 Review、push、精确 SHA CI、MySQL/Chrome 与 Issue 证据。
+1. PR #53 回流的 Compose trigger、确定对账容量 finding，以及发布前核出的打包 bootstrap、Compose 密码/数据卷、
+   Debian 非 root 数据权限与过时说明均已保留稳定 RED lineage 并完成最小修复；现在按 canonical ledger 在新 SHA
+   重跑本地、双轴 Review、push、精确 SHA CI、MySQL/Chrome 与 Issue 证据。
 2. W007 已闭合；当前按 canonical ledger 完成 W008 的剩余门；因 PR finding 修正，须在新 SHA 重跑
    对应 Review、CI 和平台证据，不得沿用 `a93b148…` 的终点结论。
 3. W008 全部门闭合后，本轮授权按顺序进入 W009：`--no-ff` merge、merge-SHA Review/CI、Issue #52 关闭、

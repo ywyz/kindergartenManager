@@ -405,3 +405,16 @@ RED commit `78e2908` 连续两轮均为 `1 failed`，最小 Compose 修复为 `c
 目标回归当前为 Compose `1 passed`、确定对账及既有 commit-unknown `4 passed`、transaction/W006 reconcile
 `33 passed`。这些修复改变产品/部署/test，旧 `a93b148…` 的 Review、CI、MySQL、Chrome 与 Issue 终点证据
 全部失效；包含本段的后续 fixed SHA 必须重新完成 W008 全部门，才能进入已单独授权的 W009。
+
+随后 release-readiness 核查确认发布说明仍把兼容 `/setup` 错写为匿名管理员入口，PyInstaller 产物也没有
+可调用的 bootstrap 子命令；Compose 还硬编码 healthcheck/数据库密码、缺独立运行数据卷，Debian 服务以 root
+运行且声明数据目录与真实 frozen 路径不一致。对应测试 lineage 为：说明 RED `653cb29`（连续两轮
+`3 failed, 2 passed`）、打包入口 RED `b1a3b04`（clean worktree `3 failed`）、自定义 healthcheck RED
+`457e740`（连续两轮 `1 failed, 1 passed`）、显式 Compose 密码 RED `3c34fcf`（连续两轮
+`1 failed, 2 passed`）、README 边界 RED `d5f914c`（连续两轮 `1 failed, 5 passed`）、显式数据目录与 Debian
+权限 RED `e9fb538`（clean worktree `9 failed, 1 passed`）、发布环境说明 RED `44b1f3a`（连续两轮
+`3 failed, 4 passed`）。最小 GREEN 依次由 `b1884f4`、`f837c8c`、`219633c`、`15ec854` 与说明提交
+`9376a54`/`46abd4f` 完成；打包入口现在支持交互 `--init`，Compose 密码缺失时失败关闭并把运行数据放在
+独立 `/data` 卷，Debian 使用专用非 root 用户、`0700/0600` 数据权限和同一显式数据目录。新增/受影响目标
+合同当前合计 `23 passed`，Ruff、YAML parse、Debian shell syntax 与 diff check 通过。以上改动再次使所有
+旧 fixed-SHA Review/CI/MySQL/Chrome 证据失效；只有包含本段的后续 commit 才能作为新的 W008 候选。

@@ -250,7 +250,8 @@ Quality `32954156965` 精确匹配成功，Issue #52 comment `5423617401` 已回
 W007 当前只开放每日计划当前页面的一份 Patch，经用户显式确认后由本地应用层采用；Provider/Tool
 能力面不变。Review、push、精确 SHA CI、人工验收与 Issue 回写仍是独立门禁，不得相互替代。完整
 RED/GREEN/Review/precheck SHA、计数和 node hash 统一记录在 `specs/agent-write/tests/README.md`。
-真实 MySQL 8 与最终可见矩阵属于 W008。PR #53 回流 finding 的产品/部署修正使 `a93b148…` 终点证据失效；
+真实 MySQL 8 与最终可见矩阵属于 W008。PR #53 回流 finding 及发布前核出的打包 bootstrap、Compose
+显式密码/独立数据卷、Debian 非 root 数据权限修正使 `a93b148…` 终点证据失效；
 新 SHA 的 W008 全部门闭合后，本轮已授权依次执行 `--no-ff` merge、merge-SHA Review/CI、Issue #52 关闭
 与 release。
 
