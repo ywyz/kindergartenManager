@@ -335,6 +335,7 @@ version/audit 各新增 1 行，writer 计数为 `1/1/0`。矩阵在 finding 后
 `DID NOT RAISE ConfirmedWriteRejected`，node hash
 `9d28c8d1f28b57e005ff5a2a2af5843d9e1846a0b8802c65f6d12c1431bd2345`。根因是 helper 只接受 exact
 `str` 表名，而真实 ORM 表名为 `str` 子类 `quoted_name`，使 `after_version` 与 `after_audit` 均无法登记。
-最小修复候选只放宽该测试态表名识别；目标节点、全部 W008 合同与完整 WRITE 分别为
-`1/27/233 passed`，Ruff/format/diff、变更范围 Pyright 与 `pip check` 通过。该候选尚无 fixed SHA；不得据此恢复旧 Review、CI、
-MySQL、浏览器或 Issue 门，也不得宣称 W008 闭合、merge、Issue 关闭或 release。
+最小修复已由 `a734934634f393e29c848177eb9dcb9763100944` 提交，只放宽该测试态表名识别；目标节点、
+全部 W008 合同与完整 WRITE 分别为 `1/27/233 passed`，Ruff/format/diff、变更范围 Pyright 与
+`pip check` 通过。该修复尚未取得 fixed-SHA Review；不得据此恢复旧 Review、CI、MySQL、浏览器或
+Issue 门，也不得宣称 W008 闭合、merge、Issue 关闭或 release。
