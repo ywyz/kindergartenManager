@@ -102,19 +102,23 @@ Tag 发布工作流可构建 Windows 安装包/便携包、Debian 包/Linux 便�
 
 ```bash
 cp .env.example .env
-# 先用密码管理器填写 MYSQL_ROOT_PASSWORD、MYSQL_PASSWORD，
+# 先填写已解析到本机的 CADDY_DOMAIN，并用密码管理器填写
+# MYSQL_ROOT_PASSWORD、MYSQL_PASSWORD，
 # 并固定 ENCRYPTION_KEY、JWT_SECRET；MySQL 密码使用十六进制随机值。
 docker compose up -d
 docker compose exec app python -m app.jobs.bootstrap_admin --init
 ```
 
-当前 Compose 包含 Caddy、主应用和 MySQL，缺少数据库密码时会失败关闭。应用数据使用独立 `app_data`
-卷，不覆盖镜像内 `/app` 代码；部署与升级时必须同时保留 `app_data`、`db_data`，并限制 UI 网络访问。
+当前 Compose 包含 Caddy、主应用和 MySQL；缺少生产域名或数据库密码时会失败关闭。域名必须先通过
+DNS 解析到部署主机，并允许 Caddy 使用 80/443 端口自动申请和续期 HTTPS 证书。应用数据使用独立
+`app_data` 卷，不覆盖镜像内 `/app` 代码；部署与升级时必须同时保留 `app_data`、`db_data`、`exports`
+卷（以及 Caddy 证书状态卷），并限制 UI 网络访问。
 
 开发 override：
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+CADDY_DOMAIN=localhost docker compose \
+  -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 
 ## 架构速览

@@ -432,3 +432,18 @@ trigger 精确；但 live helper 在任何 live SQL 前拒绝前序测试留下�
 `.kindergarten_secrets`，并在 application import 前继续安装 file-free synthetic config。目标 MySQL helper
 合同与既有 helper 矩阵为 `33 passed`，Ruff/format/diff 通过。该 helper/test/docs 改动使 `0079ab1…` 的全部
 本地/MySQL 结果不能作为终点证据；只有包含本段的后续 commit 才能重新进入 W008 全门。
+
+候选 `8cef83d5d67ee357b8cb16cd34aa7b25ac4fcc43` 的 revision/WRITE/Foundation/ordinary 为
+`12/254/261/868 passed`，Ruff、最终增量 Pyright、lock/dependency consistency、严格依赖审计、fresh
+SQLite upgrade→downgrade→upgrade、真实 MySQL 8.4.11 live helper 与 13 场景 Linux Chrome 矩阵均
+GREEN；mock 精确接受 26 次请求，即 13 份草案各两次串行 Provider 请求。但该 SHA 的 fixed-SHA Review
+随后报告 Standards H1/L1、Spec H1/M2：Debian 发布命令以 root 而非 service user 初始化 owner-only
+数据，默认 Compose 的 Caddy 实际只提供 HTTP，升级说明遗漏 `exports` 卷，`.env.example` 仍把 SQLite
+描述为程序同目录。旧候选不得 merge 或 release。
+
+四项 finding 的纯测试 RED 由 `5d359e0224a8fe4f1d1fb13c55b016342ee00adb` 固定；Caddy 断言随后在
+`f5c318811e79369f4b75616b5635d080064b22a9` 修正为接受合法的同行 `{` 语法，该 detached tree 仍精确为
+`4 failed, 16 passed`。最小修复要求 Compose 显式生产域名、Caddy 自动 HTTPS、所有 Debian init 说明复用
+service user，并同步持久卷与 SQLite 数据目录文案；目标测试当前为 `20 passed`，Compose 缺域名失败关闭，
+生产/开发配置渲染与官方 Caddy validate 通过。该修复尚无 fixed SHA，完整本地/MySQL/Chrome、双轴 Review、
+push/CI 与 Issue 门均须在提交后重新执行。

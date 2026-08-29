@@ -253,6 +253,7 @@ jobs:
             # 首次创建管理员：停止应用，复用 systemd 的受保护配置交互初始化
             sudo systemctl stop kindergarten-manager
             sudo systemd-run --wait --pty --collect \
+              --property=User=kindergarten-manager \
               --property=EnvironmentFile=/etc/kindergarten-manager/env \
               --property=WorkingDirectory=/var/lib/kindergarten-manager \
               /opt/kindergarten-manager/KindergartenManager --init
@@ -278,7 +279,8 @@ jobs:
             ```bash
             # 使用仓库中的 docker-compose.yml（含 MySQL 8）
             cp .env.example .env
-            # 用密码管理器填写 MYSQL_ROOT_PASSWORD、MYSQL_PASSWORD，
+            # 填写已解析到本机的 CADDY_DOMAIN，并用密码管理器填写
+            # MYSQL_ROOT_PASSWORD、MYSQL_PASSWORD，
             # 并固定 ENCRYPTION_KEY、JWT_SECRET；MySQL 密码使用十六进制随机值。
             docker compose up -d
 
@@ -292,7 +294,7 @@ jobs:
             **最简 Docker 启动（SQLite，演示用）**：
             ```bash
             docker run -d --name kindergarten-manager \
-              -p 8080:8080 \
+              -p 127.0.0.1:8080:8080 \
               -e ENCRYPTION_KEY="$(head -c 32 /dev/urandom | base64)" \
               -e JWT_SECRET="$(head -c 64 /dev/urandom | base64)" \
               -v kg-data:/data \
@@ -308,12 +310,14 @@ jobs:
 
             | 变量 | 必填 | 说明 |
             |------|------|------|
+            | `CADDY_DOMAIN` | Compose 必填 | 已解析到部署主机的公网域名；Caddy 自动提供 HTTPS |
             | `DATABASE_URL` | 否 | 留空使用内嵌 SQLite；MySQL 示例：`mysql+aiomysql://user:pass@host:3306/db` |
             | `ENCRYPTION_KEY` | 推荐 | AI Key 加密密钥，留空自动生成并持久化 |
             | `JWT_SECRET` | 推荐 | JWT 签名密钥，留空自动生成并持久化 |
             | `HOLIDAY_API_URL` | 否 | 节假日 API，默认 `https://timor.tech/api/holiday/info/` |
 
             > ⚠️ **重要**：生产/服务器环境请在配置文件中显式设置 `ENCRYPTION_KEY` 和 `JWT_SECRET`，
-            > 避免每次重启生成新密钥导致已加密数据无法解密。
+            > 避免每次重启生成新密钥导致已加密数据无法解密；部署与升级时保留 `app_data`、
+            > `db_data` 与 `exports` 卷。
 
             详细使用说明请查阅 [用户手册](docs/USER_MANUAL.md)。

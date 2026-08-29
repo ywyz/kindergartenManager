@@ -34,14 +34,16 @@ python3 -m venv .venv
 
 ```bash
 cp .env.example .env
-# 用密码管理器填写 MYSQL_ROOT_PASSWORD、MYSQL_PASSWORD，
+# 填写已解析到本机的 CADDY_DOMAIN，并用密码管理器填写
+# MYSQL_ROOT_PASSWORD、MYSQL_PASSWORD，
 # 并固定 ENCRYPTION_KEY、JWT_SECRET；MySQL 密码使用十六进制随机值。
 docker compose up -d
 docker compose exec app python -m app.jobs.bootstrap_admin --init
 ```
 
-初始化命令会交互读取管理员密码且不回显。Compose 会在缺少数据库密码时失败关闭；生产或共享环境还必须
-固定加密/JWT 密钥、保留 `app_data` 与 `db_data` 卷，并限制 UI 的网络访问。
+初始化命令会交互读取管理员密码且不回显。Compose 会在缺少生产域名或数据库密码时失败关闭；域名必须
+先通过 DNS 解析到部署主机，并允许 Caddy 使用 80/443 端口自动申请和续期 HTTPS 证书。生产或共享环境
+还必须固定加密/JWT 密钥、保留 `app_data`、`db_data` 与 `exports` 卷，并限制 UI 的网络访问。
 
 ### Windows/Linux 安装包
 
@@ -65,6 +67,7 @@ Debian 安装版需要先停服务，再复用 systemd 的受保护配置运行�
 ```bash
 sudo systemctl stop kindergarten-manager
 sudo systemd-run --wait --pty --collect \
+  --property=User=kindergarten-manager \
   --property=EnvironmentFile=/etc/kindergarten-manager/env \
   --property=WorkingDirectory=/var/lib/kindergarten-manager \
   /opt/kindergarten-manager/KindergartenManager --init
