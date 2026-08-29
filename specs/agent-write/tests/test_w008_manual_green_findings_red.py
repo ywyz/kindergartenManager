@@ -112,6 +112,44 @@ print(json.dumps({{
     assert json.loads(result.stdout) == {"secret": False, "lock": False}
 
 
+def test_mysql_preflight_allows_the_content_free_lifecycle_lock(monkeypatch) -> None:
+    """Browser/local gates may leave a 0600 lock, but never a config or secret."""
+    helper = _mysql()
+    captured: dict[str, object] = {}
+
+    def require_isolated(
+        tested_sha: str,
+        *,
+        clean: bool,
+        protected_names: tuple[str, ...],
+    ) -> Path:
+        captured.update(
+            tested_sha=tested_sha,
+            clean=clean,
+            protected_names=protected_names,
+        )
+        return Path("/synthetic/fixed-worktree")
+
+    monkeypatch.setattr(helper, "require_isolated_worktree", require_isolated)
+    monkeypatch.setattr(helper, "_activate_worktree_imports", lambda _root: None)
+    monkeypatch.setattr(
+        helper,
+        "_launch_live",
+        lambda tested_sha, _env: {"tested_code_sha": tested_sha},
+    )
+
+    report = helper.prepare_run(
+        type("Args", (), {"tested_sha": "a" * 40})(),
+    )
+
+    assert report == {"tested_code_sha": "a" * 40}
+    assert captured == {
+        "tested_sha": "a" * 40,
+        "clean": True,
+        "protected_names": (".env", ".kindergarten_secrets"),
+    }
+
+
 class _SeedSession:
     def __init__(self, captured: list[dict[str, object]]) -> None:
         self._captured = captured
