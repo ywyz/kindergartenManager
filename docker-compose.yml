@@ -34,6 +34,8 @@ services:
   # ── 数据库（MySQL，生产模式）──────────────────────────────────────────────
   db:
     image: mysql:8
+    command:
+      - --log-bin-trust-function-creators=1
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-kg_root_2024}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-kindergarten_db}
