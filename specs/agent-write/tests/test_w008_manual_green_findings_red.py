@@ -228,3 +228,10 @@ def test_w008_ledger_does_not_report_a_committed_green_as_uncommitted() -> None:
     w008_history = ledger[ledger.index("W008 验收基础设施 RED") :]
 
     assert "当前仍只是未提交 GREEN 候选" not in w008_history
+
+
+def test_mysql8_container_allows_app_owned_trigger_migrations_explicitly() -> None:
+    procedure = MANUAL_README.read_text(encoding="utf-8")
+
+    assert "--log-bin-trust-function-creators=1" in procedure
+    assert "@@log_bin_trust_function_creators" in procedure

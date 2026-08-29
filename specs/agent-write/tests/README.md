@@ -288,3 +288,14 @@ MySQL/浏览器验收或 Issue 回写；Spec 0/0 不能替代 Standards findings
 `f5becb455450a97d491aa90cfccf48c5ad021fc9` 固定：状态合同连续两轮均为 `1 failed, 5 passed`，
 失败 node 完全一致，node hash `c8d542f2c2373c86a9278d5c9d142c8b2e1f2cbeeb66bde1c4034d4b4e940a18`。在修正措辞并生成
 新 SHA 前，旧 Review 不得视为 0/0，也不得进入后续本地、push、CI、MySQL、浏览器或 Issue 门。
+
+措辞修正 commit `2b4bea62ae2621572da947e272c9a649bfa8cd1a` 的第三轮 fixed-SHA 双轴 Review 已达
+Standards H0/M0/L0、Spec H0/M0/L0；本地 revision/WRITE/Foundation/ordinary 分别为
+`12/231/261/847 passed`，静态门与依赖审计 GREEN。首次真实 MySQL 8 单次验收使用官方 image digest
+`sha256:e9027fe4d91c0153429607251656806cc784e914937271037f7738bd5b8e7709`，fresh 空库与
+MySQL `8.0.27` 已确认，但 app migration 在 `b7d9e1f3a5c2` 创建首个 trigger 时被 errno `1419` 拒绝；
+只读诊断为 `@@log_bin=1`、`@@log_bin_trust_function_creators=0`、head 仍为 `a6c4d8e2f9b1`、trigger 为 0。
+失败后未重跑、未执行 live helper；容器保留完成只读诊断后按精确名称停止，`--rm + tmpfs` 已移除合成库。
+该 finding 合同连续两轮均为 `1 failed, 6 passed`，失败 node 完全一致，node hash
+`2bd8936f94bd9a89eec6e27e0413824c5fd391d7c9acada292338ee0f59f97c0`；旧 Review/本地证据均不得
+作为后续新 SHA 的最终证据。
