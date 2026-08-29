@@ -44,8 +44,11 @@ services:
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root",
-             "-pkg_root_2024"]
+      test:
+        - CMD-SHELL
+        - >-
+          MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}"
+          mysqladmin ping -h localhost -u root --silent
       interval: 10s
       timeout: 5s
       retries: 5
