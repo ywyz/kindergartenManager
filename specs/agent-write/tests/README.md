@@ -443,7 +443,15 @@ GREEN；mock 精确接受 26 次请求，即 13 份草案各两次串行 Provide
 
 四项 finding 的纯测试 RED 由 `5d359e0224a8fe4f1d1fb13c55b016342ee00adb` 固定；Caddy 断言随后在
 `f5c318811e79369f4b75616b5635d080064b22a9` 修正为接受合法的同行 `{` 语法，该 detached tree 仍精确为
-`4 failed, 16 passed`。最小修复要求 Compose 显式生产域名、Caddy 自动 HTTPS、所有 Debian init 说明复用
-service user，并同步持久卷与 SQLite 数据目录文案；目标测试当前为 `20 passed`，Compose 缺域名失败关闭，
-生产/开发配置渲染与官方 Caddy validate 通过。该修复尚无 fixed SHA，完整本地/MySQL/Chrome、双轴 Review、
-push/CI 与 Issue 门均须在提交后重新执行。
+`4 failed, 16 passed`。最小修复已由 `63cab67010ff59745ae3d628229d0b3d9e169aa6` 固定：Compose
+显式要求生产域名，Caddy 对该域名自动 HTTPS，所有 Debian init 说明复用 service user，并同步持久卷与
+SQLite 数据目录文案。该 `tested_code_sha` 的目标 finding 合同为 `20 passed`；
+revision/WRITE/Foundation/ordinary 分别为 `12/254/261/872 passed`，Ruff、最终增量 Pyright、
+lock/dependency consistency、严格依赖审计、fresh SQLite upgrade→downgrade→upgrade 与真实 MySQL 8.4.11
+live helper 均 GREEN。MySQL helper 只读证据为 head e5f7a9c2d4b6、四个 trigger rejection、
+CAS `[false, true]`、最终 revision `2` 与 lock errno `1205`。Linux Chrome 的 13 场景可见矩阵全部通过：
+正常双击仅一次写入；过期、错误会话、旧 revision、A→B→A、跨标签与刷新均关闭或丢弃页面能力；
+四种确定失败完整回滚；两种未知提交分别经只读对账收敛为未生效/已生效。mock 精确接受 `26` 次请求，
+13 个场景的数据库 revision/version/audit 与 writer issue/apply/reconcile 计数均符合合同。上述临时数据库、
+容器、应用进程、mock 与浏览器标签已清理。本段只闭合 `tested_code_sha` 的本地证据；包含本段的
+evidence-closure SHA 仍须重新完成双轴 Review、push/PR CI、Issue、merge-SHA Review/CI 与 release 门。
