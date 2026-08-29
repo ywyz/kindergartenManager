@@ -41,3 +41,19 @@ def test_compose_requires_explicit_database_passwords() -> None:
     assert "${MYSQL_PASSWORD:?" in app_database_url
     assert "${MYSQL_ROOT_PASSWORD:?" in database_environment["MYSQL_ROOT_PASSWORD"]
     assert "${MYSQL_PASSWORD:?" in database_environment["MYSQL_PASSWORD"]
+
+
+def test_production_caddy_requires_a_domain_and_explicit_tls() -> None:
+    """The default topology must fail closed instead of serving an HTTP-only :80 site."""
+    compose = yaml.safe_load((_ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
+    caddy_environment = compose["services"]["caddy"].get("environment", {})
+    caddyfile = (_ROOT / "Caddyfile").read_text(encoding="utf-8")
+    active_lines = [
+        line.strip()
+        for line in caddyfile.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+
+    assert "${CADDY_DOMAIN:?" in str(caddy_environment.get("CADDY_DOMAIN", ""))
+    assert "https://{$CADDY_DOMAIN}" in active_lines
+    assert ":80" not in active_lines

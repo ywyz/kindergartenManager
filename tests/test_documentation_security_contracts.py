@@ -1,5 +1,6 @@
 """安全边界文档必须和当前脱敏实现、冻结命名保持一致。"""
 
+import re
 from pathlib import Path
 
 
@@ -35,6 +36,28 @@ def test_release_instructions_use_explicit_admin_bootstrap() -> None:
     assert "cp .env.example .env" in workflow
     assert "-v kg-data:/data" in workflow
     assert "-v kg-data:/app" not in workflow
+
+
+def test_debian_init_instructions_run_as_the_service_user() -> None:
+    """Every published Debian init command must preserve the service identity."""
+    missing_user_property: list[str] = []
+    for relative_path in ("docs/USER_MANUAL.md", ".github/workflows/release.yml"):
+        document = (_ROOT / relative_path).read_text(encoding="utf-8")
+        command = re.search(
+            r"sudo systemd-run\b(?:(?!\n```).)*?--init",
+            document,
+            flags=re.DOTALL,
+        )
+        if (
+            command is None
+            or "--property=User=kindergarten-manager" not in command.group(0)
+        ):
+            missing_user_property.append(relative_path)
+
+    assert not missing_user_property, (
+        "Debian systemd-run --init must set the service user in: "
+        + ", ".join(missing_user_property)
+    )
 
 
 def test_debian_postinstall_does_not_advertise_anonymous_admin_setup() -> None:
@@ -75,3 +98,29 @@ def test_environment_template_declares_required_compose_secrets() -> None:
     assert "MYSQL_PASSWORD=" in example
     assert "kg_root_2024" not in example
     assert "kg_pass_2024" not in example
+
+
+def test_runtime_volume_names_are_preserved_in_readme_and_user_manual() -> None:
+    """Deployment docs must name every volume whose data must survive upgrades."""
+    required_volumes = ("app_data", "db_data", "exports")
+    missing = {
+        relative_path: [
+            volume
+            for volume in required_volumes
+            if volume not in (_ROOT / relative_path).read_text(encoding="utf-8")
+        ]
+        for relative_path in ("README.md", "docs/USER_MANUAL.md")
+    }
+
+    assert not any(missing.values()), (
+        "README.md and docs/USER_MANUAL.md must retain app_data, db_data, "
+        f"and exports: {missing}"
+    )
+
+
+def test_sqlite_environment_comment_names_the_application_data_directory() -> None:
+    """The SQLite template must not imply that data lives beside the program."""
+    example = (_ROOT / ".env.example").read_text(encoding="utf-8")
+
+    assert "应用数据目录" in example
+    assert "程序同目录" not in example
