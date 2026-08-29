@@ -50,3 +50,16 @@ def test_user_manual_describes_current_explicit_bootstrap_boundary() -> None:
     assert "KindergartenManager.exe --init" in manual
     assert "KindergartenManager --init" in manual
     assert "python -m app.jobs.bootstrap_admin --init" in manual
+
+
+def test_readme_matches_current_login_agent_and_deployment_boundaries() -> None:
+    readme = (_ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "没有有效登录保护" not in readme
+    assert "受控 AI Agent（尚未实现）" not in readme
+    assert "创建固定的默认管理员记录" not in readme
+    assert "当前工作树 Alembic head：`e5f7a9c2d4b6`" in readme
+    assert "python -m app.jobs.bootstrap_admin --init" in readme
+    assert "4 个 READ Tool、2 个 DRAFT Tool" in readme
+    assert "Provider WRITE" in readme
+    assert "cp .env.example .env" in readme
