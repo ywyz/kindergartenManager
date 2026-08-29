@@ -526,7 +526,7 @@ async def test_reconcile_rejects_conflicting_audit_version_or_business_evidence(
 
 
 @pytest.mark.asyncio
-async def test_commit_unknown_without_audit_reconciles_not_applied_and_never_replays(
+async def test_commit_unknown_without_audit_stays_indeterminate_and_never_replays(
     write_database: WriteDatabase,
 ) -> None:
     api = write_api()
@@ -560,7 +560,7 @@ async def test_commit_unknown_without_audit_reconciles_not_applied_and_never_rep
     with capture_sql(write_database.engine) as reconcile_statements:
         with pytest.raises(api.ConfirmedWriteRejected) as reconciled:
             await service.reconcile(ui_session, pending.confirmation_id)
-    _assert_rejected(api, reconciled.value, "commit_not_applied")
+    _assert_rejected(api, reconciled.value, "confirmation_indeterminate")
     assert dml_statements(reconcile_statements) == []
 
     with capture_sql(write_database.engine) as replay_statements:
@@ -572,7 +572,7 @@ async def test_commit_unknown_without_audit_reconciles_not_applied_and_never_rep
 
 @pytest.mark.parametrize("commit_outcome", ["applied", "not-applied"])
 @pytest.mark.asyncio
-async def test_definitive_reconcile_releases_expired_confirmation_capacity(
+async def test_applied_reconcile_releases_capacity_but_indeterminate_fails_closed(
     write_database: WriteDatabase,
     commit_outcome: str,
 ) -> None:
@@ -624,16 +624,29 @@ async def test_definitive_reconcile_releases_expired_confirmation_capacity(
     else:
         with pytest.raises(api.ConfirmedWriteRejected) as reconciled:
             await service.reconcile(ui_session, pending.confirmation_id)
-        _assert_rejected(api, reconciled.value, "commit_not_applied")
+        _assert_rejected(api, reconciled.value, "confirmation_indeterminate")
 
     clock.move_to(pending.expires_at_utc + timedelta(microseconds=1))
-    replacement = await service.issue_confirmation(
-        ui_session,
-        build_patch(
-            before_goal=next_before,
-            after_goal=f"{AFTER_GOAL}-replacement",
-        ),
-        expected_revision=next_revision,
-    )
-
-    assert replacement.confirmation_id != pending.confirmation_id
+    if commit_outcome == "applied":
+        replacement = await service.issue_confirmation(
+            ui_session,
+            build_patch(
+                before_goal=next_before,
+                after_goal=f"{AFTER_GOAL}-replacement",
+            ),
+            expected_revision=next_revision,
+        )
+        assert replacement.confirmation_id != pending.confirmation_id
+    else:
+        # An unknown outcome with no durable audit cannot be retired from the
+        # bounded store: fail closed instead of treating it as NOT_APPLIED.
+        with pytest.raises(api.ConfirmedWriteRejected) as replacement:
+            await service.issue_confirmation(
+                ui_session,
+                build_patch(
+                    before_goal=next_before,
+                    after_goal=f"{AFTER_GOAL}-replacement",
+                ),
+                expected_revision=next_revision,
+            )
+        _assert_rejected(api, replacement.value, "confirmation_store_full")

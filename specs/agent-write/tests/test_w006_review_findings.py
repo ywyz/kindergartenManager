@@ -192,7 +192,7 @@ async def test_expired_repeat_apply_cannot_destroy_applied_reconciliation(
 
 
 @pytest.mark.asyncio
-async def test_indeterminate_confirmation_reconciles_not_applied_after_execution_ttl(
+async def test_indeterminate_confirmation_stays_indeterminate_after_execution_ttl(
     write_database: WriteDatabase,
 ) -> None:
     api = write_api()
@@ -223,7 +223,7 @@ async def test_indeterminate_confirmation_reconciles_not_applied_after_execution
 
     with pytest.raises(api.ConfirmedWriteRejected) as reconciled:
         await service.reconcile(ui_session, pending.confirmation_id)
-    _assert_rejected(api, reconciled.value, "commit_not_applied")
+    _assert_rejected(api, reconciled.value, "confirmation_indeterminate")
 
 
 @pytest.mark.asyncio

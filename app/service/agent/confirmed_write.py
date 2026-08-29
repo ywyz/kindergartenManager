@@ -105,7 +105,6 @@ class _ConfirmationState(str, Enum):
     CONSUMING = "consuming"
     APPLIED = "applied"
     RECONCILED_APPLIED = "reconciled_applied"
-    RECONCILED_NOT_APPLIED = "reconciled_not_applied"
     FAILED = "failed"
     INDETERMINATE = "indeterminate"
 
@@ -372,7 +371,6 @@ class _InMemoryConfirmationStore:
             if record.state in {
                 _ConfirmationState.INDETERMINATE,
                 _ConfirmationState.RECONCILED_APPLIED,
-                _ConfirmationState.RECONCILED_NOT_APPLIED,
             }:
                 _reject("confirmation_indeterminate")
             if record.state is not _ConfirmationState.PENDING:
@@ -428,7 +426,6 @@ class _InMemoryConfirmationStore:
                     _ConfirmationState.APPLIED,
                     _ConfirmationState.INDETERMINATE,
                     _ConfirmationState.RECONCILED_APPLIED,
-                    _ConfirmationState.RECONCILED_NOT_APPLIED,
                 },
             )
             if binding_error is not None:
@@ -482,9 +479,9 @@ class _InMemoryConfirmationStore:
     def finish_reconciled(
         self,
         record: _StoredConfirmation,
-        result: ConfirmedDailyPlanWriteResult | None,
+        result: ConfirmedDailyPlanWriteResult,
     ) -> bool:
-        """Make one definitive reconciliation eligible for normal TTL cleanup."""
+        """Make applied reconciliation eligible for normal TTL cleanup."""
         with self._lock:
             current = self._records.get(record.confirmation_id)
             if (
@@ -494,11 +491,7 @@ class _InMemoryConfirmationStore:
                 return False
             self._records[current.confirmation_id] = replace(
                 current,
-                state=(
-                    _ConfirmationState.RECONCILED_APPLIED
-                    if result is not None
-                    else _ConfirmationState.RECONCILED_NOT_APPLIED
-                ),
+                state=_ConfirmationState.RECONCILED_APPLIED,
                 result=result,
             )
             return True
@@ -927,10 +920,7 @@ class ConfirmedDailyPlanWriteService:
             user_id=record.user_id,
         )
         if audit is None:
-            if record.state in {
-                _ConfirmationState.INDETERMINATE,
-                _ConfirmationState.RECONCILED_NOT_APPLIED,
-            }:
+            if record.state is _ConfirmationState.INDETERMINATE:
                 return None
             _reject("reconcile_integrity_failure")
 
@@ -1013,13 +1003,17 @@ class ConfirmedDailyPlanWriteService:
                     _ConfirmationState.APPLIED,
                     _ConfirmationState.INDETERMINATE,
                     _ConfirmationState.RECONCILED_APPLIED,
-                    _ConfirmationState.RECONCILED_NOT_APPLIED,
                 }:
                     result = await self._reconcile_evidence(session, record)
+                    if result is None:
+                        # A new reader not seeing immutable evidence is not
+                        # durable negative evidence: the original COMMIT may
+                        # still be in flight, or its outcome may be unknown.
+                        # Keep the same confirmation retryable for reconcile.
+                        _reject("confirmation_indeterminate")
+                    assert result is not None
                     if record.state is _ConfirmationState.INDETERMINATE:
                         self._store.finish_reconciled(record, result)
-                    if result is None:
-                        _reject("commit_not_applied")
                     return result
         except ConfirmedWriteRejected:
             raise
