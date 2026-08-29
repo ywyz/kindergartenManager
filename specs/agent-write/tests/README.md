@@ -280,10 +280,11 @@ MySQL/浏览器验收或 Issue 回写；Spec 0/0 不能替代 Standards findings
 首版 finding 修复把 Alembic 运行 cwd 移到 owner-only 外部临时目录，并删除未接入实际 launcher 的自由
 字符串 sanitizer；相关 14 节点与完整 WRITE 分别为 `14 passed`、`230 passed`。提交前变更范围 Pyright
 连续两轮都只在既有测试事件联合类型解包处报同一个错误，最小 `cast` 只收窄测试类型、不改变运行行为。
-当前仍只是未提交 GREEN 候选；任何 fixed-SHA Review、MySQL/浏览器证据都必须绑定后续实际 commit。
+提交前该版本尚无 fixed SHA；任何 fixed-SHA Review、MySQL/浏览器证据都必须绑定随后实际 commit。
 
 该修复实际提交为 `9fc21f9d6e75f7e3f2393f364e795649cb3a8351`；其第二轮 fixed-SHA 双轴 Review
 为 Standards H0/M0/L1、Spec H0/M1/L0。两轴共同 finding 是上一段仍以现在时把已提交候选称为“未提交”，
-使 canonical ledger 错报当前门状态。对应状态合同连续两轮均为 `1 failed, 5 passed`，失败 node 完全一致，
-node hash `c8d542f2c2373c86a9278d5c9d142c8b2e1f2cbeeb66bde1c4034d4b4e940a18`。在修正措辞并生成
+使 canonical ledger 错报当前门状态。对应状态 RED 已由
+`f5becb455450a97d491aa90cfccf48c5ad021fc9` 固定：状态合同连续两轮均为 `1 failed, 5 passed`，
+失败 node 完全一致，node hash `c8d542f2c2373c86a9278d5c9d142c8b2e1f2cbeeb66bde1c4034d4b4e940a18`。在修正措辞并生成
 新 SHA 前，旧 Review 不得视为 0/0，也不得进入后续本地、push、CI、MySQL、浏览器或 Issue 门。
