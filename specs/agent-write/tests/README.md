@@ -462,3 +462,15 @@ H0/M1/L1、Spec H1/M0/L0：开发/人工测试文档仍停在旧迁移 head；�
 `72776b8` 固定，两个目标文件连续两轮均为 `3 failed, 13 passed`，失败节点完全一致。下一候选必须让
 app 只接收普通 MySQL principal 的 URL 与显式应用配置、保留 db-only root 配置，并统一当前 head 与数据目录
 事实；旧 `e66906b…` Review 与所有先前本地/MySQL/Chrome 终点证据均不能作为新候选的闭合门。
+
+最小修复及上述 RED lineage 的 `tested_code_sha=942aaec7e7b6360f0b12ba29f8a4828be2e71cf2` 已完成
+重新验收：revision/WRITE/Foundation/ordinary 为 `12/254/261/874 passed`；Ruff、增量 Pyright、
+lock/dependency consistency、严格依赖审计、Compose 缺域名失败关闭、生产/开发渲染的 app 环境不含
+`MYSQL_ROOT_PASSWORD`、官方 Caddy validate 与 fresh SQLite 往返均 GREEN。SQLite 最终 head
+e5f7a9c2d4b6、`19` tables、`6` triggers、目录/库 mode `0700/0600`。真实 MySQL 8.4.11 往返与 live helper
+再次得到四个 trigger rejection、CAS `[false, true]`、revision `2`、lock errno `1205`。Linux Chrome 13 场景
+全部得到预期可见状态，mock 精确接受 `26` 次请求，各场景最终 revision/version/audit 分别为正常与
+unknown-after-commit `2/1/1`、人工保存旧 revision `2/0/0`、其余 `1/0/0`。本轮一次并发预启动因本机资源
+压力在任何浏览器操作前停止，不计入矩阵；随后全部场景按独立进程与唯一端口顺序完成。所有合成 secret、
+临时数据库/目录、MySQL tmpfs 容器、应用/mock 进程与浏览器标签均已删除或停止。包含本段的 evidence-closure
+SHA 仍须取得自身的双轴 Review、PR CI，之后才可进入 `--no-ff` merge 与 merge-SHA 后续门。
