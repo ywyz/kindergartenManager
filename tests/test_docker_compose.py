@@ -43,6 +43,17 @@ def test_compose_requires_explicit_database_passwords() -> None:
     assert "${MYSQL_PASSWORD:?" in database_environment["MYSQL_PASSWORD"]
 
 
+def test_app_service_does_not_receive_mysql_root_credentials() -> None:
+    """The least-privileged app container must never inherit DB root credentials."""
+    compose = yaml.safe_load((_ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
+    application = compose["services"]["app"]
+    database_environment = compose["services"]["db"]["environment"]
+
+    assert "MYSQL_ROOT_PASSWORD" in database_environment
+    assert "env_file" not in application
+    assert "MYSQL_ROOT_PASSWORD" not in application["environment"]
+
+
 def test_production_caddy_requires_a_domain_and_explicit_tls() -> None:
     """The default topology must fail closed instead of serving an HTTP-only :80 site."""
     compose = yaml.safe_load((_ROOT / "docker-compose.yml").read_text(encoding="utf-8"))

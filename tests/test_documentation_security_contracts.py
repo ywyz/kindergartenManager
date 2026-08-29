@@ -121,6 +121,24 @@ def test_runtime_volume_names_are_preserved_in_readme_and_user_manual() -> None:
 def test_sqlite_environment_comment_names_the_application_data_directory() -> None:
     """The SQLite template must not imply that data lives beside the program."""
     example = (_ROOT / ".env.example").read_text(encoding="utf-8")
+    architecture = (_ROOT / "docs/design/system-architecture.md").read_text(
+        encoding="utf-8"
+    )
 
-    assert "应用数据目录" in example
+    assert "源码模式位于当前工作目录" in example
+    assert "打包桌面模式位于操作系统用户数据目录" in example
     assert "程序同目录" not in example
+    assert "源码模式默认数据库位于当前工作目录" in architecture
+
+
+def test_current_migration_head_is_consistent_across_operator_docs() -> None:
+    """Developer and manual migration checks must reach every current table/trigger."""
+    expected_head = "`e5f7a9c2d4b6`"
+    missing = [
+        relative_path
+        for relative_path in ("docs/DEVELOPER.md", "docs/MANUAL_TESTING.md")
+        if expected_head
+        not in (_ROOT / relative_path).read_text(encoding="utf-8")
+    ]
+
+    assert not missing, f"current Alembic head missing from: {missing}"
