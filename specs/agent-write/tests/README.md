@@ -567,3 +567,51 @@ unavailable，不使用 stale graph 作为 Review、测试或交付证据，生�
 evidence-closure SHA 仍须取得自身的固定 SHA Standards/Spec 双轴 0/0/0 Review、PR exact-head CI 与远端
 自动 Review；之后才可核对最新 main 漂移并以 `--no-ff` 集成，merge SHA 仍须重新完成 Review/CI，才能关闭
 Issue #52、发布与部署。
+
+证据闭合候选 `521418aa0710ca0dd1292db4e99d3c68e90c384a` 的 fixed-SHA Review 为 Spec
+H0/M0/L0、Standards H1/M0/L0：Windows 发布说明把 frozen 应用的 `.env` 错写为安装目录，而当前实现从
+`%LOCALAPPDATA%\KindergartenManager\.env` 读取。对应文档合同 RED 由
+`231d5dd5a8677658d798ee6abed4ee636a860029` 固定；最小 GREEN
+`fbf3f7c56378955ed217c66b63c78f3cbd9c37fd` 统一发布说明与现有数据目录合同，目标文档测试为
+`15 passed`。原 Standards reviewer 对修复后 diff 的复核为 H0/M0/L0；但新增测试使旧 SHA 的手工与完整
+本地证据失效，因此本段以下证据均重新绑定到
+`tested_code_sha=fbf3f7c56378955ed217c66b63c78f3cbd9c37fd`。
+
+Main 在该 SHA 的 clean detached linked worktree 重新得到 revision/WRITE/Foundation/ordinary
+`12/256/261/890 passed`；变更范围 Ruff、format、`git diff --check`、`pip check`、
+`uv lock --check` 与严格依赖漏洞审计均 GREEN。一次 Foundation 预检错误继承了 Main checkout 的显式
+`KINDERGARTEN_DATA_DIR`，导致 `37` 个 setup error；移除该非候选环境后，在同一 clean worktree 的完整
+`261 passed` 才计入有效证据。fresh SQLite 使用 owner-only 目录/数据库，完成
+head→a6c4d8e2f9b1→head；最终为 head e5f7a9c2d4b6、`19` tables、`6` triggers，mode
+`0700/0600`。
+
+首个真实 MySQL 预检在任何 DML 前由 helper 拒绝：普通测试在该 disposable worktree 留下 Git-ignored、
+owner-only 的 `.kindergarten_secrets`。独立只读诊断确认该运行已到达 MySQL `8.4.11`、精确 head、四个
+trigger 与 schema-scoped app principal，但 evidence/audit/user/plan 均为零，故不计为 live PASS，也不需要
+产品修复；销毁该容器后，在不含受保护文件的 exact-SHA manual worktree 和全新 schema 重跑。最终官方
+`mysql:8` digest 为
+`sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb`，解析为 MySQL
+`8.4.11`；binary log 与 `log_bin_trust_function_creators` 为 `1`，app principal 完成
+head→a6c4d8e2f9b1→head。helper 脱敏证据为四个 trigger rejection、CAS `[false, true]`、最终
+revision `2`、lock errno `1205`，且 `tested_code_sha` 精确匹配。
+
+同一 `tested_code_sha` 的 Linux 浏览器最终矩阵在 fresh mock 上，以 13 个独立 `0600` SQLite、独立应用
+进程与唯一 loopback 端口顺序完成。正常双击和 unknown-after-commit 的最终
+revision/version/audit 为 `2/1/1`；另一标签普通保存后的旧 revision 场景为 `2/0/0`；过期、错误会话、
+A→B→A、跨标签、reload、`after_version`、`after_cas`、`after_audit`、`known_before_commit` 与
+unknown-before-commit 均为 `1/0/0`。四种确定故障均显示确认关闭、正文不变，writer 为
+issue/apply/reconcile `1/1/0`；unknown-before-commit 一次人工对账后仍不确定、保留同页对账入口且无确认
+按钮，unknown-after-commit 一次对账后可见收敛为 `✅ Agent 草案已确认采用（revision 1 → 2）`，两者
+writer 均为 `1/1/1`。mock 精确接受编号 `1..26` 的 `26` 次串行 Provider 请求。
+
+最终矩阵前的非证据预检与有效场景严格分离：一次任意提示词被 mock 以 `422` 拒绝且零 WRITE；一次 seed
+目录名不满足 helper 的 owner-only 前提而未创建数据库；错误会话与旧 revision 的三次端口释放竞争均在应用
+启动/WRITE 前停止。随后均使用 fresh DB、唯一端口和最终有效场景，没有在同一 DB 自动重试。最终 mock、
+应用、浏览器标签与所有验收端口均已停止；两个 MySQL disposable 容器均已销毁。本轮 Graphify 仍按既定
+fallback 得不到覆盖目标 ledger 的语义节点，因此继续标记 unavailable，不把 stale graph 当作交付证据，
+`graphify-out/**` 生成噪声不进入候选提交。
+
+本段只闭合 `tested_code_sha` 的本地自动化、SQLite、MySQL、浏览器与 review-finding 修复复核。包含本段的
+后续 evidence-closure SHA 仍须取得自身固定 SHA Standards/Spec 双轴 0/0/0 Review、PR exact-head CI 与
+远端自动 Review；之后才可核对最新 main 漂移并以 `--no-ff` 集成，merge SHA 仍须重新完成 Review/CI，
+才能关闭 Issue #52、发布与部署。
