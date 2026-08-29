@@ -32,6 +32,9 @@ def test_release_instructions_use_explicit_admin_bootstrap() -> None:
     assert "KindergartenManager --init" in workflow
     assert "python -m app.jobs.bootstrap_admin --init" in workflow
     assert "http://localhost:8080/login" in workflow
+    assert "cp .env.example .env" in workflow
+    assert "-v kg-data:/data" in workflow
+    assert "-v kg-data:/app" not in workflow
 
 
 def test_debian_postinstall_does_not_advertise_anonymous_admin_setup() -> None:
@@ -63,3 +66,12 @@ def test_readme_matches_current_login_agent_and_deployment_boundaries() -> None:
     assert "4 个 READ Tool、2 个 DRAFT Tool" in readme
     assert "Provider WRITE" in readme
     assert "cp .env.example .env" in readme
+
+
+def test_environment_template_declares_required_compose_secrets() -> None:
+    example = (_ROOT / ".env.example").read_text(encoding="utf-8")
+
+    assert "MYSQL_ROOT_PASSWORD=" in example
+    assert "MYSQL_PASSWORD=" in example
+    assert "kg_root_2024" not in example
+    assert "kg_pass_2024" not in example
