@@ -67,6 +67,15 @@ def test_context_remote_status_advances_from_w006_to_the_w008_gate() -> None:
     assert CANONICAL_LEDGER in branch_status
 
 
+def test_context_current_next_step_is_w008_not_conditional_w007() -> None:
+    """The current-next-step section must advance with the delivery ledger."""
+    context = CONTEXT_PATH.read_text(encoding="utf-8")
+    next_steps = _section(context, "## 10. 当前共同下一步")
+
+    assert "W007 上述门全部闭合后才进入 W008" not in next_steps
+    assert "W007 已闭合；当前按 canonical ledger 完成 W008 的剩余门" in next_steps
+
+
 def test_w008_manual_helpers_share_one_fixed_sha_worktree_gate() -> None:
     """Both evidence runners must use one drift-resistant trust root."""
     problems: list[str] = []
