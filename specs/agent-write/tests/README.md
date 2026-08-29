@@ -247,3 +247,22 @@ confirmation-flow 私有读取守卫已膨胀为手写 Python 数据流分析器
 Foundation `261 passed`、ordinary `847 passed`；`uv lock --check`、隔离 locked dev import、
 Ruff/format/diff、Pyright 与 `pip check` 均通过。当前修复候选尚未取得新的 fixed-SHA 双轴 Review 0/0，
 仍不得进入 push、CI、人工验收或 Issue 回写。
+
+W007 最终产品/helper/test SHA `eb8273a20b1b955276eef4ae5cb781b3efb054b7` 随后闭合独立外部门：
+第十一轮 fixed-SHA 双轴 Review 为 Standards H0/M0/L0、Spec H0/M0/L0；远端分支精确回读同 SHA；Quality
+`33039376661` success 且 `headSha` 精确一致；Linux 可见矩阵 PASS 8/8；脱敏证据已回写 OPEN Issue #52
+comment `5440130787`。这些外部门不改变 Provider/Tool 的四 READ + 两 DRAFT + 零 WRITE，也未授权 merge、
+Issue 关闭或 release；W007 全部门闭合后才进入 W008。
+
+W008 验收基础设施 RED 已由 `fa3ee34aaae47e1b52138326390ca458b7fc1ec9` 固定：Agent WRITE
+`225 collected`，新增 browser/MySQL 合同 19 节点连续两轮均为 `19 failed`，仅因两个 helper 不存在；
+node hash `d78e8d7e42feadf073f9a34794e3243d9567cad5f3a58d360339fc6127ca13a6`。第一版 helper 合同转绿后，
+独立审计发现真实 launcher 仍为占位、MySQL app import 会创建配置文件、MySQL 合成 weekday 超过真实列宽，
+以及 SQLite run path 未封闭。finding RED 已由 `0aebdbb` 固定：4 节点连续两轮均为 `4 failed`，node hash
+`c339a09db034bd0d3a2b943b6c199a1b635891da33f04ed4cf668892a648aadc`。
+
+`0aebdbb` 后的 W008 helper GREEN 候选只增加测试态 browser/MySQL runner 与操作合同，不改生产能力面。
+初始合同 + finding 节点为 `23 passed`，完整 Agent WRITE 为 `229 passed`，Ruff/format/diff、编译与变更范围
+Pyright 为 0。该候选的 exact SHA 必须以包含本段的后续 Git commit 为准；在 fixed-SHA Review、本地全门、
+push、精确 SHA CI、真实 MySQL 8、Linux 浏览器矩阵和 OPEN Issue 回写全部完成前，不得宣称 W008 闭合、
+merge、Issue 关闭或 release。
