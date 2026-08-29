@@ -22,10 +22,12 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: mysql+aiomysql://${MYSQL_USER:-kindergarten}:${MYSQL_PASSWORD:-kg_pass_2024}@db:3306/${MYSQL_DATABASE:-kindergarten_db}
+      KINDERGARTEN_DATA_DIR: /data
+      DATABASE_URL: mysql+aiomysql://${MYSQL_USER:-kindergarten}:${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}@db:3306/${MYSQL_DATABASE:-kindergarten_db}
     env_file:
       - .env
     volumes:
+      - app_data:/data
       - exports:/app/exports
     restart: unless-stopped
     networks:
@@ -37,10 +39,10 @@ services:
     command:
       - --log-bin-trust-function-creators=1
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-kg_root_2024}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-kindergarten_db}
       MYSQL_USER: ${MYSQL_USER:-kindergarten}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-kg_pass_2024}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:
@@ -61,6 +63,7 @@ networks:
     driver: bridge
 
 volumes:
+  app_data:
   db_data:
   exports:
   caddy_data:

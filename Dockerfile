@@ -2,6 +2,8 @@ FROM python:3.14.7-slim
 
 WORKDIR /app
 
+ENV KINDERGARTEN_DATA_DIR=/data
+
 # 安装系统依赖（pymysql / argon2 编译需要）
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
