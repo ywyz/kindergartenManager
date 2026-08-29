@@ -19,6 +19,7 @@ import pytest
 MANUAL_ROOT = Path(__file__).parents[1] / "manual"
 MYSQL_HELPER = MANUAL_ROOT / "w008_mysql.py"
 BROWSER_HELPER = MANUAL_ROOT / "w008_browser.py"
+MANUAL_README = MANUAL_ROOT / "README.md"
 
 
 def _load(path: Path, name: str):
@@ -198,3 +199,25 @@ def test_browser_database_is_owner_only_w008_tmp_regular_file() -> None:
     outside = Path(tempfile.gettempdir()) / "w008-outside.db"
     with pytest.raises(helper.ManualHelperError):
         resolver(str(outside))
+
+
+def test_mysql_migration_roundtrip_keeps_config_files_outside_worktree() -> None:
+    procedure = MANUAL_README.read_text(encoding="utf-8")
+    start = procedure.index('MYSQL_URL="mysql+aiomysql://')
+    end = procedure.index('W008_MYSQL_DATABASE_URL="$MYSQL_URL"', start)
+    migration_block = procedure[start:end]
+
+    for required in (
+        "MYSQL_MIGRATION_RUNTIME=$(mktemp -d /tmp/km-w008-mysql-migrations.XXXXXX)",
+        'cd "$MYSQL_MIGRATION_RUNTIME"',
+        'PYTHONPATH="$TESTED_WORKTREE"',
+        'ENCRYPTION_KEY="f009-fictional-encryption-key-do-not-use"',
+        'JWT_SECRET="f009-fictional-jwt-secret-do-not-use"',
+        '-c "$TESTED_WORKTREE/alembic.ini"',
+    ):
+        assert required in migration_block
+
+    assert migration_block.count("run_w008_alembic upgrade head") == 2
+    assert migration_block.count("run_w008_alembic current") == 3
+    assert "run_w008_alembic downgrade a6c4d8e2f9b1" in migration_block
+    assert 'DATABASE_URL="$MYSQL_URL" "$ABS_PYTHON" -m alembic' not in (migration_block)

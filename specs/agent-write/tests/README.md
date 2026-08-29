@@ -266,3 +266,12 @@ node hash `d78e8d7e42feadf073f9a34794e3243d9567cad5f3a58d360339fc6127ca13a6`。�
 Pyright 为 0。该候选的 exact SHA 必须以包含本段的后续 Git commit 为准；在 fixed-SHA Review、本地全门、
 push、精确 SHA CI、真实 MySQL 8、Linux 浏览器矩阵和 OPEN Issue 回写全部完成前，不得宣称 W008 闭合、
 merge、Issue 关闭或 release。
+
+上述 helper GREEN commit `4b51519a89fedbbc6008a71c270cba983ef6c810` 的 W008 首轮 fixed-SHA 双轴
+Review 为 Standards H1/M0/L1、Spec H0/M0/L0。Standards hard finding 是文档在 linked worktree 内先跑
+Alembic 时必创建 `.kindergarten_secrets.lock`（缺少合成 Key 时还会创建 secrets），随后 live helper 又拒绝
+这些配置生命周期文件，导致 documented MySQL 往返不可执行；low finding 是 browser helper 保留未接入
+launcher 的自由字符串 `sanitize_report`，不能兑现关闭脱敏承诺。两项 finding 已转成只改测试合同的稳定
+RED：14 个相关节点连续两轮均为 `2 failed, 12 passed`，失败 node 完全一致，node hash
+`507a9e2607d54fc812b5aabc57d15fe0dfb8cf858936a169939386f88c1ffb04`。当前尚未修正、push、CI、
+MySQL/浏览器验收或 Issue 回写；Spec 0/0 不能替代 Standards findings。

@@ -25,15 +25,6 @@ FAULT_VALUES = {
     "unknown_before_commit",
     "unknown_after_commit",
 }
-REPORT_FIELDS = {
-    "tested_code_sha",
-    "fault",
-    "result",
-    "counters",
-    "plan_revision",
-    "version_count",
-    "audit_count",
-}
 
 
 def _load_helper():
@@ -230,7 +221,10 @@ async def test_commit_unknown_faults_never_retry_or_touch_ordinary_sessions(
     assert ordinary.commit_calls == 1
 
 
-def test_fault_counters_and_report_are_closed_sanitized_and_retry_free() -> None:
+@pytest.mark.asyncio
+async def test_fault_counters_emit_only_closed_retry_free_runtime_events(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     helper = _load_helper()
     assert {field.name for field in fields(helper.FaultCounters)} == {
         "issue",
@@ -238,29 +232,36 @@ def test_fault_counters_and_report_are_closed_sanitized_and_retry_free() -> None
         "reconcile",
     }
 
-    counters = helper.FaultCounters(issue=1, apply=1, reconcile=1)
-    raw = {
+    class _Delegate:
+        async def issue_confirmation(self, *_args, **_kwargs):
+            return object()
+
+        async def apply(self, *_args, **_kwargs):
+            return object()
+
+        async def reconcile(self, *_args, **_kwargs):
+            return object()
+
+    counted = helper._CountingWriteService(
+        _Delegate(),
+        counters=helper.FaultCounters(),
+        tested_sha=TESTED_SHA,
+        fault=helper.FaultPoint.UNKNOWN_AFTER_COMMIT,
+    )
+    await counted.issue_confirmation(
+        "sk-synthetic-must-not-appear",
+        "provider-response-body-must-not-appear",
+        expected_revision=1,
+    )
+    event = json.loads(capsys.readouterr().out)
+    assert set(event) == {"event", "tested_code_sha", "fault", "counters"}
+    assert event == {
+        "event": "w008_writer_call",
         "tested_code_sha": TESTED_SHA,
         "fault": "unknown_after_commit",
-        "result": "reconciled_applied",
-        "counters": counters,
-        "plan_revision": 2,
-        "version_count": 1,
-        "audit_count": 1,
-        "database_url": "mysql+aiomysql://synthetic-password@localhost/private",
-        "provider_body": "provider-response-body-must-not-appear",
-        "endpoint": "https://provider.invalid/private",
-        "api_key": "sk-synthetic-must-not-appear",
+        "counters": {"issue": 1, "apply": 0, "reconcile": 0},
     }
-
-    report = helper.sanitize_report(raw)
-    assert set(report) == REPORT_FIELDS
-    assert report["counters"] == {
-        "issue": 1,
-        "apply": 1,
-        "reconcile": 1,
-    }
-    rendered = json.dumps(report, ensure_ascii=False, sort_keys=True)
+    rendered = json.dumps(event, ensure_ascii=False, sort_keys=True)
     for forbidden in (
         "synthetic-password",
         "provider-response-body",
@@ -270,13 +271,8 @@ def test_fault_counters_and_report_are_closed_sanitized_and_retry_free() -> None
         assert forbidden not in rendered
 
     with pytest.raises(RuntimeError, match="automatic retry"):
-        helper.sanitize_report(
-            {
-                **raw,
-                "counters": helper.FaultCounters(
-                    issue=1,
-                    apply=2,
-                    reconcile=1,
-                ),
-            }
-        )
+        await counted.issue_confirmation(object(), object(), expected_revision=1)
+
+    assert not hasattr(helper, "sanitize_report"), (
+        "the launcher must not retain a disconnected free-form result sanitizer"
+    )
