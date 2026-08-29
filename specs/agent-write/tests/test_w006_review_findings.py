@@ -310,7 +310,7 @@ async def test_version_repository_read_binds_actor_confirmation_and_plan(
     assert wrong_confirmation is None
 
 
-def test_current_fact_docs_close_w006_and_track_w007_review_gate() -> None:
+def test_current_fact_docs_close_w007_and_track_w008_delivery_gate() -> None:
     data_model = (REPOSITORY_ROOT / "docs/design/data-model.md").read_text()
     context = (REPOSITORY_ROOT / "CONTEXT.md").read_text()
     tasks = (REPOSITORY_ROOT / "specs/agent-write/tasks.md").read_text()
@@ -335,9 +335,10 @@ def test_current_fact_docs_close_w006_and_track_w007_review_gate() -> None:
     assert "未授权" not in w005_row
     assert "未授权" not in w006_row
     assert "完成" in w006_row and "253d37d" in w006_row
-    assert "canonical ledger" in w007_row
-    assert "W007 未进入" not in w007_row
-    assert "未进入" in w008_row
+    assert "完成" in w007_row and "canonical ledger" in w007_row
+    assert "交付门进行中" not in w007_row
+    assert "进行中" in w008_row and "canonical ledger" in w008_row
+    assert "未进入" not in w008_row
     current_w007_docs = (
         data_model,
         context,
