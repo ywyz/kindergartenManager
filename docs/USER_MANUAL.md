@@ -33,12 +33,15 @@ python3 -m venv .venv
 ### Docker
 
 ```bash
+cp .env.example .env
+# 用密码管理器填写 MYSQL_ROOT_PASSWORD、MYSQL_PASSWORD，
+# 并固定 ENCRYPTION_KEY、JWT_SECRET；MySQL 密码使用十六进制随机值。
 docker compose up -d
 docker compose exec app python -m app.jobs.bootstrap_admin --init
 ```
 
-初始化命令会交互读取管理员密码且不回显。生产或共享环境必须先修改 `.env` 中的数据库密码和密钥，
-并限制 UI 的网络访问。
+初始化命令会交互读取管理员密码且不回显。Compose 会在缺少数据库密码时失败关闭；生产或共享环境还必须
+固定加密/JWT 密钥、保留 `app_data` 与 `db_data` 卷，并限制 UI 的网络访问。
 
 ### Windows/Linux 安装包
 

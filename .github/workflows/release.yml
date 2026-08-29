@@ -277,6 +277,9 @@ jobs:
 
             ```bash
             # 使用仓库中的 docker-compose.yml（含 MySQL 8）
+            cp .env.example .env
+            # 用密码管理器填写 MYSQL_ROOT_PASSWORD、MYSQL_PASSWORD，
+            # 并固定 ENCRYPTION_KEY、JWT_SECRET；MySQL 密码使用十六进制随机值。
             docker compose up -d
 
             # 首次创建管理员（密码交互输入，不回显）
@@ -292,7 +295,7 @@ jobs:
               -p 8080:8080 \
               -e ENCRYPTION_KEY="$(head -c 32 /dev/urandom | base64)" \
               -e JWT_SECRET="$(head -c 64 /dev/urandom | base64)" \
-              -v kg-data:/app \
+              -v kg-data:/data \
               ghcr.io/ywyz/kindergartenmanager:${{ steps.ver.outputs.version }}
 
             docker exec -it kindergarten-manager \

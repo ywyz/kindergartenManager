@@ -2,9 +2,7 @@
 
 KindergartenManager 是一个 Python 3.14.7 / NiceGUI 教学管理应用。当前主线是模块化单体：默认使用本地 SQLite，也可连接 MySQL；支持文本/视觉 AI、固定 Word 模板导出，以及按租户隔离的只读 REST API。
 
-> 仓库状态：当前维护审查基线为 `dev4.0@0657c3a`，最近产品主线为 `main@225fe139`；未提交的审查改动不等于主线发布。
-
-> 当前身份边界：UI 为固定身份的单用户模式，没有有效登录保护。PyInstaller 模式只监听本机；源码或 Docker 模式若暴露到网络，必须先增加可信网络边界或恢复认证。
+> 当前身份边界：UI 使用本地账号登录、JWT 与 RBAC，并按 tenant/user 隔离；匿名注册不挂载，空库也不会自动创建默认管理员。PyInstaller 模式只监听本机；源码或 Docker 模式对外提供服务时仍必须配置 TLS、强密码与网络访问控制。
 
 ## 当前能力
 
@@ -31,21 +29,23 @@ KindergartenManager 是一个 Python 3.14.7 / NiceGUI 教学管理应用。当�
 | 文档导出 | python-docx |
 | 测试 | pytest + pytest-asyncio（SQLite 内存库隔离） |
 
-## 已确认的下一能力：受控 AI Agent（尚未实现）
+## 受控 AI Agent
 
-项目已接受 [ADR-0005](docs/ADR/ADR-0005-controlled-ai-agent-runtime.md)，下一功能方向是在每日活动
-计划页面增加一个受控单 Agent。首阶段只有 4 个 READ Tool 和 2 个 DRAFT Tool：它可以读取当前计划、
-班级/学期/日历的最小投影并生成字段级 `PlanPatch`，但不会修改表单正文、写数据库、保存对话或调用
-文件、URL、SQL、MCP/插件。
+每日活动计划页已接入受控单 Agent。Provider/Tool 能力面固定为 4 个 READ Tool、2 个 DRAFT Tool、
+0 个 Provider WRITE；每轮上下文按可信 tenant/user 与当前页面重建并在轮后丢弃，不保存对话、线程、
+embedding、工具结果或长期记忆。DRAFT 只返回内存 `PlanPatch`。
 
-这仍是设计状态，不属于上方“当前能力”。实现前必须先确认分支基线、补齐 Service 读取投影，并建立
-稳定 RED。未来 Agent WRITE、多 Agent、长期记忆和无人值守 Workflow 均未获授权。
+当前 WRITE 边界仅允许本地应用在用户逐 Patch 显式确认后，把一个当前页面 Patch 原子应用到现有记录；
+Provider WRITE、自动重试、批量/跨页面采用、新 Tool、多 Agent 和长期 Patch 持久化均不在当前能力内。
+详见 [ADR-0005](docs/ADR/ADR-0005-controlled-ai-agent-runtime.md) 与
+[ADR-0006](docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md)。
 
 ## 快速开始
 
 ```bash
 python3.14 -m venv .venv
 .venv/bin/pip install -r requirements.txt
+.venv/bin/python -m app.jobs.bootstrap_admin --init
 .venv/bin/python -m app.main
 ```
 
@@ -54,8 +54,8 @@ python3.14 -m venv .venv
 1. 解析 `.env` 与环境变量。
 2. 在未设置 `DATABASE_URL` 时使用用户数据目录中的 SQLite。
 3. 尝试执行 `alembic upgrade head`。
-4. 创建固定的默认管理员记录。
-5. 直接进入 `/home`。
+4. 不自动创建默认管理员；管理员由上述受控命令交互初始化。
+5. 进入 `/login`，认证成功后再访问业务页面。
 
 统一在 `/settings` 配置学期、班级、教师和 AI 接口。旧 `/setup` 只保留为跳转到 `/settings` 的兼容入口。
 
@@ -70,7 +70,7 @@ python3.14 -m venv .venv
 .venv/bin/alembic upgrade head
 ```
 
-当前工作树 Alembic head：`c1a8e4f6b2d9`。
+当前工作树 Alembic head：`e5f7a9c2d4b6`。
 
 仓库历史曾记录多次通过结果，但这些数字属于对应旧 SHA。本 README 不把历史数字当作当前验证；交付时应记录本次命令、SHA、平台和结果。
 
@@ -79,6 +79,7 @@ python3.14 -m venv .venv
 | 变量 | 默认/边界 |
 |---|---|
 | `DATABASE_URL` | 留空使用 SQLite；MySQL 例：`mysql+aiomysql://...` |
+| `KINDERGARTEN_DATA_DIR` | 可选绝对路径；显式部署时统一承载 SQLite、密钥和运行期 `.env` |
 | `ENCRYPTION_KEY` | 留空自动生成并持久化；服务器应显式提供 |
 | `JWT_SECRET` | 留空自动生成；当前主要用于 NiceGUI storage secret |
 | `PORT` | `8080` |
@@ -100,10 +101,15 @@ Tag 发布工作流可构建 Windows 安装包/便携包、Debian 包/Linux 便�
 ### Docker
 
 ```bash
+cp .env.example .env
+# 先用密码管理器填写 MYSQL_ROOT_PASSWORD、MYSQL_PASSWORD，
+# 并固定 ENCRYPTION_KEY、JWT_SECRET；MySQL 密码使用十六进制随机值。
 docker compose up -d
+docker compose exec app python -m app.jobs.bootstrap_admin --init
 ```
 
-当前 Compose 包含 Caddy、主应用和 MySQL。示例默认密码只适合本地试验；部署前必须在 `.env` 中覆盖，并限制 UI 网络访问。
+当前 Compose 包含 Caddy、主应用和 MySQL，缺少数据库密码时会失败关闭。应用数据使用独立 `app_data`
+卷，不覆盖镜像内 `/app` 代码；部署与升级时必须同时保留 `app_data`、`db_data`，并限制 UI 网络访问。
 
 开发 override：
 
@@ -117,7 +123,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 NiceGUI UI / FastAPI-style API
             │
          service
-        ├─ planned controlled Agent ── Agent Provider
+        ├─ controlled Agent ── Agent Provider
         └───┬─────────┘
             │
         ┌───┴─────────┐
