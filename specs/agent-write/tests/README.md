@@ -391,3 +391,8 @@ H0/M1/L0、Spec H0/M0/L0。先前 duplicated-code finding 已关闭；剩余 Med
 `1 failed, 2 passed`，失败节点完全一致，node hash
 `a1687b69f353c4795b2aaf117a3c1060b13ac81afde8ff7d902755fb7a3dd83e`。该轮 Spec 0/0 不能替代
 Standards finding；修复后生成的新 SHA 仍须取得自身双轴 Review，且所有后续门保持未闭合。
+
+最小措辞修复已由 `f4efaa720591968eb4359c4cb8201b86d59ad054` 提交：`CONTEXT.md` 现在明确 W007
+已闭合、当前按 canonical ledger 完成 W008 剩余门；目标 finding 文件为 `3 passed`，连同 W008 状态合同
+为 `11 passed`，Ruff/format/diff 通过。该修复不改产品或 helper 行为；包含本段的后续 fixed SHA 仍须
+独立双轴 Review，不能继承 `c0d7210` 的 Spec 0/0。
