@@ -485,3 +485,28 @@ ADR-0003 与系统架构文档仍混淆源码/打包模式的默认数据与密�
 README、用户手册与 release body 中使用同一条 one-shot Compose bootstrap 命令；常驻 app 环境
 仍必须不含该 override，MySQL root 凭据仍必须仅属于 db。本段不预先宣称 GREEN、后续 Review、
 完整本地门、PR CI、merge、Issue 或 release 通过。
+
+最小修正及上述 RED lineage 的
+`tested_code_sha=bba33dc2c7cab3208622c2c8807518dd57865189` 已重新完成本地门：三个 finding 节点与
+完整目标文件为 `19 passed`，发布/文档/bootstrap 矩阵为 `38 passed`，revision/WRITE/
+Foundation/ordinary 为 `12/254/261/877 passed`。变更范围 Ruff/format/Pyright、diff check、
+`uv lock --check`、pip/uv dependency consistency 与严格依赖漏洞审计均 GREEN，已有历史 migration 的
+三处未使用导入不属于本轮 diff，未改写历史 migration。Compose 缺域名精确 fail-closed；
+生产/开发渲染均确认 app 不含 `MYSQL_ROOT_PASSWORD` 或
+`BOOTSTRAP_ADMIN_ALLOW_REMOTE`、db 保留 root 配置；官方 Caddy validate 确认自动 TLS 与 HTTP→HTTPS
+重定向。fresh SQLite upgrade→downgrade→upgrade 最终为 head e5f7a9c2d4b6、`19` tables、
+`6` triggers、目录/库 mode `0700/0600`。
+
+真实官方 `mysql:8` image digest
+`sha256:e9027fe4d91c0153429607251656806cc784e914937271037f7738bd5b8e7709` 在本机解析为
+MySQL `8.0.27`；binary log 与 `log_bin_trust_function_creators` 均为 `1`，schema-scoped app principal 的
+head→a6c4d8e2f9b1→head 往返与 live helper 均 GREEN。helper 脱敏证据为四个 trigger rejection、
+CAS `[false, true]`、最终 revision `2`、lock errno `1205`。Linux 浏览器最终矩阵在重启的
+fresh mock 上按独立进程/数据库顺序完成 13 场景，mock 精确接受 `26` 次串行 Provider 请求。
+正常双击与 unknown-after-commit 终态为 `2/1/1`，另一标签普通保存后的旧 revision 场景为
+`2/0/0`，过期、错误会话、A→B→A、跨标签、reload、四种确定故障与 unknown-before-commit 均为
+`1/0/0`；每个场景的 writer issue/apply/reconcile 公开操作均未超过一次。最终矩阵前的两次
+浏览器脚本连接/选择器预检中断未执行 WRITE，已重启 mock 并使用 fresh DB，不计入最终矩阵。
+全部合成 secret、临时数据库/目录、MySQL tmpfs 容器、应用/mock 进程与浏览器标签已删除或停止。
+包含本段的 evidence-closure SHA 仍须取得自身的双轴 Review、push/PR CI，之后才可进入
+`--no-ff` merge 与 merge-SHA 后续门。
