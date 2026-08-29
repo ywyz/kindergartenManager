@@ -313,8 +313,8 @@ Review、本地全门、真实 MySQL、浏览器、CI 或 Issue 门通过。
 MySQL 前提修正 commit `367ad33f5092fd6e4dfd5c001c934a9bb178d7ee` 的 fixed-SHA Review 为
 Standards H0/M1/L0、Spec H0/M0/L0。Standards finding 是 `tasks.md` 状态表仍把已闭合的 W007 标成
 “交付门进行中”、把已进入多轮门的 W008 标成“未进入”，与 canonical ledger 相反。任务表只应把 W007
-标为完成、W008 标为进行中并指向 ledger，不复制逐轮事实。该 finding 尚待稳定 RED 与修正；当前不得
-使用 Spec 0/0 替代 Standards finding。状态合同连续两轮均为 `1 failed`，失败 node 完全一致，node hash
+标为完成、W008 标为进行中并指向 ledger，不复制逐轮事实。该轮 Spec 0/0 不能替代 Standards finding；
+后续状态合同连续两轮均为 `1 failed`，失败 node 完全一致，node hash
 `6339519d44c7f306eb4faaa837cdb037e6a38cc1ebabb9852fb8adc9f7420bdf`，并由
 `3c69c239b5f67f2f856acede293ad714f0ed1611` 固定。
 
@@ -322,5 +322,5 @@ Standards H0/M1/L0、Spec H0/M0/L0。Standards finding 是 `tasks.md` 状态表�
 Standards H0/M0/L1、Spec H0/M1/L0。两轴共同 finding 是上一段在已经记录稳定 RED 且任务表已修正后，
 仍以现在时称“尚待稳定 RED 与修正”，使 canonical ledger 同时表达待办与完成。对应状态诚实性合同在
 本轮连续两次均为 `1 failed`，失败 node 完全一致，node hash
-`cf19c9d1d43de29ae375accbe3baae62766997086da008ca68aa8632416baea3`；旧 Review 不能作为后续
-修正文档 SHA 的 0/0 证据。
+`cf19c9d1d43de29ae375accbe3baae62766997086da008ca68aa8632416baea3`，并由
+`bf0dc52551c067b4e9561093bf103549bfc07df6` 固定；旧 Review 不能作为后续修正文档 SHA 的 0/0 证据。
