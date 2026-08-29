@@ -418,3 +418,17 @@ RED commit `78e2908` 连续两轮均为 `1 failed`，最小 Compose 修复为 `c
 独立 `/data` 卷，Debian 使用专用非 root 用户、`0700/0600` 数据权限和同一显式数据目录。新增/受影响目标
 合同当前合计 `23 passed`，Ruff、YAML parse、Debian shell syntax 与 diff check 通过。以上改动再次使所有
 旧 fixed-SHA Review/CI/MySQL/Chrome 证据失效；只有包含本段的后续 commit 才能作为新的 W008 候选。
+
+候选 `0079ab182d41546d5f401bf5d79a180b523acc7a` 的本地 revision/WRITE/Foundation/ordinary 为
+`12/253/261/868 passed`；Ruff、最终增量 Pyright、lock/dependency consistency、严格依赖审计与 fresh SQLite
+upgrade→downgrade→upgrade 均 GREEN，SQLite 最终为 head `e5f7a9c2d4b6`、`19` tables、`6` triggers、
+mode `0600`。真实 MySQL `8.4.11` 的同一迁移往返也成功，且只读诊断确认 app principal、head 与四个 evidence
+trigger 精确；但 live helper 在任何 live SQL 前拒绝前序测试留下的 owner-only、`0600`、零内容
+`.kindergarten_secrets.lock`，只输出脱敏失败。该锁同时是 browser helper 的显式前提，因此旧 helper 合同存在
+顺序矛盾；失败容器保留完成只读诊断后已按精确名称停止，tmpfs 合成库已移除，未重跑 helper。
+
+对应前检 RED commit `afff51e3c98110b3748d1fc8d6b37cf9a26bc340` 连续两轮均为 `1 failed, 8 deselected`；
+最小 GREEN `2ce7dc0ec5f03131750bb845caaee3b69d172c9c` 只允许该无内容 lock，仍拒绝 `.env` 与
+`.kindergarten_secrets`，并在 application import 前继续安装 file-free synthetic config。目标 MySQL helper
+合同与既有 helper 矩阵为 `33 passed`，Ruff/format/diff 通过。该 helper/test/docs 改动使 `0079ab1…` 的全部
+本地/MySQL 结果不能作为终点证据；只有包含本段的后续 commit 才能重新进入 W008 全门。
