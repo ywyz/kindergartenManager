@@ -396,3 +396,12 @@ Standards finding；修复后生成的新 SHA 仍须取得自身双轴 Review，
 已闭合、当前按 canonical ledger 完成 W008 剩余门；目标 finding 文件为 `3 passed`，连同 W008 状态合同
 为 `11 passed`，Ruff/format/diff 通过。该修复不改产品或 helper 行为；包含本段的后续 fixed SHA 仍须
 独立双轴 Review，不能继承 `c0d7210` 的 Spec 0/0。
+
+状态收敛 SHA `a93b148def7ef561a82b2b1d63ad72a3c580ca33` 曾完成 W008 外部门并回写 Issue #52 comment
+`5461698915`；但 PR #53 自动 Review 随后报告两个新 finding：默认 Compose 未向 MySQL 8 提供应用 principal
+创建 trigger 的必要前提，以及 `INDETERMINATE` 在确定对账后永久占用 confirmation store 容量。前者稳定
+RED commit `78e2908` 连续两轮均为 `1 failed`，最小 Compose 修复为 `cd1672f`；后者稳定 RED commit
+`0628c00` 连续两轮均为 `2 failed`，覆盖 applied/not-applied 两种确定对账，最小状态机修复为 `172818f`。
+目标回归当前为 Compose `1 passed`、确定对账及既有 commit-unknown `4 passed`、transaction/W006 reconcile
+`33 passed`。这些修复改变产品/部署/test，旧 `a93b148…` 的 Review、CI、MySQL、Chrome 与 Issue 终点证据
+全部失效；包含本段的后续 fixed SHA 必须重新完成 W008 全部门，才能进入已单独授权的 W009。

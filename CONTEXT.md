@@ -117,7 +117,8 @@ UI 登录用户与 API 的租户服务主体仍是两个不同边界，不得混
   本文不复制逐轮事实。
 - F009 产品验收仍只绑定 `tested_code_sha=a50c6f6b9aa941996052c59a301a7a40bdbd706f`，closure 证据绑定
   `0ec2e944…`，详见 Issue #48；后续产品/helper/test 变化不能由该历史人工证据覆盖。
-- 当前没有 PR、merge、Issue 关闭或 release 授权；Issue #48 与 Issue #52 均保持 OPEN。
+- PR #53 已绑定 `feat/agent-write` → `main`；本轮已单独授权在 W008 新 SHA 全部门重新闭合后，依次执行
+  `--no-ff` merge、merge-SHA Review/CI、Issue #52 关闭与 release。Issue #48 与 Issue #52 当前仍保持 OPEN。
 
 ## 8. 已确认的下一能力：受控 AI Agent
 
@@ -221,12 +222,13 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
 
 当前共同下一步是：
 
-1. 按 canonical ledger 的当前门依次完成 finding RED、最小修复、本地 GREEN、固定 SHA 双轴复审、push、
-   精确 SHA CI、人工验收和 Issue #52 回写；各门保持可见且不得提前宣称完成。
-2. W007 已闭合；当前按 canonical ledger 完成 W008 的剩余门。任何产品/helper/test 变化都要求在新 SHA
-   重跑对应 Review、CI 和平台证据。
-3. 默认停止在 merge、Issue 关闭和 release 之前；不得给 Provider 增加 WRITE、自动重试、批量/跨页面采用、
-   设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。
+1. 先为 PR #53 回流的 Compose trigger 前提与确定对账容量 finding 保留稳定 RED lineage，完成最小修复；
+   再按 canonical ledger 在新 SHA 重跑本地、双轴 Review、push、精确 SHA CI、MySQL/Chrome 与 Issue 证据。
+2. W007 已闭合；当前按 canonical ledger 完成 W008 的剩余门；因 PR finding 修正，须在新 SHA 重跑
+   对应 Review、CI 和平台证据，不得沿用 `a93b148…` 的终点结论。
+3. W008 全部门闭合后，本轮授权按顺序进入 W009：`--no-ff` merge、merge-SHA Review/CI、Issue #52 关闭、
+   release。不得给 Provider 增加 WRITE、自动重试、批量/跨页面采用、设置/文件/Word/删除/创建写入、
+   长期 Patch 持久化、新 Tool 或多 Agent。
 4. Windows/Word/MySQL 和其他业务模块人工回归仍是独立工作，不与 Agent 结果互相替代。
 
 ## 11. 更新规则

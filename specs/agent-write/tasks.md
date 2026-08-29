@@ -15,7 +15,7 @@
 | W006 | 实现 `daily_plan_operation_version`、`agent_write_audit`、DB immutability trigger 与原子 CAS 写事务 | W005 GREEN + Review | 完成：fixed SHA `253d37d…`，Review 0/0、本地/CI、Linux service-boundary 10/10 与 Issue 回写均闭合 |
 | W007 | 在每日计划页增加逐 Patch 确认/过期/失败/对账 UI，保持 Provider READ/DRAFT | W006 GREEN + Review | 完成；精确闭合证据见 canonical ledger，Issue #52 仅记录已回写外部门 |
 | W008 | 最终固定 SHA 双轴 Review、本地全量、精确 CI、人工故障验收与 Issue 证据；如有改动则 finding RED/修正并全部重跑 | W007 GREEN/Review/commit/push/CI/人工验收/Issue 全部门禁闭合 | 进行中；精确本地状态见 canonical ledger，全部门闭合前不进入 W009 |
-| W009 | merge、Issue 关闭与发布 | W008 全门禁闭合 + 单独授权 | 未授权 |
+| W009 | merge、Issue 关闭与发布 | W008 全门禁闭合 + 单独授权 | 已授权；等待 PR #53 finding 修正后的 W008 新 SHA 全部门闭合，再按 merge、merge-SHA Review/CI、Issue 关闭、release 顺序执行 |
 
 W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
 Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确本地交付状态、Review 轮次、
