@@ -104,6 +104,8 @@ class _ConfirmationState(str, Enum):
     PENDING = "pending"
     CONSUMING = "consuming"
     APPLIED = "applied"
+    RECONCILED_APPLIED = "reconciled_applied"
+    RECONCILED_NOT_APPLIED = "reconciled_not_applied"
     FAILED = "failed"
     INDETERMINATE = "indeterminate"
 
@@ -367,7 +369,11 @@ class _InMemoryConfirmationStore:
                 _reject(binding_error)
             if record.state is _ConfirmationState.CONSUMING:
                 _reject("confirmation_consuming")
-            if record.state is _ConfirmationState.INDETERMINATE:
+            if record.state in {
+                _ConfirmationState.INDETERMINATE,
+                _ConfirmationState.RECONCILED_APPLIED,
+                _ConfirmationState.RECONCILED_NOT_APPLIED,
+            }:
                 _reject("confirmation_indeterminate")
             if record.state is not _ConfirmationState.PENDING:
                 _reject("confirmation_consumed")
@@ -421,6 +427,8 @@ class _InMemoryConfirmationStore:
                 not in {
                     _ConfirmationState.APPLIED,
                     _ConfirmationState.INDETERMINATE,
+                    _ConfirmationState.RECONCILED_APPLIED,
+                    _ConfirmationState.RECONCILED_NOT_APPLIED,
                 },
             )
             if binding_error is not None:
@@ -470,6 +478,30 @@ class _InMemoryConfirmationStore:
 
     def finish_indeterminate(self, claim: _ConfirmationClaim) -> bool:
         return self._finish(claim, state=_ConfirmationState.INDETERMINATE)
+
+    def finish_reconciled(
+        self,
+        record: _StoredConfirmation,
+        result: ConfirmedDailyPlanWriteResult | None,
+    ) -> bool:
+        """Make one definitive reconciliation eligible for normal TTL cleanup."""
+        with self._lock:
+            current = self._records.get(record.confirmation_id)
+            if (
+                current is not record
+                or current.state is not _ConfirmationState.INDETERMINATE
+            ):
+                return False
+            self._records[current.confirmation_id] = replace(
+                current,
+                state=(
+                    _ConfirmationState.RECONCILED_APPLIED
+                    if result is not None
+                    else _ConfirmationState.RECONCILED_NOT_APPLIED
+                ),
+                result=result,
+            )
+            return True
 
 
 def _utc_now() -> datetime:
@@ -886,7 +918,7 @@ class ConfirmedDailyPlanWriteService:
         self,
         session: AsyncSession,
         record: _StoredConfirmation,
-    ) -> ConfirmedDailyPlanWriteResult:
+    ) -> ConfirmedDailyPlanWriteResult | None:
         """Reconcile immutable evidence in a new read-only transaction."""
         audit = await get_agent_write_audit_by_confirmation(
             session,
@@ -895,8 +927,11 @@ class ConfirmedDailyPlanWriteService:
             user_id=record.user_id,
         )
         if audit is None:
-            if record.state is _ConfirmationState.INDETERMINATE:
-                _reject("commit_not_applied")
+            if record.state in {
+                _ConfirmationState.INDETERMINATE,
+                _ConfirmationState.RECONCILED_NOT_APPLIED,
+            }:
+                return None
             _reject("reconcile_integrity_failure")
 
         version = await get_daily_plan_operation_version_by_id(
@@ -948,7 +983,14 @@ class ConfirmedDailyPlanWriteService:
             before_revision=audit.before_revision,
             after_revision=audit.after_revision,
         )
-        if record.state is _ConfirmationState.APPLIED and record.result != result:
+        if (
+            record.state
+            in {
+                _ConfirmationState.APPLIED,
+                _ConfirmationState.RECONCILED_APPLIED,
+            }
+            and record.result != result
+        ):
             _reject("reconcile_integrity_failure")
         return result
 
@@ -970,8 +1012,15 @@ class ConfirmedDailyPlanWriteService:
                 if record.state in {
                     _ConfirmationState.APPLIED,
                     _ConfirmationState.INDETERMINATE,
+                    _ConfirmationState.RECONCILED_APPLIED,
+                    _ConfirmationState.RECONCILED_NOT_APPLIED,
                 }:
-                    return await self._reconcile_evidence(session, record)
+                    result = await self._reconcile_evidence(session, record)
+                    if record.state is _ConfirmationState.INDETERMINATE:
+                        self._store.finish_reconciled(record, result)
+                    if result is None:
+                        _reject("commit_not_applied")
+                    return result
         except ConfirmedWriteRejected:
             raise
         except asyncio.CancelledError:
