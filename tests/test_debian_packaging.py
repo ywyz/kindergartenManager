@@ -54,9 +54,8 @@ def test_postinst_enforces_secure_env_and_data_permissions() -> None:
     assert 'chmod 640 "$CONFIG_DIR/env"' in postinst
 
     assert 'mkdir -p "$DATA_DIR/exports"' in postinst
-    assert 'chmod 700 "$DATA_DIR"' in postinst
-    assert 'chmod 700 "$DATA_DIR/exports"' in postinst
     assert "chown -R --no-dereference" in postinst
+    assert 'find "$DATA_DIR" -type d -exec chmod 700 {} +' in postinst
     assert 'find "$DATA_DIR" -type f -exec chmod 600 {} +' in postinst
 
 

@@ -1,12 +1,26 @@
 #!/bin/bash
 # postinst — 安装后脚本
-set -e
+set -euo pipefail
 
 CONFIG_DIR=/etc/kindergarten-manager
 DATA_DIR=/var/lib/kindergarten-manager
+SERVICE_USER=kindergarten-manager
+SERVICE_GROUP=kindergarten-manager
+ENV_CREATED=0
+
+# ── 创建服务身份（幂等） ───────────────────────────────────────────────────────
+if ! getent group "$SERVICE_GROUP" >/dev/null 2>&1; then
+    groupadd -r "$SERVICE_GROUP"
+fi
+if ! id -u "$SERVICE_USER" >/dev/null 2>&1; then
+    useradd -r -g "$SERVICE_GROUP" -d "$DATA_DIR" -s /usr/sbin/nologin "$SERVICE_USER"
+fi
 
 # ── 创建数据目录 ──────────────────────────────────────────────────────────────
 mkdir -p "$DATA_DIR/exports"
+chown -R --no-dereference "$SERVICE_USER:$SERVICE_GROUP" "$DATA_DIR"
+find "$DATA_DIR" -type d -exec chmod 700 {} +
+find "$DATA_DIR" -type f -exec chmod 600 {} +
 
 # ── 生成配置文件（仅首次安装） ───────────────────────────────────────────────
 if [ ! -f "$CONFIG_DIR/env" ]; then
@@ -23,6 +37,7 @@ if [ ! -f "$CONFIG_DIR/env" ]; then
 # 数据库连接（留空使用内嵌 SQLite，适合单机演示）
 # MySQL 示例：mysql+aiomysql://user:password@localhost:3306/kindergarten_db
 DATABASE_URL=
+KINDERGARTEN_DATA_DIR=${DATA_DIR}
 
 # 加密密钥（自动生成，重要：请勿随意修改，密钥改变后已加密数据将无法解密）
 ENCRYPTION_KEY=${ENCRYPTION_KEY}
@@ -34,20 +49,22 @@ JWT_EXPIRE_MINUTES=60
 HOLIDAY_API_URL=https://timor.tech/api/holiday/info/
 LOG_LEVEL=INFO
 EOF
-    chmod 600 "$CONFIG_DIR/env"
+    chmod 640 "$CONFIG_DIR/env"
+    ENV_CREATED=1
+fi
+chown root:"$SERVICE_GROUP" "$CONFIG_DIR/env"
+chmod 640 "$CONFIG_DIR/env"
+
+if [ "$ENV_CREATED" -eq 1 ]; then
     echo "配置文件已生成：$CONFIG_DIR/env"
 fi
-
-# ── 设置数据目录权限 ─────────────────────────────────────────────────────────
-chmod 755 "$DATA_DIR"
-chmod 755 "$DATA_DIR/exports"
 
 # ── 注册并启动 systemd 服务 ──────────────────────────────────────────────────
 systemctl daemon-reload
 systemctl enable kindergarten-manager.service
 
-if [ "$1" = "configure" ]; then
-    systemctl start kindergarten-manager.service || true
+if [ "${1:-}" = "configure" ]; then
+    systemctl restart kindergarten-manager.service || true
 fi
 
 echo ""
@@ -61,7 +78,7 @@ echo "  数据目录：$DATA_DIR"
 echo ""
 echo "  首次管理员初始化（交互输入密码）："
 echo "    sudo systemctl stop kindergarten-manager"
-echo "    sudo systemd-run --wait --pty --collect --property=EnvironmentFile=$CONFIG_DIR/env --property=WorkingDirectory=$DATA_DIR /opt/kindergarten-manager/KindergartenManager --init"
+echo "    sudo systemd-run --wait --pty --collect --property=User=$SERVICE_USER --property=EnvironmentFile=$CONFIG_DIR/env --property=WorkingDirectory=$DATA_DIR /opt/kindergarten-manager/KindergartenManager --init"
 echo "    sudo systemctl start kindergarten-manager"
 echo ""
 echo "  如需使用 MySQL，请编辑 $CONFIG_DIR/env"
