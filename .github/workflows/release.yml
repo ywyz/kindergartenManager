@@ -240,7 +240,7 @@ jobs:
 
             **零配置模式（内嵌 SQLite）**：直接安装即可使用，无需额外配置数据库。
 
-            **MySQL 模式**：在安装目录创建 `.env` 文件，填写 `DATABASE_URL=mysql+aiomysql://...`，重启程序。
+            **MySQL 模式**：请在 `%LOCALAPPDATA%\KindergartenManager\.env` 写入 `DATABASE_URL=mysql+aiomysql://...`（或等效用户数据目录变量），重启程序。
 
             ---
 
