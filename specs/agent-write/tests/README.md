@@ -615,3 +615,49 @@ fallback 得不到覆盖目标 ledger 的语义节点，因此继续标记 unava
 后续 evidence-closure SHA 仍须取得自身固定 SHA Standards/Spec 双轴 0/0/0 Review、PR exact-head CI 与
 远端自动 Review；之后才可核对最新 main 漂移并以 `--no-ff` 集成，merge SHA 仍须重新完成 Review/CI，
 才能关闭 Issue #52、发布与部署。
+
+候选 `ff0d26e4da498e788c4e995cd88c31a4c77db2ec` 的 fixed-SHA Review 为 Spec H0/M0/L0、
+Standards H1/M0/L0：本 ledger 把前一 closure commit 错写为不存在的 SHA，破坏固定 SHA lineage。
+对应合同 RED `99d448a1645e3a16b40517a29fc6e3ab0f76e345` 连续两轮均为同一节点 `1 failed`；最小
+GREEN `c17e5233d4038adebde054a92c4292b3e114ab22` 修正为真实
+`521418aa1df2dfa30d7e57b8a536ead41b8e5d07`，文档合同为 `16 passed`。正确的 Ruff format 门随后在
+`c17e523…` 报告新测试需格式化，纯机械修正由
+`66955b9ba93a5d2445280c6c65dfc984725c0c6d` 固定；Ruff check/format 与同一 `16 passed` 均 GREEN。
+新增测试与格式字节使旧手工证据失效，因此本段全部终点证据绑定
+`tested_code_sha=66955b9ba93a5d2445280c6c65dfc984725c0c6d`。
+
+Main 在该 SHA 的全新 detached linked worktree 得到 revision/WRITE/Foundation/ordinary
+`12/256/261/891 passed`；变更范围 Ruff check/format、`git diff --check`、`pip check`、
+`uv lock --check` 与严格依赖漏洞审计均 GREEN。此前一次把 `-z` 误放在 Git pathspec 之后的 Ruff 调用被
+识别为无效调用，不计证据；修正命令后的结果才形成上述静态门。fresh SQLite 首次预检误用同步
+`sqlite://`，在任何 migration 前被 async engine 拒绝；全新 owner-only DB 使用
+`sqlite+aiosqlite://` 完成 head→a6c4d8e2f9b1→head，最终为 head e5f7a9c2d4b6、`19` tables、
+`6` triggers、目录/数据库 `0700/0600`。
+
+真实官方 `mysql:8` digest 为
+`sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb`，解析为 MySQL
+`8.4.11`，binary log 与 `log_bin_trust_function_creators` 均为 `1`，fresh schema table count `0`。
+schema-scoped app principal 完成 head→a6c4d8e2f9b1→head；live helper 脱敏证据为四个 trigger
+rejection、CAS `[false, true]`、revision `2`、lock errno `1205`，且 SHA 精确匹配。Docker 健康控制面在
+本机高负载下超时，但 host 直连只读检查、三次 migration revision 与 helper 均形成有效证据；证据完成后
+常规 `docker stop` 仍超时，Main 只对本次精确 disposable `mysqld` PID 执行 SIGKILL，`--rm + tmpfs` 已清除，
+容器名与 loopback `13306` 均为空。
+
+同一 `tested_code_sha` 的最终 Linux 浏览器矩阵在收敛日期控件交互后，使用一个重新启动的 fresh mock、
+13 个独立 `0600` SQLite、独立 app 进程和唯一 loopback 端口顺序完成。mock 只包含最终有效矩阵并精确接受
+编号 `1..26` 的 `26` 次串行 Provider 请求。正常双击与 unknown-after-commit 最终为
+revision/version/audit `2/1/1`；另一标签普通保存后的旧 revision 为 `2/0/0`；过期、错误会话、A→B→A、
+跨标签、reload、四种确定故障、known-before-commit 与 unknown-before-commit 均为 `1/0/0`。四种确定
+故障全部显示确认关闭、正文不变；unknown-before-commit 一次对账后仍不确定、保留同页入口且没有确认按钮；
+unknown-after-commit 一次对账后可见收敛为 `✅ Agent 草案已确认采用（revision 1 → 2）`。每个有效场景的
+公开 writer issue/apply/reconcile 均未超过一次。
+
+最终 fresh mock 前的浏览器连接、登录重定向、端口释放和日期动画/选择器预检均使用独立 DB；一项错误日期的
+旧-revision 预检曾在其 disposable DB 上采用一次 Patch，因此对应 DB 与整轮 mock 都明确作废，而不是拼入
+终点矩阵或在同一 DB 重试。其余无效交互也在 whole-mock 边界丢弃；月份/日期操作收敛后才启动上述最终
+`1..26` mock。最终所有 app/mock、浏览器标签、MySQL 容器与验收端口均已停止。Graphify 仍无法生成覆盖
+目标 ledger 的语义节点，继续标记 unavailable，不把 stale graph 当作证据，`graphify-out/**` 不进入候选。
+
+本段只闭合 `tested_code_sha` 的本地、SQLite、MySQL 与浏览器证据。包含本段的后续 evidence-closure SHA
+仍须取得自身 fixed-SHA Standards/Spec 双轴 0/0/0 Review、PR exact-head CI 与远端自动 Review；之后才可
+核对最新 main 漂移并以 `--no-ff` 集成，merge SHA 仍须重新完成 Review/CI，才能关闭 Issue #52、发布与部署。
