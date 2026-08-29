@@ -120,6 +120,41 @@ def test_explicit_posix_data_dir_rejects_symlink(monkeypatch, tmp_path: Path) ->
         app_data_dir()
 
 
+def test_explicit_posix_data_dir_rejects_intermediate_symlink(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """祖先路径也不得经 symlink 重新定向数据目录。"""
+    if os.name != "posix":
+        pytest.skip("POSIX symlink contract")
+
+    real_parent = tmp_path / "real-parent"
+    real_parent.mkdir(mode=0o700)
+    linked_parent = tmp_path / "linked-parent"
+    linked_parent.symlink_to(real_parent, target_is_directory=True)
+    monkeypatch.setenv("KINDERGARTEN_DATA_DIR", str(linked_parent / "data"))
+
+    with pytest.raises((OSError, RuntimeError, ValueError)):
+        app_data_dir()
+
+
+def test_explicit_posix_data_dir_rejects_writable_untrusted_ancestor(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """非 sticky 的 group/other 可写祖先会允许他人替换已验证目录。"""
+    if os.name != "posix":
+        pytest.skip("POSIX ancestor permission contract")
+
+    shared_parent = tmp_path / "shared-parent"
+    shared_parent.mkdir(mode=0o777)
+    shared_parent.chmod(0o777)
+    data_dir = shared_parent / "data"
+    data_dir.mkdir(mode=0o700)
+    monkeypatch.setenv("KINDERGARTEN_DATA_DIR", str(data_dir))
+
+    with pytest.raises((OSError, RuntimeError, ValueError)):
+        app_data_dir()
+
+
 def test_explicit_posix_data_dir_rejects_foreign_owner(
     monkeypatch, tmp_path: Path
 ) -> None:
