@@ -105,7 +105,7 @@ def test_mysql_url_is_only_loaded_from_the_dedicated_environment_mapping() -> No
     loaded = helper.load_mysql_url(
         {
             "W008_MYSQL_DATABASE_URL": (
-                f"mysql+aiomysql://w008-user:{password}@127.0.0.1:3306/w008_db"
+                f"mysql+aiomysql://w008-user:{password}@127.0.0.1:3306/w008db"
             ),
             "DATABASE_URL": "sqlite+aiosqlite:///must-not-be-used.sqlite3",
         }

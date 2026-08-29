@@ -100,7 +100,7 @@ sudo -n docker run --detach --rm --name "$MYSQL_CONTAINER" \
   --publish "127.0.0.1:$MYSQL_PORT:3306" \
   --tmpfs '/var/lib/mysql:rw,nosuid,nodev,noexec,size=2g' \
   --env MYSQL_ROOT_PASSWORD="$MYSQL_ROOT_PASSWORD" \
-  --env MYSQL_DATABASE=km_w008 \
+  --env MYSQL_DATABASE=kmw008 \
   --env MYSQL_USER=km_w008 \
   --env MYSQL_PASSWORD="$MYSQL_APP_PASSWORD" \
   --health-cmd='MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqladmin ping --silent -h 127.0.0.1 -uroot' \
@@ -117,7 +117,7 @@ table count `0`：
 
 ```text
 sudo -n docker exec "$MYSQL_CONTAINER" sh -lc \
-  'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -N -B -h127.0.0.1 -uroot -D km_w008 \
+  'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -N -B -h127.0.0.1 -uroot -D kmw008 \
   -e "SELECT VERSION(), @@GLOBAL.log_bin, @@GLOBAL.log_bin_trust_function_creators; SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE();"'
 ```
 
@@ -125,7 +125,7 @@ sudo -n docker exec "$MYSQL_CONTAINER" sh -lc \
 不得把 URL 作为 CLI 参数或贴入证据：
 
 ```text
-MYSQL_URL="mysql+aiomysql://km_w008:$MYSQL_APP_PASSWORD@127.0.0.1:$MYSQL_PORT/km_w008?charset=utf8mb4"
+MYSQL_URL="mysql+aiomysql://km_w008:$MYSQL_APP_PASSWORD@127.0.0.1:$MYSQL_PORT/kmw008?charset=utf8mb4"
 TESTED_WORKTREE=$PWD
 MYSQL_MIGRATION_RUNTIME=$(mktemp -d /tmp/km-w008-mysql-migrations.XXXXXX)
 

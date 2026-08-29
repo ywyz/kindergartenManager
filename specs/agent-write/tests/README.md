@@ -351,3 +351,15 @@ Spec findings。
 最小修复候选拒绝 root URL，并在任何验收 DML 前只读验证连接 principal 只有 USAGE 与目标 schema grants；
 browser helper 在应用导入前移除继承 proxy 并固定双写 loopback `NO_PROXY`。全部 W008 合同为 `37 passed`。
 该候选尚无 fixed SHA，尚未运行完整本地门、复审、真实 MySQL、push/CI、完整 Chrome 矩阵或 Issue 回写。
+
+上述两项 Spec finding 修复候选已由 `89bb093c6010a05daff75666c541dbed75a20829` 提交，提交前 W008/WRITE
+为 `37/243 passed`；但 precommit 审计发现 MySQL database-level grant 中未转义 `_`/`%` 是通配符，
+原 classifier 还用 `casefold()` 接受大小写错配，可能把跨 schema 权限误报为单 schema。该 hard finding
+的 RED 已由 `76dd5aacd0092da8f28cdfcba7e77b61edb54b5c` 固定：MySQL helper 文件连续两轮均为
+`5 failed, 19 passed`，失败节点完全一致，node hash
+`51117cf0ab127871ceab6be424f792336eaa5b3e99f9a693171a6d21118516ac`；中间候选不得进入复审或外部门。
+
+最小修复候选把 disposable schema 改为无 grant 通配字符的 `kmw008`，URL gate 拒绝非字母数字 schema，
+classifier 按大小写精确匹配并只接受正确转义的历史 wildcard grant。全部 W008/WRITE 分别为
+`42/248 passed`，Ruff/format/diff、变更范围 Pyright 与 `pip check` 通过。该候选尚无 fixed SHA，
+不得据此宣称 Review 0/0、真实 MySQL、push/CI、Chrome 矩阵、Issue 回写或 W008 闭合。

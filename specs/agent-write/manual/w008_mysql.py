@@ -59,6 +59,7 @@ _EXPECTED_TRIGGER_ROWS = frozenset(
 )
 _SHA_PATTERN = re.compile(r"[0-9a-f]{40}")
 _MYSQL_8_PATTERN = re.compile(r"8(?:\.\d+){1,}")
+_MYSQL_DATABASE_PATTERN = re.compile(r"[A-Za-z0-9]+")
 _TENANT_ID = 8_008_001
 _USER_ID = 8_008_002
 _PLAN_ID = 8_008_003
@@ -111,8 +112,11 @@ def load_mysql_url(env: Mapping[str, str]) -> URL:
         raise ManualHelperError("W008 MySQL principal must be a non-root app user")
     if not _is_loopback(database_url.host):
         raise ManualHelperError("W008 MySQL host must be loopback")
-    if not database_url.database:
-        raise ManualHelperError("W008 MySQL database name is required")
+    if (
+        not database_url.database
+        or _MYSQL_DATABASE_PATTERN.fullmatch(database_url.database) is None
+    ):
+        raise ManualHelperError("W008 MySQL database name is not grant-safe")
     return database_url
 
 
@@ -147,15 +151,20 @@ def _principal_grants_are_schema_scoped(
     ):
         return False
 
-    escaped_database = expected_database.replace("`", "``").casefold()
-    allowed_schema_scope = f" on `{escaped_database}`.* to "
+    escaped_database = (
+        expected_database.replace("\\", "\\\\")
+        .replace("_", "\\_")
+        .replace("%", "\\%")
+        .replace("`", "``")
+    )
+    allowed_schema_scope = f" ON `{escaped_database}`.* TO "
     for grant in grants:
-        normalized = " ".join(grant.split()).casefold()
-        if " with grant option" in normalized:
+        normalized = " ".join(grant.split())
+        if " WITH GRANT OPTION" in normalized:
             return False
-        if normalized.startswith("grant usage on *.* to "):
+        if normalized.startswith("GRANT USAGE ON *.* TO "):
             continue
-        if normalized.startswith("grant ") and allowed_schema_scope in normalized:
+        if normalized.startswith("GRANT ") and allowed_schema_scope in normalized:
             continue
         return False
     return True
