@@ -376,3 +376,10 @@ fixed-SHA、Git、linked-worktree/clean 与 import activation 信任根。对应
 `82931c2e60fa75eda6840c6cb754a3071de38f78` 固定：两个节点连续两轮均为 `2 failed`，失败节点完全一致，node hash
 `1c118801d3b7f832dd009e8599805f6c81f4633f4705f0b58d3ce3df4f7f5423`。旧 Review 结论不得作为后续
 SHA 的 0/0；修复后仍须重新执行双轴 Review、本地、MySQL、push/CI、Chrome 与 Issue 门。
+
+最小修复已由 `198c2ab7ae1c578c3f5a072cb62d3df7f2c9c1bd` 提交：`CONTEXT.md` 不再复制过时的
+W006 远端 SHA，并把精确门状态委托给本 ledger；browser/MySQL runner 通过一个纯 stdlib 深 module 共用
+fixed-SHA、Git、linked-worktree/clean 与 import activation 信任根，同时以参数保留两入口不同的受保护
+文件策略。finding 节点与全部 W008 合同为 `2/44 passed`，完整 WRITE 为 `250 passed`；Ruff/format/diff
+与变更范围 Pyright 通过。该 GREEN commit 尚未取得自身的 fixed-SHA 双轴 Review；包含本段的后续 SHA
+也必须重新 Review，且不得预先宣称真实 MySQL、push/CI、Chrome、Issue 或 W008 闭合。
