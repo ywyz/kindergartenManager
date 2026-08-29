@@ -339,3 +339,15 @@ version/audit 各新增 1 行，writer 计数为 `1/1/0`。矩阵在 finding 后
 全部 W008 合同与完整 WRITE 分别为 `1/27/233 passed`，Ruff/format/diff、变更范围 Pyright 与
 `pip check` 通过。该修复尚未取得 fixed-SHA Review；不得据此恢复旧 Review、CI、MySQL、浏览器或
 Issue 门，也不得宣称 W008 闭合、merge、Issue 关闭或 release。
+
+Chrome finding 修复状态 SHA `e7f171822ab4dcdc212463682a4969a2654ab990` 的 fixed-SHA 双轴 Review 为
+Standards H0/M0/L0、Spec H0/M2/L0。Spec findings 是 live MySQL helper 接受 root URL 且未验证实际
+principal 只具单 schema 权限，以及 browser helper 继承宿主 HTTP(S)/ALL proxy、未在 app import 前强制
+mock 流量直连 loopback。对应 finding RED 已由 `a0b4d8f050d169f5f6a8a5744e949abb32b52408` 固定：
+两个相关文件连续两轮均为 `5 failed, 16 passed`，失败节点完全一致，node hash
+`cadc1ae0cdc32ca4f7aa85434c88a9fef3b46c58e79cdb6cdba4b061b96b10a9`；该轮 Standards 0/0 不能替代
+Spec findings。
+
+最小修复候选拒绝 root URL，并在任何验收 DML 前只读验证连接 principal 只有 USAGE 与目标 schema grants；
+browser helper 在应用导入前移除继承 proxy 并固定双写 loopback `NO_PROXY`。全部 W008 合同为 `37 passed`。
+该候选尚无 fixed SHA，尚未运行完整本地门、复审、真实 MySQL、push/CI、完整 Chrome 矩阵或 Issue 回写。

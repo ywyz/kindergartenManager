@@ -73,6 +73,8 @@ class AcceptanceBackend(Protocol):
 
     async def server_version(self) -> str: ...
 
+    async def app_principal_is_schema_scoped(self) -> bool: ...
+
     async def current_alembic_heads(self) -> tuple[str, ...]: ...
 
     async def immutable_trigger_rejections(self) -> set[tuple[str, str]]: ...
@@ -105,6 +107,8 @@ def load_mysql_url(env: Mapping[str, str]) -> URL:
 
     if database_url.drivername != "mysql+aiomysql":
         raise ManualHelperError("W008 acceptance requires MySQL with aiomysql")
+    if not database_url.username or database_url.username.casefold() == "root":
+        raise ManualHelperError("W008 MySQL principal must be a non-root app user")
     if not _is_loopback(database_url.host):
         raise ManualHelperError("W008 MySQL host must be loopback")
     if not database_url.database:
@@ -122,6 +126,39 @@ def _is_loopback(host: str | None) -> bool:
         return ipaddress.ip_address(normalized).is_loopback
     except ValueError:
         return False
+
+
+def _principal_grants_are_schema_scoped(
+    *,
+    principal: str,
+    expected_username: str,
+    expected_database: str,
+    grants: tuple[str, ...],
+) -> bool:
+    """Accept only USAGE plus grants on the one documented app schema."""
+    username, separator, _host = principal.partition("@")
+    if (
+        separator != "@"
+        or username != expected_username
+        or not username
+        or username.casefold() == "root"
+        or not expected_database
+        or not grants
+    ):
+        return False
+
+    escaped_database = expected_database.replace("`", "``").casefold()
+    allowed_schema_scope = f" on `{escaped_database}`.* to "
+    for grant in grants:
+        normalized = " ".join(grant.split()).casefold()
+        if " with grant option" in normalized:
+            return False
+        if normalized.startswith("grant usage on *.* to "):
+            continue
+        if normalized.startswith("grant ") and allowed_schema_scope in normalized:
+            continue
+        return False
+    return True
 
 
 def _git(root: Path, *args: str) -> bytes:
@@ -203,6 +240,9 @@ async def run_live_acceptance(
     normalized_sha = _sha(tested_sha)
     await validate_mysql8(backend)
 
+    if await backend.app_principal_is_schema_scoped() is not True:
+        raise ManualHelperError("MySQL principal is not schema-scoped")
+
     heads = await backend.current_alembic_heads()
     if heads != (CURRENT_HEAD,):
         raise ManualHelperError("live database is not at the exact current head")
@@ -244,6 +284,8 @@ class LiveMySQLBackend:
         cas_apply: CasApply,
         get_user_by_id: GetUserById,
     ) -> None:
+        self._expected_username = database_url.username or ""
+        self._expected_database = database_url.database or ""
         self._engine = create_async_engine(
             database_url,
             poolclass=NullPool,
@@ -269,6 +311,23 @@ class LiveMySQLBackend:
                 return str(result.scalar_one())
         except Exception:
             raise ManualHelperError("MySQL version check failed") from None
+
+    async def app_principal_is_schema_scoped(self) -> bool:
+        """Reject root, global privileges, roles and cross-schema grants."""
+        try:
+            async with self._sessions() as session:
+                principal = str(
+                    (await session.execute(text("SELECT CURRENT_USER()"))).scalar_one()
+                )
+                grant_rows = (await session.execute(text("SHOW GRANTS"))).all()
+            return _principal_grants_are_schema_scoped(
+                principal=principal,
+                expected_username=self._expected_username,
+                expected_database=self._expected_database,
+                grants=tuple(str(row[0]) for row in grant_rows),
+            )
+        except Exception:
+            raise ManualHelperError("MySQL principal check failed") from None
 
     async def current_alembic_heads(self) -> tuple[str, ...]:
         try:

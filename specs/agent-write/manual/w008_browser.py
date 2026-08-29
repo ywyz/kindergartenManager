@@ -8,6 +8,7 @@ writer's sessions; ordinary application sessions remain untouched.
 from __future__ import annotations
 
 import argparse
+from collections.abc import MutableMapping
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
@@ -31,6 +32,15 @@ _MOCK_ENCRYPTION_KEY = "f009-fictional-encryption-key-do-not-use"
 _MOCK_JWT_SECRET = "f009-fictional-jwt-secret-do-not-use"
 _MOCK_HOLIDAY_URL = "http://127.0.0.1:18081/holiday/info/"
 _MOCK_PORT = 18081
+_PROXY_ENVIRONMENT_NAMES = (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+)
+_LOOPBACK_NO_PROXY = "127.0.0.1,localhost"
 
 
 class ManualHelperError(RuntimeError):
@@ -339,6 +349,14 @@ def _port_listening(port: int) -> bool:
         return probe.connect_ex(("127.0.0.1", port)) == 0
 
 
+def _force_loopback_network_environment(env: MutableMapping[str, str]) -> None:
+    """Keep every acceptance-helper HTTP request on direct loopback."""
+    for name in _PROXY_ENVIRONMENT_NAMES:
+        env.pop(name, None)
+    env["NO_PROXY"] = _LOOPBACK_NO_PROXY
+    env["no_proxy"] = _LOOPBACK_NO_PROXY
+
+
 def _launch_product_app(args: argparse.Namespace) -> None:
     """Compose the real page with a page-local, writer-only acceptance service."""
     tested_sha = _sha(args.tested_sha)
@@ -352,6 +370,7 @@ def _launch_product_app(args: argparse.Namespace) -> None:
     if not _port_free(args.port) or not _port_listening(_MOCK_PORT):
         raise ManualHelperError("required loopback port state is not ready")
     fault = FaultPoint(args.fault) if args.fault is not None else None
+    _force_loopback_network_environment(os.environ)
 
     os.environ.update(
         DATABASE_URL=f"sqlite+aiosqlite:///{database.as_posix()}",

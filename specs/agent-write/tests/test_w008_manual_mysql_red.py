@@ -143,6 +143,70 @@ def test_mysql_url_loader_rejects_the_root_principal(username: str) -> None:
 
 
 @pytest.mark.parametrize(
+    ("principal", "grants", "expected"),
+    (
+        (
+            "km_w008@%",
+            (
+                "GRANT USAGE ON *.* TO `km_w008`@`%`",
+                "GRANT ALL PRIVILEGES ON `w008_db`.* TO `km_w008`@`%`",
+            ),
+            True,
+        ),
+        (
+            "root@localhost",
+            ("GRANT ALL PRIVILEGES ON *.* TO `root`@`localhost`",),
+            False,
+        ),
+        (
+            "km_w008@%",
+            ("GRANT ALL PRIVILEGES ON *.* TO `km_w008`@`%`",),
+            False,
+        ),
+        (
+            "km_w008@%",
+            ("GRANT ALL ON `other_db`.* TO `km_w008`@`%`",),
+            False,
+        ),
+        (
+            "km_w008@%",
+            ("GRANT ALL ON `w008_db`.* TO `km_w008`@`%` WITH GRANT OPTION",),
+            False,
+        ),
+        (
+            "km_w008@%",
+            ("GRANT `w008_role`@`%` TO `km_w008`@`%`",),
+            False,
+        ),
+    ),
+    ids=(
+        "schema-only",
+        "root",
+        "global",
+        "other-schema",
+        "grant-option",
+        "role",
+    ),
+)
+def test_mysql_principal_classifier_accepts_only_one_schema(
+    principal: str,
+    grants: tuple[str, ...],
+    expected: bool,
+) -> None:
+    helper = _load_helper()
+
+    assert (
+        helper._principal_grants_are_schema_scoped(
+            principal=principal,
+            expected_username="km_w008",
+            expected_database="w008_db",
+            grants=grants,
+        )
+        is expected
+    )
+
+
+@pytest.mark.parametrize(
     "database_url",
     (
         "sqlite+aiosqlite:///synthetic.sqlite3",
