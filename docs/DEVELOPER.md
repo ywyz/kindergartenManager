@@ -84,7 +84,8 @@ API 身份独立：`X-Api-Key` 映射到 tenant；配置 `API_SIGNING_SECRET` �
 
 ## 5. 数据库与迁移
 
-当前工作树 Alembic head：`c1a8e4f6b2d9`。
+当前工作树 Alembic head：`e5f7a9c2d4b6`。该 revision 创建 W006 的两张 append-only evidence 表及
+SQLite/MySQL 不可变 trigger；人工迁移验收不得停在前序 `c1a8e4f6b2d9`。
 
 ```bash
 .venv/bin/alembic current

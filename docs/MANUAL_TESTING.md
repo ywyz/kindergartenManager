@@ -19,7 +19,7 @@ Word：Microsoft Word / LibreOffice / 未执行
 
 ## 2. 启动与迁移
 
-- [ ] 全新数据目录启动，迁移到 `c1a8e4f6b2d9`。
+- [ ] 全新数据目录启动，迁移到 `e5f7a9c2d4b6`，并确认两张 Agent WRITE evidence 表及不可变 trigger 存在。
 - [ ] 空库不自动创建固定管理员；在应用主机显式 bootstrap 后才能登录。
 - [ ] `/` 跳转 `/login`；未登录不能进入 `/home`、`/settings` 等业务页，匿名 `/register` 不挂载。
 - [ ] 登录后 `/home`、`/settings` 可打开；旧 `/setup` 立即跳转 `/settings`。

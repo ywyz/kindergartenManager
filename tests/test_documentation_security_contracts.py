@@ -137,8 +137,7 @@ def test_current_migration_head_is_consistent_across_operator_docs() -> None:
     missing = [
         relative_path
         for relative_path in ("docs/DEVELOPER.md", "docs/MANUAL_TESTING.md")
-        if expected_head
-        not in (_ROOT / relative_path).read_text(encoding="utf-8")
+        if expected_head not in (_ROOT / relative_path).read_text(encoding="utf-8")
     ]
 
     assert not missing, f"current Alembic head missing from: {missing}"

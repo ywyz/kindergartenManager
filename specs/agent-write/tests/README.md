@@ -455,3 +455,10 @@ CAS `[false, true]`、最终 revision `2` 与 lock errno `1205`。Linux Chrome �
 13 个场景的数据库 revision/version/audit 与 writer issue/apply/reconcile 计数均符合合同。上述临时数据库、
 容器、应用进程、mock 与浏览器标签已清理。本段只闭合 `tested_code_sha` 的本地证据；包含本段的
 evidence-closure SHA 仍须重新完成双轴 Review、push/PR CI、Issue、merge-SHA Review/CI 与 release 门。
+
+证据闭合候选 `e66906ba87d058d1e954b8bea42abc96d53953df` 的 fixed-SHA Review 为 Standards
+H0/M1/L1、Spec H1/M0/L0：开发/人工测试文档仍停在旧迁移 head；源码/打包 SQLite 数据目录措辞仍混淆；
+默认 Compose 还把包含 MySQL root 密码的完整 `.env` 注入 app 容器。对应 finding RED 已由
+`72776b8` 固定，两个目标文件连续两轮均为 `3 failed, 13 passed`，失败节点完全一致。下一候选必须让
+app 只接收普通 MySQL principal 的 URL 与显式应用配置、保留 db-only root 配置，并统一当前 head 与数据目录
+事实；旧 `e66906b…` Review 与所有先前本地/MySQL/Chrome 终点证据均不能作为新候选的闭合门。
