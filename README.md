@@ -52,7 +52,7 @@ python3.14 -m venv .venv
 浏览器访问 `http://localhost:8080`。首次运行会：
 
 1. 解析 `.env` 与环境变量。
-2. 在未设置 `DATABASE_URL` 时使用用户数据目录中的 SQLite。
+2. 在未设置 `DATABASE_URL` 时，源码模式默认为当前工作目录中的 SQLite；打包模式才使用平台用户数据目录。
 3. 尝试执行 `alembic upgrade head`。
 4. 不自动创建默认管理员；管理员由上述受控命令交互初始化。
 5. 进入 `/login`，认证成功后再访问业务页面。
@@ -106,8 +106,11 @@ cp .env.example .env
 # MYSQL_ROOT_PASSWORD、MYSQL_PASSWORD，
 # 并固定 ENCRYPTION_KEY、JWT_SECRET；MySQL 密码使用十六进制随机值。
 docker compose up -d
-docker compose exec app python -m app.jobs.bootstrap_admin --init
+docker compose exec -e BOOTSTRAP_ADMIN_ALLOW_REMOTE=true app python -m app.jobs.bootstrap_admin --init
 ```
+
+该 `BOOTSTRAP_ADMIN_ALLOW_REMOTE` 只作用于这一次交互初始化命令；常驻 app 容器不得设置它，MySQL root
+凭据仍只属于 db 容器。
 
 当前 Compose 包含 Caddy、主应用和 MySQL；缺少生产域名或数据库密码时会失败关闭。域名必须先通过
 DNS 解析到部署主机，并允许 Caddy 使用 80/443 端口自动申请和续期 HTTPS 证书。应用数据使用独立

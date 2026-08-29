@@ -284,8 +284,9 @@ jobs:
             # 并固定 ENCRYPTION_KEY、JWT_SECRET；MySQL 密码使用十六进制随机值。
             docker compose up -d
 
-            # 首次创建管理员（密码交互输入，不回显）
-            docker compose exec app python -m app.jobs.bootstrap_admin --init
+            # 首次创建管理员（密码交互输入，不回显）。
+            # 该远程 override 只对本次 exec 生效，不得进入常驻 app 容器环境。
+            docker compose exec -e BOOTSTRAP_ADMIN_ALLOW_REMOTE=true app python -m app.jobs.bootstrap_admin --init
 
             # 或直接拉取镜像（使用外部 MySQL）
             docker pull ghcr.io/ywyz/kindergartenmanager:${{ steps.ver.outputs.version }}

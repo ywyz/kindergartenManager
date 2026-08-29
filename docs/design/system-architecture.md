@@ -241,7 +241,8 @@ DRAFT 只返回内存 `PlanPatch`，不修改 UI 正文、数据库、版本、p
 配置来自环境变量和 `.env`：
 
 - `DATABASE_URL` 留空时使用 SQLite。
-- `ENCRYPTION_KEY`、`JWT_SECRET` 留空时自动生成并写到用户数据目录的 `.kindergarten_secrets`。
+- `ENCRYPTION_KEY`、`JWT_SECRET` 留空时自动生成；源码模式的自动密钥写入当前工作目录的
+  `.kindergarten_secrets`，打包模式才写入平台用户数据目录，显式的 `KINDERGARTEN_DATA_DIR` 可覆盖数据根。
 - `API_KEYS` 留空时业务 API 关闭。
 - `API_SIGNING_SECRET` 非空时强制 HMAC。
 - `IMAGE_STORAGE_BACKEND` 当前默认 `mysql_blob`。

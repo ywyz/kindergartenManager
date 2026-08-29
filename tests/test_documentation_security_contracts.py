@@ -150,9 +150,7 @@ def test_all_authoritative_docs_distinguish_source_and_packaged_data_dirs() -> N
         "docs/ADR/ADR-0003-sqlite-default-mysql-optional-alembic.md": (
             "源码模式使用当前工作目录"
         ),
-        "docs/design/system-architecture.md": (
-            "源码模式的自动密钥写入当前工作目录"
-        ),
+        "docs/design/system-architecture.md": ("源码模式的自动密钥写入当前工作目录"),
     }
     missing = [
         relative_path
@@ -184,8 +182,7 @@ def test_compose_bootstrap_docs_use_an_explicit_one_shot_remote_override() -> No
             "docs/USER_MANUAL.md",
             ".github/workflows/release.yml",
         )
-        if required_command
-        not in (_ROOT / relative_path).read_text(encoding="utf-8")
+        if required_command not in (_ROOT / relative_path).read_text(encoding="utf-8")
     ]
 
     assert not missing, f"safe Compose bootstrap command missing from: {missing}"

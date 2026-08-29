@@ -474,3 +474,14 @@ unknown-after-commit `2/1/1`、人工保存旧 revision `2/0/0`、其余 `1/0/0`
 压力在任何浏览器操作前停止，不计入矩阵；随后全部场景按独立进程与唯一端口顺序完成。所有合成 secret、
 临时数据库/目录、MySQL tmpfs 容器、应用/mock 进程与浏览器标签均已删除或停止。包含本段的 evidence-closure
 SHA 仍须取得自身的双轴 Review、PR CI，之后才可进入 `--no-ff` merge 与 merge-SHA 后续门。
+
+证据闭合候选 `aa1167a8b515772a159ab7a7fcb12254c1464fd6` 的 fixed-SHA Review 为 Standards
+H0/M1/L1、Spec H1/M1/L0：开发者指南仍把当前已提交分支写成“正在实现尚未提交”；README、
+ADR-0003 与系统架构文档仍混淆源码/打包模式的默认数据与密钥路径；且移除 app 的整体
+`env_file` 后，Compose 首次管理员命令连接远程 MySQL，却未提供仅限本次调用的
+`BOOTSTRAP_ADMIN_ALLOW_REMOTE=true`，会按默认 fail-closed。对应 finding RED 已由
+`0f09dd5d6f93618a465f68f75ac737fd869e701b` 固定；三个目标节点连续两轮均为 `3 failed, 16 passed`，
+失败节点完全一致。下一候选必须统一三处路径语义、把开发状态委派给本 ledger，并在
+README、用户手册与 release body 中使用同一条 one-shot Compose bootstrap 命令；常驻 app 环境
+仍必须不含该 override，MySQL root 凭据仍必须仅属于 db。本段不预先宣称 GREEN、后续 Review、
+完整本地门、PR CI、merge、Issue 或 release 通过。

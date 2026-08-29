@@ -38,10 +38,11 @@ cp .env.example .env
 # MYSQL_ROOT_PASSWORD、MYSQL_PASSWORD，
 # 并固定 ENCRYPTION_KEY、JWT_SECRET；MySQL 密码使用十六进制随机值。
 docker compose up -d
-docker compose exec app python -m app.jobs.bootstrap_admin --init
+docker compose exec -e BOOTSTRAP_ADMIN_ALLOW_REMOTE=true app python -m app.jobs.bootstrap_admin --init
 ```
 
-初始化命令会交互读取管理员密码且不回显。Compose 会在缺少生产域名或数据库密码时失败关闭；域名必须
+这里的 `BOOTSTRAP_ADMIN_ALLOW_REMOTE` 只对该次交互初始化生效，不会注入常驻 app 容器；MySQL root
+凭据仍只属于 db 容器。初始化命令会交互读取管理员密码且不回显。Compose 会在缺少生产域名或数据库密码时失败关闭；域名必须
 先通过 DNS 解析到部署主机，并允许 Caddy 使用 80/443 端口自动申请和续期 HTTPS 证书。生产或共享环境
 还必须固定加密/JWT 密钥、保留 `app_data`、`db_data` 与 `exports` 卷，并限制 UI 的网络访问。
 

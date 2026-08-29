@@ -9,9 +9,10 @@
 3. `docs/ROADMAP.md`
 4. 相关 ADR、设计、测试计划和代码
 
-当前检出基线是 `main@ca3b7bd…`；Agent Foundation 已合入主线。本工作树正在实现尚未提交的
-可信 UI session 与 `daily_plan.revision` 先决条件，并固定 Agent WRITE RED。产品仍是 NiceGUI
-模块化单体，不是已拆分的微服务系统。
+Agent Foundation 已合入主线，W007 已按独立交付门闭合；当前分支正在完成 W008 的剩余
+发布门。精确本地交付状态、Review 轮次、SHA 与测试证据只以
+`specs/agent-write/tests/README.md` 为准；未经其中对应的 fixed-SHA Review、PR CI、merge 与发布门，
+不得宣称 W008 闭合。产品仍是 NiceGUI 模块化单体，不是已拆分的微服务系统。
 
 ## 2. 环境
 

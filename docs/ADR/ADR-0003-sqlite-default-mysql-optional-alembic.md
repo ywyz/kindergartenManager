@@ -9,7 +9,8 @@
 
 ## 决策
 
-- `DATABASE_URL` 留空时，权威数据库是用户数据目录中的 SQLite。
+- `DATABASE_URL` 留空时，源码模式使用当前工作目录中的 SQLite；打包模式使用平台用户数据目录，
+  显式的 `KINDERGARTEN_DATA_DIR` 则统一覆盖两者的数据根目录。
 - 显式配置时可使用 MySQL 8。
 - 所有 schema 变更通过 Alembic；禁止依赖 `create_all()`。
 - 迁移必须同时考虑 SQLite batch/类型差异和 MySQL enum/BLOB 行为。
