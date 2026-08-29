@@ -368,3 +368,11 @@ browser helper 在应用导入前移除继承 proxy 并固定双写 loopback `NO
 状态收敛 SHA `08799d89b7e72144ee3dfb560ef18d22ae0ef653` 的 fixed-SHA 双轴 Review 为
 Standards H0/M0/L0、Spec H0/M0/L0。本段只记录该已闭合历史门；包含本段的后续 fixed SHA 仍须取得
 自身的双轴 Review，不能继承 `08799d8` 的结果。
+
+后续证据记录 SHA `d9e04f05b02cca11e0bad97196d2267c802f5e2c` 的 Standards Review 在独立子审计
+回流后更正为 H0/M1/L1；Spec 为 H0/M0/L0。Medium finding 是 `CONTEXT.md` 仍把远端分支写成只到
+W006，与本 ledger 已闭合的 W007 外部门及实际远端矛盾；Low finding 是 browser/MySQL helper 分别复制
+fixed-SHA、Git、linked-worktree/clean 与 import activation 信任根。对应 finding RED 已由
+`82931c2e60fa75eda6840c6cb754a3071de38f78` 固定：两个节点连续两轮均为 `2 failed`，失败节点完全一致，node hash
+`1c118801d3b7f832dd009e8599805f6c81f4633f4705f0b58d3ce3df4f7f5423`。旧 Review 结论不得作为后续
+SHA 的 0/0；修复后仍须重新执行双轴 Review、本地、MySQL、push/CI、Chrome 与 Issue 门。

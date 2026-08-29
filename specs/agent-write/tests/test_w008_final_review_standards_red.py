@@ -23,6 +23,14 @@ SHARED_GATE_DEFINITIONS = frozenset(
         "_activate_worktree_imports",
     }
 )
+SHARED_GATE_IMPORTS = frozenset(
+    {
+        "ManualHelperError",
+        "_activate_worktree_imports",
+        "_sha",
+        "require_isolated_worktree",
+    }
+)
 
 
 def _section(markdown: str, heading: str) -> str:
@@ -36,6 +44,16 @@ def _top_level_definitions(path: Path) -> set[str]:
         node.name
         for node in tree.body
         if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+
+
+def _shared_gate_imports(path: Path) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    return {
+        alias.name
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom) and node.module == "w008_fixed_sha"
+        for alias in node.names
     }
 
 
@@ -61,8 +79,8 @@ def test_w008_manual_helpers_share_one_fixed_sha_worktree_gate() -> None:
         )
         if duplicated:
             problems.append(f"{helper_path.name}: duplicated {duplicated}")
-        source = helper_path.read_text(encoding="utf-8")
-        if "from w008_fixed_sha import" not in source:
-            problems.append(f"{helper_path.name}: missing shared gate import")
+        imported = _shared_gate_imports(helper_path)
+        if imported != SHARED_GATE_IMPORTS:
+            problems.append(f"{helper_path.name}: shared imports {sorted(imported)}")
 
     assert problems == [], "\n".join(problems)

@@ -12,6 +12,7 @@ import pytest
 
 
 HELPER_PATH = Path(__file__).parents[1] / "manual" / "w008_mysql.py"
+sys.path.insert(0, str(HELPER_PATH.parent))
 TESTED_SHA = "a" * 40
 CURRENT_HEAD = "e5f7a9c2d4b6"
 TRIGGER_CASES = {

@@ -16,10 +16,7 @@ import hashlib
 import ipaddress
 import json
 import os
-from pathlib import Path
 import re
-import stat
-import subprocess
 import sys
 from types import ModuleType, SimpleNamespace
 from typing import Any, Protocol
@@ -34,6 +31,12 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.pool import NullPool
+from w008_fixed_sha import (
+    ManualHelperError,
+    _activate_worktree_imports,
+    _sha,
+    require_isolated_worktree,
+)
 
 
 MYSQL_URL_ENV = "W008_MYSQL_DATABASE_URL"
@@ -57,16 +60,11 @@ _EXPECTED_TRIGGER_ROWS = frozenset(
         for table_name, operation in TRIGGER_CASES
     }
 )
-_SHA_PATTERN = re.compile(r"[0-9a-f]{40}")
 _MYSQL_8_PATTERN = re.compile(r"8(?:\.\d+){1,}")
 _MYSQL_DATABASE_PATTERN = re.compile(r"[A-Za-z0-9]+")
 _TENANT_ID = 8_008_001
 _USER_ID = 8_008_002
 _PLAN_ID = 8_008_003
-
-
-class ManualHelperError(RuntimeError):
-    """A fail-closed error whose message never contains connection details."""
 
 
 class AcceptanceBackend(Protocol):
@@ -87,13 +85,6 @@ class AcceptanceBackend(Protocol):
 
 CasApply = Callable[..., Awaitable[bool]]
 GetUserById = Callable[..., Awaitable[object | None]]
-
-
-def _sha(value: str) -> str:
-    normalized = value.strip().casefold()
-    if _SHA_PATTERN.fullmatch(normalized) is None:
-        raise ManualHelperError("tested SHA must be complete 40-character hex")
-    return normalized
 
 
 def load_mysql_url(env: Mapping[str, str]) -> URL:
@@ -168,69 +159,6 @@ def _principal_grants_are_schema_scoped(
             continue
         return False
     return True
-
-
-def _git(root: Path, *args: str) -> bytes:
-    result = subprocess.run(
-        ("git", *args),
-        cwd=root,
-        check=False,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    if result.returncode:
-        raise ManualHelperError("git verification failed")
-    return result.stdout
-
-
-def require_isolated_worktree(tested_sha: str, *, clean: bool = True) -> Path:
-    """Require a clean linked worktree whose exact HEAD is being reported."""
-    expected = _sha(tested_sha)
-    root = Path.cwd().resolve()
-    top = Path(_git(root, "rev-parse", "--show-toplevel").decode().strip()).resolve()
-    try:
-        git_entry = (root / ".git").lstat()
-    except OSError:
-        raise ManualHelperError("run from a linked worktree root") from None
-    if root != top or not stat.S_ISREG(git_entry.st_mode):
-        raise ManualHelperError("run from a linked worktree root")
-    actual = _git(root, "rev-parse", "HEAD").decode().strip().casefold()
-    if actual != expected:
-        raise ManualHelperError("HEAD does not match tested SHA")
-    for protected_name in (
-        ".env",
-        ".kindergarten_secrets",
-        ".kindergarten_secrets.lock",
-    ):
-        try:
-            (root / protected_name).lstat()
-        except FileNotFoundError:
-            continue
-        except OSError:
-            raise ManualHelperError("cannot inspect protected runtime entry") from None
-        raise ManualHelperError("refusing protected runtime entry")
-    if clean and _git(
-        root,
-        "status",
-        "--porcelain=v1",
-        "-z",
-        "--untracked-files=all",
-    ):
-        raise ManualHelperError("isolated worktree is not clean")
-    return root
-
-
-def _activate_worktree_imports(root: Path) -> None:
-    """Make the verified worktree authoritative for delayed app imports."""
-    verified = str(root.resolve())
-    sys.path[:] = [
-        verified,
-        *(
-            entry
-            for entry in sys.path
-            if str(Path(entry or Path.cwd()).resolve()) != verified
-        ),
-    ]
 
 
 async def validate_mysql8(backend: AcceptanceBackend) -> None:
@@ -745,7 +673,15 @@ def _launch_live(tested_sha: str, env: Mapping[str, str]) -> dict[str, object]:
 
 def prepare_run(args: argparse.Namespace) -> dict[str, object]:
     """Cross into application imports only after the fixed-SHA gate."""
-    root = require_isolated_worktree(args.tested_sha, clean=True)
+    root = require_isolated_worktree(
+        args.tested_sha,
+        clean=True,
+        protected_names=(
+            ".env",
+            ".kindergarten_secrets",
+            ".kindergarten_secrets.lock",
+        ),
+    )
     _activate_worktree_imports(root)
     return _launch_live(_sha(args.tested_sha), os.environ)
 

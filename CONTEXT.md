@@ -107,9 +107,10 @@ UI 登录用户与 API 的租户服务主体仍是两个不同边界，不得混
 
 ## 7. 分支与仓库状态
 
-- 当前 merge base 为 `main@ca3b7bd922f838c0739ccf9ed0f58655d292dc2f`；远端
-  `feat/agent-write` 已到 W006 fixed SHA `253d37d…`，`main` 以 `--no-ff` 语义保留 Agent Foundation
-  的 RED/GREEN ancestry。
+- 当前 merge base 为 `main@ca3b7bd922f838c0739ccf9ed0f58655d292dc2f`；
+  远端 `feat/agent-write` 已闭合 W007 并进入 W008 交付门，精确门状态与 SHA 以
+  `specs/agent-write/tests/README.md` 为准；`main` 以 `--no-ff` 语义保留 Agent Foundation 的
+  RED/GREEN ancestry。
 - W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
   Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确本地交付状态、Review 轮次、
   SHA 与测试证据仅以 `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后作为外部证据；

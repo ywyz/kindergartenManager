@@ -26,6 +26,7 @@ from conftest import (
 
 
 HELPER_PATH = Path(__file__).parents[1] / "manual" / "w008_browser.py"
+sys.path.insert(0, str(HELPER_PATH.parent))
 TESTED_SHA = "a" * 40
 FAULT_VALUES = {
     "after_version",

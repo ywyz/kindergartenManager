@@ -17,6 +17,7 @@ import pytest
 
 
 MANUAL_ROOT = Path(__file__).parents[1] / "manual"
+sys.path.insert(0, str(MANUAL_ROOT))
 MYSQL_HELPER = MANUAL_ROOT / "w008_mysql.py"
 BROWSER_HELPER = MANUAL_ROOT / "w008_browser.py"
 MANUAL_README = MANUAL_ROOT / "README.md"
@@ -85,6 +86,7 @@ import sys
 
 root = Path({str(Path(__file__).parents[3])!r})
 sys.path.insert(0, str(root))
+sys.path.insert(0, {str(MANUAL_ROOT)!r})
 spec = importlib.util.spec_from_file_location('w008_mysql_probe', Path({str(MYSQL_HELPER)!r}))
 module = importlib.util.module_from_spec(spec)
 sys.modules['w008_mysql_probe'] = module
