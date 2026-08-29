@@ -61,8 +61,18 @@ def test_permission_error_creating_data_dir_is_not_swallowed(
 
     with pytest.raises(PermissionError, match="denied"):
         with pytest.MonkeyPatch().context() as mp:
-            mp.setattr(paths.Path, "mkdir", _permission_denied)
+            mp.setattr(paths.os, "mkdir", _permission_denied)
             app_data_dir()
+
+
+def test_explicit_posix_data_dir_rejects_filesystem_root(monkeypatch) -> None:
+    """root 进程也不得把文件系统根目录当作数据目录并 chmod。"""
+    if os.name != "posix":
+        pytest.skip("POSIX root-directory contract")
+
+    monkeypatch.setenv("KINDERGARTEN_DATA_DIR", "/")
+    with pytest.raises(RuntimeError, match="根目录"):
+        app_data_dir()
 
 
 def test_existing_posix_data_dir_is_private_before_runtime_files(

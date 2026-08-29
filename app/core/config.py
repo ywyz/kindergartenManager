@@ -15,15 +15,47 @@ import tempfile
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
+from contextvars import ContextVar
+from io import StringIO
 from pathlib import Path
+from typing import Any
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings.sources import DotEnvSettingsSource
+from pydantic_settings.sources.utils import parse_env_vars
+from dotenv import dotenv_values
 
+from app.core import env_writer
 from app.core.paths import app_data_dir
 
 logger = logging.getLogger("app.config")
 _SECRETS_THREAD_LOCK = threading.Lock()
+_USE_DYNAMIC_DOTENV = ContextVar("use_dynamic_dotenv", default=False)
+
+
+class _SnapshotDotEnvSettingsSource(DotEnvSettingsSource):
+    """A standard dotenv source backed by one already-validated text snapshot."""
+
+    def __init__(self, snapshot: str | None, **kwargs: Any) -> None:
+        self._snapshot = snapshot
+        super().__init__(**kwargs)
+
+    def _read_env_files(self) -> dict[str, str | None]:
+        if self._snapshot is None:
+            return {}
+        file_vars = dotenv_values(
+            stream=StringIO(self._snapshot),
+            encoding=self.env_file_encoding or "utf8",
+        )
+        return dict(
+            parse_env_vars(
+                file_vars,
+                self.case_sensitive,
+                self.env_ignore_empty,
+                self.env_parse_none_str,
+            )
+        )
 
 
 class _SecretsFileError(RuntimeError):
@@ -370,6 +402,47 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    def __init__(self, **values: Any) -> None:
+        """Load the dynamic default source without changing source priority."""
+        model_env_file = type(self).model_config.get("env_file")
+        use_dynamic_source = "_env_file" not in values and model_env_file == ".env"
+        token = _USE_DYNAMIC_DOTENV.set(use_dynamic_source)
+        try:
+            super().__init__(**values)
+        finally:
+            _USE_DYNAMIC_DOTENV.reset(token)
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: Any,
+        env_settings: Any,
+        dotenv_settings: Any,
+        file_secret_settings: Any,
+    ) -> tuple[Any, ...]:
+        if not _USE_DYNAMIC_DOTENV.get():
+            return init_settings, env_settings, dotenv_settings, file_secret_settings
+
+        _, snapshot = env_writer.read_dot_env_snapshot()
+        snapshot_source = _SnapshotDotEnvSettingsSource(
+            snapshot=snapshot,
+            settings_cls=settings_cls,
+            env_file=dotenv_settings.env_file,
+            env_file_encoding=dotenv_settings.env_file_encoding,
+            dotenv_filtering=dotenv_settings.dotenv_filtering,
+            case_sensitive=dotenv_settings.case_sensitive,
+            env_prefix=dotenv_settings.env_prefix,
+            env_prefix_target=dotenv_settings.env_prefix_target,
+            env_nested_delimiter=dotenv_settings.env_nested_delimiter,
+            env_nested_max_split=dotenv_settings.env_nested_max_split,
+            env_ignore_empty=dotenv_settings.env_ignore_empty,
+            env_parse_none_str=dotenv_settings.env_parse_none_str,
+            env_parse_enums=dotenv_settings.env_parse_enums,
+            _init_state=dotenv_settings._init_state,
+        )
+        return init_settings, env_settings, snapshot_source, file_secret_settings
 
     # ── 数据库 ───────────────────────────────────────────────────────────────
     # 留空时 database.py 自动降级为嵌入式 SQLite（适合桌面/演示环境）
