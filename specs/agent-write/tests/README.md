@@ -526,3 +526,44 @@ source 优先级和显式 override。Main 复跑路径/config `58 passed`、comm
 两组独立 GREEN Review 均为 H0/M0/L0。上述产品/helper/test 变化已使 `bba33dc…` 的完整 MySQL 与浏览器证据
 失效；包含本段的后续候选必须重新执行全部本地、MySQL、13 场景浏览器、fixed-SHA Review 与 PR CI 门，本文
 不预先宣称这些后续门通过。
+
+上述修复与 RED lineage 的精确本地验收候选为
+`tested_code_sha=9cc05c89eb83712aea00196cea17f3796cad90cf`。Main 在该 SHA 的 clean detached linked
+worktree/主 checkout 组合上重新得到 revision/WRITE/Foundation/ordinary
+`12/256/261/889 passed`；变更范围 Ruff 与 format、`git diff --check`、path/config 目标 Pyright、
+`pip check`、`uv lock --check`、locked uv 环境 dependency consistency 和严格依赖漏洞审计均 GREEN。
+service 整文件 Pyright 仍会报告既有 `_reject` 返回类型导致的控制流收窄问题，不冒充本候选新增通过项，且
+当前 CI 不以该整文件命令为门。
+
+fresh SQLite 的最终有效运行使用 W008 owner-only umask，完成
+head→a6c4d8e2f9b1→head 往返；最终为 head e5f7a9c2d4b6、`19` tables、`6` triggers，目录/数据库
+mode `0700/0600`。此前一次默认 umask 预检得到数据库 `0644`，未计入证据并清理。真实官方 `mysql:8`
+image digest 仍为
+`sha256:e9027fe4d91c0153429607251656806cc784e914937271037f7738bd5b8e7709`，本机解析为 MySQL
+`8.0.27`；binary log 与 `log_bin_trust_function_creators` 均为 `1`。fresh schema 上 schema-scoped
+app principal 完成 head→a6c4d8e2f9b1→head，live helper 脱敏证据为四个 trigger rejection、
+CAS `[false, true]`、revision `2`、lock errno `1205`，且 `tested_code_sha` 精确匹配。本轮前两个 disposable
+MySQL harness 分别因错误解析 venv 解释器和未使用 clean linked worktree 而在 migration/live helper 前置门
+停止；只读诊断确认未把它们当作 live PASS，容器清理后第三个全新 schema 才形成上述有效证据。
+
+同一 `tested_code_sha` 的 Linux 浏览器矩阵在一个 fresh mock 上，以 13 个独立 `0600` SQLite、独立应用
+进程与唯一 loopback 端口顺序完成。正常双击和 unknown-after-commit 的最终
+revision/version/audit 为 `2/1/1`；另一标签普通保存后的旧 revision 场景为 `2/0/0`；过期、错误会话、
+A→B→A、跨标签、reload、`after_version`、`after_cas`、`after_audit`、`known_before_commit` 与
+unknown-before-commit 均为 `1/0/0`。unknown-before-commit 在一次显式人工对账后仍保持
+indeterminate、保留同页对账入口且不出现确认采用按钮；unknown-after-commit 经一次只读对账收敛为已采用。
+mock 精确接受编号 `1..26` 的 `26` 次串行 Provider 请求；每个有效场景 writer
+issue/apply/reconcile 公开操作均未超过一次。最终有效计数之外共有七次 fresh-DB 浏览器输入/连接/日期动画
+预检中断：六次未发 Provider 请求，一次任意提示词被关闭 mock 以 `422` 拒绝；七次均为零 WRITE、数据库
+baseline，均未在同一 DB 自动重试。最终 mock、应用、浏览器标签、合成数据库/secret 与本轮 linked
+worktree 已停止或清理。
+
+本轮 Graphify 辅助刷新严格按 `OpenAI-compatible -> DeepSeek -> luna_worker` 执行：OpenAI 返回 0 但遗漏
+目标 ledger，DeepSeek 在自适应拆分后的响应读取中持续停滞，luna_worker 只读核对仍确认该 ledger 为 0 节点。
+当前图虽可解析、规模无不明缩水且无断边，但不能证明本段 evidence 覆盖；因此 Graphify 在本候选上标记为
+unavailable，不使用 stale graph 作为 Review、测试或交付证据，生成图文件也不进入本候选提交。
+
+本段只闭合 `tested_code_sha` 的本地自动化、SQLite、MySQL 与浏览器证据。包含本段的后续
+evidence-closure SHA 仍须取得自身的固定 SHA Standards/Spec 双轴 0/0/0 Review、PR exact-head CI 与远端
+自动 Review；之后才可核对最新 main 漂移并以 `--no-ff` 集成，merge SHA 仍须重新完成 Review/CI，才能关闭
+Issue #52、发布与部署。
