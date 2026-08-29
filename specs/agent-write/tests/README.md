@@ -427,7 +427,7 @@ trigger 精确；但 live helper 在任何 live SQL 前拒绝前序测试留下�
 `.kindergarten_secrets.lock`，只输出脱敏失败。该锁同时是 browser helper 的显式前提，因此旧 helper 合同存在
 顺序矛盾；失败容器保留完成只读诊断后已按精确名称停止，tmpfs 合成库已移除，未重跑 helper。
 
-对应前检 RED commit `afff51e3c98110b3748d1fc8d6b37cf9a26bc340` 连续两轮均为 `1 failed, 8 deselected`；
+对应前检 RED commit `afff51e1c9b601defd2b34c4a846294749bc30e1` 连续两轮均为 `1 failed, 8 deselected`；
 最小 GREEN `2ce7dc0ec5f03131750bb845caaee3b69d172c9c` 只允许该无内容 lock，仍拒绝 `.env` 与
 `.kindergarten_secrets`，并在 application import 前继续安装 file-free synthetic config。目标 MySQL helper
 合同与既有 helper 矩阵为 `33 passed`，Ruff/format/diff 通过。该 helper/test/docs 改动使 `0079ab1…` 的全部
@@ -480,7 +480,7 @@ H0/M1/L1、Spec H1/M1/L0：开发者指南仍把当前已提交分支写成“�
 ADR-0003 与系统架构文档仍混淆源码/打包模式的默认数据与密钥路径；且移除 app 的整体
 `env_file` 后，Compose 首次管理员命令连接远程 MySQL，却未提供仅限本次调用的
 `BOOTSTRAP_ADMIN_ALLOW_REMOTE=true`，会按默认 fail-closed。对应 finding RED 已由
-`0f09dd5d6f93618a465f68f75ac737fd869e701b` 固定；三个目标节点连续两轮均为 `3 failed, 16 passed`，
+`0f09dd5e29214fbeb7d31e7612d8f3b9e9d7f72a` 固定；三个目标节点连续两轮均为 `3 failed, 16 passed`，
 失败节点完全一致。下一候选必须统一三处路径语义、把开发状态委派给本 ledger，并在
 README、用户手册与 release body 中使用同一条 one-shot Compose bootstrap 命令；常驻 app 环境
 仍必须不含该 override，MySQL root 凭据仍必须仅属于 db。本段不预先宣称 GREEN、后续 Review、
