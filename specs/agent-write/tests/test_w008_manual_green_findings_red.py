@@ -221,3 +221,10 @@ def test_mysql_migration_roundtrip_keeps_config_files_outside_worktree() -> None
     assert migration_block.count("run_w008_alembic current") == 3
     assert "run_w008_alembic downgrade a6c4d8e2f9b1" in migration_block
     assert 'DATABASE_URL="$MYSQL_URL" "$ABS_PYTHON" -m alembic' not in (migration_block)
+
+
+def test_w008_ledger_does_not_report_a_committed_green_as_uncommitted() -> None:
+    ledger = (Path(__file__).parent / "README.md").read_text(encoding="utf-8")
+    w008_history = ledger[ledger.index("W008 验收基础设施 RED") :]
+
+    assert "当前仍只是未提交 GREEN 候选" not in w008_history
