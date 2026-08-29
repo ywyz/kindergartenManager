@@ -421,7 +421,7 @@ RED commit `78e2908` 连续两轮均为 `1 failed`，最小 Compose 修复为 `c
 
 候选 `0079ab182d41546d5f401bf5d79a180b523acc7a` 的本地 revision/WRITE/Foundation/ordinary 为
 `12/253/261/868 passed`；Ruff、最终增量 Pyright、lock/dependency consistency、严格依赖审计与 fresh SQLite
-upgrade→downgrade→upgrade 均 GREEN，SQLite 最终为 head `e5f7a9c2d4b6`、`19` tables、`6` triggers、
+upgrade→downgrade→upgrade 均 GREEN，SQLite 最终为 head e5f7a9c2d4b6、`19` tables、`6` triggers、
 mode `0600`。真实 MySQL `8.4.11` 的同一迁移往返也成功，且只读诊断确认 app principal、head 与四个 evidence
 trigger 精确；但 live helper 在任何 live SQL 前拒绝前序测试留下的 owner-only、`0600`、零内容
 `.kindergarten_secrets.lock`，只输出脱敏失败。该锁同时是 browser helper 的显式前提，因此旧 helper 合同存在
