@@ -231,6 +231,42 @@ def _make_settings(**env_overrides):
         os.environ.update(old_env)
 
 
+def test_settings_reads_env_file_from_explicit_data_dir(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """显式数据目录下的 .env 必须同时成为 Settings 的配置来源。"""
+    from app.core import config as config_mod
+    from app.core import env_writer
+
+    working_dir = tmp_path / "source-cwd"
+    data_dir = tmp_path / "runtime-data"
+    working_dir.mkdir()
+    monkeypatch.chdir(working_dir)
+    monkeypatch.setenv("KINDERGARTEN_DATA_DIR", str(data_dir))
+    monkeypatch.delenv("PORT", raising=False)
+    monkeypatch.delenv("LOG_LEVEL", raising=False)
+    monkeypatch.setenv("ENCRYPTION_KEY", _ENVIRONMENT_ENCRYPTION_KEY)
+    monkeypatch.setenv("JWT_SECRET", _ENVIRONMENT_JWT_SECRET)
+
+    (working_dir / ".env").write_text(
+        "PORT=41000\nLOG_LEVEL=WARNING\n",
+        encoding="utf-8",
+    )
+    env_writer.write_dot_env({"PORT": "49173", "LOG_LEVEL": "DEBUG"})
+    env_path = data_dir / ".env"
+    assert env_writer.get_env_path() == env_path
+
+    settings = config_mod.Settings()
+
+    assert settings.PORT == 49173
+    assert settings.LOG_LEVEL == "DEBUG"
+
+    monkeypatch.setenv("PORT", "49174")
+    overridden = config_mod.Settings()
+    assert overridden.PORT == 49174
+    assert overridden.LOG_LEVEL == "DEBUG"
+
+
 def _assert_non_posix_regular_file_contract(tmp_path, monkeypatch) -> None:
     """只验证跨平台功能，不把 POSIX mode 当作 Windows DACL 证据。"""
     secrets_path = tmp_path / ".kindergarten_secrets"
