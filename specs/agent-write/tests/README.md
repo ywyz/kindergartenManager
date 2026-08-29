@@ -271,7 +271,13 @@ merge、Issue 关闭或 release。
 Review 为 Standards H1/M0/L1、Spec H0/M0/L0。Standards hard finding 是文档在 linked worktree 内先跑
 Alembic 时必创建 `.kindergarten_secrets.lock`（缺少合成 Key 时还会创建 secrets），随后 live helper 又拒绝
 这些配置生命周期文件，导致 documented MySQL 往返不可执行；low finding 是 browser helper 保留未接入
-launcher 的自由字符串 `sanitize_report`，不能兑现关闭脱敏承诺。两项 finding 已转成只改测试合同的稳定
-RED：14 个相关节点连续两轮均为 `2 failed, 12 passed`，失败 node 完全一致，node hash
+launcher 的自由字符串 `sanitize_report`，不能兑现关闭脱敏承诺。两项 finding 的稳定 RED 已由
+`1ded7bf164c16c7df9e8f31f0361be2ae2f6d5c3` 固定：14 个相关节点连续两轮均为
+`2 failed, 12 passed`，失败 node 完全一致，node hash
 `507a9e2607d54fc812b5aabc57d15fe0dfb8cf858936a169939386f88c1ffb04`。当前尚未修正、push、CI、
 MySQL/浏览器验收或 Issue 回写；Spec 0/0 不能替代 Standards findings。
+
+首版 finding 修复把 Alembic 运行 cwd 移到 owner-only 外部临时目录，并删除未接入实际 launcher 的自由
+字符串 sanitizer；相关 14 节点与完整 WRITE 分别为 `14 passed`、`230 passed`。提交前变更范围 Pyright
+连续两轮都只在既有测试事件联合类型解包处报同一个错误，最小 `cast` 只收窄测试类型、不改变运行行为。
+当前仍只是未提交 GREEN 候选；任何 fixed-SHA Review、MySQL/浏览器证据都必须绑定后续实际 commit。

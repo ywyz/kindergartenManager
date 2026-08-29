@@ -8,8 +8,10 @@ helper 不提供自动重试、批量/跨页面采用、设置/文件/Word/删�
 
 1. 先提交产品、helper、测试与本文，人工核对完整 40 位 `TESTED_SHA`。之后任一产品/helper/test 字节变化
    都使 Review、CI、MySQL 与浏览器证据失效。
-2. 所有命令从该 SHA 的全新 detached linked worktree 根执行；`.git` 必须是文件，Git 必须干净。解释器使用
-   已验证主 checkout 的绝对 `.venv/bin/python`，不得在验收 worktree 创建 `.venv` 链接。
+2. 除下述 Alembic 子进程外，所有命令从该 SHA 的全新 detached linked worktree 根执行；`.git` 必须是文件，
+   Git 必须干净。Alembic 只在 owner-only 外部临时运行目录中启动，但代码、配置与 migration 仍全部取自该
+   fixed-SHA worktree。解释器使用已验证主 checkout 的绝对 `.venv/bin/python`，不得在验收 worktree 创建
+   `.venv` 链接。
 3. 只用合成用户、计划、Provider 配置与随机 MySQL 密码。Issue 不记录密码、Key、endpoint、Provider/
    Patch 正文、JWT、session、confirmation、nonce、原始异常或日志。
 4. 一次失败即停；不得在同一场景自动重试。容器 health readiness 轮询不属于 Provider/WRITE 重试。
@@ -111,17 +113,34 @@ app 密码只在进程环境中组装 URL；不得把 URL 作为 CLI 参数或�
 
 ```text
 MYSQL_URL="mysql+aiomysql://km_w008:$MYSQL_APP_PASSWORD@127.0.0.1:$MYSQL_PORT/km_w008?charset=utf8mb4"
+TESTED_WORKTREE=$PWD
+MYSQL_MIGRATION_RUNTIME=$(mktemp -d /tmp/km-w008-mysql-migrations.XXXXXX)
 
-DATABASE_URL="$MYSQL_URL" "$ABS_PYTHON" -m alembic upgrade head
-DATABASE_URL="$MYSQL_URL" "$ABS_PYTHON" -m alembic current
-DATABASE_URL="$MYSQL_URL" "$ABS_PYTHON" -m alembic downgrade a6c4d8e2f9b1
-DATABASE_URL="$MYSQL_URL" "$ABS_PYTHON" -m alembic current
-DATABASE_URL="$MYSQL_URL" "$ABS_PYTHON" -m alembic upgrade head
-DATABASE_URL="$MYSQL_URL" "$ABS_PYTHON" -m alembic current
+run_w008_alembic() {
+  (
+    cd "$MYSQL_MIGRATION_RUNTIME" || exit 1
+    PYTHONPATH="$TESTED_WORKTREE" \
+      ENCRYPTION_KEY="f009-fictional-encryption-key-do-not-use" \
+      JWT_SECRET="f009-fictional-jwt-secret-do-not-use" \
+      DATABASE_URL="$MYSQL_URL" \
+      "$ABS_PYTHON" -m alembic -c "$TESTED_WORKTREE/alembic.ini" "$@"
+  )
+}
+
+run_w008_alembic upgrade head
+run_w008_alembic current
+run_w008_alembic downgrade a6c4d8e2f9b1
+run_w008_alembic current
+run_w008_alembic upgrade head
+run_w008_alembic current
 
 W008_MYSQL_DATABASE_URL="$MYSQL_URL" \
   "$ABS_PYTHON" specs/agent-write/manual/w008_mysql.py --tested-sha TESTED_SHA
 ```
+
+固定虚构 Key 只阻止配置层生成 secrets；POSIX lifecycle lock 只会落在
+`MYSQL_MIGRATION_RUNTIME`，不会污染或放宽 fixed-SHA worktree。函数使用 subshell，因此每次 migration 后
+自动返回 worktree 根；live helper 随后仍会拒绝 worktree 内任何 `.env`/secrets/lock。
 
 三个 `current` 必须依序为 `e5f7a9c2d4b6`、`a6c4d8e2f9b1`、`e5f7a9c2d4b6`。live helper 单次验证：
 

@@ -9,6 +9,7 @@ import importlib.util
 import json
 from pathlib import Path
 import sys
+from typing import cast
 
 import pytest
 from sqlalchemy import column, table, update
@@ -136,7 +137,7 @@ def test_helper_has_no_application_import_before_verified_delayed_launch(
 
     assert helper.prepare_run(args) == "launched"
     assert [name for name, _value in events] == ["gate", "activate", "launch"]
-    gated_sha, gate_kwargs = events[0][1]
+    gated_sha, gate_kwargs = cast(tuple[str, dict[str, object]], events[0][1])
     assert gated_sha == TESTED_SHA
     assert gate_kwargs.get("clean") is True
     assert events[1][1] == verified_root

@@ -20,22 +20,13 @@ import stat
 import subprocess
 import sys
 from threading import Lock
-from typing import Any, Mapping
+from typing import Any
 
 from sqlalchemy.exc import DisconnectionError
 from sqlalchemy.sql.dml import Update
 
 
 _SHA_PATTERN = re.compile(r"[0-9a-f]{40}")
-_REPORT_FIELDS = (
-    "tested_code_sha",
-    "fault",
-    "result",
-    "counters",
-    "plan_revision",
-    "version_count",
-    "audit_count",
-)
 _MOCK_ENCRYPTION_KEY = "f009-fictional-encryption-key-do-not-use"
 _MOCK_JWT_SECRET = "f009-fictional-jwt-secret-do-not-use"
 _MOCK_HOLIDAY_URL = "http://127.0.0.1:18081/holiday/info/"
@@ -236,48 +227,6 @@ def _sha(value: object) -> str:
     if _SHA_PATTERN.fullmatch(normalized) is None:
         raise ManualHelperError("tested SHA must be complete 40-character hex")
     return normalized
-
-
-def _closed_count(value: object) -> int:
-    if type(value) is not int or value < 0:
-        raise ManualHelperError("invalid fault counter")
-    if value > 1:
-        raise RuntimeError("automatic retry detected")
-    return value
-
-
-def sanitize_report(raw: Mapping[str, object]) -> dict[str, object]:
-    """Project only closed, non-secret evidence and reject repeated calls."""
-    if not isinstance(raw, Mapping):
-        raise ManualHelperError("invalid acceptance report")
-    counters = raw.get("counters")
-    if type(counters) is not FaultCounters:
-        raise ManualHelperError("invalid fault counters")
-    rendered_counters = {
-        "issue": _closed_count(counters.issue),
-        "apply": _closed_count(counters.apply),
-        "reconcile": _closed_count(counters.reconcile),
-    }
-    fault = raw.get("fault")
-    if type(fault) is not str or fault not in {item.value for item in FaultPoint}:
-        raise ManualHelperError("invalid fault point")
-    result = raw.get("result")
-    if type(result) is not str or not result or len(result) > 64:
-        raise ManualHelperError("invalid acceptance result")
-    numeric: dict[str, int] = {}
-    for name in ("plan_revision", "version_count", "audit_count"):
-        value = raw.get(name)
-        if type(value) is not int or value < 0:
-            raise ManualHelperError("invalid acceptance count")
-        numeric[name] = value
-    values: dict[str, object] = {
-        "tested_code_sha": _sha(raw.get("tested_code_sha")),
-        "fault": fault,
-        "result": result,
-        "counters": rendered_counters,
-        **numeric,
-    }
-    return {name: values[name] for name in _REPORT_FIELDS}
 
 
 def _git(root: Path, *args: str) -> bytes:
