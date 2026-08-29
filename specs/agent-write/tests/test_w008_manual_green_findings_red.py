@@ -174,6 +174,42 @@ def test_browser_launcher_is_real_writer_only_loopback_composition() -> None:
     ) < source.index("import app.main")
 
 
+def test_browser_helper_forces_direct_loopback_network_environment() -> None:
+    helper = _browser()
+    installer = getattr(helper, "_force_loopback_network_environment", None)
+    assert callable(installer), (
+        "browser helper must remove inherited proxies before mock traffic"
+    )
+    environment = {
+        "HTTP_PROXY": "http://proxy.invalid:8080",
+        "HTTPS_PROXY": "http://proxy.invalid:8080",
+        "ALL_PROXY": "socks5://proxy.invalid:1080",
+        "http_proxy": "http://proxy.invalid:8080",
+        "https_proxy": "http://proxy.invalid:8080",
+        "all_proxy": "socks5://proxy.invalid:1080",
+        "NO_PROXY": "metadata.invalid",
+        "no_proxy": "metadata.invalid",
+    }
+
+    installer(environment)
+
+    for name in (
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "all_proxy",
+    ):
+        assert name not in environment
+    assert environment["NO_PROXY"] == "127.0.0.1,localhost"
+    assert environment["no_proxy"] == "127.0.0.1,localhost"
+    source = inspect.getsource(helper._launch_product_app)
+    assert source.index("_force_loopback_network_environment") < source.index(
+        "from app.core.database"
+    )
+
+
 def test_browser_database_is_owner_only_w008_tmp_regular_file() -> None:
     helper = _browser()
     resolver = getattr(helper, "_database_path", None)
