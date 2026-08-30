@@ -810,3 +810,53 @@ disposable DB；对应 app/DB 均停止并作废，没有拼入最终 13 个数�
 evidence-closure SHA 仍须取得自身 fixed-SHA Standards/Spec 双轴 0/0/0 Review、PR exact-head CI 与
 远端自动 Review；之后才可重新核对最新 main 漂移并以 `--no-ff` 集成。merge SHA 仍须重新完成
 Review/CI，才能关闭 Issue #52、发布与部署；Issue #48 始终不在本轮关闭范围。
+
+## 2026-08-30：evidence-closure Review findings 与 FINAL4 重跑
+
+包含上一段的 evidence-closure 候选
+`d2ecf52324ac1fc16d00bb651b4a8d652e7a4072` 未进入 push/PR/merge：fixed-SHA Standards Review
+发现打包入口 `run.py` 丢弃 bootstrap CLI 的 `0/1/2` 退出码（H1），fixed-SHA Spec Review 发现管理员
+停用再启用账号后会恢复停用前 JWT（M1）。其余 finding 为 H0/M0/L0。打包入口 finding 由
+`83a11ff143a2e57450a2932eeb6d74a618b9f826` 固定参数化 0/1/2 RED，再由
+`cc0ca8b72e21d8843a379d0df3dadc90b977d689` 以 `SystemExit` 最小传播闭合；认证 finding 由
+`40c9ca9f1e4d2d537801b9425d4c6882a01fdfaf` 固定“停用→启用不得复活旧 token” RED，再由
+`1cdb4004680fd159ca66a9d925503346dc951331` 在同一状态写事务中原子递增 `auth_epoch` 闭合。两位原
+Reviewer 对该终点定点复核均为 H0/M0/L0；入口/auth 定点回归分别为 `18/66 passed`。
+
+上述产品与测试变化使上一段 `6a1d25b…` 的手工结果失效，因此本段全部重新运行的代码、数据库与浏览器
+证据绑定 `tested_code_sha=1cdb4004680fd159ca66a9d925503346dc951331`。两个 clean exact-SHA linked
+worktree 的 revision/WRITE/Foundation/ordinary 为 `14/260/261/909 passed`；相对 main 的 `121` 个 Python
+变更文件通过 Ruff check/format check，`git diff --check`、`pip check`、`uv pip check`、
+`uv lock --check` 与严格 local dependency vulnerability audit 均 GREEN。候选与旧 PR head
+`b375a75a113ff8662b343093874ff7b08f23ac92` 在同一 Python/path 配置下的 Pyright 均为 `39` 个既有错误，
+增量为 `0`。一次对未固定 requirements 的额外直接解析审计长时间无响应后被中止，不计为通过证据，也不
+替代已经 GREEN 的 locked/local dependency 门。
+
+fresh SQLite 在 owner-only runtime 完成 head→a6c4d8e2f9b1→head，最终唯一 head 为
+`alembic:2b7f3d5e9c8a`、`19` tables、`6` triggers，`user.auth_epoch` NOT NULL/default/check 与
+`0700/0600` 权限均符合合同。真实 MySQL 首次 helper 因旧临时 worktree 含 owner-only
+`.kindergarten_secrets` 在 import/migration/write 前 fail closed；随后从无受保护文件的 clean exact-SHA
+worktree 与 fresh container/schema 重跑。官方 `mysql:8` digest
+`sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb` 解析为 MySQL
+`8.4.11`，binlog/trust 均为 `1`，fresh schema 为 `0` tables；head→a6c→head 与 live helper 返回
+`auth_epoch` default `1`、非法值 errno `3819`、四个 trigger rejection、CAS `[false, true]`、最终
+revision `2`、管理员竞争锁 errno `1205`，且 `tested_code_sha` 精确匹配。两个容器与 `13319/13320`
+端口均已清理。
+
+同一 `tested_code_sha` 的最终 Linux Chrome FINAL4 在浏览器连接恢复后，从重新启动的 fresh mock、
+13 个独立 `0600` SQLite、独立 app 进程与唯一 loopback 端口完成 13/13；mock 只接受编号 `1..26` 的
+`26` 次串行 `draft` Provider 请求。正常双击与 unknown-after-commit 为 `2/1/1`，旧 revision 为
+`2/0/0`，其余十项为 `1/0/0`。四种确定故障均显示写入关闭；unknown-before-commit 一次人工对账后
+对账入口仍在且确认按钮不存在，unknown-after-commit 一次对账后可见收敛为
+`✅ Agent 草案已确认采用（revision 1 → 2）`。有效矩阵 writer issue/apply/reconcile 为 `13/9/2`，
+每个公开操作每场景至多一次；全部 app/mock、Chrome 标签与验收端口已停止或释放。
+
+FINAL4 前一轮在 A→B→A 纯页面切换时遇到 Chrome 控制通道超时并重置 JS 内核；该轮 mock 已接受的
+`1..10`、对应 disposable DB 与 app 全部作废。插件热更新后控制服务仍引用旧缓存路径，使用指向当前同一
+bundle 的只读兼容符号链接恢复连接；随后从 fresh mock、pristine DB 和全新端口重跑上述完整 FINAL4，
+没有拼接旧轮 Provider/WRITE/数据库结果，也没有在同一 DB 重试 WRITE。
+
+本段只闭合 `tested_code_sha` 的本地自动化、SQLite、MySQL、浏览器与两项 Review finding 的定点复核。
+包含本段的后续 evidence-closure SHA 仍须取得自身 fixed-SHA Standards/Spec 双轴 0/0/0 Review、PR
+exact-head CI 与远端自动 Review；之后才可重新核对最新 main 漂移并以 `--no-ff` 集成。merge SHA 仍须
+重新完成 Review/CI，才能关闭 Issue #52、发布与部署；Issue #48 始终不在本轮关闭范围。
