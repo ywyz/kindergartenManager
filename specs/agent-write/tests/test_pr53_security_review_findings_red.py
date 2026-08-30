@@ -95,4 +95,7 @@ def test_bootstrap_cli_migration_failure_has_nonzero_process_exit() -> None:
 
     assert "迁移失败" in output
     assert test_password not in output
+    assert "Traceback" not in output
+    assert "Connection refused" not in output
+    assert "sqlalchemy.exc" not in output
     assert completed.returncode != 0
