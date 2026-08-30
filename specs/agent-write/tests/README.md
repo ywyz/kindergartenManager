@@ -702,3 +702,64 @@ writer issue/apply/reconcile 为 `1/1/0`；unknown-before-commit 一次对账后
 evidence-closure SHA 仍须取得自身 fixed-SHA Standards/Spec 双轴 0/0/0 Review、PR exact-head CI 与
 远端自动 Review；之后才可重新核对最新 main 漂移并以 `--no-ff` 集成。merge SHA 仍须重新完成
 Review/CI，才能关闭 Issue #52、发布与部署；Issue #48 始终不在本轮关闭范围。
+
+随后审阅的历史候选 `58625055d9bfba202c18f40ff1e19b981e711b27` 的 fixed-SHA Review 为 Standards
+H0/M0/L0、Spec H0/M1/L0：`tests/test_documentation_security_contracts.py` 仍把旧的
+`521418aa…` 当作最新 ledger closure，而上段最新候选已是
+`0581840b2e9265b03cdf8b6dc27307e40411afb9`；该整文件复现为 `15 passed, 1 failed`，因此候选未进入
+push/PR/merge。最小修正 `61ab16d8228837cd878b75073f1bd4621439788a` 对齐最新预期并收敛测试说明；独立
+复核随后发现其负向 guard 使用了不存在的假 SHA，不能保护真实旧 closure。最终修正
+`69e77ed0e884a035ae0288f74e34dc7752cf96e3` 改为真实旧 closure 的完整 SHA guard；
+独立 Review 为 H0/M0/L0，文档安全合同 `16 passed`、Agent WRITE ledger 合同 `1 passed`。测试字节变化使
+旧候选的手工与完整本地证据失效，因此本段全部终点证据绑定
+`tested_code_sha=69e77ed0e884a035ae0288f74e34dc7752cf96e3`。
+
+本段首稿完整复述负向 guard 值，文档安全合同如预期以同一节点 `15 passed, 1 failed` 阻止闭合；改用短
+SHA 后，第二稿又把 review finding 候选误标为新的“证据闭合候选”，同一合同再次以 `15 passed, 1 failed`
+阻止闭合。收敛为短 SHA 与准确的历史候选表述后才重新进入文档门，两次失败均不作为通过证据。
+
+Main 在该 SHA 的 clean detached linked worktree 得到 revision/WRITE/Foundation/ordinary
+`12/257/261/891 passed`；相对 main 的全部 `113` 个 Python 变更文件通过 Ruff check/format，新增文档合同
+测试的增量 Pyright 为 `0 errors`，`git diff --check`、`pip check`、`uv lock --check`、locked dependency
+consistency 与严格依赖漏洞审计均 GREEN。一次误把全历史 Python 变化纳入增量 Pyright 的调用报告
+`247` 个既有类型问题，范围不符合本轮门且明确不计为通过证据。fresh SQLite 在 owner-only 目录/数据库完成
+head→a6c4d8e2f9b1→head，最终为 head e5f7a9c2d4b6、`19` tables、`6` triggers，mode
+`0700/0600`。
+
+真实 MySQL 首次预检在应用 import、migration 与数据库写入前 fail closed：自动化 worktree 中有普通测试
+遗留的 Git-ignored、owner-only `.kindergarten_secrets`，只读检查确认 fresh schema 仍为 `0` tables，故该次
+不计为 live PASS。销毁该容器后，从不含受保护文件的 exact-SHA manual worktree 和全新 schema 重跑；官方
+`mysql:8` digest 为
+`sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb`，解析为 MySQL
+`8.4.11`，binary log 与 `log_bin_trust_function_creators` 均为 `1`。schema-scoped app principal 完成
+head→a6c4d8e2f9b1→head；live helper 返回四个 trigger rejection、CAS `[false, true]`、最终 revision
+`2`、管理员竞争锁 errno `1205`，且 `tested_code_sha` 精确匹配。证据完成后 exact container 与 loopback
+`13306` 均已清空。
+
+同一 `tested_code_sha` 的最终 Linux Chrome FINAL2 矩阵使用一个 fresh mock、13 个独立 `0600` SQLite、
+独立应用进程与唯一 loopback 端口顺序完成，13/13 场景通过；mock 只接受编号 `1..26` 的 `26` 次串行
+`draft` Provider 请求。正常双击与 unknown-after-commit 最终 revision/version/audit 为 `2/1/1`；另一
+标签普通保存后的旧 revision 场景为 `2/0/0`；过期、错误会话、A→B→A、跨标签、reload、
+`after_version`、`after_cas`、`after_audit`、`known_before_commit` 与 unknown-before-commit 均为
+`1/0/0`。四种确定故障均可见显示“写入未完成，本次确认已关闭”、正文与审计保持基线；
+unknown-before-commit 一次人工对账后仍明确禁止重复采用、保留同页对账入口且无确认按钮；
+unknown-after-commit 一次对账后可见收敛为 `✅ Agent 草案已确认采用（revision 1 → 2）`。整轮 writer
+issue/apply/reconcile 汇总为 `13/9/2`，每个场景的每类公开操作均未超过一次；最终数据库逐项断言和
+`18081..18094` 端口释放检查均 PASS。
+
+FINAL2 前的非证据输入与整轮边界严格分离：任意提示词被 mock 以 `422` 拒绝的一轮、跨端口登录预检、
+日期控件 transport timeout 的整轮，以及超时前只完成前四项和部分 A→B→A 的整轮均全部作废，不拼接
+可见结果、数据库输出或 Provider 计数，也不在同一 DB 自动重试。浏览器连接恢复后才从 fresh DB 和 fresh
+mock 完成上述 FINAL2；一个丢失进程会话句柄但尚未开始浏览器动作的 ABA 实例也先精确停止并从种子重建。
+最终所有 app/mock、Chrome 标签、MySQL 容器与验收端口均已停止。
+
+本轮 Graphify 辅助刷新按固定 fallback 的首项 OpenAI-compatible 一次完成，不需要进入 DeepSeek 或
+luna_worker。当前图相对即时备份从 `4938` nodes/`11753` edges 增至 `4946/11754`，目标 ledger 节点从
+`3` 增至 `11`，`built_at_commit` 精确为 `69e77ed0e884a035ae0288f74e34dc7752cf96e3`；multigraph 诊断为
+missing/dangling endpoint、self-loop 与 exact duplicate edge 全部 `0`，无不明缩水。Graphify 仍只作辅助
+覆盖证据，不替代 live tests/Review/CI，全部 `graphify-out/**` 生成文件继续排除在本候选提交之外。
+
+本段只闭合 `tested_code_sha` 的本地自动化、SQLite、MySQL、浏览器与前一 Review finding 修复复核。
+包含本段的后续 evidence-closure SHA 仍须取得自身 fixed-SHA Standards/Spec 双轴 0/0/0 Review、PR
+exact-head CI 与远端自动 Review；之后才可重新核对最新 main 漂移并以 `--no-ff` 集成。merge SHA 仍须
+重新完成 Review/CI，才能关闭 Issue #52、发布与部署；Issue #48 始终不在本轮关闭范围。
