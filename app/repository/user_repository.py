@@ -141,14 +141,17 @@ async def update_user_active(
     user_id: int,
     is_active: bool,
 ) -> bool:
-    """在指定租户中更新用户启停状态，返回是否更新成功。"""
+    """更新启停状态并递增认证世代，返回是否更新成功。"""
     result = await session.execute(
         update(User)
         .where(
             User.tenant_id == tenant_id,
             User.id == user_id,
         )
-        .values(is_active=is_active)
+        .values(
+            is_active=is_active,
+            auth_epoch=User.auth_epoch + 1,
+        )
     )
     await session.commit()
     return bool(result.rowcount)
