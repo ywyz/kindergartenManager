@@ -20,7 +20,10 @@ import getpass
 
 from sqlalchemy.engine import make_url
 
-from app.auth.legacy import uses_legacy_single_user_password
+from app.auth.legacy import (
+    reject_legacy_single_user_password,
+    uses_legacy_single_user_password,
+)
 from app.auth.password import hash_password, verify_password
 from app.core.audit import log_audit
 from app.core.config import settings
@@ -59,6 +62,10 @@ async def bootstrap_admin(
         return "error: BOOTSTRAP_ADMIN_USERNAME 不能为空"
     if len(password) < 8:
         return "error: BOOTSTRAP_ADMIN_PASSWORD 至少 8 位"
+    try:
+        reject_legacy_single_user_password(password)
+    except ValueError:
+        return "error: BOOTSTRAP_ADMIN_PASSWORD 不得使用旧单用户模式保留值"
 
     async with AsyncSessionLocal() as session:
         existing = await get_user_by_username(
@@ -130,6 +137,10 @@ async def reset_admin_password(
 
     if len(new_password) < 8:
         return "error: 新密码至少 8 位"
+    try:
+        reject_legacy_single_user_password(new_password)
+    except ValueError:
+        return "error: 新密码不得使用旧单用户模式保留值"
 
     normalized_username = username.strip()
     async with AsyncSessionLocal() as session:

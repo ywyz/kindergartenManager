@@ -9,7 +9,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import create_access_token
-from app.auth.legacy import uses_legacy_single_user_password
+from app.auth.legacy import (
+    reject_legacy_single_user_password,
+    uses_legacy_single_user_password,
+)
 from app.auth.password import hash_password, verify_password
 from app.core.audit import log_audit
 from app.core.exceptions import AuthError
@@ -79,6 +82,7 @@ async def change_password(
     user = await get_user_by_id(session, tenant_id=tenant_id, user_id=user_id)
     if user is None or not verify_password(old_password, user.hashed_password):
         raise AuthError("旧密码不正确")
+    reject_legacy_single_user_password(new_password)
 
     updated = await update_password(
         session,
@@ -139,6 +143,7 @@ async def create_user_by_admin(
         raise ValueError("用户名长度不能超过 64")
     if len(password) < 8:
         raise ValueError("密码长度不能少于 8 位")
+    reject_legacy_single_user_password(password)
 
     try:
         target_role = UserRole(normalized_role)
@@ -276,6 +281,7 @@ async def reset_user_password_by_admin(
     )
     if len(new_password) < 8:
         raise ValueError("新密码长度不能少于 8 位")
+    reject_legacy_single_user_password(new_password)
 
     target = await get_user_by_id(
         session,
@@ -324,6 +330,7 @@ async def register_user(
 
     if len(password) < 8:
         raise ValueError("密码长度不能少于 8 位")
+    reject_legacy_single_user_password(password)
     if not username or len(username) < 4:
         raise ValueError("用户名不能少于 4 位")
 
