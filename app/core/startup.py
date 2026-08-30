@@ -5,6 +5,7 @@
 - PyInstaller 打包模式：alembic.ini 和 alembic/ 目录随二进制打包进 _MEIPASS
 - Docker 模式：与开发模式相同
 """
+
 import logging
 import os
 import sys
@@ -44,11 +45,12 @@ def build_sync_url(database_url: str | None) -> str:
     return database_url
 
 
-def run_startup_migrations() -> None:
+def run_startup_migrations(*, log_failure_detail: bool = True) -> None:
     """在应用启动时自动执行 alembic upgrade head。
 
-    桌面、开发与服务器模式统一 fail-closed：迁移失败时记录异常并重新抛出，
-    防止应用在未知或过期 schema 上继续接受业务操作。
+    桌面、开发与服务器模式统一 fail-closed：迁移失败时重新抛出，防止应用在未知
+    或过期 schema 上继续接受业务操作。默认记录异常；已经提供脱敏错误边界的调用方
+    可关闭详细日志，避免 CLI 输出连接串或 SQL 参数。
     """
     try:
         from alembic import command
@@ -65,9 +67,13 @@ def run_startup_migrations() -> None:
         # configparser 插值规则：% 须转义为 %%，否则 URL 中的 %40 等编码字符会引发 ValueError
         alembic_cfg.set_main_option("sqlalchemy.url", sync_url.replace("%", "%%"))
 
-        logger.info("正在执行数据库迁移...", extra={"db_url": sync_url.split("@")[-1] if "@" in sync_url else sync_url})
+        logger.info(
+            "正在执行数据库迁移...",
+            extra={"db_url": sync_url.split("@")[-1] if "@" in sync_url else sync_url},
+        )
         command.upgrade(alembic_cfg, "head")
         logger.info("数据库迁移完成")
     except Exception:
-        logger.exception("数据库迁移失败，应用启动已中止")
+        if log_failure_detail:
+            logger.exception("数据库迁移失败，应用启动已中止")
         raise

@@ -238,7 +238,7 @@ async def test_run_init_redacts_unexpected_bootstrap_failure(
     password = "TestOnlyStrongPass!"
     leaked_hash = "$argon2id$test-only-sensitive-hash"
 
-    monkeypatch.setattr(module, "run_startup_migrations", lambda: None)
+    monkeypatch.setattr(module, "run_startup_migrations", lambda **_kwargs: None)
     monkeypatch.setattr(module.settings, "BOOTSTRAP_ADMIN_ENABLED", True)
     monkeypatch.setattr(module.settings, "BOOTSTRAP_ADMIN_USERNAME", "sysadmin")
     monkeypatch.setattr(module.settings, "BOOTSTRAP_ADMIN_PASSWORD", password)
@@ -248,9 +248,10 @@ async def test_run_init_redacts_unexpected_bootstrap_failure(
 
     monkeypatch.setattr(module, "bootstrap_admin", fail_bootstrap)
 
-    await module._run_init()
+    exit_code = await module._run_init()
 
     output = capsys.readouterr().out
+    assert exit_code == 1
     assert "创建失败" in output
     assert password not in output
     assert leaked_hash not in output
@@ -275,7 +276,11 @@ async def test_run_init_stops_after_redacted_migration_failure(
         bootstrap_called = True
         return "ok: should not run"
 
-    monkeypatch.setattr(module, "run_startup_migrations", fail_migration)
+    monkeypatch.setattr(
+        module,
+        "run_startup_migrations",
+        lambda **_kwargs: fail_migration(),
+    )
     monkeypatch.setattr(module, "bootstrap_admin", record_bootstrap_call)
     monkeypatch.setattr(module.settings, "BOOTSTRAP_ADMIN_ENABLED", True)
     monkeypatch.setattr(module.settings, "BOOTSTRAP_ADMIN_USERNAME", "sysadmin")
@@ -285,9 +290,65 @@ async def test_run_init_stops_after_redacted_migration_failure(
         "TestOnlyStrongPass!",
     )
 
-    await module._run_init()
+    exit_code = await module._run_init()
 
     output = capsys.readouterr().out
+    assert exit_code == 1
     assert "迁移失败" in output
     assert leaked_detail not in output
     assert bootstrap_called is False
+
+
+async def test_run_init_maps_ok_and_skip_results_to_success(
+    monkeypatch,
+    capsys,
+) -> None:
+    """创建成功与已存在的幂等跳过都应返回成功状态。"""
+    from app.jobs import bootstrap_admin as module
+
+    monkeypatch.setattr(module, "run_startup_migrations", lambda **_kwargs: None)
+    monkeypatch.setattr(module.settings, "BOOTSTRAP_ADMIN_ENABLED", True)
+    monkeypatch.setattr(module.settings, "BOOTSTRAP_ADMIN_USERNAME", "sysadmin")
+    monkeypatch.setattr(
+        module.settings,
+        "BOOTSTRAP_ADMIN_PASSWORD",
+        "TestOnlyStrongPass!",
+    )
+
+    for message in ("ok: created", "skip: already exists"):
+
+        async def return_message(**_kwargs) -> str:
+            return message
+
+        monkeypatch.setattr(module, "bootstrap_admin", return_message)
+        assert await module._run_init() == 0
+
+    capsys.readouterr()
+
+
+async def test_run_reset_cancel_and_exception_have_nonzero_sanitized_status(
+    monkeypatch,
+    capsys,
+) -> None:
+    """重置取消与异常不得被自动化误判为成功或泄露异常正文。"""
+    from app.jobs import bootstrap_admin as module
+
+    monkeypatch.setattr(module, "_prompt_str", lambda *_args: "sysadmin")
+    prompts = iter(("old-password", "new-password", "different-password"))
+    monkeypatch.setattr(module, "_prompt_password", lambda *_args: next(prompts))
+    assert await module._run_reset() == 2
+
+    leaked_detail = "database-secret-test-only"
+    prompts = iter(("old-password", "new-password", "new-password"))
+    monkeypatch.setattr(module, "_prompt_password", lambda *_args: next(prompts))
+
+    async def fail_reset(**_kwargs) -> str:
+        raise RuntimeError(leaked_detail)
+
+    monkeypatch.setattr(module, "reset_admin_password", fail_reset)
+    assert await module._run_reset() == 1
+
+    output = capsys.readouterr().out
+    assert "已取消" in output
+    assert "重置失败" in output
+    assert leaked_detail not in output
