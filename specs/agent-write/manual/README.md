@@ -165,7 +165,7 @@ config，因此允许它存在，但仍拒绝 worktree 内任何 `.env` 或 `.ki
   不变；
 - 两个真实 session 对同一 revision 的生产 CAS 恰一真一假，最终 revision 为 2；
 - 生产 `get_user_by_id(..., for_update=True)` 持锁时，竞争 session 返回 errno 1205；释放后可重新取锁；
-- 输出仅含 SHA、head、trigger 数量、CAS 布尔值/revision 与 lock errno。
+- 输出仅含 SHA、head、auth-epoch 默认值/约束 errno、trigger 数量、CAS 布尔值/revision 与 lock errno。
 
 任一迁移或行为门失败都保留该 disposable 容器供只读诊断，不自动修补或重跑。全部脱敏证据捕获后，只停止
 精确容器名；`--rm + tmpfs` 使合成数据库随容器停止而消失：
