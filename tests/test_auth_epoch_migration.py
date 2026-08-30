@@ -58,7 +58,9 @@ def _insert_user(
         'VALUES (?, ?, "hash", ?, ?, "2026-08-30 10:00:00", "2026-08-30 10:00:00")',
         (tenant_id, username, role, is_active),
     )
-    return int(cursor.lastrowid)
+    user_id = cursor.lastrowid
+    assert user_id is not None
+    return user_id
 
 
 def _has_auth_epoch_column(connection: sqlite3.Connection) -> bool:
