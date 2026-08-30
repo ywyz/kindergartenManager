@@ -182,7 +182,7 @@ def test_latest_agent_write_ledger_previous_closure_sha_matches_expected() -> No
     """最新 Agent WRITE 证据闭合候选必须引用预期可回溯仓库 SHA。"""
     ledger = (_ROOT / "specs/agent-write/tests/README.md").read_text(encoding="utf-8")
     expected = "0581840b2e9265b03cdf8b6dc27307e40411afb9"
-    wrong = "521418aa0710ca0dd1292db4e99d3c68e90c384a"
+    wrong = "521418aa1df2dfa30d7e57b8a536ead41b8e5d07"
 
     matches = list(re.finditer(r"证据闭合候选\s+`([0-9a-f]{40})`", ledger))
     assert matches, "README ledger must contain at least one evidence closure candidate"
