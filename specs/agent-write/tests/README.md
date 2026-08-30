@@ -661,3 +661,44 @@ unknown-after-commit 一次对账后可见收敛为 `✅ Agent 草案已确认�
 本段只闭合 `tested_code_sha` 的本地、SQLite、MySQL 与浏览器证据。包含本段的后续 evidence-closure SHA
 仍须取得自身 fixed-SHA Standards/Spec 双轴 0/0/0 Review、PR exact-head CI 与远端自动 Review；之后才可
 核对最新 main 漂移并以 `--no-ff` 集成，merge SHA 仍须重新完成 Review/CI，才能关闭 Issue #52、发布与部署。
+
+证据闭合候选 `0581840b2e9265b03cdf8b6dc27307e40411afb9` 的 fixed-SHA Review 为 Spec
+H0/M0/L0、Standards H2/M0/L0：本 ledger 另有两处 reviewer SHA 尾位写错，分别把真实
+`afff51e1c9b601defd2b34c4a846294749bc30e1` 与
+`0f09dd5e29214fbeb7d31e7612d8f3b9e9d7f72a` 记录成不存在的 commit。通用文档 ledger
+commit-ref 合同 RED `67de0554686cae6d4e10e26cb0b9ed6f329dacde` 连续两轮均为同一节点
+`1 failed`；最小 GREEN `5cd4bbd0c4dc8c74fb6c0dd8d3d63c4b9cb8fd29` 只修正上述两个引用。
+该测试字节变化使旧 fixed-SHA 手工证据失效，因此本段全部有效证据重新绑定
+`tested_code_sha=5cd4bbd0c4dc8c74fb6c0dd8d3d63c4b9cb8fd29`。
+
+Main 在该 SHA 的 clean detached linked worktree 得到 revision/WRITE/Foundation/ordinary
+`12/257/261/891 passed`；变更范围 Ruff check/format、增量 Pyright、`git diff --check`、
+`pip check`、`uv lock --check` 与严格依赖漏洞审计均 GREEN。一次未显式绑定共享解释器的 Pyright
+调用只产生环境依赖解析错误，未计入证据；绑定绝对 `--pythonpath` 后的增量门为 `0 errors`。fresh
+SQLite 在 owner-only 目录/数据库完成 head→a6c4d8e2f9b1→head，最终为 head
+e5f7a9c2d4b6、`19` tables、`6` triggers、目录/数据库 `0700/0600`。
+
+重启前的三个 disposable MySQL 预检均因本机 Docker/资源运行时失稳而在完整证据形成前作废，不归因于
+产品或 migration finding，也没有拼接到本段 PASS。宿主机重启恢复后，Main 从新的 tmpfs schema 单次完成
+正式验收：官方 `mysql:8` digest
+`sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb` 解析为 MySQL
+`8.4.11`，binary log 与 `log_bin_trust_function_creators` 均为 `1`，fresh table count 为 `0`；
+schema-scoped app principal 完成 head→a6c4d8e2f9b1→head。live helper 返回四个 trigger rejection、
+CAS `[false, true]`、最终 revision `2`、管理员竞争锁 errno `1205`，且 `tested_code_sha` 精确匹配。
+证据捕获后该 exact container 与 loopback `13306` 均已清空。
+
+同一 `tested_code_sha` 的最终 Linux Chrome 矩阵使用 fresh mock、13 个独立 `0600` SQLite、独立应用进程
+与唯一 loopback 端口顺序完成；mock 精确接受编号 `1..26` 的 `26` 次串行 Provider 请求。正常双击与
+unknown-after-commit 最终 revision/version/audit 为 `2/1/1`；另一标签普通保存后的旧 revision 场景为
+`2/0/0`；过期、错误会话、A→B→A、跨标签、reload、`after_version`、`after_cas`、`after_audit`、
+`known_before_commit` 与 unknown-before-commit 均为 `1/0/0`。四种确定故障全部可见显示确认关闭且
+writer issue/apply/reconcile 为 `1/1/0`；unknown-before-commit 一次对账后仍不确定、保留同页对账入口、
+没有确认按钮且 writer 为 `1/1/1`；unknown-after-commit 一次对账后可见收敛为
+`✅ Agent 草案已确认采用（revision 1 → 2）`，writer 同为 `1/1/1`。浏览器跨端口复用合成登录的预检
+在 Provider/WRITE 前停止并丢弃对应 DB，不进入有效矩阵；最终 mock 中仍只有上述 `1..26` 请求。
+所有 app/mock、浏览器标签、MySQL 容器与验收端口均已停止。
+
+本段只闭合 `tested_code_sha` 的本地自动化、SQLite、MySQL 与浏览器证据。包含本段的后续
+evidence-closure SHA 仍须取得自身 fixed-SHA Standards/Spec 双轴 0/0/0 Review、PR exact-head CI 与
+远端自动 Review；之后才可重新核对最新 main 漂移并以 `--no-ff` 集成。merge SHA 仍须重新完成
+Review/CI，才能关闭 Issue #52、发布与部署；Issue #48 始终不在本轮关闭范围。
