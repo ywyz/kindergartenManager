@@ -763,3 +763,50 @@ missing/dangling endpoint、self-loop 与 exact duplicate edge 全部 `0`，无�
 包含本段的后续 evidence-closure SHA 仍须取得自身 fixed-SHA Standards/Spec 双轴 0/0/0 Review、PR
 exact-head CI 与远端自动 Review；之后才可重新核对最新 main 漂移并以 `--no-ff` 集成。merge SHA 仍须
 重新完成 Review/CI，才能关闭 Issue #52、发布与部署；Issue #48 始终不在本轮关闭范围。
+
+## 2026-08-30：auth_epoch 与迁移头收敛后的 fixed-SHA 本地证据
+
+本段全部代码与测试证据绑定
+`tested_code_sha=6a1d25b2671e37189e42a82b24961ae3e0f91858`。该候选在前一轮远端 Review 四项
+安全 finding 的逐项 RED/GREEN 之后，增加登录凭据脱敏、CLI fail-closed、不可用密码 sentinel 拒绝、
+`auth_epoch` 会话撤销与对应 forward-only Alembic 迁移；当前唯一 migration head 为
+`alembic:2b7f3d5e9c8a`。真实 MySQL helper、权威文档和 memory-bank 的 head 引用已与该迁移一致，helper 对
+`lastrowid is None` 显式 fail closed。
+
+Main 在两个 clean exact-SHA linked worktree 分别运行自动化与手工门：revision/WRITE/Foundation/ordinary
+为 `14/260/261/905 passed`；相对 main 的全部变更 Python 文件通过 Ruff check，`121` 个 Python 文件通过
+Ruff format check；候选与旧 PR head `b375a75a113ff8662b343093874ff7b08f23ac92` 使用同一 Python/path 配置的
+Pyright 均为 `39` 个既有错误，增量为 `0`。`git diff --check`、`pip check`、`uv lock --check` 与严格
+依赖漏洞审计均 GREEN。
+
+fresh SQLite 在 owner-only 目录/数据库完成 head→a6c4d8e2f9b1→head，最终为 head
+`alembic:2b7f3d5e9c8a`、`19` tables、`6` triggers；`user.auth_epoch` 的 NOT NULL/default/check 均符合合同，
+目录/数据库 mode 为 `0700/0600`。真实 MySQL 首次预检因 exact-SHA 自动化 worktree 中存在 Git-ignored、
+owner-only `.kindergarten_secrets` 而在 import、migration 与数据库写入前 fail closed；fresh schema 保持
+`0` tables，该次不计为 live PASS。随后从不含受保护文件的 exact-SHA manual worktree 与全新 schema
+重跑：官方 `mysql:8` digest 为
+`sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb`，解析为 MySQL
+`8.4.11`，binary log 与 `log_bin_trust_function_creators` 均为 `1`。schema-scoped app principal 完成
+head→a6c4d8e2f9b1→head；live helper 返回 `auth_epoch` default `1`、非法值 errno `3819`、四个 trigger
+rejection、CAS `[false, true]`、最终 revision `2` 与管理员竞争锁 errno `1205`，且 helper 回报的
+`tested_code_sha` 精确匹配。容器与 loopback `13309` 在证据完成后已清理。
+
+同一 `tested_code_sha` 的最终 Linux Chrome FINAL3 矩阵在浏览器连接恢复后，使用一个 fresh mock、
+13 个独立 `0600` SQLite、独立 app 进程与唯一 loopback 端口顺序完成，13/13 场景通过；mock 只接受编号
+`1..26` 的 `26` 次串行 `draft` Provider 请求。正常双击与 unknown-after-commit 最终
+revision/version/audit 为 `2/1/1`；另一标签普通保存后的旧 revision 场景为 `2/0/0`；过期、错误会话、
+A→B→A、跨标签、reload、`after_version`、`after_cas`、`after_audit`、`known_before_commit` 与
+unknown-before-commit 均为 `1/0/0`。四种确定故障均可见显示“写入未完成，本次确认已关闭”；
+unknown-before-commit 一次人工对账后保持未生效、保留同页对账入口且无确认按钮；
+unknown-after-commit 一次对账后可见收敛为 `✅ Agent 草案已确认采用（revision 1 → 2）`。最终有效矩阵的
+writer issue/apply/reconcile 汇总为 `13/9/2`，每个场景的每类公开操作均未超过一次，全部验收端口已释放。
+
+FINAL3 前及过程中，跨端口登录重定向、日期动画和两次未进入 fresh mock 计数的页面状态预检均使用独立
+disposable DB；对应 app/DB 均停止并作废，没有拼入最终 13 个数据库、`1..26` Provider 计数或 writer
+汇总，也没有在同一 DB 重试 WRITE。最终有效 reload 与 `after_version` 均从 pristine seed、fresh DB 和
+未使用端口重新运行。
+
+本段只闭合 `tested_code_sha` 的本地自动化、SQLite、MySQL 与浏览器证据。包含本段的后续
+evidence-closure SHA 仍须取得自身 fixed-SHA Standards/Spec 双轴 0/0/0 Review、PR exact-head CI 与
+远端自动 Review；之后才可重新核对最新 main 漂移并以 `--no-ff` 集成。merge SHA 仍须重新完成
+Review/CI，才能关闭 Issue #52、发布与部署；Issue #48 始终不在本轮关闭范围。
