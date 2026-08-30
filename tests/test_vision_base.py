@@ -3,7 +3,7 @@
 使用 httpx.MockTransport 隔离真实 HTTP 请求。
 测试覆盖：
   1. 正常响应：返回合法 JSON → 解析为 dict
-  2. HTTP 4xx → AiCallError，message 含响应体摘要
+  2. HTTP 4xx → AiCallError，且响应体、endpoint 与 Key 不进入异常或日志
   3. HTTP 5xx → AiCallError（重试后仍失败）
   4. content 非 JSON → AiParseError
   5. 请求体含多模态 image_url (data url) 结构
@@ -19,7 +19,9 @@ from app.core.exceptions import AiCallError, AiParseError
 from app.integration.ai_client.vision_base import call_ai_vision
 
 
-def _make_openai_response(content: dict | str, status_code: int = 200) -> httpx.Response:
+def _make_openai_response(
+    content: dict | str, status_code: int = 200
+) -> httpx.Response:
     """构造模拟 OpenAI Chat Completions 响应。"""
     if isinstance(content, dict):
         content_str = json.dumps(content, ensure_ascii=False)
@@ -61,7 +63,10 @@ def _make_error_response(status_code: int, body: dict | None = None) -> httpx.Re
 @pytest.mark.asyncio
 async def test_call_ai_vision_success():
     """正常响应时，返回解析后的 dict。"""
-    expected = {"observation_goal": "观察幼儿搭建行为", "observation_record": "幼儿专注搭积木"}
+    expected = {
+        "observation_goal": "观察幼儿搭建行为",
+        "observation_record": "幼儿专注搭积木",
+    }
     transport = httpx.MockTransport(lambda req: _make_openai_response(expected))
     client = httpx.AsyncClient(transport=transport)
 
@@ -75,25 +80,31 @@ async def test_call_ai_vision_success():
 
 
 # ---------------------------------------------------------------------------
-# 2. HTTP 4xx → AiCallError（含响应体摘要）
+# 2. HTTP 4xx → AiCallError（脱敏）
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_call_ai_vision_http_400_raises_ai_call_error():
-    """HTTP 400 时抛出 AiCallError，message 应包含响应体错误描述。"""
-    err_body = {"error": {"message": "invalid request"}}
+async def test_call_ai_vision_http_400_raises_ai_call_error(caplog):
+    """HTTP 400 的响应体、endpoint 与 Key 不得进入异常或日志。"""
+    secret = "sk-vision-provider-echo"
+    endpoint = "https://private-vision.invalid/v1"
+    err_body = {"error": {"message": f"invalid request {secret}"}}
     transport = httpx.MockTransport(lambda req: _make_error_response(400, err_body))
     client = httpx.AsyncClient(transport=transport)
 
     with pytest.raises(AiCallError) as exc_info:
         await call_ai_vision(
             messages=[{"role": "user", "content": [{"type": "text", "text": "test"}]}],
-            api_base_url="https://api.example.com/v1",
-            api_key="sk-test",
+            api_base_url=endpoint,
+            api_key=secret,
             _client=client,
         )
-    assert "400" in exc_info.value.message or "invalid request" in exc_info.value.message
+    rendered = f"{exc_info.value!r}\n{caplog.text}"
+    assert "400" in exc_info.value.message
+    assert "invalid request" not in rendered
+    assert secret not in rendered
+    assert endpoint not in rendered
 
 
 # ---------------------------------------------------------------------------
@@ -115,6 +126,7 @@ async def test_call_ai_vision_http_500_retries_and_raises():
 
     def _fast_retry():
         from tenacity import retry, stop_after_attempt, wait_none
+
         return retry(stop=stop_after_attempt(3), wait=wait_none(), reraise=True)
 
     with mock.patch.object(vb, "_make_retry_decorator", _fast_retry):
@@ -123,7 +135,9 @@ async def test_call_ai_vision_http_500_retries_and_raises():
 
         with pytest.raises(AiCallError):
             await call_ai_vision(
-                messages=[{"role": "user", "content": [{"type": "text", "text": "test"}]}],
+                messages=[
+                    {"role": "user", "content": [{"type": "text", "text": "test"}]}
+                ],
                 api_base_url="https://api.example.com/v1",
                 api_key="sk-test",
                 _client=client,
@@ -140,9 +154,7 @@ async def test_call_ai_vision_http_500_retries_and_raises():
 @pytest.mark.asyncio
 async def test_call_ai_vision_non_json_content_raises_parse_error():
     """AI content 字段不是有效 JSON 时，抛出 AiParseError。"""
-    transport = httpx.MockTransport(
-        lambda req: _make_openai_response("这不是JSON")
-    )
+    transport = httpx.MockTransport(lambda req: _make_openai_response("这不是JSON"))
     client = httpx.AsyncClient(transport=transport)
 
     with pytest.raises(AiParseError):

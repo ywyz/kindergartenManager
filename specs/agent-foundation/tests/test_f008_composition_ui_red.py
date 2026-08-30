@@ -544,9 +544,10 @@ async def test_discard_only_clears_agent_memory_not_caller_owned_body(
     assert body == before
 
 
-def test_agent_ui_surface_is_closed_and_patch_rows_are_detached_primitives():
+def test_foundation_panel_stays_read_draft_while_local_patch_actions_are_explicit():
     component = import_module("app.ui.components.agent_draft")
     panel_source = inspect.getsource(component.DailyPlanAgentPanel)
+    render_signature = inspect.signature(component.render_daily_plan_agent_panel)
 
     assert component.AGENT_ACTION_LABELS == ("运行", "取消", "丢弃建议")
     assert component.AGENT_FIXED_NOTICE == "仅生成建议，不会保存或修改当前计划。"
@@ -554,6 +555,9 @@ def test_agent_ui_surface_is_closed_and_patch_rows_are_detached_primitives():
     assert not hasattr(component, "apply_patch")
     assert not hasattr(component, "confirm_write")
     assert callable(component.render_daily_plan_agent_panel)
+    assert "patch_actions" in render_signature.parameters
+    assert "ConfirmedDailyPlanWriteService" not in panel_source
+    assert "save_daily_plan" not in panel_source
     assert "on_disconnect(self.disconnect)" in panel_source
     assert "on_disconnect(self.close)" not in panel_source
     assert "on_delete(self.close)" in panel_source
@@ -572,7 +576,7 @@ def test_date_selection_guard_invalidates_out_of_order_callbacks():
     assert guard.current == second
 
 
-def test_daily_plan_page_wires_immediate_selection_and_agent_panel_without_write_actions():
+def test_daily_plan_page_wires_local_confirmation_without_provider_write():
     page = import_module("app.ui.pages.daily_plan")
     source = inspect.getsource(page)
 
@@ -584,14 +588,41 @@ def test_daily_plan_page_wires_immediate_selection_and_agent_panel_without_write
     assert source.index("agent_panel.plan_changed(d)") < save_call
 
     direct_delete = source.index("await delete_daily_plan(")
-    captured_date = source.index('deleting_date = state["selected_date"]')
+    captured_target = source.index("target = _capture_plan_target()", save_call)
+    captured_date = source.index(
+        "deleting_date = target.selected_date", captured_target
+    )
+    captured_plan_id = source.index("deleting_plan_id = target.plan_id", captured_date)
+    captured_revision = source.index(
+        "deleting_revision = target.revision", captured_plan_id
+    )
+    delete_auth = source.index("await _require_live_session()", captured_revision)
+    current_guard = source.index("_is_current_plan_target(target)", delete_auth)
     direct_invalidation = source.index("agent_panel.plan_changed(deleting_date)")
-    assert captured_date < direct_invalidation < direct_delete
-    assert source.index("plan_date=deleting_date", direct_delete) > direct_delete
+    assert (
+        captured_target
+        < captured_date
+        < captured_plan_id
+        < captured_revision
+        < delete_auth
+        < current_guard
+        < direct_invalidation
+    )
+    assert direct_invalidation < direct_delete
+    assert source.index("plan_id=deleting_plan_id", direct_delete) > direct_delete
+    assert (
+        source.index("expected_revision=deleting_revision", direct_delete)
+        > direct_delete
+    )
 
     history_delete = source.index("await delete_daily_plan(", direct_delete + 1)
     history_invalidation = source.index("agent_panel.plan_changed(p.plan_date)")
     assert history_invalidation < history_delete
+    assert source.index("plan_id=p.id", history_delete) > history_delete
+    assert source.index("expected_revision=p.revision", history_delete) > history_delete
     assert "agent_controller" in source
-    assert "adopt_patch" not in source
-    assert "confirm_write" not in source
+    assert "create_daily_plan_patch_confirmation_controller" in source
+    assert "DailyPlanPatchConfirmationPanel" in source
+    assert "patch_actions=" in source
+    assert "Permission.WRITE" not in source
+    assert "build_foundation_registry" not in source

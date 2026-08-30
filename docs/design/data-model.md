@@ -1,14 +1,22 @@
 # KindergartenManager 数据模型
 
-> 审查基线：`dev4.0@0657c3a`；最近产品主线：`main@225fe139`；Alembic head：`a6c4d8e2f9b1`。
+> 合入基线：`main@ca3b7bd`；当前 `feat/agent-write` Alembic head：`2b7f3d5e9c8a`。
+> W005/W006 已闭合。W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
+> Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确本地交付状态、Review 轮次、
+> SHA 与测试证据仅以 `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后作为外部证据；
+> 本文不复制逐轮事实。
+> 不得增加 Provider WRITE、自动重试、批量或跨页面采用、
+> 设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。完整 W007 证据仅见
+> `specs/agent-write/tests/README.md`。
 
 ## 1. 建模原则
 
 - 所有 schema 变化通过 Alembic。
 - 主键使用 `BIGINT`，SQLite 下变体为 `INTEGER` 以支持自增。
-- 所有 16 个 ORM 表均有 `tenant_id`。
-- 除 `user` 与租户级参考表 `indicator_catalog` 外，其余 14 个 ORM 表均有 `user_id`。
-- 除只增不改的 `export_records` 外，模型通常包含 `created_at` 和 `updated_at`。
+- 所有 18 个 ORM 表均有 `tenant_id`。
+- 除 `user` 与租户级参考表 `indicator_catalog` 外，其余 16 个 ORM 表均有 `user_id`。
+- 可变业务表通常同时包含 `created_at` 和 `updated_at`；`export_records` 与两张 W006 evidence 表是明确的
+  append-only/历史例外，只记录 `created_at`。
 - 历史导出所需的年级、班级、教师等采用快照字段，避免设置变更改写历史。
 - 图片子表、倾听子表和导出关联多数为逻辑外键；完整性由 repository/service 和测试承担。
 
@@ -22,6 +30,8 @@
 | `ai_api_key` | 加密 AI Key、base URL、模型、类型和启用状态 | tenant + user |
 | `prompt_template` | 按任务类型和版本保存提示词 | tenant + user |
 | `daily_plan` | 每日计划、教案拆分、适配和生成内容 | tenant + user |
+| `daily_plan_operation_version` | 单次确认写入前的完整每日计划业务快照 | tenant + user |
+| `agent_write_audit` | 单次确认写入的最小不可变成功审计 | tenant + user |
 | `game_observation` | 游戏观察主记录 | tenant + user |
 | `game_observation_image` | 游戏观察图片和存储元数据 | tenant + user |
 | `listening_record` | 一对一倾听主记录 | tenant + user |
@@ -63,8 +73,11 @@ tenant
 
 - `(tenant_id, username)` 唯一。
 - `hashed_password` 使用 Argon2 生成。
+- `auth_epoch` 是默认值为 1 的正整数；任何密码变更与 epoch 递增在同一条租户限定 UPDATE 中完成，
+  token 的 epoch 不存在、非法或与数据库不一致时会话失败关闭。
 - `role` 枚举为 teacher / teaching_admin / sys_admin。
-- 当前单用户 UI 只依赖默认 `admin` 记录；保留表不等于登录已启用。
+- UI 登录已在当前工作树恢复：JWT `sub + tenant_id + jti + auth_epoch` 先通过签名/时间校验，然后每次受保护页面入口按 tenant/user 重读 active `user`，角色、显示名和 epoch 以数据库为权威。
+- 应用启动不再自动创建固定 `admin`，也不挂载匿名自注册；空库初始化与老版固定密码账号恢复只能通过显式本地 admin bootstrap。
 
 ### `semester_config`
 
@@ -83,6 +96,8 @@ tenant
 - `api_key_encrypted` 只存密文。
 - `key_type` 为 text/vision。
 - 同类型只有一个 active Key 由 repository 操作保证。
+- `/settings` 按当前可信 actor 的 tenant + user 持久化 endpoint、model 与加密 Key。日常跨 worktree 复测可复用仓库外专用非生产数据库，并从仓库外权限受限的环境文件为进程提供与其配对的稳定 `ENCRYPTION_KEY`/`JWT_SECRET`；AI Key 本身不写入 `.env`。
+- 只备份数据库密文而丢失原 `ENCRYPTION_KEY` 无法恢复 Key。日常持久化 profile 不能代替指定 SHA 的 F009 全新隔离验收。
 
 ### `prompt_template`
 
@@ -104,8 +119,18 @@ tenant
 - 目标、准备、重点、难点。
 - 活动过程原文与年龄适配稿。
 - 晨间活动、晨间谈话、室内区域、户外活动和一日反思。
+- 显式非空正整数 `revision`：既有行迁移回填为 1，新行为 1，每次成功更新恰好 `N → N+1`。
 
 原文与适配稿必须同时保留，Word 导出的差异标红依赖两者。
+页面加载时保存精确 plan id + revision，保存时原样带回；Repository 必须先匹配这两个调用方观察值，
+再由 ORM `version_id_col` 执行实际 UPDATE CAS。陈旧页面/并发写失败，调用方不能经字段参数覆写 revision；
+公开 ORM 属性只读，SQLite/MySQL trigger 还拒绝非 1 初始值、纯 revision bump 及不满足“内容变化且
+`OLD + 1`”的 UPDATE；MySQL 文本字段先 `CAST(... AS BINARY)` 再做 NULL-safe 比较，避免默认不区分大小写/
+重音的 collation 把字节级真实变化误判为 no-op。只读 API 已显式返回 revision。该先决条件已随 W004-W006
+提交并通过精确 SHA CI 与 Linux service-boundary 验收；最终浏览器矩阵和真实 MySQL 8 验收仍属于 W008。
+
+删除同样不能只按日期：页面捕获实际加载的 plan id + revision，Repository 用 tenant/user/id/revision 单条
+条件 DELETE；未命中抛 stale 并回滚。这样旧标签页不能删除另一个标签后来更新或替换的记录。
 
 ## 7. 游戏观察
 
@@ -171,7 +196,7 @@ tenant
 Repository 必须满足：
 
 1. ID 不是授权信息；按 ID 查询仍需 tenant 过滤。
-2. UI 用户资源按固定 tenant/user 查询；API 读取以 API principal 的 tenant 为权威。
+2. UI 用户资源按可信 session 回查得到的 tenant/user 查询；API 读取仍以独立 API principal 的 tenant 为权威，不与 UI JWT 混用。
 3. 更新和删除与读取使用相同的隔离条件。
 4. 子表不能只凭 `record_id` 操作；同时验证 tenant/user。
 5. `indicator_catalog` 是租户级参考数据，不使用 user_id。
@@ -184,12 +209,20 @@ Repository 必须满足：
 - 历史记录保存配置快照，不在读取时用当前设置覆盖。
 - 提示词和 AI Key 用 active + 历史行管理；切换 active 应在事务中完成。
 
-## 13. Agent Foundation 的数据边界
+## 13. Agent Foundation 与确认写入的数据边界
 
-当前 16 张 ORM 表中没有 Agent 表，当前 Alembic head 也不包含 Agent 迁移。
-[ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md) 确定 Agent Foundation 不改变这一事实。
-F009 自动矩阵动态反射了包含 Alembic 版本表在内的 17 张实际 SQLite 表，并证明成功、失败、取消、超时、
-stale、越权、断开和重启路径均不增加或修改 Agent 持久化状态；两类人工验收的前后逻辑摘要也完全相等。
+当前有 18 张 ORM 业务表。`b7d9e1f3a5c2` 为 `daily_plan` 增加 revision，`c1a8e4f6b2d9` 修复
+SQLite `user.id` 自增类型，`e5f7a9c2d4b6` 只增加
+`daily_plan_operation_version` 与 `agent_write_audit` 两张 W006 evidence 表及其不可变 trigger。
+当前 head `2b7f3d5e9c8a` 只为既有 `user` 表增加 token 撤销所需的 `auth_epoch`。
+[ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md) 确定 Agent Foundation 的零 Agent 持久化边界，该 Foundation 已合入
+`main@ca3b7bd`。
+
+F009 自动矩阵曾在其固定 `tested_code_sha` 动态反射包含 Alembic 版本表在内的 17 张实际 SQLite 表，
+并验证成功、失败、取消、超时、stale、越权、断开和重启不产生 Agent 持久化。两类人工摘要也只对该 SHA
+有效。W006 自动矩阵把两张新 evidence 空表纳入动态 baseline，并继续证明 Foundation READ/DRAFT
+对其零写入；其 fixed SHA `253d37d…` 已闭合本地/CI/service 验收与 Issue 门。这不刷新旧 Foundation
+人工证据，旧结果仍只能作为历史证据。
 
 以下对象只能作为当前 operation 的内存 DTO：
 
@@ -198,20 +231,43 @@ stale、越权、断开和重启路径均不增加或修改 Agent 持久化状�
 - `ToolResult` 和 `PlanPatch`。
 
 不新建 conversation、message、thread、run、embedding、vector、summary、profile 或供应商 thread 映射表，
-也不在 `daily_plan`、preview、audit 或导出记录中隐式保存 Agent 草案。取消、超时、作用域变化或应用退出后
-相关对象直接丢弃。
+也不在 `daily_plan`、preview 或导出记录中隐式保存 Agent 草案。未确认、取消、超时、作用域变化或应用退出
+后的 Patch 直接丢弃；成功确认只留下下面两张表定义的版本/最小审计，不保存完整 Patch 或 Provider 正文。
 
-未来 Agent WRITE 不能依赖 `updated_at` 或内容哈希伪装业务 revision。它至少需要：
+[ADR-0006](../ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md) 与独立 spec 已冻结并实现 W005/W006 的条件：
 
-- `daily_plan` 显式单调 revision。
-- 可核对的操作前版本和受保护字段路径。
-- 最小不可变 Agent action audit，不保存密钥、隐藏 Prompt 或不必要的幼儿正文。
+- `daily_plan` 使用显式单调 revision；`updated_at` 和内容哈希都不能代替它。
+- `daily_plan_operation_version` 保存可核对的完整操作前业务快照和受保护字段路径。
+- `agent_write_audit` 保存最小不可变 action audit，不保存密钥、隐藏 Prompt、完整 Patch 或不必要的幼儿正文。
+- 确认必须逐次绑定 session/actor/Patch/turn/target/revision/before/expiry，并在短事务中原子完成版本、CAS 更新与审计；已知失败全回滚。
 
-这些都必须在独立 ADR/spec 中冻结并使用新 Alembic revision；当前不预留空表、字段或猜测迁移编号。
+当前 confirmation store、生产 WRITE service 与 W007 页面本地确认 UI 已实现；确认材料仍只在进程内
+短命保存。当前能力只允许用户在每日计划当前页面显式确认一份 Patch；Provider/Tool 仍不具备 WRITE。
+精确交付状态、SHA、测试计数与 node hash 统一记录在 `specs/agent-write/tests/README.md`，本数据模型
+不复制逐轮 lineage。
 
 ## 14. 迁移链
 
-当前单线迁移从空 smoke revision 开始，依次覆盖用户、设置、AI、每日计划、提示词、导出、游戏观察、一对一倾听、自制教玩具和课程审议，head 为 `a6c4d8e2f9b1`。
+当前单线迁移从空 smoke revision 开始，依次覆盖用户、设置、AI、每日计划、提示词、导出、游戏观察、
+一对一倾听、自制教玩具、课程审议、Agent WRITE evidence 与 token 撤销 epoch；当前工作树 head 为
+`2b7f3d5e9c8a`。
+`b7d9e1f3a5c2` 以 `a6c4d8e2f9b1` 为 down revision，为 `daily_plan` 增加带服务器默认 1 和正数约束的
+`revision`；现有行回填为 1，并建立 SQLite/MySQL trigger 强制 INSERT 从 1 开始、UPDATE 必须有业务内容
+变化且恰好 `OLD + 1`；downgrade 先移除 trigger，再移除约束与列。
+
+`c1a8e4f6b2d9` 以 `b7d9e1f3a5c2` 为 down revision，只在 SQLite batch-recreate `user`，把历史
+`BIGINT PRIMARY KEY` 修复为 `INTEGER PRIMARY KEY`，保留既有用户、复合唯一约束和 tenant 索引；MySQL
+继续使用原有 `BIGINT AUTO_INCREMENT`，upgrade/downgrade 均不改变 MySQL schema。
+
+`e5f7a9c2d4b6` 以 `c1a8e4f6b2d9` 为 down revision，创建精确 14 列的
+`daily_plan_operation_version` 与精确 17 列的 `agent_write_audit`；后者对 `confirmation_id`、
+`nonce_sha256` 分别使用单列唯一约束。SQLite/MySQL 均各建四个 UPDATE/DELETE 拒绝 trigger；downgrade
+先移除 trigger 再移除两表。MySQL `snapshot_json` 使用 `LONGTEXT`。真实 MySQL 8 往返和触发器行为仍属于
+W008 独立人工门。
+
+`2b7f3d5e9c8a` 以 `e5f7a9c2d4b6` 为 down revision，为 `user` 增加默认值 1、非空且必须大于等于 1 的
+`auth_epoch`。既有用户回填为 1；密码变更通过租户限定的单条 UPDATE 原子递增该值。downgrade 移除约束与列，
+但不删除用户行。
 
 验证要求：
 
@@ -227,6 +283,7 @@ stale、越权、断开和重启路径均不增加或修改 Agent 持久化状�
 - active 唯一性多由业务层保证，竞争写入时需要事务测试。
 - 表时间戳类型/默认实现不完全统一。
 - `export_records` 没有 `updated_at`，属于明确的不可变例外；仓库总规则应承认该例外。
-- UI 固定单用户与保留用户表并存，恢复认证前需要重新确认所有数据所有权语义。
-- `daily_plan` 没有可供将来 Agent WRITE 使用的显式单调 revision；这不影响只读/草案 Foundation，
-  但是 WRITE 的硬门禁。
+- 可信 UI session 已恢复并进入分支/远端 CI，但当前会话不落独立 server-side session 表，后续撤销/运维策略需以独立需求收紧。
+- W005/W006 已闭合逐次确认、操作前版本、不可变审计和原子 CAS；W007 后续交付门的精确本地状态以
+  `specs/agent-write/tests/README.md` 为准，Issue #52 仅记录已回写外部门；真实 MySQL 8 与最终固定 SHA
+  可见验收属于 W008。

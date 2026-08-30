@@ -9,8 +9,10 @@
 3. `docs/ROADMAP.md`
 4. 相关 ADR、设计、测试计划和代码
 
-当前检出 `feat/agent-foundation`，其 F007 固定证据从授权基线 `0880f64…` 严格串行形成；最近远端产品主线为
-`origin/main@cfeadef…`。产品仍是单用户 NiceGUI 模块化单体，不是已完成的多用户系统或微服务系统。
+Agent Foundation 已合入主线，W007 已按独立交付门闭合；当前分支正在完成 W008 的剩余
+发布门。精确本地交付状态、Review 轮次、SHA 与测试证据只以
+`specs/agent-write/tests/README.md` 为准；未经其中对应的 fixed-SHA Review、PR CI、merge 与发布门，
+不得宣称 W008 闭合。产品仍是 NiceGUI 模块化单体，不是已拆分的微服务系统。
 
 ## 2. 环境
 
@@ -29,7 +31,8 @@ python3.14 -m venv .venv
 .venv/bin/python -m app.main
 ```
 
-默认访问 `http://localhost:8080`。未设置 `DATABASE_URL` 时使用用户数据目录中的 SQLite。
+默认访问 `http://localhost:8080`。未设置 `DATABASE_URL` 时，源码/容器模式使用当前工作目录中的 SQLite；
+打包模式使用平台用户数据目录。
 
 ### 2.1 依赖安全基线
 
@@ -65,21 +68,26 @@ ui/api/jobs → service → repository → core/database
 
 ## 4. 当前身份模型
 
-UI 固定使用：
+UI 登录后以签名 JWT 和当前数据库用户共同重建冻结 actor：
 
 ```python
-{"sub": "1", "tenant_id": 1, "role": "sys_admin", "username": "admin"}
+TrustedUiSession(session_id, tenant_id, user_id, role, username, ...)
 ```
 
-`sub` 在页面中转换为 `user_id`。JWT、密码、RBAC 页面和中间件仍作为低优先级多用户预备资产保留，但当前 `app/main.py` 不注册相关页面或挂载认证中间件。
+`session_id` 来自每次登录唯一的 JWT `jti`；tenant/user 从已验证 claims 解析，role/name 以数据库
+active User 为权威。受保护页面入口和有外部副作用的长寿命 callback 都必须重新验证同一 `jti`，不能捕获
+dict/裸 tenant/user 后跨退出、过期、停用或重新登录继续操作。空库管理员只允许在应用主机上显式运行
+`python -m app.jobs.bootstrap_admin --init`；应用不挂载匿名自注册。
 
 API 身份独立：`X-Api-Key` 映射到 tenant；配置 `API_SIGNING_SECRET` 后要求 `X-Timestamp` + `X-Signature`。
 
-恢复多用户不是局部开关，必须连同管理员初始化、路由守卫、会话、所有模块越权测试和人工验收一起设计。
+新增身份能力必须连同管理员初始化、路由守卫、callback 会话绑定、所有模块越权测试和人工验收一起设计。
 
 ## 5. 数据库与迁移
 
-当前 Alembic head：`a6c4d8e2f9b1`。
+当前工作树 Alembic head：`2b7f3d5e9c8a`。前序 `e5f7a9c2d4b6` 创建 W006 的两张 append-only
+evidence 表及 SQLite/MySQL 不可变 trigger；当前 revision 为 `user` 增加正整数 `auth_epoch`。
+人工迁移验收不得停在任一前序 revision。
 
 ```bash
 .venv/bin/alembic current
@@ -100,7 +108,7 @@ API 身份独立：`X-Api-Key` 映射到 tenant；配置 `API_SIGNING_SECRET` �
 - 只验证 SQLite 就宣称 MySQL enum/BLOB/ALTER 通过。
 - 在日志中输出含凭据的完整数据库 URL。
 
-所有业务查询必须执行 tenant 隔离；user-owned 数据还应验证 user。API tenant 投影与 UI tenant + user 投影要使用不同的窄查询入口。逻辑外键聚合写入/删除必须由 service/use-case 持有事务；repository 内部不得提前 commit，并要用失败注入测试证明回滚。
+所有业务查询必须执行 tenant 隔离；user-owned 数据还应验证 user。API tenant 投影与 UI tenant + user 投影要使用不同的窄查询入口。带 revision 的资源更新和删除必须携带调用方实际读取到的精确 id + revision，不能退回按日期删除。逻辑外键聚合写入/删除必须由 service/use-case 持有事务；repository 内部不得提前 commit，并要用失败注入测试证明回滚。
 
 ## 6. AI 集成
 
@@ -108,12 +116,22 @@ API 身份独立：`X-Api-Key` 映射到 tenant；配置 `API_SIGNING_SECRET` �
 - Service 负责读取 active prompt/profile、业务上下文、审计和结果采用。
 - Key 从 repository 取出后短暂解密；明文不写日志。
 - 每个任务定义结构化输出、超时、重试、无效 JSON 和长度边界。
+
+### 6.1 日常模型配置复用
+
+API 地址、模型名和 AI Key 应在登录后的 `/settings` 保存；它们按 tenant + user 写入 `ai_api_key`，
+其中 Key 只保存 Fernet 密文。重复使用同一源码工作区时，保留启动工作目录中的 `kindergarten.db` 与
+owner-only `.kindergarten_secrets` 即可复用；打包版两者位于平台用户数据目录。
+
+若经常新建 worktree，使用仓库外的专用非生产 SQLite，并从权限受限的外部环境文件向启动 shell 提供
+稳定的 `DATABASE_URL`、`ENCRYPTION_KEY` 和 `JWT_SECRET`；AI Key 本身不要放入该文件或仓库 `.env`，仍只在
+`/settings` 输入一次。数据库密文与原 `ENCRYPTION_KEY` 必须成对保留；任一丢失都不能解密旧 Key。
 - 失败不覆盖教师原输入；教师可编辑 AI 结果。
 - 视觉任务发送最少必要的幼儿数据。
 
 自动测试使用 `httpx.MockTransport` 或 mock 边界，不调用真实 AI；F009 人工真实模型验收遵守下述独立门禁。
 
-### 6.1 受控 Agent Foundation（F005-F009 已固定 GREEN）
+### 6.2 受控 Agent Foundation（F005-F009 已固定 GREEN）
 
 实现前必须阅读 [ADR-0005](ADR/ADR-0005-controlled-ai-agent-runtime.md) 和
 [Agent Runtime 设计](design/agent-runtime.md)。规划依赖方向为：

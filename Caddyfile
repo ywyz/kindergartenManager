@@ -1,16 +1,12 @@
 # Caddyfile — 反向代理配置
 #
-# 开发模式（IP + HTTP）：使用下面的 :80 配置
-# 生产模式（域名 + HTTPS）：将 :80 替换为你的域名，如 kindergarten.example.com
+# 默认 Compose 仅支持配置了公网域名的 HTTPS 生产入口。
+# CADDY_DOMAIN 必须在 .env 中显式设置为已解析到本机的域名。
+# 本地开发请使用 docker-compose.dev.yml 直接访问应用端口，不启动 Caddy。
 #
 # Caddy 会自动为域名申请 Let's Encrypt 证书并续期。
 
-:80 {
+https://{$CADDY_DOMAIN} {
 	# 主系统反向代理
 	reverse_proxy app:8080
 }
-
-# ── 生产模式示例（取消注释并替换域名）────────────────────────
-# kindergarten.example.com {
-# 	reverse_proxy app:8080
-# }

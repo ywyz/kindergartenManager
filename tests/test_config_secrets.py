@@ -231,6 +231,126 @@ def _make_settings(**env_overrides):
         os.environ.update(old_env)
 
 
+def test_settings_reads_env_file_from_explicit_data_dir(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """显式数据目录下的 .env 必须同时成为 Settings 的配置来源。"""
+    from app.core import config as config_mod
+    from app.core import env_writer
+
+    working_dir = tmp_path / "source-cwd"
+    data_dir = tmp_path / "runtime-data"
+    working_dir.mkdir()
+    monkeypatch.chdir(working_dir)
+    monkeypatch.setenv("KINDERGARTEN_DATA_DIR", str(data_dir))
+    monkeypatch.delenv("PORT", raising=False)
+    monkeypatch.delenv("LOG_LEVEL", raising=False)
+    monkeypatch.setenv("ENCRYPTION_KEY", _ENVIRONMENT_ENCRYPTION_KEY)
+    monkeypatch.setenv("JWT_SECRET", _ENVIRONMENT_JWT_SECRET)
+
+    (working_dir / ".env").write_text(
+        "PORT=41000\nLOG_LEVEL=WARNING\n",
+        encoding="utf-8",
+    )
+    env_writer.write_dot_env({"PORT": "49173", "LOG_LEVEL": "DEBUG"})
+    env_path = data_dir / ".env"
+    assert env_writer.get_env_path() == env_path
+
+    settings = config_mod.Settings()
+
+    assert settings.PORT == 49173
+    assert settings.LOG_LEVEL == "DEBUG"
+
+    monkeypatch.setenv("PORT", "49174")
+    overridden = config_mod.Settings()
+    assert overridden.PORT == 49174
+    assert overridden.LOG_LEVEL == "DEBUG"
+
+
+def test_settings_rejects_symlinked_env_in_explicit_data_dir(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Settings 不得绕过 env_writer 的非跟随校验读取 symlink 配置。"""
+    if os.name != "posix":
+        pytest.skip("POSIX symlink contract")
+
+    from app.core import config as config_mod
+
+    data_dir = tmp_path / "runtime-data"
+    data_dir.mkdir(mode=0o700)
+    victim = tmp_path / "untrusted.env"
+    victim.write_text("PORT=49175\n", encoding="utf-8")
+    (data_dir / ".env").symlink_to(victim)
+    monkeypatch.setenv("KINDERGARTEN_DATA_DIR", str(data_dir))
+    monkeypatch.setenv("ENCRYPTION_KEY", _ENVIRONMENT_ENCRYPTION_KEY)
+    monkeypatch.setenv("JWT_SECRET", _ENVIRONMENT_JWT_SECRET)
+
+    with pytest.raises(RuntimeError, match="配置文件"):
+        config_mod.Settings()
+
+
+def test_settings_loads_the_same_secure_env_snapshot_after_path_swap(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """安全读取后路径被替换时，Settings 不得二次按路径打开攻击者文件。"""
+    if os.name != "posix":
+        pytest.skip("POSIX path-swap contract")
+
+    from app.core import config as config_mod
+    from app.core import env_writer
+
+    data_dir = tmp_path / "runtime-data"
+    data_dir.mkdir(mode=0o700)
+    env_path = data_dir / ".env"
+    env_path.write_text("PORT=49173\n", encoding="utf-8")
+    attacker_file = tmp_path / "attacker.env"
+    attacker_file.write_text("PORT=49175\n", encoding="utf-8")
+    monkeypatch.setenv("KINDERGARTEN_DATA_DIR", str(data_dir))
+    monkeypatch.setenv("ENCRYPTION_KEY", _ENVIRONMENT_ENCRYPTION_KEY)
+    monkeypatch.setenv("JWT_SECRET", _ENVIRONMENT_JWT_SECRET)
+    monkeypatch.delenv("PORT", raising=False)
+
+    secure_read = env_writer._read_posix_text
+
+    def _read_then_swap(path: Path) -> str | None:
+        snapshot = secure_read(path)
+        path.unlink()
+        path.symlink_to(attacker_file)
+        return snapshot
+
+    monkeypatch.setattr(env_writer, "_read_posix_text", _read_then_swap)
+
+    settings = config_mod.Settings()
+
+    assert settings.PORT == 49173
+
+
+def test_settings_preserves_subclass_explicit_env_file(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """显式 subclass dotenv source 不得被应用默认数据目录覆盖。"""
+    from pydantic_settings import SettingsConfigDict
+
+    from app.core import config as config_mod
+
+    custom_env = tmp_path / "custom.env"
+    custom_env.write_text("PORT=49176\n", encoding="utf-8")
+    data_dir = tmp_path / "runtime-data"
+    monkeypatch.setenv("KINDERGARTEN_DATA_DIR", str(data_dir))
+    monkeypatch.setenv("ENCRYPTION_KEY", _ENVIRONMENT_ENCRYPTION_KEY)
+    monkeypatch.setenv("JWT_SECRET", _ENVIRONMENT_JWT_SECRET)
+    monkeypatch.delenv("PORT", raising=False)
+
+    class _CustomEnvSettings(config_mod.Settings):
+        model_config = SettingsConfigDict(
+            env_file=custom_env,
+            env_file_encoding="utf-8",
+            extra="ignore",
+        )
+
+    assert _CustomEnvSettings().PORT == 49176
+
+
 def _assert_non_posix_regular_file_contract(tmp_path, monkeypatch) -> None:
     """只验证跨平台功能，不把 POSIX mode 当作 Windows DACL 证据。"""
     secrets_path = tmp_path / ".kindergarten_secrets"

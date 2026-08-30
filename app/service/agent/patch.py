@@ -106,6 +106,30 @@ class PlanPatch:
     canonical_sha256: str
 
 
+def _canonical_plan_patch_payload(
+    *,
+    schema_version: int,
+    operation_id: UUID,
+    turn_id: UUID,
+    tool_name: str,
+    target: PlanPatchTarget,
+    base_fingerprint: str,
+    operations: tuple[PatchOperation, ...],
+    warnings: tuple[str, ...],
+) -> dict[str, object]:
+    """Return the single authoritative payload covered by a PlanPatch hash."""
+    return {
+        "schema_version": schema_version,
+        "operation_id": operation_id,
+        "turn_id": turn_id,
+        "tool_name": tool_name,
+        "target": target,
+        "base_fingerprint": base_fingerprint,
+        "operations": operations,
+        "warnings": warnings,
+    }
+
+
 def _reject(code: str) -> None:
     raise PlanPatchRejected(code)
 
@@ -262,16 +286,16 @@ def build_plan_patch(
     tool_paths = _validate_tool(context, proposal.tool_name)
     operations = _normalize_operations(proposal, sections, tool_paths)
     warnings = _normalize_warnings(proposal.warnings)
-    canonical_payload = {
-        "schema_version": PATCH_SCHEMA_VERSION,
-        "operation_id": proposal.operation_id,
-        "turn_id": proposal.turn_id,
-        "tool_name": proposal.tool_name,
-        "target": target,
-        "base_fingerprint": proposal.base_fingerprint,
-        "operations": operations,
-        "warnings": warnings,
-    }
+    canonical_payload = _canonical_plan_patch_payload(
+        schema_version=PATCH_SCHEMA_VERSION,
+        operation_id=proposal.operation_id,
+        turn_id=proposal.turn_id,
+        tool_name=proposal.tool_name,
+        target=target,
+        base_fingerprint=proposal.base_fingerprint,
+        operations=operations,
+        warnings=warnings,
+    )
     return PlanPatch(
         patch_id=uuid4(),
         schema_version=PATCH_SCHEMA_VERSION,
@@ -365,6 +389,94 @@ def build_plan_patch_from_arguments(
         raise
     except (TypeError, ValueError):
         _reject("proposal_invalid")
+
+
+def _plan_patch_is_canonical(value: object) -> bool:
+    if type(value) is not PlanPatch:
+        return False
+    if (
+        type(value.patch_id) is not UUID
+        or type(value.schema_version) is not int
+        or value.schema_version != PATCH_SCHEMA_VERSION
+        or type(value.operation_id) is not UUID
+        or type(value.turn_id) is not UUID
+        or type(value.tool_name) is not str
+        or len(value.tool_name) > MAX_TOOL_METADATA_LENGTH
+        or type(value.target) is not PlanPatchTarget
+        or type(value.target.daily_plan_id) is not int
+        or not 0 < value.target.daily_plan_id <= MAX_TOOL_ID
+        or type(value.target.plan_date) is not date
+        or type(value.base_fingerprint) is not str
+        or _SHA256_PATTERN.fullmatch(value.base_fingerprint) is None
+        or type(value.operations) is not tuple
+        or not value.operations
+        or len(value.operations) > len(ALLOWED_PLAN_PATCH_PATHS)
+        or type(value.warnings) is not tuple
+        or len(value.warnings) > MAX_PATCH_WARNINGS
+        or type(value.canonical_sha256) is not str
+        or _SHA256_PATTERN.fullmatch(value.canonical_sha256) is None
+    ):
+        return False
+
+    if value.tool_name == "daily_plan.draft_section_patch":
+        allowed_paths = SECTION_PATCH_PATHS
+    elif value.tool_name == "daily_plan.draft_reflection_patch":
+        allowed_paths = REFLECTION_PATCH_PATHS
+    else:
+        return False
+
+    paths: list[str] = []
+    for operation in value.operations:
+        if (
+            type(operation) is not PatchOperation
+            or type(operation.field_path) is not str
+            or operation.field_path not in allowed_paths
+            or type(operation.before_sha256) is not str
+            or _SHA256_PATTERN.fullmatch(operation.before_sha256) is None
+            or type(operation.before_display) is not str
+            or len(operation.before_display) > MAX_PATCH_VALUE_LENGTH
+            or operation.before_sha256 != canonical_sha256(operation.before_display)
+            or type(operation.after_value) is not str
+            or len(operation.after_value) > MAX_PATCH_VALUE_LENGTH
+            or type(operation.after_display) is not str
+            or len(operation.after_display) > MAX_PATCH_VALUE_LENGTH
+            or operation.after_display != operation.after_value
+        ):
+            return False
+        paths.append(operation.field_path)
+    if paths != sorted(paths) or len(paths) != len(set(paths)):
+        return False
+
+    if any(
+        type(warning) is not str
+        or warning != warning.strip()
+        or not warning
+        or len(warning) > MAX_PATCH_WARNING_LENGTH
+        for warning in value.warnings
+    ):
+        return False
+    if value.warnings != tuple(sorted(set(value.warnings))):
+        return False
+
+    canonical_payload = _canonical_plan_patch_payload(
+        schema_version=value.schema_version,
+        operation_id=value.operation_id,
+        turn_id=value.turn_id,
+        tool_name=value.tool_name,
+        target=value.target,
+        base_fingerprint=value.base_fingerprint,
+        operations=value.operations,
+        warnings=value.warnings,
+    )
+    return value.canonical_sha256 == canonical_sha256(canonical_payload)
+
+
+def plan_patch_is_canonical(value: object) -> bool:
+    """Verify every canonical field and fail closed for malformed exact types."""
+    try:
+        return _plan_patch_is_canonical(value)
+    except Exception:
+        return False
 
 
 def plan_patch_matches_expected(*, actual: object, expected: PlanPatch) -> bool:

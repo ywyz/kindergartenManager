@@ -84,6 +84,12 @@ FORBIDDEN_AGENT_SCHEMA_TERMS = frozenset(
         "plan_patch",
     }
 )
+AUTHORIZED_AGENT_WRITE_EVIDENCE_TABLES = frozenset(
+    {
+        "daily_plan_operation_version",
+        "agent_write_audit",
+    }
+)
 
 
 def _canonical_scalar(value: object) -> object:
@@ -1361,9 +1367,21 @@ async def test_restart_after_draft_has_fresh_ids_history_and_no_agent_schema(
     )
     assert len(fresh_request.messages) == 1
 
-    names = _table_names(await effect_environment.snapshot())
+    snapshot = await effect_environment.snapshot()
+    names = _table_names(snapshot)
     for term in FORBIDDEN_AGENT_SCHEMA_TERMS:
         assert _is_forbidden_agent_schema_name(f"foundation_{term}")
-    assert not any(_is_forbidden_agent_schema_name(name) for name in names)
+    assert AUTHORIZED_AGENT_WRITE_EVIDENCE_TABLES <= names
+    assert not any(
+        _is_forbidden_agent_schema_name(name)
+        for name in names - AUTHORIZED_AGENT_WRITE_EVIDENCE_TABLES
+    )
+    rows_by_table = {
+        table_name: rows for table_name, _columns, rows in snapshot.database
+    }
+    assert all(
+        rows_by_table[table_name] == ()
+        for table_name in AUTHORIZED_AGENT_WRITE_EVIDENCE_TABLES
+    )
     assert not _is_forbidden_agent_schema_name("alembic_version")
     assert not _is_forbidden_agent_schema_name("external_state_probe")

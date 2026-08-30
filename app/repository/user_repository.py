@@ -2,7 +2,8 @@
 
 所有查询必须携带 tenant_id 过滤条件，确保多租户数据隔离。
 """
-from sqlalchemy import func, select, update
+
+from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models.user import User, UserRole
@@ -49,14 +50,35 @@ async def get_user_by_id(
     session: AsyncSession,
     tenant_id: int,
     user_id: int,
+    *,
+    for_update: bool = False,
 ) -> User | None:
-    """在指定租户下按 ID 查询用户，不存在时返回 None。"""
-    result = await session.execute(
-        select(User).where(
-            User.tenant_id == tenant_id,
-            User.id == user_id,
+    """在指定租户下按 ID 查询用户；写授权可锁定该 actor 行。"""
+    dialect_name = session.get_bind().dialect.name
+    if for_update and dialect_name == "sqlite":
+        # SQLite has no row-level ``FOR UPDATE``.  A no-op write upgrades either
+        # a fresh or an already autobegun transaction to the database write
+        # lock without changing ORM-managed timestamps.  The following SELECT
+        # then refreshes the exact actor from that same locked transaction.
+        await session.execute(
+            text(
+                'UPDATE "user" SET id = id '
+                "WHERE tenant_id = :tenant_id AND id = :user_id"
+            ),
+            {"tenant_id": tenant_id, "user_id": user_id},
         )
+
+    statement = select(User).where(
+        User.tenant_id == tenant_id,
+        User.id == user_id,
     )
+    if for_update and dialect_name != "sqlite":
+        statement = statement.with_for_update().execution_options(
+            populate_existing=True
+        )
+    elif for_update:
+        statement = statement.execution_options(populate_existing=True)
+    result = await session.execute(statement)
     return result.scalar_one_or_none()
 
 
@@ -65,15 +87,24 @@ async def update_password(
     tenant_id: int,
     user_id: int,
     new_hashed_password: str,
+    *,
+    is_active: bool | None = None,
 ) -> bool:
-    """在指定租户中更新用户哈希密码，返回是否更新成功。"""
+    """原子更新密码与凭据版本；恢复场景可同时激活账号。"""
+    values: dict[str, object] = {
+        "hashed_password": new_hashed_password,
+        "auth_epoch": User.auth_epoch + 1,
+    }
+    if is_active is not None:
+        values["is_active"] = is_active
+
     result = await session.execute(
         update(User)
         .where(
             User.tenant_id == tenant_id,
             User.id == user_id,
         )
-        .values(hashed_password=new_hashed_password)
+        .values(**values)
     )
     await session.commit()
     return bool(result.rowcount)
@@ -85,20 +116,21 @@ async def list_users_by_tenant(
 ) -> list[User]:
     """返回指定租户下的用户列表（按创建时间倒序）。"""
     result = await session.execute(
-        select(User)
-        .where(User.tenant_id == tenant_id)
-        .order_by(User.created_at.desc())
+        select(User).where(User.tenant_id == tenant_id).order_by(User.created_at.desc())
     )
     return list(result.scalars().all())
 
 
-async def has_any_user(
-    session: AsyncSession,
-    tenant_id: int,
-) -> bool:
-    """检查指定租户是否已有任意用户，用于判断注册者是否是第一个用户。"""
+async def has_active_sys_admin(session: AsyncSession, tenant_id: int) -> bool:
+    """检查租户是否已有可登录的系统管理员。"""
     result = await session.execute(
-        select(func.count()).select_from(User).where(User.tenant_id == tenant_id)
+        select(func.count())
+        .select_from(User)
+        .where(
+            User.tenant_id == tenant_id,
+            User.role == UserRole.sys_admin,
+            User.is_active.is_(True),
+        )
     )
     return (result.scalar_one() or 0) > 0
 
@@ -109,14 +141,17 @@ async def update_user_active(
     user_id: int,
     is_active: bool,
 ) -> bool:
-    """在指定租户中更新用户启停状态，返回是否更新成功。"""
+    """更新启停状态并递增认证世代，返回是否更新成功。"""
     result = await session.execute(
         update(User)
         .where(
             User.tenant_id == tenant_id,
             User.id == user_id,
         )
-        .values(is_active=is_active)
+        .values(
+            is_active=is_active,
+            auth_epoch=User.auth_epoch + 1,
+        )
     )
     await session.commit()
     return bool(result.rowcount)

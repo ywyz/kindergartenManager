@@ -1,4 +1,5 @@
 """JWT 工具单元测试。"""
+
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -20,12 +21,18 @@ LEGACY_PYTHON_JOSE_TOKEN = (
 
 def test_create_and_decode_returns_correct_fields():
     """正常 token 可成功解码并取回 user_id、tenant_id、role。"""
-    token = create_access_token(user_id=42, tenant_id=1, role="teacher")
+    token = create_access_token(
+        user_id=42,
+        tenant_id=1,
+        role="teacher",
+        auth_epoch=1,
+    )
     payload = decode_access_token(token)
 
     assert payload["sub"] == "42"
     assert payload["tenant_id"] == 1
     assert payload["role"] == "teacher"
+    assert payload["auth_epoch"] == 1
 
 
 def test_legacy_python_jose_hs256_token_remains_valid(monkeypatch):
@@ -46,7 +53,12 @@ def test_legacy_python_jose_hs256_token_remains_valid(monkeypatch):
 
 def test_tampered_signature_raises_auth_error():
     """篡改签名的 token 解码时抛出 AuthError。"""
-    token = create_access_token(user_id=1, tenant_id=1, role="teacher")
+    token = create_access_token(
+        user_id=1,
+        tenant_id=1,
+        role="teacher",
+        auth_epoch=1,
+    )
     # 在末尾加一个字符破坏签名
     tampered = token + "x"
     with pytest.raises(AuthError):
@@ -87,6 +99,11 @@ def test_expired_token_raises_auth_error():
 def test_all_roles_are_encodable():
     """三种角色都能正常生成并解码 token。"""
     for role in ("teacher", "teaching_admin", "sys_admin"):
-        token = create_access_token(user_id=1, tenant_id=1, role=role)
+        token = create_access_token(
+            user_id=1,
+            tenant_id=1,
+            role=role,
+            auth_epoch=1,
+        )
         payload = decode_access_token(token)
         assert payload["role"] == role

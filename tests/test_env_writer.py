@@ -4,6 +4,9 @@
 - read_dot_env()：文件不存在返回 {}；解析 key=value；忽略注释和空行
 - write_dot_env()：创建文件；更新已有 key；保留其他 key；异常时抛出 RuntimeError
 """
+
+import os
+import stat
 from pathlib import Path
 from unittest.mock import patch
 
@@ -15,6 +18,7 @@ class TestReadDotEnv:
         env_file = tmp_path / ".env"
         with patch("app.core.env_writer.get_env_path", return_value=env_file):
             from app.core.env_writer import read_dot_env
+
             assert read_dot_env() == {}
 
     def test_parses_key_value_pairs(self, tmp_path: Path) -> None:
@@ -22,6 +26,7 @@ class TestReadDotEnv:
         env_file.write_text("DATABASE_URL=sqlite:///./db.db\nPORT=8080\n")
         with patch("app.core.env_writer.get_env_path", return_value=env_file):
             from app.core.env_writer import read_dot_env
+
             result = read_dot_env()
         assert result["DATABASE_URL"] == "sqlite:///./db.db"
         assert result["PORT"] == "8080"
@@ -31,6 +36,7 @@ class TestReadDotEnv:
         env_file.write_text("# This is a comment\nFOO=bar\n")
         with patch("app.core.env_writer.get_env_path", return_value=env_file):
             from app.core.env_writer import read_dot_env
+
             result = read_dot_env()
         assert "FOO" in result
         assert len(result) == 1
@@ -40,6 +46,7 @@ class TestReadDotEnv:
         env_file.write_text("\nFOO=bar\n\nBAZ=qux\n")
         with patch("app.core.env_writer.get_env_path", return_value=env_file):
             from app.core.env_writer import read_dot_env
+
             result = read_dot_env()
         assert result == {"FOO": "bar", "BAZ": "qux"}
 
@@ -49,6 +56,7 @@ class TestReadDotEnv:
         env_file.write_text("URL=mysql://user:pass@host/db?option=1\n")
         with patch("app.core.env_writer.get_env_path", return_value=env_file):
             from app.core.env_writer import read_dot_env
+
             result = read_dot_env()
         assert result["URL"] == "mysql://user:pass@host/db?option=1"
 
@@ -58,6 +66,7 @@ class TestWriteDotEnv:
         env_file = tmp_path / ".env"
         with patch("app.core.env_writer.get_env_path", return_value=env_file):
             from app.core.env_writer import write_dot_env
+
             write_dot_env({"PORT": "9090"})
         assert env_file.exists()
         assert "PORT=9090" in env_file.read_text()
@@ -67,6 +76,7 @@ class TestWriteDotEnv:
         env_file.write_text("PORT=8080\n")
         with patch("app.core.env_writer.get_env_path", return_value=env_file):
             from app.core.env_writer import write_dot_env
+
             write_dot_env({"PORT": "9090"})
         assert "PORT=9090" in env_file.read_text()
         assert "PORT=8080" not in env_file.read_text()
@@ -76,6 +86,7 @@ class TestWriteDotEnv:
         env_file.write_text("DATABASE_URL=sqlite:///./db.db\nPORT=8080\n")
         with patch("app.core.env_writer.get_env_path", return_value=env_file):
             from app.core.env_writer import write_dot_env
+
             write_dot_env({"PORT": "9090"})
         content = env_file.read_text()
         assert "DATABASE_URL=sqlite:///./db.db" in content
@@ -86,6 +97,7 @@ class TestWriteDotEnv:
         env_file.write_text("PORT=8080\n")
         with patch("app.core.env_writer.get_env_path", return_value=env_file):
             from app.core.env_writer import write_dot_env
+
             write_dot_env({"DATABASE_URL": "sqlite:///./new.db"})
         content = env_file.read_text()
         assert "DATABASE_URL=sqlite:///./new.db" in content
@@ -95,5 +107,31 @@ class TestWriteDotEnv:
         env_file = tmp_path / "no_such_dir" / ".env"
         with patch("app.core.env_writer.get_env_path", return_value=env_file):
             from app.core.env_writer import write_dot_env
+
             with pytest.raises(RuntimeError, match="无法写入配置文件"):
                 write_dot_env({"PORT": "9090"})
+
+    def test_posix_atomic_replace_fsyncs_the_parent_directory(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        """文件 fsync 后还必须持久化原子替换的目录项。"""
+        if os.name != "posix":
+            pytest.skip("POSIX durability contract")
+
+        from app.core import env_writer
+
+        env_file = tmp_path / ".env"
+        real_fsync = os.fsync
+        fsynced_directory = False
+
+        def _record_fsync(fd: int) -> None:
+            nonlocal fsynced_directory
+            if stat.S_ISDIR(os.fstat(fd).st_mode):
+                fsynced_directory = True
+            real_fsync(fd)
+
+        monkeypatch.setattr(env_writer.os, "fsync", _record_fsync)
+        with patch("app.core.env_writer.get_env_path", return_value=env_file):
+            env_writer.write_dot_env({"PORT": "9090"})
+
+        assert fsynced_directory is True

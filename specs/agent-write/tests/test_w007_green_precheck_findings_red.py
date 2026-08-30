@@ -1,0 +1,1318 @@
+"""Stable RED for findings found while prechecking the W007 GREEN repair."""
+
+from __future__ import annotations
+
+import asyncio
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import timedelta
+import gc
+import weakref
+from uuid import UUID
+
+import pytest
+
+from app.service.agent.composition import DailyPlanAgentController
+from app.service.agent.confirmed_write import (
+    ConfirmedDailyPlanWriteResult,
+    ConfirmedWriteRejected,
+    PendingPlanPatchConfirmation,
+)
+from app.service.agent.confirmation_flow import (
+    DailyPlanPatchConfirmationController,
+    PatchConfirmationStatus,
+)
+from app.service.agent.contracts import DailyPlanScope, TrustedActor
+from app.service.agent.patch import PlanPatch
+from app.service.agent.runtime import AgentTurnOutcome, AgentTurnStatus
+
+from conftest import (
+    ACTOR_TENANT_ID,
+    ACTOR_USER_ID,
+    NOW,
+    OPERATION_ID,
+    PLAN_DATE,
+    PLAN_ID,
+    TURN_ID,
+    build_patch,
+    trusted_ui_session,
+)
+
+
+SECOND_OPERATION_ID = UUID("31313131-3131-4131-8131-313131313131")
+SECOND_TURN_ID = UUID("42424242-4242-4242-8242-424242424242")
+
+
+class _WriterCleanupAbort(BaseException):
+    """A non-Exception failure raised only after writer cancellation cleanup."""
+
+
+async def _event_loop_checkpoint() -> None:
+    """Let ready tasks run without introducing timing-based sleeps."""
+    loop = asyncio.get_running_loop()
+    checkpoint = loop.create_future()
+    loop.call_soon(checkpoint.set_result, None)
+    await checkpoint
+
+
+@dataclass(slots=True)
+class _TwoPatchDraftCoordinator:
+    """Publish two canonical Patches through the existing Agent seam."""
+
+    patches: tuple[PlanPatch, PlanPatch]
+
+    async def execute(
+        self,
+        *,
+        owner_id: UUID,
+        actor: TrustedActor,
+        scope: DailyPlanScope,
+        intent: str,
+        scope_reader: Callable[[], DailyPlanScope | None],
+    ) -> AgentTurnOutcome:
+        del owner_id, actor, intent
+        assert scope_reader() == scope
+        return AgentTurnOutcome(
+            status=AgentTurnStatus.DRAFT_READY,
+            assistant_content="同一页面 generation 的两份独立草案。",
+            patches=self.patches,
+        )
+
+    def invalidate(self, owner_id: UUID) -> None:
+        del owner_id
+
+    def plan_changed(self, actor: TrustedActor, scope: DailyPlanScope) -> None:
+        del actor, scope
+
+    async def cancel(self, owner_id: UUID) -> bool:
+        del owner_id
+        return True
+
+
+@dataclass
+class _BlockingRecordingWriter:
+    """Observe only the public writer port, optionally blocking the first issue."""
+
+    block_phase: str | None = None
+    block_call_number: int = 1
+    cancellation_cleanup: bool = False
+    cancellation_outcome: str = "reraise"
+    before_issue_return: Callable[[], None] | None = None
+    apply_error_code: str | None = None
+    reconcile_error_code: str | None = None
+    issue_patch_ids: list[UUID] = field(default_factory=list)
+    apply_confirmation_ids: list[UUID] = field(default_factory=list)
+    reconcile_confirmation_ids: list[UUID] = field(default_factory=list)
+    entered: asyncio.Event = field(default_factory=asyncio.Event)
+    release: asyncio.Event = field(default_factory=asyncio.Event)
+    cleanup_entered: asyncio.Event = field(default_factory=asyncio.Event)
+    cleanup_release: asyncio.Event = field(default_factory=asyncio.Event)
+    cleanup_completed: asyncio.Event = field(default_factory=asyncio.Event)
+    _revision_by_confirmation: dict[UUID, int] = field(
+        default_factory=dict,
+        repr=False,
+    )
+
+    async def _block(self, phase: str, call_number: int) -> None:
+        if self.block_phase != phase or call_number != self.block_call_number:
+            return
+        self.entered.set()
+        try:
+            await self.release.wait()
+        except asyncio.CancelledError:
+            if not self.cancellation_cleanup:
+                raise
+            self.cleanup_entered.set()
+            await self.cleanup_release.wait()
+            self.cleanup_completed.set()
+            if self.cancellation_outcome == "return":
+                return
+            if self.cancellation_outcome == "raise_base_exception":
+                raise _WriterCleanupAbort("writer_cleanup_abort")
+            raise
+
+    async def issue_confirmation(
+        self,
+        ui_session: object,
+        patch: PlanPatch,
+        *,
+        expected_revision: int,
+    ) -> PendingPlanPatchConfirmation:
+        del ui_session
+        self.issue_patch_ids.append(patch.patch_id)
+        issue_number = len(self.issue_patch_ids)
+        confirmation_id = UUID(int=900 + issue_number)
+        self._revision_by_confirmation[confirmation_id] = expected_revision
+        await self._block("issue", issue_number)
+        pending = PendingPlanPatchConfirmation(
+            confirmation_id=confirmation_id,
+            expires_at_utc=NOW + timedelta(minutes=4),
+            daily_plan_id=patch.target.daily_plan_id,
+            expected_revision=expected_revision,
+            patch_id=patch.patch_id,
+            patch_sha256=patch.canonical_sha256,
+            field_paths=tuple(operation.field_path for operation in patch.operations),
+        )
+        if self.before_issue_return is not None:
+            self.before_issue_return()
+        return pending
+
+    async def apply(
+        self,
+        ui_session: object,
+        confirmation_id: UUID,
+    ) -> ConfirmedDailyPlanWriteResult:
+        del ui_session
+        self.apply_confirmation_ids.append(confirmation_id)
+        await self._block("apply", len(self.apply_confirmation_ids))
+        if self.apply_error_code is not None:
+            raise ConfirmedWriteRejected(self.apply_error_code)
+        expected_revision = self._revision_by_confirmation[confirmation_id]
+        return ConfirmedDailyPlanWriteResult(
+            before_version_id=41,
+            audit_id=42,
+            before_revision=expected_revision,
+            after_revision=expected_revision + 1,
+        )
+
+    async def reconcile(
+        self,
+        ui_session: object,
+        confirmation_id: UUID,
+    ) -> ConfirmedDailyPlanWriteResult:
+        del ui_session
+        self.reconcile_confirmation_ids.append(confirmation_id)
+        await self._block("reconcile", len(self.reconcile_confirmation_ids))
+        if self.reconcile_error_code is not None:
+            raise ConfirmedWriteRejected(self.reconcile_error_code)
+        expected_revision = self._revision_by_confirmation[confirmation_id]
+        return ConfirmedDailyPlanWriteResult(
+            before_version_id=41,
+            audit_id=42,
+            before_revision=expected_revision,
+            after_revision=expected_revision + 1,
+        )
+
+
+async def _two_patch_flow(
+    *,
+    block_phase: str | None = None,
+    block_call_number: int = 1,
+    cancellation_cleanup: bool = False,
+    cancellation_outcome: str = "reraise",
+) -> tuple[
+    DailyPlanPatchConfirmationController,
+    _BlockingRecordingWriter,
+    DailyPlanAgentController,
+    PlanPatch,
+    PlanPatch,
+]:
+    patch_a = build_patch(
+        operation_id=OPERATION_ID,
+        turn_id=TURN_ID,
+        after_goal="W007 precheck 草案 A",
+    )
+    patch_b = build_patch(
+        operation_id=SECOND_OPERATION_ID,
+        turn_id=SECOND_TURN_ID,
+        after_goal="W007 precheck 草案 B",
+    )
+    assert patch_a.patch_id != patch_b.patch_id
+    agent = DailyPlanAgentController(
+        coordinator=_TwoPatchDraftCoordinator((patch_a, patch_b)),  # type: ignore[arg-type]
+        actor=TrustedActor(
+            tenant_id=ACTOR_TENANT_ID,
+            user_id=ACTOR_USER_ID,
+        ),
+    )
+    agent.scope_changed(PLAN_DATE)
+    panel = await agent.run("生成两份只能逐次确认的当前页面草案")
+    assert panel.status.value == AgentTurnStatus.DRAFT_READY.value
+    assert tuple(item.patch_id for item in panel.patches) == (
+        patch_a.patch_id,
+        patch_b.patch_id,
+    )
+    writer = _BlockingRecordingWriter(
+        block_phase=block_phase,
+        block_call_number=block_call_number,
+        cancellation_cleanup=cancellation_cleanup,
+        cancellation_outcome=cancellation_outcome,
+    )
+    return (
+        DailyPlanPatchConfirmationController(
+            agent_controller=agent,
+            write_service=writer,
+        ),
+        writer,
+        agent,
+        patch_a,
+        patch_b,
+    )
+
+
+async def _task_outcome(task: asyncio.Task[object]) -> tuple[str, object | None]:
+    try:
+        return ("result", await task)
+    except asyncio.CancelledError:
+        return ("cancelled", None)
+    except BaseException as error:
+        return ("base_exception", error)
+
+
+@pytest.mark.asyncio
+async def test_concurrent_b_issue_cannot_steal_or_discard_blocked_a_issue() -> None:
+    """A's flight remains authoritative and cannot create writer A,B,A."""
+    flow, writer, _agent, patch_a, patch_b = await _two_patch_flow(
+        block_phase="issue",
+    )
+    ui_session = trusted_ui_session()
+    issue_a_task = asyncio.create_task(
+        flow.issue(
+            ui_session,
+            patch_a.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+    )
+    await writer.entered.wait()
+
+    a_inflight_snapshot = flow.snapshot
+    issue_b_task = asyncio.create_task(
+        flow.issue(
+            ui_session,
+            patch_b.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+    )
+    await _event_loop_checkpoint()
+    snapshot_after_b_probe = flow.snapshot
+    writer.release.set()
+    a_pending, b_during_a = await asyncio.gather(issue_a_task, issue_b_task)
+
+    a_terminal = await flow.apply(ui_session)
+    b_pending = await flow.issue(
+        ui_session,
+        patch_b.patch_id,
+        expected_plan_id=PLAN_ID,
+        expected_revision=1,
+    )
+    b_terminal = await flow.apply(ui_session)
+    a_revisited = await flow.issue(
+        ui_session,
+        patch_a.patch_id,
+        expected_plan_id=PLAN_ID,
+        expected_revision=1,
+    )
+
+    assert {
+        "b_probe_kept_a_identity": (
+            b_during_a.patch_id,
+            b_during_a.patch_sha256,
+        ),
+        "public_snapshot_did_not_switch": snapshot_after_b_probe == a_inflight_snapshot,
+        "a_pending": (
+            a_pending.status,
+            a_pending.patch_id,
+            a_pending.patch_sha256,
+        ),
+        "a_terminal": (a_terminal.status, a_terminal.patch_id),
+        "b_pending": (b_pending.status, b_pending.patch_id),
+        "b_terminal": (b_terminal.status, b_terminal.patch_id),
+        "a_revisited": (a_revisited.status, a_revisited.patch_id),
+        "writer_issue_order": tuple(writer.issue_patch_ids),
+        "writer_apply_count": len(writer.apply_confirmation_ids),
+    } == {
+        "b_probe_kept_a_identity": (
+            patch_a.patch_id,
+            patch_a.canonical_sha256,
+        ),
+        "public_snapshot_did_not_switch": True,
+        "a_pending": (
+            PatchConfirmationStatus.PENDING,
+            patch_a.patch_id,
+            patch_a.canonical_sha256,
+        ),
+        "a_terminal": (PatchConfirmationStatus.APPLIED, patch_a.patch_id),
+        "b_pending": (PatchConfirmationStatus.PENDING, patch_b.patch_id),
+        "b_terminal": (PatchConfirmationStatus.APPLIED, patch_b.patch_id),
+        "a_revisited": (PatchConfirmationStatus.APPLIED, patch_a.patch_id),
+        "writer_issue_order": (patch_a.patch_id, patch_b.patch_id),
+        "writer_apply_count": 2,
+    }
+
+
+@pytest.mark.parametrize(
+    ("first_expected_plan_id", "first_expected_revision"),
+    [
+        pytest.param(PLAN_ID + 1, 1, id="wrong-plan"),
+        pytest.param(PLAN_ID, 0, id="invalid-revision"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_first_invalid_issue_is_exact_terminal_a_and_cannot_be_reissued(
+    first_expected_plan_id: int,
+    first_expected_revision: int,
+) -> None:
+    """An invalid first issue closes the exact canonical Patch identity."""
+    flow, writer, _agent, patch_a, _patch_b = await _two_patch_flow()
+    ui_session = trusted_ui_session()
+
+    first = await flow.issue(
+        ui_session,
+        patch_a.patch_id,
+        expected_plan_id=first_expected_plan_id,
+        expected_revision=first_expected_revision,
+    )
+    repeated_with_correct_parameters = await flow.issue(
+        ui_session,
+        patch_a.patch_id,
+        expected_plan_id=PLAN_ID,
+        expected_revision=1,
+    )
+
+    assert {
+        "first_status": first.status,
+        "first_identity": (first.patch_id, first.patch_sha256),
+        "first_error": first.error_code,
+        "correct_parameters_kept_same_terminal": repeated_with_correct_parameters
+        == first,
+        "writer_issue_patch_ids": tuple(writer.issue_patch_ids),
+    } == {
+        "first_status": PatchConfirmationStatus.STALE,
+        "first_identity": (patch_a.patch_id, patch_a.canonical_sha256),
+        "first_error": "target_mismatch",
+        "correct_parameters_kept_same_terminal": True,
+        "writer_issue_patch_ids": (),
+    }
+
+
+@pytest.mark.parametrize("lifecycle_method", ["close", "disconnect"])
+@pytest.mark.asyncio
+async def test_closed_page_releases_patch_and_confirmation_capability_owners(
+    lifecycle_method: str,
+) -> None:
+    """Page shutdown releases sensitive Patch and confirmation ownership."""
+    flow, writer, agent, patch_a, _patch_b = await _two_patch_flow()
+    ui_session = trusted_ui_session()
+    pending = await flow.issue(
+        ui_session,
+        patch_a.patch_id,
+        expected_plan_id=PLAN_ID,
+        expected_revision=1,
+    )
+    assert pending.status is PatchConfirmationStatus.PENDING
+
+    writer.apply_error_code = "commit_outcome_unknown"
+    indeterminate = await flow.apply(ui_session)
+    assert indeterminate.status is PatchConfirmationStatus.INDETERMINATE
+    writer.reconcile_error_code = "reconcile_integrity_failure"
+    integrity_terminal = await flow.reconcile(ui_session)
+    assert integrity_terminal.status is PatchConfirmationStatus.FAILED
+    assert integrity_terminal.error_code == "reconcile_integrity_failure"
+
+    patch_capability_owner = weakref.ref(agent)
+    confirmation_capability_owner = weakref.ref(writer)
+    closed = await getattr(flow, lifecycle_method)()
+    del agent, writer
+    await _event_loop_checkpoint()
+    gc.collect()
+
+    assert {
+        "closed_status": closed.status,
+        "closed_patch_id": closed.patch_id,
+        "closed_patch_sha256": closed.patch_sha256,
+        "patch_capability_owner_retained": patch_capability_owner() is not None,
+        "confirmation_capability_owner_retained": (
+            confirmation_capability_owner() is not None
+        ),
+    } == {
+        "closed_status": PatchConfirmationStatus.CLOSED,
+        "closed_patch_id": None,
+        "closed_patch_sha256": None,
+        "patch_capability_owner_retained": False,
+        "confirmation_capability_owner_retained": False,
+    }
+
+
+@pytest.mark.parametrize("phase", ["issue", "apply"])
+@pytest.mark.asyncio
+async def test_same_key_joiner_cancellation_does_not_cancel_owner_flight(
+    phase: str,
+) -> None:
+    """A cancelled joiner cannot cancel the same-key owner's inner operation."""
+    flow, writer, _agent, patch_a, _patch_b = await _two_patch_flow(
+        block_phase=phase,
+    )
+    ui_session = trusted_ui_session()
+    if phase == "apply":
+        pending = await flow.issue(
+            ui_session,
+            patch_a.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+        assert pending.status is PatchConfirmationStatus.PENDING
+
+    async def invoke() -> object:
+        if phase == "issue":
+            return await flow.issue(
+                ui_session,
+                patch_a.patch_id,
+                expected_plan_id=PLAN_ID,
+                expected_revision=1,
+            )
+        return await flow.apply(ui_session)
+
+    owner_task = asyncio.create_task(invoke())
+    await writer.entered.wait()
+    joiner_started = asyncio.Event()
+
+    async def join_owner_flight() -> object:
+        joiner_started.set()
+        return await invoke()
+
+    joiner_task = asyncio.create_task(join_owner_flight())
+    await joiner_started.wait()
+    await _event_loop_checkpoint()
+    joiner_task.cancel()
+    joiner_outcome = await _task_outcome(joiner_task)
+    await _event_loop_checkpoint()
+    owner_done_before_release = owner_task.done()
+    writer.release.set()
+    owner_outcome = await _task_outcome(owner_task)
+    owner_result = owner_outcome[1]
+    expected_status = (
+        PatchConfirmationStatus.PENDING
+        if phase == "issue"
+        else PatchConfirmationStatus.APPLIED
+    )
+    phase_call_count = (
+        len(writer.issue_patch_ids)
+        if phase == "issue"
+        else len(writer.apply_confirmation_ids)
+    )
+
+    assert {
+        "joiner_outcome": joiner_outcome[0],
+        "owner_done_before_release": owner_done_before_release,
+        "owner_outcome": owner_outcome[0],
+        "owner_status": getattr(owner_result, "status", None),
+        "owner_patch_id": getattr(owner_result, "patch_id", None),
+        "writer_phase_call_count": phase_call_count,
+        "controller_matches_owner": (
+            owner_result is not None and flow.snapshot == owner_result
+        ),
+    } == {
+        "joiner_outcome": "cancelled",
+        "owner_done_before_release": False,
+        "owner_outcome": "result",
+        "owner_status": expected_status,
+        "owner_patch_id": patch_a.patch_id,
+        "writer_phase_call_count": 1,
+        "controller_matches_owner": True,
+    }
+
+
+@pytest.mark.parametrize("lifecycle_method", ["close", "disconnect"])
+@pytest.mark.asyncio
+async def test_cancelled_shutdown_waits_for_inner_cleanup_and_releases_capabilities(
+    lifecycle_method: str,
+) -> None:
+    """Shutdown cancellation propagates only after mandatory cleanup finishes."""
+    flow, writer, agent, patch_a, patch_b = await _two_patch_flow(
+        block_phase="issue",
+        block_call_number=2,
+        cancellation_cleanup=True,
+    )
+    ui_session = trusted_ui_session()
+
+    pending_a = await flow.issue(
+        ui_session,
+        patch_a.patch_id,
+        expected_plan_id=PLAN_ID,
+        expected_revision=1,
+    )
+    assert pending_a.status is PatchConfirmationStatus.PENDING
+    terminal_a = await flow.apply(ui_session)
+    assert terminal_a.status is PatchConfirmationStatus.APPLIED
+
+    owner_task = asyncio.create_task(
+        flow.issue(
+            ui_session,
+            patch_b.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+    )
+    await writer.entered.wait()
+    patch_capability_owner = weakref.ref(agent)
+    confirmation_capability_owner = weakref.ref(writer)
+    cleanup_completed = writer.cleanup_completed
+
+    shutdown_task = asyncio.create_task(getattr(flow, lifecycle_method)())
+    await writer.cleanup_entered.wait()
+    shutdown_task.cancel()
+    await _event_loop_checkpoint()
+    await _event_loop_checkpoint()
+    shutdown_done_before_cleanup_release = shutdown_task.done()
+    writer.cleanup_release.set()
+    shutdown_outcome = await _task_outcome(shutdown_task)
+    owner_outcome = await _task_outcome(owner_task)
+    repeated_close = await flow.close()
+
+    del agent, writer, owner_task, shutdown_task
+    await _event_loop_checkpoint()
+    gc.collect()
+
+    assert {
+        "shutdown_done_before_cleanup_release": (shutdown_done_before_cleanup_release),
+        "shutdown_outcome": shutdown_outcome[0],
+        "inner_cleanup_completed": cleanup_completed.is_set(),
+        "owner_outcome": owner_outcome[0],
+        "owner_status": getattr(owner_outcome[1], "status", None),
+        "repeated_close_status": repeated_close.status,
+        "repeated_close_patch_id": repeated_close.patch_id,
+        "patch_capability_owner_retained": patch_capability_owner() is not None,
+        "confirmation_capability_owner_retained": (
+            confirmation_capability_owner() is not None
+        ),
+    } == {
+        "shutdown_done_before_cleanup_release": False,
+        "shutdown_outcome": "cancelled",
+        "inner_cleanup_completed": True,
+        "owner_outcome": "result",
+        "owner_status": PatchConfirmationStatus.CLOSED,
+        "repeated_close_status": PatchConfirmationStatus.CLOSED,
+        "repeated_close_patch_id": None,
+        "patch_capability_owner_retained": False,
+        "confirmation_capability_owner_retained": False,
+    }
+
+
+@pytest.mark.parametrize(
+    "cancellation_outcome",
+    [
+        pytest.param("return", id="writer-returns-valid-result"),
+        pytest.param(
+            "raise_base_exception",
+            id="writer-raises-base-exception-after-cleanup",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_owner_cancel_never_publishes_or_replays_resistant_apply(
+    cancellation_outcome: str,
+) -> None:
+    """Owner cancellation dominates every cancellation-resistant writer result."""
+    flow, writer, _agent, patch_a, _patch_b = await _two_patch_flow(
+        block_phase="apply",
+        cancellation_cleanup=True,
+        cancellation_outcome=cancellation_outcome,
+    )
+    ui_session = trusted_ui_session()
+    pending = await flow.issue(
+        ui_session,
+        patch_a.patch_id,
+        expected_plan_id=PLAN_ID,
+        expected_revision=1,
+    )
+    assert pending.status is PatchConfirmationStatus.PENDING
+
+    owner_task = asyncio.create_task(flow.apply(ui_session))
+    await writer.entered.wait()
+    joiner_started = asyncio.Event()
+
+    async def join_owner_flight() -> object:
+        joiner_started.set()
+        return await flow.apply(ui_session)
+
+    joiner_task = asyncio.create_task(join_owner_flight())
+    await joiner_started.wait()
+    await _event_loop_checkpoint()
+    owner_task.cancel()
+    await writer.cleanup_entered.wait()
+    await _event_loop_checkpoint()
+    owner_done_before_cleanup_release = owner_task.done()
+    writer.cleanup_release.set()
+    owner_outcome = await _task_outcome(owner_task)
+    joiner_outcome = await _task_outcome(joiner_task)
+    controller_after_cancel = flow.snapshot
+    repeated_apply = await flow.apply(ui_session)
+
+    unsafe_statuses = {
+        PatchConfirmationStatus.PENDING,
+        PatchConfirmationStatus.APPLIED,
+    }
+    joiner_status = getattr(joiner_outcome[1], "status", None)
+
+    assert {
+        "owner_done_before_cleanup_release": owner_done_before_cleanup_release,
+        "owner_outcome": owner_outcome[0],
+        "joiner_published_unsafe_status": joiner_status in unsafe_statuses,
+        "controller_kept_unsafe_status": (
+            controller_after_cancel.status in unsafe_statuses
+        ),
+        "repeat_kept_unsafe_status": repeated_apply.status in unsafe_statuses,
+        "writer_apply_call_count": len(writer.apply_confirmation_ids),
+        "repeat_matches_controller": repeated_apply == flow.snapshot,
+        "cleanup_completed": writer.cleanup_completed.is_set(),
+    } == {
+        "owner_done_before_cleanup_release": False,
+        "owner_outcome": "cancelled",
+        "joiner_published_unsafe_status": False,
+        "controller_kept_unsafe_status": False,
+        "repeat_kept_unsafe_status": False,
+        "writer_apply_call_count": 1,
+        "repeat_matches_controller": True,
+        "cleanup_completed": True,
+    }
+
+
+@pytest.mark.parametrize(
+    ("first_method", "second_method", "cancel_first"),
+    [
+        pytest.param("close", "disconnect", False, id="close-then-disconnect"),
+        pytest.param("disconnect", "close", False, id="disconnect-then-close"),
+        pytest.param(
+            "close",
+            "disconnect",
+            True,
+            id="cancelled-close-then-disconnect",
+        ),
+        pytest.param(
+            "disconnect",
+            "close",
+            True,
+            id="cancelled-disconnect-then-close",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_concurrent_shutdown_callers_share_completion_barrier(
+    first_method: str,
+    second_method: str,
+    cancel_first: bool,
+) -> None:
+    """Every shutdown caller waits for cleanup and capability release."""
+    flow, writer, agent, patch_a, _patch_b = await _two_patch_flow(
+        block_phase="issue",
+        cancellation_cleanup=True,
+    )
+    ui_session = trusted_ui_session()
+    owner_task = asyncio.create_task(
+        flow.issue(
+            ui_session,
+            patch_a.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+    )
+    await writer.entered.wait()
+
+    patch_capability_owner = weakref.ref(agent)
+    confirmation_capability_owner = weakref.ref(writer)
+    cleanup_entered = writer.cleanup_entered
+    cleanup_release = writer.cleanup_release
+    cleanup_completed = writer.cleanup_completed
+    del agent, writer
+
+    async def observed_shutdown(method: str) -> dict[str, object]:
+        snapshot = await getattr(flow, method)()
+        gc.collect()
+        return {
+            "status": snapshot.status,
+            "patch_id": snapshot.patch_id,
+            "cleanup_completed": cleanup_completed.is_set(),
+            "patch_capability_released": patch_capability_owner() is None,
+            "confirmation_capability_released": (
+                confirmation_capability_owner() is None
+            ),
+        }
+
+    first_shutdown = asyncio.create_task(observed_shutdown(first_method))
+    await cleanup_entered.wait()
+    second_started = asyncio.Event()
+
+    async def second_shutdown_call() -> object:
+        second_started.set()
+        return await observed_shutdown(second_method)
+
+    second_shutdown = asyncio.create_task(second_shutdown_call())
+    await second_started.wait()
+    await _event_loop_checkpoint()
+    if cancel_first:
+        first_shutdown.cancel()
+        await _event_loop_checkpoint()
+    first_done_before_cleanup_release = first_shutdown.done()
+    second_done_before_cleanup_release = second_shutdown.done()
+
+    cleanup_release.set()
+    first_outcome = await _task_outcome(first_shutdown)
+    second_outcome = await _task_outcome(second_shutdown)
+    owner_outcome = await _task_outcome(owner_task)
+    del first_shutdown, second_shutdown, owner_task
+    await _event_loop_checkpoint()
+    gc.collect()
+
+    expected_observation = {
+        "status": PatchConfirmationStatus.CLOSED,
+        "patch_id": None,
+        "cleanup_completed": True,
+        "patch_capability_released": True,
+        "confirmation_capability_released": True,
+    }
+    assert {
+        "first_done_before_cleanup_release": first_done_before_cleanup_release,
+        "second_done_before_cleanup_release": second_done_before_cleanup_release,
+        "first_outcome": first_outcome[0],
+        "first_observation": first_outcome[1],
+        "second_outcome": second_outcome[0],
+        "second_observation": second_outcome[1],
+        "owner_outcome": owner_outcome[0],
+        "owner_status": getattr(owner_outcome[1], "status", None),
+        "cleanup_completed": cleanup_completed.is_set(),
+        "patch_capability_owner_retained": patch_capability_owner() is not None,
+        "confirmation_capability_owner_retained": (
+            confirmation_capability_owner() is not None
+        ),
+    } == {
+        "first_done_before_cleanup_release": False,
+        "second_done_before_cleanup_release": False,
+        "first_outcome": "cancelled" if cancel_first else "result",
+        "first_observation": None if cancel_first else expected_observation,
+        "second_outcome": "result",
+        "second_observation": expected_observation,
+        "owner_outcome": "result",
+        "owner_status": PatchConfirmationStatus.CLOSED,
+        "cleanup_completed": True,
+        "patch_capability_owner_retained": False,
+        "confirmation_capability_owner_retained": False,
+    }
+
+
+@pytest.mark.asyncio
+async def test_owner_cancel_before_shield_delivery_closes_same_key_issue_joiner() -> (
+    None
+):
+    """A queued owner cancellation dominates an already-built PENDING result."""
+    flow, writer, _agent, patch_a, _patch_b = await _two_patch_flow(
+        block_phase="issue",
+    )
+    ui_session = trusted_ui_session()
+    loop = asyncio.get_running_loop()
+    pending_built = asyncio.Event()
+    owner_tasks: list[asyncio.Task[object]] = []
+
+    def cancel_owner_before_shield_delivery() -> None:
+        pending_built.set()
+        assert len(owner_tasks) == 1
+        loop.call_soon(owner_tasks[0].cancel)
+
+    writer.before_issue_return = cancel_owner_before_shield_delivery
+    owner_task = asyncio.create_task(
+        flow.issue(
+            ui_session,
+            patch_a.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+    )
+    owner_tasks.append(owner_task)
+    await writer.entered.wait()
+
+    joiner_started = asyncio.Event()
+
+    async def join_same_issue_flight() -> object:
+        joiner_started.set()
+        return await flow.issue(
+            ui_session,
+            patch_a.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+
+    joiner_task = asyncio.create_task(join_same_issue_flight())
+    await joiner_started.wait()
+    await _event_loop_checkpoint()
+    writer.release.set()
+
+    owner_outcome = await _task_outcome(owner_task)
+    joiner_outcome = await _task_outcome(joiner_task)
+    controller_after_cancel = flow.snapshot
+    repeated_issue = await flow.issue(
+        ui_session,
+        patch_a.patch_id,
+        expected_plan_id=PLAN_ID,
+        expected_revision=1,
+    )
+    joiner_snapshot = joiner_outcome[1]
+
+    assert {
+        "valid_pending_was_built": pending_built.is_set(),
+        "owner_outcome": owner_outcome[0],
+        "joiner_outcome": joiner_outcome[0],
+        "joiner_status": getattr(joiner_snapshot, "status", None),
+        "joiner_error": getattr(joiner_snapshot, "error_code", None),
+        "controller_status": controller_after_cancel.status,
+        "controller_error": controller_after_cancel.error_code,
+        "repeated_status": repeated_issue.status,
+        "repeated_error": repeated_issue.error_code,
+        "writer_issue_call_count": len(writer.issue_patch_ids),
+        "joiner_matches_controller": joiner_snapshot == controller_after_cancel,
+        "repeat_matches_controller": repeated_issue == controller_after_cancel,
+    } == {
+        "valid_pending_was_built": True,
+        "owner_outcome": "cancelled",
+        "joiner_outcome": "result",
+        "joiner_status": PatchConfirmationStatus.STALE,
+        "joiner_error": "target_mismatch",
+        "controller_status": PatchConfirmationStatus.STALE,
+        "controller_error": "target_mismatch",
+        "repeated_status": PatchConfirmationStatus.STALE,
+        "repeated_error": "target_mismatch",
+        "writer_issue_call_count": 1,
+        "joiner_matches_controller": True,
+        "repeat_matches_controller": True,
+    }
+
+
+@pytest.mark.asyncio
+async def test_completed_apply_joiner_keeps_its_result_when_next_issue_starts() -> None:
+    """A normal joiner receives its completed flight, not the next Patch state."""
+    flow, writer, _agent, patch_a, patch_b = await _two_patch_flow(
+        block_phase="apply",
+    )
+    ui_session = trusted_ui_session()
+    pending_a = await flow.issue(
+        ui_session,
+        patch_a.patch_id,
+        expected_plan_id=PLAN_ID,
+        expected_revision=1,
+    )
+    assert pending_a.status is PatchConfirmationStatus.PENDING
+
+    owner_terminals: list[object] = []
+
+    async def owner_apply_then_issue_b() -> object:
+        terminal = await flow.apply(ui_session)
+        owner_terminals.append(terminal)
+        return await flow.issue(
+            ui_session,
+            patch_b.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+
+    owner_task = asyncio.create_task(owner_apply_then_issue_b())
+    await writer.entered.wait()
+    joiner_started = asyncio.Event()
+
+    async def join_apply_a() -> object:
+        joiner_started.set()
+        return await flow.apply(ui_session)
+
+    joiner_task = asyncio.create_task(join_apply_a())
+    await joiner_started.wait()
+    await _event_loop_checkpoint()
+
+    apply_release = writer.release
+    writer.block_phase = "issue"
+    writer.block_call_number = 2
+    writer.entered = asyncio.Event()
+    writer.release = asyncio.Event()
+    apply_release.set()
+
+    await writer.entered.wait()
+    joiner_snapshot = await joiner_task
+    owner_terminal = owner_terminals[0]
+    controller_during_b = flow.snapshot
+
+    writer.release.set()
+    pending_b = await owner_task
+
+    assert {
+        "joiner_status": getattr(joiner_snapshot, "status", None),
+        "joiner_patch_id": getattr(joiner_snapshot, "patch_id", None),
+        "joiner_matches_owner_flight": joiner_snapshot == owner_terminal,
+        "owner_status": getattr(owner_terminal, "status", None),
+        "owner_patch_id": getattr(owner_terminal, "patch_id", None),
+        "controller_during_b": (
+            controller_during_b.status,
+            controller_during_b.patch_id,
+        ),
+        "pending_b": (pending_b.status, pending_b.patch_id),
+        "writer_issue_order": tuple(writer.issue_patch_ids),
+        "writer_apply_count": len(writer.apply_confirmation_ids),
+    } == {
+        "joiner_status": PatchConfirmationStatus.APPLIED,
+        "joiner_patch_id": patch_a.patch_id,
+        "joiner_matches_owner_flight": True,
+        "owner_status": PatchConfirmationStatus.APPLIED,
+        "owner_patch_id": patch_a.patch_id,
+        "controller_during_b": (PatchConfirmationStatus.IDLE, patch_b.patch_id),
+        "pending_b": (PatchConfirmationStatus.PENDING, patch_b.patch_id),
+        "writer_issue_order": (patch_a.patch_id, patch_b.patch_id),
+        "writer_apply_count": 1,
+    }
+
+
+@pytest.mark.parametrize(
+    ("lifecycle", "expected_status"),
+    [
+        pytest.param(
+            "invalidate",
+            PatchConfirmationStatus.STALE,
+            id="external-invalidate",
+        ),
+        pytest.param(
+            "close",
+            PatchConfirmationStatus.CLOSED,
+            id="external-close",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_completed_issue_waiters_observe_external_lifecycle_override(
+    lifecycle: str,
+    expected_status: PatchConfirmationStatus,
+) -> None:
+    """A lifecycle transition dominates a completed, undelivered issue result."""
+    flow, writer, _agent, patch_a, _patch_b = await _two_patch_flow(
+        block_phase="issue",
+    )
+    ui_session = trusted_ui_session()
+    loop = asyncio.get_running_loop()
+    lifecycle_tasks: list[asyncio.Task[object]] = []
+    waiter_observations: list[PatchConfirmationStatus] = []
+
+    def queue_lifecycle_before_shield_delivery() -> None:
+        if lifecycle == "invalidate":
+            loop.call_soon(flow.invalidate)
+        else:
+            lifecycle_tasks.append(loop.create_task(flow.close()))
+
+    writer.before_issue_return = queue_lifecycle_before_shield_delivery
+
+    async def invoke_issue() -> object:
+        result = await flow.issue(
+            ui_session,
+            patch_a.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+        waiter_observations.append(flow.snapshot.status)
+        return result
+
+    owner_task = asyncio.create_task(invoke_issue())
+    await writer.entered.wait()
+    joiner_task = asyncio.create_task(invoke_issue())
+    await _event_loop_checkpoint()
+    writer.release.set()
+
+    owner_result, joiner_result = await asyncio.gather(owner_task, joiner_task)
+    if lifecycle_tasks:
+        await lifecycle_tasks[0]
+    repeated = await flow.issue(
+        ui_session,
+        patch_a.patch_id,
+        expected_plan_id=PLAN_ID,
+        expected_revision=1,
+    )
+
+    assert {
+        "returned_statuses": (owner_result.status, joiner_result.status),
+        "waiters_observed_controller": tuple(waiter_observations),
+        "controller_status": flow.snapshot.status,
+        "repeated_status": repeated.status,
+        "writer_issue_count": len(writer.issue_patch_ids),
+    } == {
+        "returned_statuses": (expected_status, expected_status),
+        "waiters_observed_controller": (expected_status, expected_status),
+        "controller_status": expected_status,
+        "repeated_status": expected_status,
+        "writer_issue_count": 1,
+    }
+
+
+@pytest.mark.asyncio
+async def test_prestart_invalidate_override_stays_with_old_issue_waiters() -> None:
+    """A cancelled-before-start flight cannot read its successor's snapshot."""
+    flow, writer, _agent, patch_a, patch_b = await _two_patch_flow(
+        block_phase="issue",
+        block_call_number=1,
+    )
+    ui_session = trusted_ui_session()
+    owner_a_results: list[object] = []
+
+    async def owner_issue_a_then_b() -> object:
+        result_a = await flow.issue(
+            ui_session,
+            patch_a.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+        owner_a_results.append(result_a)
+        return await flow.issue(
+            ui_session,
+            patch_b.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+
+    async def join_issue_a() -> object:
+        return await flow.issue(
+            ui_session,
+            patch_a.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+
+    async def invalidate_before_inner_start() -> None:
+        flow.invalidate()
+
+    owner_task = asyncio.create_task(owner_issue_a_then_b())
+    joiner_task = asyncio.create_task(join_issue_a())
+    invalidate_task = asyncio.create_task(invalidate_before_inner_start())
+
+    await writer.entered.wait()
+    joiner_a = await joiner_task
+    controller_during_b = flow.snapshot
+
+    writer.release.set()
+    pending_b = await owner_task
+    await invalidate_task
+    owner_a = owner_a_results[0]
+
+    assert {
+        "owner_a": (
+            getattr(owner_a, "status", None),
+            getattr(owner_a, "patch_id", None),
+        ),
+        "joiner_a": (
+            getattr(joiner_a, "status", None),
+            getattr(joiner_a, "patch_id", None),
+        ),
+        "joiner_matches_owner": joiner_a == owner_a,
+        "controller_during_b": (
+            controller_during_b.status,
+            controller_during_b.patch_id,
+        ),
+        "pending_b": (pending_b.status, pending_b.patch_id),
+        "writer_issue_order": tuple(writer.issue_patch_ids),
+    } == {
+        "owner_a": (PatchConfirmationStatus.STALE, patch_a.patch_id),
+        "joiner_a": (PatchConfirmationStatus.STALE, patch_a.patch_id),
+        "joiner_matches_owner": True,
+        "controller_during_b": (PatchConfirmationStatus.IDLE, patch_b.patch_id),
+        "pending_b": (PatchConfirmationStatus.PENDING, patch_b.patch_id),
+        "writer_issue_order": (patch_b.patch_id,),
+    }
+
+
+@pytest.mark.parametrize(
+    "lifecycle_method",
+    [
+        pytest.param("close", id="close"),
+        pytest.param("disconnect", id="disconnect"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_shutdown_base_exception_closes_owner_and_releases_writer(
+    lifecycle_method: str,
+) -> None:
+    """Shutdown cannot leave a raw writer traceback in an old public flight."""
+    flow, writer, agent, patch_a, _patch_b = await _two_patch_flow(
+        block_phase="issue",
+        cancellation_cleanup=True,
+        cancellation_outcome="raise_base_exception",
+    )
+    ui_session = trusted_ui_session()
+    owner_task = asyncio.create_task(
+        flow.issue(
+            ui_session,
+            patch_a.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+    )
+    await writer.entered.wait()
+
+    writer_ref = weakref.ref(writer)
+    agent_ref = weakref.ref(agent)
+    cleanup_entered = writer.cleanup_entered
+    cleanup_release = writer.cleanup_release
+    del writer, agent
+
+    shutdown_task = asyncio.create_task(getattr(flow, lifecycle_method)())
+    await cleanup_entered.wait()
+    cleanup_release.set()
+    shutdown_snapshot = await shutdown_task
+
+    await _event_loop_checkpoint()
+    await _event_loop_checkpoint()
+    gc.collect()
+    owner_done = owner_task.done()
+    writer_retained = writer_ref() is not None
+    agent_retained = agent_ref() is not None
+    owner_outcome = await _task_outcome(owner_task)
+
+    assert {
+        "shutdown_status": shutdown_snapshot.status,
+        "owner_done": owner_done,
+        "owner_outcome": owner_outcome[0],
+        "owner_status": getattr(owner_outcome[1], "status", None),
+        "writer_retained": writer_retained,
+        "agent_retained": agent_retained,
+    } == {
+        "shutdown_status": PatchConfirmationStatus.CLOSED,
+        "owner_done": True,
+        "owner_outcome": "result",
+        "owner_status": PatchConfirmationStatus.CLOSED,
+        "writer_retained": False,
+        "agent_retained": False,
+    }
+
+
+@pytest.mark.asyncio
+async def test_cancelled_issue_joiner_does_not_log_later_base_exception() -> None:
+    """A cancelled joiner cannot expose a later private writer failure."""
+    flow, writer, _agent, patch_a, _patch_b = await _two_patch_flow(
+        block_phase="issue",
+    )
+    ui_session = trusted_ui_session()
+    loop = asyncio.get_running_loop()
+    previous_handler = loop.get_exception_handler()
+    loop_contexts: list[dict[str, object]] = []
+
+    def capture_loop_exception(
+        _loop: asyncio.AbstractEventLoop,
+        context: dict[str, object],
+    ) -> None:
+        loop_contexts.append(context)
+
+    def raise_private_writer_failure() -> None:
+        raise _WriterCleanupAbort("writer_private_marker")
+
+    writer.before_issue_return = raise_private_writer_failure
+    loop.set_exception_handler(capture_loop_exception)
+    try:
+        owner_task = asyncio.create_task(
+            flow.issue(
+                ui_session,
+                patch_a.patch_id,
+                expected_plan_id=PLAN_ID,
+                expected_revision=1,
+            )
+        )
+        await writer.entered.wait()
+        joiner_task = asyncio.create_task(
+            flow.issue(
+                ui_session,
+                patch_a.patch_id,
+                expected_plan_id=PLAN_ID,
+                expected_revision=1,
+            )
+        )
+        await _event_loop_checkpoint()
+        joiner_task.cancel()
+        joiner_outcome = await _task_outcome(joiner_task)
+        writer.release.set()
+        owner_outcome = await _task_outcome(owner_task)
+        await _event_loop_checkpoint()
+        await _event_loop_checkpoint()
+        observed_loop_events = tuple(
+            (
+                context.get("message"),
+                type(context.get("exception")).__name__,
+                str(context.get("exception")),
+            )
+            for context in loop_contexts
+        )
+    finally:
+        writer.release.set()
+        await flow.close()
+        await _event_loop_checkpoint()
+        loop.set_exception_handler(previous_handler)
+
+    assert {
+        "joiner_outcome": joiner_outcome[0],
+        "owner_outcome": owner_outcome[0],
+        "writer_issue_count": len(writer.issue_patch_ids),
+        "loop_events": observed_loop_events,
+    } == {
+        "joiner_outcome": "cancelled",
+        "owner_outcome": "base_exception",
+        "writer_issue_count": 1,
+        "loop_events": (),
+    }
+
+
+@pytest.mark.asyncio
+async def test_joiner_cancellation_cannot_erase_owner_cancellation_settlement() -> None:
+    """Owner identity remains bound to its flight until every waiter settles."""
+    flow, writer, _agent, patch_a, _patch_b = await _two_patch_flow(
+        block_phase="issue",
+    )
+    ui_session = trusted_ui_session()
+    loop = asyncio.get_running_loop()
+    owner_tasks: list[asyncio.Task[object]] = []
+    joiner_tasks: list[asyncio.Task[object]] = []
+
+    def cancel_joiner_then_owner_before_delivery() -> None:
+        assert len(owner_tasks) == 1
+        assert len(joiner_tasks) == 1
+        loop.call_soon(joiner_tasks[0].cancel)
+        loop.call_soon(owner_tasks[0].cancel)
+
+    writer.before_issue_return = cancel_joiner_then_owner_before_delivery
+    owner_task = asyncio.create_task(
+        flow.issue(
+            ui_session,
+            patch_a.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+    )
+    owner_tasks.append(owner_task)
+    await writer.entered.wait()
+
+    joiner_task = asyncio.create_task(
+        flow.issue(
+            ui_session,
+            patch_a.patch_id,
+            expected_plan_id=PLAN_ID,
+            expected_revision=1,
+        )
+    )
+    joiner_tasks.append(joiner_task)
+    await _event_loop_checkpoint()
+    writer.release.set()
+
+    joiner_outcome = await _task_outcome(joiner_task)
+    owner_outcome = await _task_outcome(owner_task)
+    controller_after_cancel = flow.snapshot
+    repeated_issue = await flow.issue(
+        ui_session,
+        patch_a.patch_id,
+        expected_plan_id=PLAN_ID,
+        expected_revision=1,
+    )
+
+    assert {
+        "joiner_outcome": joiner_outcome[0],
+        "owner_outcome": owner_outcome[0],
+        "controller_status": controller_after_cancel.status,
+        "controller_error": controller_after_cancel.error_code,
+        "repeated_status": repeated_issue.status,
+        "repeated_error": repeated_issue.error_code,
+        "writer_issue_count": len(writer.issue_patch_ids),
+    } == {
+        "joiner_outcome": "cancelled",
+        "owner_outcome": "cancelled",
+        "controller_status": PatchConfirmationStatus.STALE,
+        "controller_error": "target_mismatch",
+        "repeated_status": PatchConfirmationStatus.STALE,
+        "repeated_error": "target_mismatch",
+        "writer_issue_count": 1,
+    }

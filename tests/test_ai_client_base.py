@@ -9,10 +9,12 @@ import httpx
 import pytest
 
 from app.core.exceptions import AiCallError, AiParseError
-from app.integration.ai_client.base import call_ai
+from app.integration.ai_client.base import call_ai, call_ai_text
 
 
-def _make_openai_response(content: dict | str, status_code: int = 200) -> httpx.Response:
+def _make_openai_response(
+    content: dict | str, status_code: int = 200
+) -> httpx.Response:
     """构造模拟 OpenAI Chat Completions 响应。"""
     if isinstance(content, dict):
         content_str = json.dumps(content, ensure_ascii=False)
@@ -49,6 +51,7 @@ def _make_error_response(status_code: int) -> httpx.Response:
 # 正常响应测试
 # -------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_call_ai_success():
     """正常响应时，返回解析后的 dict。"""
@@ -68,6 +71,7 @@ async def test_call_ai_success():
 # -------------------------------------------------------------------
 # 无效 JSON 响应测试
 # -------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_call_ai_invalid_json_in_content():
@@ -89,6 +93,7 @@ async def test_call_ai_invalid_json_in_content():
 @pytest.mark.asyncio
 async def test_call_ai_non_json_body():
     """服务器返回非 JSON body 时，抛出 AiParseError。"""
+
     def _handler(req):
         return httpx.Response(
             status_code=200,
@@ -112,6 +117,7 @@ async def test_call_ai_non_json_body():
 # HTTP 错误响应测试
 # -------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_call_ai_http_500_raises_ai_call_error():
     """HTTP 500 时重试后抛出 AiCallError。"""
@@ -128,6 +134,7 @@ async def test_call_ai_http_500_raises_ai_call_error():
 
     def _fast_retry():
         from tenacity import retry, stop_after_attempt, wait_none
+
         return retry(stop=stop_after_attempt(3), wait=wait_none(), reraise=True)
 
     with mock.patch.object(ai_base, "_make_retry_decorator", _fast_retry):
@@ -149,6 +156,7 @@ async def test_call_ai_http_500_raises_ai_call_error():
 @pytest.mark.asyncio
 async def test_call_ai_http_400_raises_ai_call_error():
     """HTTP 400 时抛出 AiCallError（不重试，因为是客户端错误）。"""
+
     # 注：当前实现对 4xx 也会重试（tenacity 统一处理），这里只验证最终抛出异常
     def _handler(req):
         return _make_error_response(400)
@@ -158,6 +166,7 @@ async def test_call_ai_http_400_raises_ai_call_error():
 
     def _fast_retry():
         from tenacity import retry, stop_after_attempt, wait_none
+
         return retry(stop=stop_after_attempt(1), wait=wait_none(), reraise=True)
 
     with mock.patch.object(ai_base, "_make_retry_decorator", _fast_retry):
@@ -173,13 +182,53 @@ async def test_call_ai_http_400_raises_ai_call_error():
             )
 
 
+@pytest.mark.parametrize("caller", [call_ai, call_ai_text])
+@pytest.mark.asyncio
+async def test_provider_error_body_and_endpoint_never_enter_exception_or_logs(
+    caller,
+    caplog,
+) -> None:
+    secret = "sk-provider-echo-must-stay-secret"
+    endpoint = "https://private-provider.invalid/v1"
+    response = httpx.Response(
+        status_code=401,
+        json={"error": {"message": f"Incorrect API key {secret}"}},
+    )
+    transport = httpx.MockTransport(lambda _request: response)
+    client = httpx.AsyncClient(transport=transport)
+
+    import unittest.mock as mock
+    from app.integration.ai_client import base as ai_base
+
+    def _fast_retry():
+        from tenacity import retry, stop_after_attempt, wait_none
+
+        return retry(stop=stop_after_attempt(1), wait=wait_none(), reraise=True)
+
+    with mock.patch.object(ai_base, "_make_retry_decorator", _fast_retry):
+        with pytest.raises(AiCallError) as raised:
+            await caller(
+                messages=[{"role": "user", "content": "test"}],
+                api_base_url=endpoint,
+                api_key=secret,
+                _client=client,
+            )
+
+    rendered = f"{raised.value!r}\n{caplog.text}"
+    assert secret not in rendered
+    assert endpoint not in rendered
+    assert "Incorrect API key" not in rendered
+
+
 # -------------------------------------------------------------------
 # 响应结构异常测试
 # -------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_call_ai_missing_choices():
     """响应缺少 choices 字段时，抛出 AiParseError。"""
+
     def _handler(req):
         return httpx.Response(
             status_code=200,

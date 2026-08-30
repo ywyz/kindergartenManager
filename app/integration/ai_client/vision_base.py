@@ -68,62 +68,41 @@ async def call_ai_vision(
 
     async def _do_request(client: httpx.AsyncClient) -> dict:
         try:
-            response = await client.post(url, headers=headers, json=payload, timeout=60.0)
+            response = await client.post(
+                url, headers=headers, json=payload, timeout=60.0
+            )
         except httpx.TimeoutException as exc:
-            raise AiCallError(f"视觉 AI 请求超时: {exc}") from exc
+            raise AiCallError("视觉 AI 请求超时") from exc
         except httpx.RequestError as exc:
-            raise AiCallError(f"视觉 AI 请求网络错误: {exc}") from exc
+            raise AiCallError("视觉 AI 请求网络错误") from exc
 
         if response.status_code >= 400:
-            try:
-                err_body = response.json()
-                err_detail = (
-                    err_body.get("error", {}).get("message")
-                    or err_body.get("message")
-                    or err_body.get("detail")
-                    or str(err_body)[:200]
-                )
-            except Exception:
-                err_detail = response.text[:200]
             logger.error(
                 "视觉 AI 接口返回错误",
-                extra={
-                    "status_code": response.status_code,
-                    "url": url,
-                    "error_detail": err_detail,
-                },
+                extra={"status_code": response.status_code},
             )
-            raise AiCallError(
-                f"视觉 AI 接口返回 HTTP {response.status_code}: {err_detail}"
-            )
+            raise AiCallError(f"视觉 AI 接口返回 HTTP {response.status_code}")
 
-        raw_text = response.text
         try:
             body = response.json()
         except Exception as exc:
-            logger.info("视觉 AI 返回内容解析失败（非 JSON）", extra={"raw": raw_text[:500]})
-            raise AiParseError(f"视觉 AI 返回内容不是有效 JSON: {exc}") from exc
+            logger.info("视觉 AI 返回内容解析失败（非 JSON）")
+            raise AiParseError("视觉 AI 返回内容不是有效 JSON") from exc
 
         try:
             content_str = body["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
-            logger.info(
-                "视觉 AI 响应结构异常，缺少 choices/message/content",
-                extra={"raw": raw_text[:500]},
-            )
-            raise AiParseError(f"视觉 AI 响应结构异常: {exc}") from exc
+            logger.info("视觉 AI 响应结构异常，缺少 choices/message/content")
+            raise AiParseError("视觉 AI 响应结构异常") from exc
 
         try:
             result = json.loads(content_str)
         except json.JSONDecodeError as exc:
-            logger.info(
-                "视觉 AI content 字段不是有效 JSON",
-                extra={"content": content_str[:500]},
-            )
-            raise AiParseError(f"视觉 AI content 不是有效 JSON: {exc}") from exc
+            logger.info("视觉 AI content 字段不是有效 JSON")
+            raise AiParseError("视觉 AI content 不是有效 JSON") from exc
 
         if not isinstance(result, dict):
-            logger.info("视觉 AI 返回内容不是 JSON 对象", extra={"content": content_str[:200]})
+            logger.info("视觉 AI 返回内容不是 JSON 对象")
             raise AiParseError("视觉 AI 返回内容不是 JSON 对象")
 
         return result

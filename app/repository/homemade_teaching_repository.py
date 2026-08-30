@@ -41,12 +41,14 @@ async def get_homemade_teaching_toy(
     session: AsyncSession,
     *,
     tenant_id: int,
+    user_id: int,
     toy_id: int,
 ) -> HomemadeTeachingToy | None:
-    """按 id 查询记录，强制 tenant_id 过滤。"""
+    """按 id 查询记录，强制 tenant_id + user_id 过滤。"""
     result = await session.execute(
         select(HomemadeTeachingToy).where(
             HomemadeTeachingToy.tenant_id == tenant_id,
+            HomemadeTeachingToy.user_id == user_id,
             HomemadeTeachingToy.id == toy_id,
         )
     )

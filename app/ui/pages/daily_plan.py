@@ -9,15 +9,16 @@
 """
 
 import asyncio
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
+from typing import TypedDict
 
 from nicegui import ui
+from sqlalchemy.orm.exc import StaleDataError
 
 from app.core.database import AsyncSessionLocal
 from app.core.audit import log_audit
 from app.core.exceptions import AiCallError, AiParseError, ConfigError
-from app.core.user_context import get_current_user
 from app.integration.holiday_client.client import is_near_holiday
 from app.integration.word_export.exporter import (
     export_batch_daily_plans,
@@ -37,21 +38,75 @@ from app.service.diff_service import compute_diff
 from app.service.generate_service import generate_activity_content
 from app.service.lesson_plan_service import process_lesson_plan
 from app.service.agent.composition import create_daily_plan_agent_controller
+from app.service.agent.confirmed_plan_read import read_confirmed_daily_plan
+from app.service.agent.confirmation_flow import (
+    create_daily_plan_patch_confirmation_controller,
+)
 from app.service.agent.contracts import TrustedActor
 from app.ui.components.agent_draft import render_daily_plan_agent_panel
+from app.ui.components.agent_write_confirmation import (
+    DailyPlanPatchConfirmationPanel,
+    PatchConfirmationSnapshotView,
+)
 from app.ui.components.app_shell import render_shell
 from app.ui.components.date_panel import DatePanel, DateSelection
+from app.ui.auth_context import require_bound_ui_session, require_current_ui_session
+from app.ui.daily_plan_target import (
+    DailyPlanUiTarget,
+    UiGenerationGuard,
+    UiSingleFlightSlot,
+    capture_daily_plan_ui_target,
+    is_current_daily_plan_ui_target,
+)
+
+
+class _DailyPlanSavePayload(TypedDict):
+    plan_date: date
+    week_number: int
+    weekday_cn: str
+    grade: str
+    class_name: str
+    expected_plan_id: int | None
+    expected_revision: int | None
+    activity_goal: object
+    activity_prep: object
+    activity_key: object
+    activity_difficult: object
+    activity_process_original: object
+    activity_process_adapted: object
+    morning_activity: object
+    morning_talk_topic: object
+    indoor_area: object
+    outdoor_activity: object
+    daily_reflection: object
 
 
 @ui.page("/daily-plan")
 async def daily_plan_page() -> None:
-    user = get_current_user()
+    ui_session = await require_current_ui_session()
+    if ui_session is None:
+        return
+    user = ui_session.as_user_dict()
 
-    tenant_id: int = user["tenant_id"]
-    user_id: int = int(user["sub"])
-    agent_controller = create_daily_plan_agent_controller(
-        TrustedActor(tenant_id=tenant_id, user_id=user_id)
+    tenant_id = ui_session.tenant_id
+    user_id = ui_session.user_id
+    trusted_actor = TrustedActor(tenant_id=tenant_id, user_id=user_id)
+    agent_controller = create_daily_plan_agent_controller(trusted_actor)
+    patch_confirmation_controller = create_daily_plan_patch_confirmation_controller(
+        agent_controller=agent_controller,
     )
+
+    async def _require_live_session():
+        return await require_bound_ui_session(ui_session)
+
+    async def _authorize_agent_operation() -> bool:
+        captured_selection = selection_state["current"]
+        if await _require_live_session() is None:
+            return False
+        return (
+            captured_selection is not None
+            and selection_state["current"] is captured_selection
+        )
 
     # 状态变量（Python 层，NiceGUI reactive 通过 label/input binding 刷新）
     state = {
@@ -64,6 +119,9 @@ async def daily_plan_page() -> None:
         "original_process": "",  # 拆分原文（折叠展示用）
         "indoor_areas": "",  # 室内区域（来自 class_cfg）
         "outdoor_content": "",  # 户外内容（来自 class_cfg）
+        "morning_talk_questions": "",  # Agent 可更新但当前表单未单独编辑
+        "loaded_plan_id": None,  # int | None，当前表单读取到的精确行
+        "loaded_revision": None,  # int | None，保存时必须原样带回
     }
 
     await render_shell(user, active="daily-plan")
@@ -76,6 +134,8 @@ async def daily_plan_page() -> None:
         async with AsyncSessionLocal() as session:
             semester = await get_active_semester(session, tenant_id, user_id)
             class_cfg = await get_class_config(session, tenant_id, user_id)
+        if await _require_live_session() is None:
+            return
 
         sem_start = semester.start_date if semester else None
         sem_end = semester.end_date if semester else None
@@ -87,6 +147,113 @@ async def daily_plan_page() -> None:
             state["outdoor_content"] = class_cfg.outdoor_content or ""
 
         selection_state: dict[str, DateSelection | None] = {"current": None}
+        form_generation = UiGenerationGuard()
+        split_operations = UiSingleFlightSlot[
+            tuple[DailyPlanUiTarget | None, str, str]
+        ]()
+        gen_all_operations = UiSingleFlightSlot[
+            tuple[DailyPlanUiTarget | None, dict[str, object], str, str]
+        ]()
+        reflection_operations = UiSingleFlightSlot[
+            tuple[DailyPlanUiTarget | None, dict[str, object]]
+        ]()
+        save_operations = UiSingleFlightSlot[
+            tuple[DailyPlanUiTarget | None, _DailyPlanSavePayload | None]
+        ]()
+        export_operations = UiSingleFlightSlot[DailyPlanUiTarget | None]()
+        batch_range_generation = UiGenerationGuard()
+        batch_export_operations = UiSingleFlightSlot[
+            tuple[int, str, str, date | None, date | None, bool]
+        ]()
+        history_requests = UiGenerationGuard()
+
+        def _capture_plan_target() -> DailyPlanUiTarget | None:
+            return capture_daily_plan_ui_target(
+                current_selection=selection_state["current"],
+                selected_date=state["selected_date"],
+                loaded_plan_id=state["loaded_plan_id"],
+                loaded_revision=state["loaded_revision"],
+                form_generation=form_generation.capture(),
+            )
+
+        def _is_current_plan_target(target: DailyPlanUiTarget) -> bool:
+            return is_current_daily_plan_ui_target(
+                target,
+                current_selection=selection_state["current"],
+                selected_date=state["selected_date"],
+                loaded_plan_id=state["loaded_plan_id"],
+                loaded_revision=state["loaded_revision"],
+                form_generation=form_generation.capture(),
+            )
+
+        async def _publish_confirmed_plan(
+            confirmation: PatchConfirmationSnapshotView,
+            target: DailyPlanUiTarget,
+        ) -> None:
+            """Reload one confirmed result; never replay it through legacy save."""
+            target_plan_id = target.plan_id
+            target_revision = target.revision
+            confirmation_plan_id = confirmation.daily_plan_id
+            before_revision = confirmation.before_revision
+            after_revision = confirmation.after_revision
+            if (
+                await _require_live_session() is None
+                or not _is_current_plan_target(target)
+                or type(target_plan_id) is not int
+                or target_plan_id <= 0
+                or type(target_revision) is not int
+                or target_revision <= 0
+                or type(confirmation_plan_id) is not int
+                or confirmation_plan_id <= 0
+                or type(before_revision) is not int
+                or before_revision <= 0
+                or type(after_revision) is not int
+                or after_revision <= 0
+                or confirmation_plan_id != target_plan_id
+                or before_revision != target_revision
+                or after_revision != target_revision + 1
+            ):
+                raise RuntimeError("agent_confirmation_target_stale")
+
+            authoritative = await read_confirmed_daily_plan(
+                trusted_actor,
+                plan_id=target_plan_id,
+                selected_date=target.selected_date,
+                expected_revision=after_revision,
+            )
+
+            if await _require_live_session() is None or not _is_current_plan_target(
+                target
+            ):
+                raise RuntimeError("agent_confirmation_target_stale")
+
+            agent_panel.plan_changed(target.selected_date)
+            form_generation.advance()
+            goal_area.value = authoritative.activity_goal
+            prep_area.value = authoritative.activity_prep
+            key_area.value = authoritative.activity_key
+            difficult_area.value = authoritative.activity_difficult
+            original_area.value = authoritative.activity_process_original
+            adapted_area.value = authoritative.activity_process_adapted
+            morning_activity_area.value = authoritative.morning_activity
+            morning_talk_area.value = authoritative.morning_talk_topic
+            area_game_area.value = authoritative.indoor_area
+            outdoor_activity_area.value = authoritative.outdoor_activity
+            daily_reflection_area.value = authoritative.daily_reflection
+            state["original_process"] = authoritative.activity_process_original
+            state["loaded_plan_id"] = authoritative.plan_id
+            state["loaded_revision"] = authoritative.revision
+            state["morning_talk_questions"] = authoritative.morning_talk_questions
+            save_msg.classes(
+                remove="text-red-500 text-orange-500",
+                add="text-green-600",
+            )
+            save_msg.text = (
+                "✅ Agent 草案已确认采用"
+                f"（revision {confirmation.before_revision}"
+                f" → {confirmation.after_revision}）"
+            )
+            await refresh_history()
 
         def _on_date_selected(selection: DateSelection) -> None:
             """Invalidate old page/Agent state before holiday or DB awaits begin."""
@@ -103,6 +270,8 @@ async def daily_plan_page() -> None:
             agent_panel.scope_changed(selected)
 
         async def _on_date_change(selected: date | None) -> None:
+            if await _require_live_session() is None:
+                return
             selection = selection_state["current"]
             if selection is None or selection.selected_date != selected:
                 return
@@ -115,7 +284,18 @@ async def daily_plan_page() -> None:
             on_date_selected=_on_date_selected,
         )
         panel.render()
-        agent_panel = render_daily_plan_agent_panel(agent_controller)
+        patch_confirmation_panel = DailyPlanPatchConfirmationPanel(
+            patch_confirmation_controller,
+            authorize_confirmation=_require_live_session,
+            capture_target=_capture_plan_target,
+            is_current_target=_is_current_plan_target,
+            on_applied=_publish_confirmed_plan,
+        )
+        agent_panel = render_daily_plan_agent_panel(
+            agent_controller,
+            authorize_operation=_authorize_agent_operation,
+            patch_actions=patch_confirmation_panel,
+        )
 
         # ══════════════════════════════════════════════════════════════════════
         # 区块二：教案输入
@@ -130,17 +310,23 @@ async def daily_plan_page() -> None:
                 .classes("w-full")
                 .props("rows=8 autogrow")
             )
+            raw_text_area.on_value_change(form_generation.advance)
 
             split_msg = ui.label("").classes("text-sm mt-1")
 
-            async def _do_split() -> None:
-                if not state["selected_date"]:
+            async def _do_split(
+                owner: object,
+                frozen: tuple[DailyPlanUiTarget | None, str, str],
+            ) -> None:
+                target, raw, grade = frozen
+                if await _require_live_session() is None:
+                    return
+                if target is None or not _is_current_plan_target(target):
                     split_msg.classes(remove="text-green-600 text-red-500")
                     split_msg.classes(add="text-orange-500")
-                    split_msg.text = "⚠ 请先选择日期"
+                    split_msg.text = "⚠ 请重新选择日期并加载当前草稿"
                     return
 
-                raw = raw_text_area.value.strip()
                 if not raw:
                     split_msg.classes(remove="text-green-600 text-orange-500")
                     split_msg.classes(add="text-red-500")
@@ -158,10 +344,15 @@ async def daily_plan_page() -> None:
                             tenant_id=tenant_id,
                             user_id=user_id,
                             raw_text=raw,
-                            grade=state["grade"] or "中班",
+                            grade=grade,
                         )
+                    if await _require_live_session() is None:
+                        return
+                    if not _is_current_plan_target(target):
+                        return
 
                     # 回填表单
+                    form_generation.advance()
                     goal_area.value = result.activity_goal
                     prep_area.value = result.activity_prep
                     key_area.value = result.activity_key
@@ -176,24 +367,52 @@ async def daily_plan_page() -> None:
                     split_msg.classes(add="text-green-600")
                     split_msg.text = "✅ AI 拆分完成，已自动回填以下字段"
 
-                except ConfigError as e:
+                except ConfigError:
+                    if await _require_live_session() is None:
+                        return
+                    if not _is_current_plan_target(target):
+                        return
                     split_msg.classes(add="text-red-500")
-                    split_msg.text = f"⚠ {e.message}，请前往【设置】配置 AI Key"
-                except AiCallError as e:
+                    split_msg.text = "⚠ AI 配置不可用，请前往【设置】检查模型配置"
+                except AiCallError:
+                    if await _require_live_session() is None:
+                        return
+                    if not _is_current_plan_target(target):
+                        return
                     split_msg.classes(add="text-red-500")
-                    split_msg.text = f"❌ AI 接口调用失败：{e.message}"
-                except AiParseError as e:
+                    split_msg.text = "❌ AI 接口调用失败，请检查配置或稍后重试"
+                except AiParseError:
+                    if await _require_live_session() is None:
+                        return
+                    if not _is_current_plan_target(target):
+                        return
                     split_msg.classes(add="text-red-500")
-                    split_msg.text = f"❌ AI 返回内容解析失败：{e.message}"
+                    split_msg.text = "❌ AI 返回内容解析失败，请稍后重试"
                 except Exception as e:
+                    if await _require_live_session() is None:
+                        return
+                    if not _is_current_plan_target(target):
+                        return
                     split_msg.classes(add="text-red-500")
-                    split_msg.text = f"❌ 拆分过程发生未知错误：{type(e).__name__}: {e}"
+                    split_msg.text = f"❌ 拆分过程发生未知错误：{type(e).__name__}"
                 finally:
-                    split_btn.props(remove="loading")
+                    if (
+                        await _require_live_session() is not None
+                        and split_operations.owns(owner)
+                    ):
+                        split_btn.props(remove="loading")
 
+            trigger_split = split_operations.bind(
+                capture=lambda: (
+                    _capture_plan_target(),
+                    str(raw_text_area.value or "").strip(),
+                    state["grade"] or "中班",
+                ),
+                run=_do_split,
+            )
             split_btn = ui.button(
                 "连接 AI 拆分",
-                on_click=_do_split,
+                on_click=trigger_split,
             ).classes("bg-blue-600 text-white mt-2")
 
         # ══════════════════════════════════════════════════════════════════════
@@ -205,15 +424,19 @@ async def daily_plan_page() -> None:
             goal_area = (
                 ui.textarea(label="活动目标").classes("w-full").props("rows=3 autogrow")
             )
+            goal_area.on_value_change(form_generation.advance)
             prep_area = (
                 ui.textarea(label="活动准备").classes("w-full").props("rows=3 autogrow")
             )
+            prep_area.on_value_change(form_generation.advance)
             key_area = (
                 ui.textarea(label="活动重点").classes("w-full").props("rows=2 autogrow")
             )
+            key_area.on_value_change(form_generation.advance)
             difficult_area = (
                 ui.textarea(label="活动难点").classes("w-full").props("rows=2 autogrow")
             )
+            difficult_area.on_value_change(form_generation.advance)
 
             ui.separator().classes("my-2")
             ui.label("活动过程（年龄适配改写版）").classes(
@@ -224,6 +447,7 @@ async def daily_plan_page() -> None:
                 .classes("w-full")
                 .props("rows=6 autogrow")
             )
+            adapted_area.on_value_change(form_generation.advance)
 
             # 折叠：查看拆分原文
             with ui.expansion("查看 AI 拆分原文（改写前）", icon="history").classes(
@@ -249,12 +473,23 @@ async def daily_plan_page() -> None:
                 "生成后各区块内容均可手动修改。"
             ).classes("text-xs text-gray-500")
 
-            async def _gen_all_daily() -> None:
-                if not state["selected_date"]:
+            async def _gen_all_daily(
+                owner: object,
+                frozen: tuple[
+                    DailyPlanUiTarget | None,
+                    dict[str, object],
+                    str,
+                    str,
+                ],
+            ) -> None:
+                target, base_ctx, indoor_areas, outdoor_content = frozen
+                if await _require_live_session() is None:
+                    return
+                if target is None or not _is_current_plan_target(target):
                     gen_all_msg.classes(
                         remove="text-green-600 text-red-500", add="text-orange-500"
                     )
-                    gen_all_msg.text = "⚠ 请先选择日期"
+                    gen_all_msg.text = "⚠ 请重新选择日期并加载当前草稿"
                     return
 
                 gen_all_btn.props("loading")
@@ -265,19 +500,17 @@ async def daily_plan_page() -> None:
 
                 # 查询是否临近法定节假日（API 失败返回 None，静默忽略不阻断生成）
                 try:
-                    near_holiday = await is_near_holiday(state["selected_date"])
+                    near_holiday = await is_near_holiday(target.selected_date)
                 except Exception:
                     near_holiday = None
+                if await _require_live_session() is None:
+                    return
+                if not _is_current_plan_target(target):
+                    if gen_all_operations.owns(owner):
+                        gen_all_btn.props(remove="loading")
+                    return
 
-                base_ctx = {
-                    "grade": state["grade"],
-                    "class_name": state["class_name"],
-                    "activity_goal": goal_area.value,
-                    "activity_process": adapted_area.value or original_area.value,
-                    "week_number": state["week_number"],
-                    "weekday": state["weekday_cn"],
-                    "near_holiday": near_holiday,
-                }
+                base_ctx["near_holiday"] = near_holiday
                 # 每项任务：(task_type, 额外 context, 目标 textarea, 状态 label, 名称)
                 tasks = [
                     (
@@ -296,7 +529,7 @@ async def daily_plan_page() -> None:
                     ),
                     (
                         "area_game",
-                        {"indoor_areas": state["indoor_areas"]},
+                        {"indoor_areas": indoor_areas},
                         area_game_area,
                         area_game_msg,
                         "室内区域游戏",
@@ -304,7 +537,7 @@ async def daily_plan_page() -> None:
                     (
                         "outdoor_game",
                         {
-                            "outdoor_content": state["outdoor_content"],
+                            "outdoor_content": outdoor_content,
                             "activity_process": "",
                         },
                         outdoor_activity_area,
@@ -324,21 +557,29 @@ async def daily_plan_page() -> None:
                     *[_run_one(t, extra) for t, extra, *_ in tasks],
                     return_exceptions=True,
                 )
+                if await _require_live_session() is None:
+                    return
+                if not _is_current_plan_target(target):
+                    if gen_all_operations.owns(owner):
+                        gen_all_btn.props(remove="loading")
+                    return
 
+                if any(not isinstance(result, Exception) for result in results):
+                    form_generation.advance()
                 failures: list[str] = []
                 for (task_type, _extra, area, msg, name), res in zip(tasks, results):
                     msg.classes(remove="text-green-600 text-red-500 text-orange-500")
                     if isinstance(res, ConfigError):
                         msg.classes(add="text-orange-500")
-                        msg.text = f"⚠ {res.message}"
-                        failures.append(f"{name}：{res.message}")
+                        msg.text = "⚠ AI 配置不可用"
+                        failures.append(f"{name}：配置不可用")
                     elif isinstance(res, (AiCallError, AiParseError)):
                         msg.classes(add="text-red-500")
-                        msg.text = f"❌ {res.message}"
-                        failures.append(f"{name}：{res.message}")
+                        msg.text = "❌ AI 调用或解析失败"
+                        failures.append(f"{name}：AI 调用或解析失败")
                     elif isinstance(res, Exception):
                         msg.classes(add="text-red-500")
-                        msg.text = f"❌ {type(res).__name__}: {res}"
+                        msg.text = f"❌ {type(res).__name__}"
                         failures.append(f"{name}：{type(res).__name__}")
                     else:
                         area.value = res
@@ -357,10 +598,36 @@ async def daily_plan_page() -> None:
                         f"⚠ 部分生成失败（{len(failures)}/{len(tasks)}）："
                         + "；".join(failures)
                     )
-                gen_all_btn.props(remove="loading")
+                if gen_all_operations.owns(owner):
+                    gen_all_btn.props(remove="loading")
 
+            def _capture_generate_all() -> tuple[
+                DailyPlanUiTarget | None,
+                dict[str, object],
+                str,
+                str,
+            ]:
+                return (
+                    _capture_plan_target(),
+                    {
+                        "grade": state["grade"],
+                        "class_name": state["class_name"],
+                        "activity_goal": goal_area.value,
+                        "activity_process": adapted_area.value or original_area.value,
+                        "week_number": state["week_number"],
+                        "weekday": state["weekday_cn"],
+                        "near_holiday": None,
+                    },
+                    str(state["indoor_areas"] or ""),
+                    str(state["outdoor_content"] or ""),
+                )
+
+            trigger_generate_all = gen_all_operations.bind(
+                capture=_capture_generate_all,
+                run=_gen_all_daily,
+            )
             gen_all_btn = ui.button(
-                "一键生成一日活动", on_click=_gen_all_daily
+                "一键生成一日活动", on_click=trigger_generate_all
             ).classes("bg-purple-600 text-white mt-1")
 
         # ══════════════════════════════════════════════════════════════════════
@@ -378,6 +645,7 @@ async def daily_plan_page() -> None:
                 .classes("w-full")
                 .props("rows=5 autogrow")
             )
+            morning_activity_area.on_value_change(form_generation.advance)
 
         # ══════════════════════════════════════════════════════════════════════
         # 区块三-C：晨间谈话
@@ -394,6 +662,7 @@ async def daily_plan_page() -> None:
                 .classes("w-full")
                 .props("rows=5 autogrow")
             )
+            morning_talk_area.on_value_change(form_generation.advance)
 
         # ══════════════════════════════════════════════════════════════════════
         # 区块三-D：室内区域游戏
@@ -412,6 +681,7 @@ async def daily_plan_page() -> None:
                 .classes("w-full")
                 .props("rows=5 autogrow")
             )
+            area_game_area.on_value_change(form_generation.advance)
 
         # ══════════════════════════════════════════════════════════════════════
         # 区块三-E：户外游戏
@@ -428,6 +698,7 @@ async def daily_plan_page() -> None:
                 .classes("w-full")
                 .props("rows=5 autogrow")
             )
+            outdoor_activity_area.on_value_change(form_generation.advance)
 
         # ══════════════════════════════════════════════════════════════════════
         # 区块三-F：一日活动反思
@@ -446,15 +717,71 @@ async def daily_plan_page() -> None:
                 .classes("w-full")
                 .props("rows=4 autogrow")
             )
+            daily_reflection_area.on_value_change(form_generation.advance)
 
-            async def _gen_daily_reflection() -> None:
+            async def _gen_daily_reflection(
+                owner: object,
+                frozen: tuple[DailyPlanUiTarget | None, dict[str, object]],
+            ) -> None:
+                target, context = frozen
+                if await _require_live_session() is None:
+                    return
+                if target is None or not _is_current_plan_target(target):
+                    daily_reflection_msg.classes(
+                        remove="text-green-600 text-red-500", add="text-orange-500"
+                    )
+                    daily_reflection_msg.text = "⚠ 请重新选择日期并加载当前草稿"
+                    return
                 daily_reflection_btn.props("loading")
                 daily_reflection_msg.classes(
                     remove="text-green-600 text-red-500 text-orange-500"
                 )
                 daily_reflection_msg.text = "AI 生成中……"
                 try:
-                    context = {
+                    async with AsyncSessionLocal() as session:
+                        content = await generate_activity_content(
+                            session, tenant_id, user_id, "daily_reflection", context
+                        )
+                    if await _require_live_session() is None:
+                        return
+                    if not _is_current_plan_target(target):
+                        return
+                    form_generation.advance()
+                    daily_reflection_area.value = content
+                    daily_reflection_msg.classes(add="text-green-600")
+                    daily_reflection_msg.text = "✅ 生成完成"
+                except ConfigError:
+                    if await _require_live_session() is None:
+                        return
+                    if not _is_current_plan_target(target):
+                        return
+                    daily_reflection_msg.classes(add="text-orange-500")
+                    daily_reflection_msg.text = "⚠ AI 配置不可用，请检查模型配置"
+                except (AiCallError, AiParseError):
+                    if await _require_live_session() is None:
+                        return
+                    if not _is_current_plan_target(target):
+                        return
+                    daily_reflection_msg.classes(add="text-red-500")
+                    daily_reflection_msg.text = "❌ AI 调用或解析失败，请稍后重试"
+                except Exception as e:
+                    if await _require_live_session() is None:
+                        return
+                    if not _is_current_plan_target(target):
+                        return
+                    daily_reflection_msg.classes(add="text-red-500")
+                    daily_reflection_msg.text = f"❌ {type(e).__name__}"
+                finally:
+                    if (
+                        await _require_live_session() is not None
+                        and reflection_operations.owns(owner)
+                    ):
+                        daily_reflection_btn.props(remove="loading")
+
+            trigger_generate_reflection = reflection_operations.bind(
+                capture=lambda: (
+                    _capture_plan_target(),
+                    {
                         "grade": state["grade"],
                         "class_name": state["class_name"],
                         "activity_goal": goal_area.value,
@@ -462,28 +789,12 @@ async def daily_plan_page() -> None:
                         "morning_talk": morning_talk_area.value,
                         "indoor_area": area_game_area.value,
                         "outdoor_activity": outdoor_activity_area.value,
-                    }
-                    async with AsyncSessionLocal() as session:
-                        content = await generate_activity_content(
-                            session, tenant_id, user_id, "daily_reflection", context
-                        )
-                    daily_reflection_area.value = content
-                    daily_reflection_msg.classes(add="text-green-600")
-                    daily_reflection_msg.text = "✅ 生成完成"
-                except ConfigError as e:
-                    daily_reflection_msg.classes(add="text-orange-500")
-                    daily_reflection_msg.text = f"⚠ {e.message}"
-                except (AiCallError, AiParseError) as e:
-                    daily_reflection_msg.classes(add="text-red-500")
-                    daily_reflection_msg.text = f"❌ {e.message}"
-                except Exception as e:
-                    daily_reflection_msg.classes(add="text-red-500")
-                    daily_reflection_msg.text = f"❌ {type(e).__name__}: {e}"
-                finally:
-                    daily_reflection_btn.props(remove="loading")
-
+                    },
+                ),
+                run=_gen_daily_reflection,
+            )
             daily_reflection_btn = ui.button(
-                "AI 生成", on_click=_gen_daily_reflection
+                "AI 生成", on_click=trigger_generate_reflection
             ).classes("bg-purple-600 text-white text-sm mt-2")
 
         # ══════════════════════════════════════════════════════════════════════
@@ -492,66 +803,134 @@ async def daily_plan_page() -> None:
         with ui.row().classes("w-full gap-3 mt-2"):
             save_msg = ui.label("").classes("text-sm flex-1")
 
-            async def _save_draft() -> None:
-                if not state["selected_date"]:
+            async def _save_draft(
+                owner: object,
+                frozen: tuple[
+                    DailyPlanUiTarget | None,
+                    _DailyPlanSavePayload | None,
+                ],
+            ) -> None:
+                target, save_payload = frozen
+                if await _require_live_session() is None:
+                    return
+                if (
+                    target is None
+                    or save_payload is None
+                    or not _is_current_plan_target(target)
+                ):
                     save_msg.classes(remove="text-green-600 text-red-500")
                     save_msg.classes(add="text-orange-500")
-                    save_msg.text = "⚠ 请先选择日期"
+                    save_msg.text = "⚠ 请重新选择日期并加载当前草稿"
                     return
 
                 save_btn.props("loading")
                 save_msg.classes(remove="text-green-600 text-red-500 text-orange-500")
                 save_msg.text = "保存中……"
 
-                d = state["selected_date"]
-                wn = state["week_number"] or 1
-                wday = state["weekday_cn"] or get_weekday_cn(d)
+                d = target.selected_date
 
                 agent_panel.plan_changed(d)
                 try:
                     async with AsyncSessionLocal() as session:
                         async with session.begin():
-                            await save_daily_plan(
+                            saved_plan = await save_daily_plan(
                                 session=session,
                                 tenant_id=tenant_id,
                                 user_id=user_id,
-                                plan_date=d,
-                                week_number=wn,
-                                weekday_cn=wday,
-                                grade=state["grade"],
-                                class_name=state["class_name"],
-                                activity_goal=goal_area.value,
-                                activity_prep=prep_area.value,
-                                activity_key=key_area.value,
-                                activity_difficult=difficult_area.value,
-                                activity_process_original=original_area.value,
-                                activity_process_adapted=adapted_area.value,
-                                morning_activity=morning_activity_area.value,
-                                morning_talk_topic=morning_talk_area.value,
-                                indoor_area=area_game_area.value,
-                                outdoor_activity=outdoor_activity_area.value,
-                                daily_reflection=daily_reflection_area.value,
+                                **save_payload,
                             )
 
+                    if await _require_live_session() is None:
+                        return
+                    if not _is_current_plan_target(target):
+                        return
+                    state["loaded_plan_id"] = saved_plan.id
+                    state["loaded_revision"] = saved_plan.revision
                     save_msg.classes(add="text-green-600")
                     save_msg.text = f"✅ 草稿已保存（{d}）"
+                except StaleDataError:
+                    if await _require_live_session() is None:
+                        return
+                    if not _is_current_plan_target(target):
+                        return
+                    save_msg.classes(add="text-orange-500")
+                    save_msg.text = "⚠ 计划已被其他页面更新，请重新选择日期加载最新版本"
                 except Exception:
+                    if await _require_live_session() is None:
+                        return
+                    if not _is_current_plan_target(target):
+                        return
                     save_msg.classes(add="text-red-500")
                     save_msg.text = "❌ 保存失败，请重试"
                 finally:
-                    save_btn.props(remove="loading")
+                    if (
+                        await _require_live_session() is not None
+                        and save_operations.owns(owner)
+                    ):
+                        save_btn.props(remove="loading")
 
-            save_btn = ui.button("保存草稿", on_click=_save_draft).classes(
+            def _capture_save() -> tuple[
+                DailyPlanUiTarget | None,
+                _DailyPlanSavePayload | None,
+            ]:
+                target = _capture_plan_target()
+                if target is None:
+                    return None, None
+                d = target.selected_date
+                save_payload: _DailyPlanSavePayload = {
+                    "plan_date": d,
+                    "week_number": int(state["week_number"] or 1),
+                    "weekday_cn": str(state["weekday_cn"] or get_weekday_cn(d)),
+                    "grade": str(state["grade"] or ""),
+                    "class_name": str(state["class_name"] or ""),
+                    "expected_plan_id": target.plan_id,
+                    "expected_revision": target.revision,
+                    "activity_goal": goal_area.value,
+                    "activity_prep": prep_area.value,
+                    "activity_key": key_area.value,
+                    "activity_difficult": difficult_area.value,
+                    "activity_process_original": original_area.value,
+                    "activity_process_adapted": adapted_area.value,
+                    "morning_activity": morning_activity_area.value,
+                    "morning_talk_topic": morning_talk_area.value,
+                    "indoor_area": area_game_area.value,
+                    "outdoor_activity": outdoor_activity_area.value,
+                    "daily_reflection": daily_reflection_area.value,
+                }
+                return target, save_payload
+
+            trigger_save = save_operations.bind(
+                capture=_capture_save,
+                run=_save_draft,
+            )
+            save_btn = ui.button("保存草稿", on_click=trigger_save).classes(
                 "bg-green-600 text-white"
             )
 
             async def _delete_draft() -> None:
-                deleting_date = state["selected_date"]
+                target = _capture_plan_target()
+                deleting_date = target.selected_date if target is not None else None
+                deleting_plan_id = target.plan_id if target is not None else None
+                deleting_revision = target.revision if target is not None else None
+                if await _require_live_session() is None:
+                    return
                 if not deleting_date:
                     save_msg.classes(
                         remove="text-green-600 text-red-500", add="text-orange-500"
                     )
                     save_msg.text = "⚠ 请先选择日期"
+                    return
+                if deleting_plan_id is None or deleting_revision is None:
+                    save_msg.classes(
+                        remove="text-green-600 text-red-500", add="text-orange-500"
+                    )
+                    save_msg.text = "⚠ 当前日期没有已加载的草稿"
+                    return
+                if target is None or not _is_current_plan_target(target):
+                    save_msg.classes(
+                        remove="text-green-600 text-red-500", add="text-orange-500"
+                    )
+                    save_msg.text = "⚠ 页面目标已变化，请重新选择日期"
                     return
                 with ui.dialog() as dlg, ui.card():
                     ui.label("确定要删除当天的草稿吗？删除后无法恢复。").classes(
@@ -565,44 +944,63 @@ async def daily_plan_page() -> None:
                         ui.button("取消", on_click=lambda: dlg.submit("no"))
                 result = await dlg
                 if result == "yes":
+                    if await _require_live_session() is None:
+                        return
+                    if not _is_current_plan_target(target):
+                        return
                     agent_panel.plan_changed(deleting_date)
                     try:
                         async with AsyncSessionLocal() as session:
-                            deleted = await delete_daily_plan(
-                                session,
-                                tenant_id=tenant_id,
-                                user_id=user_id,
-                                plan_date=deleting_date,
-                            )
-                        if deleted:
-                            save_msg.classes(
-                                remove="text-green-600 text-orange-500",
-                                add="text-gray-500",
-                            )
-                            save_msg.text = "✅ 草稿已删除"
-                            # 清空表单
-                            for area in (
-                                goal_area,
-                                prep_area,
-                                key_area,
-                                difficult_area,
-                                adapted_area,
-                                original_area,
-                                morning_activity_area,
-                                morning_talk_area,
-                                area_game_area,
-                                outdoor_activity_area,
-                                daily_reflection_area,
-                            ):
-                                area.value = ""
-                            raw_text_area.value = ""
-                            await refresh_history()
-                        else:
-                            save_msg.classes(add="text-orange-500")
-                            save_msg.text = "⚠ 未找到当天草稿"
+                            async with session.begin():
+                                await delete_daily_plan(
+                                    session,
+                                    tenant_id=tenant_id,
+                                    user_id=user_id,
+                                    plan_id=deleting_plan_id,
+                                    expected_revision=deleting_revision,
+                                )
+                        if await _require_live_session() is None:
+                            return
+                        if not _is_current_plan_target(target):
+                            return
+                        save_msg.classes(
+                            remove="text-green-600 text-orange-500",
+                            add="text-gray-500",
+                        )
+                        save_msg.text = "✅ 草稿已删除"
+                        # 清空表单
+                        for area in (
+                            goal_area,
+                            prep_area,
+                            key_area,
+                            difficult_area,
+                            adapted_area,
+                            original_area,
+                            morning_activity_area,
+                            morning_talk_area,
+                            area_game_area,
+                            outdoor_activity_area,
+                            daily_reflection_area,
+                        ):
+                            area.value = ""
+                        raw_text_area.value = ""
+                        state["loaded_plan_id"] = None
+                        state["loaded_revision"] = None
+                        await refresh_history()
+                    except StaleDataError:
+                        if await _require_live_session() is None:
+                            return
+                        if not _is_current_plan_target(target):
+                            return
+                        save_msg.classes(add="text-orange-500")
+                        save_msg.text = "⚠ 计划已被其他页面更新，请重新加载后再删除"
                     except Exception as e:
+                        if await _require_live_session() is None:
+                            return
+                        if not _is_current_plan_target(target):
+                            return
                         save_msg.classes(add="text-red-500")
-                        save_msg.text = f"❌ 删除失败：{e}"
+                        save_msg.text = f"❌ 删除失败：{type(e).__name__}"
 
             ui.button("删除草稿", icon="delete", on_click=_delete_draft).classes(
                 "bg-red-500 text-white"
@@ -612,13 +1010,18 @@ async def daily_plan_page() -> None:
         with ui.row().classes("w-full gap-3 mt-1 items-center"):
             export_msg = ui.label("").classes("text-sm flex-1")
 
-            async def _export_word() -> None:
-                if not state["selected_date"]:
+            async def _export_word(
+                owner: object,
+                target: DailyPlanUiTarget | None,
+            ) -> None:
+                if await _require_live_session() is None:
+                    return
+                if target is None or not _is_current_plan_target(target):
                     export_msg.classes(
                         remove="text-green-600 text-red-500",
                         add="text-orange-500",
                     )
-                    export_msg.text = "⚠ 请先选择日期并保存草稿"
+                    export_msg.text = "⚠ 请重新选择日期并加载当前草稿"
                     return
 
                 export_btn.props("loading")
@@ -626,15 +1029,23 @@ async def daily_plan_page() -> None:
                 export_msg.text = "导出中……"
 
                 try:
-                    d = state["selected_date"]
+                    d = target.selected_date
                     async with AsyncSessionLocal() as session:
                         plan = await get_daily_plan_by_date(
                             session, tenant_id, user_id, d
                         )
+                    if await _require_live_session() is None:
+                        return
+                    if not _is_current_plan_target(target):
+                        return
 
                     if plan is None:
                         export_msg.classes(add="text-orange-500")
                         export_msg.text = "⚠ 请先保存草稿再导出"
+                        return
+                    if plan.id != target.plan_id or plan.revision != target.revision:
+                        export_msg.classes(add="text-orange-500")
+                        export_msg.text = "⚠ 计划版本已变化，请重新选择日期后再导出"
                         return
 
                     # 从已存储的原文与改写文重新计算差异
@@ -645,6 +1056,10 @@ async def daily_plan_page() -> None:
 
                     # 生成 Word 字节流
                     doc_bytes = export_daily_plan(plan, diff)
+                    if await _require_live_session() is None:
+                        return
+                    if not _is_current_plan_target(target):
+                        return
 
                     # 构建文件名与路径
                     grade = plan.grade or "未知年级"
@@ -669,6 +1084,10 @@ async def daily_plan_page() -> None:
                                 file_name=filename,
                                 file_path=str(file_path.resolve()),
                             )
+                    if await _require_live_session() is None:
+                        return
+                    if not _is_current_plan_target(target):
+                        return
 
                     # 触发浏览器下载
                     ui.download(doc_bytes, filename=filename)
@@ -684,12 +1103,24 @@ async def daily_plan_page() -> None:
                     export_msg.text = f"✅ 已导出：{filename}"
 
                 except Exception as e:
+                    if await _require_live_session() is None:
+                        return
+                    if not _is_current_plan_target(target):
+                        return
                     export_msg.classes(add="text-red-500")
-                    export_msg.text = f"❌ 导出失败：{type(e).__name__}: {e}"
+                    export_msg.text = f"❌ 导出失败：{type(e).__name__}"
                 finally:
-                    export_btn.props(remove="loading")
+                    if (
+                        await _require_live_session() is not None
+                        and export_operations.owns(owner)
+                    ):
+                        export_btn.props(remove="loading")
 
-            export_btn = ui.button("导出 Word", on_click=_export_word).classes(
+            trigger_export = export_operations.bind(
+                capture=_capture_plan_target,
+                run=_export_word,
+            )
+            export_btn = ui.button("导出 Word", on_click=trigger_export).classes(
                 "bg-indigo-600 text-white"
             )
 
@@ -720,13 +1151,29 @@ async def daily_plan_page() -> None:
                 with ui.menu() as batch_end_picker:
                     ui.date(mask="YYYY-MM-DD").bind_value(batch_end_input)
 
+        batch_start_input.on_value_change(batch_range_generation.advance)
+        batch_end_input.on_value_change(batch_range_generation.advance)
+
         batch_msg = ui.label("").classes("text-sm mt-2")
 
-        async def _batch_export() -> None:
-            from datetime import datetime
-
-            start_str = batch_start_input.value
-            end_str = batch_end_input.value
+        async def _batch_export(
+            owner: object,
+            frozen: tuple[int, str, str, date | None, date | None, bool],
+        ) -> None:
+            (
+                range_generation,
+                start_str,
+                end_str,
+                start_date,
+                end_date,
+                date_parse_failed,
+            ) = frozen
+            if await _require_live_session() is None:
+                return
+            if not batch_range_generation.is_current(
+                range_generation
+            ) or not batch_export_operations.owns(owner):
+                return
 
             if not start_str or not end_str:
                 batch_msg.classes(
@@ -735,10 +1182,7 @@ async def daily_plan_page() -> None:
                 batch_msg.text = "⚠ 请先选择开始日期和结束日期"
                 return
 
-            try:
-                start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
-                end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
-            except ValueError:
+            if date_parse_failed or start_date is None or end_date is None:
                 batch_msg.classes(
                     remove="text-green-600 text-red-500", add="text-orange-500"
                 )
@@ -766,6 +1210,12 @@ async def daily_plan_page() -> None:
                         end_date=end_date,
                         limit=200,
                     )
+                if await _require_live_session() is None:
+                    return
+                if not batch_range_generation.is_current(
+                    range_generation
+                ) or not batch_export_operations.owns(owner):
+                    return
 
                 if not plans:
                     batch_msg.classes(add="text-orange-500")
@@ -789,6 +1239,12 @@ async def daily_plan_page() -> None:
                 ]
 
                 doc_bytes = export_batch_daily_plans(plans_with_diffs)
+                if await _require_live_session() is None:
+                    return
+                if not batch_range_generation.is_current(
+                    range_generation
+                ) or not batch_export_operations.owns(owner):
+                    return
 
                 # 取第一条（按日期升序后最早的）的年级班级信息
                 first_plan = min(plans, key=lambda p: p.plan_date)
@@ -814,6 +1270,12 @@ async def daily_plan_page() -> None:
                             file_name=filename,
                             file_path=str(file_path.resolve()),
                         )
+                if await _require_live_session() is None:
+                    return
+                if not batch_range_generation.is_current(
+                    range_generation
+                ) or not batch_export_operations.owns(owner):
+                    return
 
                 ui.download(doc_bytes, filename=filename)
 
@@ -833,12 +1295,55 @@ async def daily_plan_page() -> None:
                 )
 
             except Exception as e:
+                if await _require_live_session() is None:
+                    return
+                if not batch_range_generation.is_current(
+                    range_generation
+                ) or not batch_export_operations.owns(owner):
+                    return
                 batch_msg.classes(add="text-red-500")
-                batch_msg.text = f"❌ 批量导出失败：{type(e).__name__}: {e}"
+                batch_msg.text = f"❌ 批量导出失败：{type(e).__name__}"
             finally:
-                batch_btn.props(remove="loading")
+                if (
+                    await _require_live_session() is not None
+                    and batch_export_operations.owns(owner)
+                ):
+                    batch_btn.props(remove="loading")
 
-        batch_btn = ui.button("批量导出 Word", on_click=_batch_export).classes(
+        def _capture_batch_export() -> tuple[
+            int,
+            str,
+            str,
+            date | None,
+            date | None,
+            bool,
+        ]:
+            range_generation = batch_range_generation.capture()
+            start_str = str(batch_start_input.value or "")
+            end_str = str(batch_end_input.value or "")
+            start_date = None
+            end_date = None
+            date_parse_failed = False
+            if start_str and end_str:
+                try:
+                    start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
+                    end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
+                except ValueError:
+                    date_parse_failed = True
+            return (
+                range_generation,
+                start_str,
+                end_str,
+                start_date,
+                end_date,
+                date_parse_failed,
+            )
+
+        trigger_batch_export = batch_export_operations.bind(
+            capture=_capture_batch_export,
+            run=_batch_export,
+        )
+        batch_btn = ui.button("批量导出 Word", on_click=trigger_batch_export).classes(
             "bg-emerald-600 text-white mt-2"
         )
 
@@ -851,7 +1356,9 @@ async def daily_plan_page() -> None:
     history_container = ui.column().classes("w-full gap-2 mt-1")
 
     async def refresh_history() -> None:
-        history_container.clear()
+        request_generation = history_requests.advance()
+        if await _require_live_session() is None:
+            return
         try:
             async with AsyncSessionLocal() as session:
                 plans, _ = await list_daily_plans_for_user(
@@ -860,6 +1367,11 @@ async def daily_plan_page() -> None:
                     user_id,
                     limit=20,
                 )
+            if await _require_live_session() is None:
+                return
+            if not history_requests.is_current(request_generation):
+                return
+            history_container.clear()
             with history_container:
                 if not plans:
                     ui.label("暂无历史记录").classes("text-gray-400 text-sm")
@@ -875,6 +1387,15 @@ async def daily_plan_page() -> None:
                                 ).classes("text-sm text-gray-700")
 
                                 async def _delete_plan(p=plan) -> None:
+                                    selected_target = _capture_plan_target()
+                                    if selected_target is not None and (
+                                        selected_target.selected_date != p.plan_date
+                                        or selected_target.plan_id != p.id
+                                        or selected_target.revision != p.revision
+                                    ):
+                                        selected_target = None
+                                    if await _require_live_session() is None:
+                                        return
                                     with ui.dialog() as dlg, ui.card():
                                         ui.label(
                                             f"确定要删除「{p.plan_date}」的活动计划吗？删除后无法恢复。"
@@ -890,25 +1411,53 @@ async def daily_plan_page() -> None:
                                             )
                                     result = await dlg
                                     if result == "yes":
+                                        if await _require_live_session() is None:
+                                            return
                                         agent_panel.plan_changed(p.plan_date)
                                         try:
                                             async with AsyncSessionLocal() as s:
-                                                await delete_daily_plan(
-                                                    s,
-                                                    tenant_id=tenant_id,
-                                                    user_id=user_id,
-                                                    plan_date=p.plan_date,
+                                                async with s.begin():
+                                                    await delete_daily_plan(
+                                                        s,
+                                                        tenant_id=tenant_id,
+                                                        user_id=user_id,
+                                                        plan_id=p.id,
+                                                        expected_revision=p.revision,
+                                                    )
+                                            if await _require_live_session() is None:
+                                                return
+                                            if (
+                                                selected_target is not None
+                                                and _is_current_plan_target(
+                                                    selected_target
                                                 )
+                                            ):
+                                                state["loaded_plan_id"] = None
+                                                state["loaded_revision"] = None
                                             await refresh_history()
-                                        except Exception as ex:
+                                        except StaleDataError:
+                                            if await _require_live_session() is None:
+                                                return
                                             ui.notify(
-                                                f"删除失败：{ex}", type="negative"
+                                                "计划已被其他页面更新，请刷新后再删除",
+                                                type="warning",
+                                            )
+                                        except Exception as ex:
+                                            if await _require_live_session() is None:
+                                                return
+                                            ui.notify(
+                                                f"删除失败：{type(ex).__name__}",
+                                                type="negative",
                                             )
 
                                 ui.button(
                                     "删除", icon="delete", on_click=_delete_plan
                                 ).props("size=sm flat").classes("text-red-500")
         except Exception:
+            if await _require_live_session() is None:
+                return
+            if not history_requests.is_current(request_generation):
+                return
             with history_container:
                 ui.label("加载历史失败").classes("text-red-500 text-sm")
 
@@ -929,12 +1478,16 @@ async def daily_plan_page() -> None:
         daily_reflection_area.value = ""
         state["original_process"] = ""
         state["diff_result"] = []
+        state["loaded_plan_id"] = None
+        state["loaded_revision"] = None
 
     async def _load_draft(
         selected: date | None,
         selection: DateSelection,
     ) -> None:
         """根据选定日期加载已有草稿，回填各字段。"""
+        if await _require_live_session() is None:
+            return
         if (
             not selected
             or selection_state["current"] is not selection
@@ -949,9 +1502,12 @@ async def daily_plan_page() -> None:
         except Exception:
             return
 
+        if await _require_live_session() is None:
+            return
         if plan is None or selection_state["current"] is not selection:
             return
 
+        form_generation.advance()
         goal_area.value = plan.activity_goal or ""
         prep_area.value = plan.activity_prep or ""
         key_area.value = plan.activity_key or ""
@@ -959,6 +1515,8 @@ async def daily_plan_page() -> None:
         adapted_area.value = plan.activity_process_adapted or ""
         original_area.value = plan.activity_process_original or ""
         state["original_process"] = plan.activity_process_original or ""
+        state["loaded_plan_id"] = plan.id
+        state["loaded_revision"] = plan.revision
         morning_activity_area.value = plan.morning_activity or ""
         morning_talk_area.value = plan.morning_talk_topic or ""
         area_game_area.value = plan.indoor_area or ""

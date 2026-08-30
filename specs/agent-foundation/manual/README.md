@@ -1,7 +1,8 @@
 # F009 人工验收辅助
 
-本目录只服务于 F009 的 Linux 浏览器 mock 与安全配置真实模型验收。辅助脚本不增加或执行 Agent WRITE，
-不保存会话，也不代替浏览器可见断言、真实模型 PASS、双轴 Review 或精确 SHA Quality。
+本目录主体服务于 F009 的 Linux 浏览器 mock 与安全配置真实模型验收；W007/W008 只可复用 mock seed 与关闭
+mock server 作为合成 fixture，并须由各自规范的独立 helper/数据库断言形成证据。辅助脚本不增加或执行
+Agent WRITE，不保存会话，也不代替浏览器可见断言、真实模型 PASS、双轴 Review 或精确 SHA Quality。
 
 ## 共同安全门
 

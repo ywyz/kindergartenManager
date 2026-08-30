@@ -1,6 +1,7 @@
 # KindergartenManager 当前人工测试矩阵
 
-> 每次验收记录固定 SHA、构建来源、平台、数据库和外部服务。历史账号管理测试已不适用于当前单用户 UI。
+> 每次验收记录固定 SHA、构建来源、平台、数据库和外部服务。身份验收必须覆盖当前可信 UI session，
+> 不能沿用旧固定 actor 或单用户流程。
 
 ## 1. 记录头
 
@@ -18,9 +19,14 @@ Word：Microsoft Word / LibreOffice / 未执行
 
 ## 2. 启动与迁移
 
-- [ ] 全新数据目录启动，迁移到 `a6c4d8e2f9b1`。
-- [ ] `/` 跳转 `/home`，没有登录表单。
-- [ ] `/home`、`/settings` 可打开；旧 `/setup` 立即跳转 `/settings`。
+- [ ] 全新数据目录启动，迁移到 `2b7f3d5e9c8a`，确认两张 Agent WRITE evidence 表及不可变 trigger 存在，
+  且 `user.auth_epoch` 默认 1、非空、拒绝非正数。
+- [ ] 空库不自动创建固定管理员；在应用主机显式 bootstrap 后才能登录。
+- [ ] `/` 跳转 `/login`；未登录不能进入 `/home`、`/settings` 等业务页，匿名 `/register` 不挂载。
+- [ ] 登录后 `/home`、`/settings` 可打开；旧 `/setup` 立即跳转 `/settings`。
+- [ ] A 标签页退出并在 B 标签页重新登录后，A 的保存、AI、导出和删除 callback 因 `jti` 不匹配失败关闭。
+- [ ] token 过期、用户停用、角色降权或数据库不可用时清除旧登录态；无 Repository/Provider/文件副作用。
+- [ ] 用户自改密码、管理员重置或 bootstrap 恢复密码后，旧 token 立即失效；重新登录签发的新 token 可用。
 - [ ] 重启后 SQLite、自动密钥和已保存 AI 配置可继续使用。
 - [ ] 迁移失败时明确记录实际行为，不能只记“页面打开”。
 - [ ] 日志不含 AI Key、数据库密码或完整幼儿图片内容。
@@ -41,6 +47,9 @@ Word：Microsoft Word / LibreOffice / 未执行
 - [ ] 年龄适配保留原文并生成可编辑适配稿。
 - [ ] 晨间活动、晨间谈话、区域、户外、反思可生成/编辑。
 - [ ] 保存后重开仍一致。
+- [ ] 两个页面都读取同一 revision 后，先保存者成功且恰好 `N→N+1`，后保存的陈旧表单不覆盖新值。
+- [ ] 两个页面都读取同一 revision 后，B 先保存为新 revision；A 再确认删除时得到 stale 提示，B 的新版本仍在。
+- [ ] 在真实 MySQL 8 上分别只改变正文大小写、重音或尾随空格，均被视为真实内容变化并恰好递增一次 revision。
 - [ ] Word 使用 `teacherplan.docx`，字段、中文字体和差异红字正确。
 - [ ] 导出记录与业务记录关联正确。
 
@@ -90,7 +99,7 @@ Word：Microsoft Word / LibreOffice / 未执行
 ## 10. 安全与网络
 
 - [ ] frozen 桌面版只监听 `127.0.0.1`。
-- [ ] 源码/Docker 暴露范围符合验收环境，未把无登录 UI 直接暴露公网。
+- [ ] 源码/Docker 暴露范围符合验收环境，所有业务 UI 均经过登录与 callback-time 会话绑定。
 - [ ] `.env`、`.kindergarten_secrets`、数据库和 exports 权限合理。
 - [ ] Compose 已覆盖所有示例默认密码。
 - [ ] 上传、AI、导出异常不在 UI/日志显示密钥或 traceback。

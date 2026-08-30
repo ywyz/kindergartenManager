@@ -33,7 +33,7 @@ async def test_create_homemade_teaching_toy_persists_fields(async_session):
 
 
 @pytest.mark.asyncio
-async def test_get_homemade_teaching_toy_tenant_isolation(async_session):
+async def test_get_homemade_teaching_toy_actor_isolation(async_session):
     from app.repository.homemade_teaching_repository import (
         create_homemade_teaching_toy,
         get_homemade_teaching_toy,
@@ -51,12 +51,30 @@ async def test_get_homemade_teaching_toy_tenant_isolation(async_session):
         play_methods="按颜色和大小配对。",
     )
 
-    found = await get_homemade_teaching_toy(async_session, tenant_id=1, toy_id=toy.id)
+    found = await get_homemade_teaching_toy(
+        async_session,
+        tenant_id=1,
+        user_id=2,
+        toy_id=toy.id,
+    )
     assert found is not None
     assert found.toy_name == "瓶盖配对盒"
 
-    not_found = await get_homemade_teaching_toy(async_session, tenant_id=99, toy_id=toy.id)
+    not_found = await get_homemade_teaching_toy(
+        async_session,
+        tenant_id=99,
+        user_id=2,
+        toy_id=toy.id,
+    )
     assert not_found is None
+
+    another_user = await get_homemade_teaching_toy(
+        async_session,
+        tenant_id=1,
+        user_id=3,
+        toy_id=toy.id,
+    )
+    assert another_user is None
 
 
 @pytest.mark.asyncio
@@ -130,20 +148,39 @@ async def test_delete_homemade_teaching_toy_requires_tenant_and_user(async_sessi
         play_methods="幼儿投掷并记录分数。",
     )
 
-    assert await delete_homemade_teaching_toy(
-        async_session,
-        tenant_id=1,
-        user_id=99,
-        toy_id=toy.id,
-    ) is False
+    assert (
+        await delete_homemade_teaching_toy(
+            async_session,
+            tenant_id=1,
+            user_id=99,
+            toy_id=toy.id,
+        )
+        is False
+    )
 
-    assert await get_homemade_teaching_toy(async_session, tenant_id=1, toy_id=toy.id)
-
-    assert await delete_homemade_teaching_toy(
+    assert await get_homemade_teaching_toy(
         async_session,
         tenant_id=1,
         user_id=2,
         toy_id=toy.id,
-    ) is True
+    )
 
-    assert await get_homemade_teaching_toy(async_session, tenant_id=1, toy_id=toy.id) is None
+    assert (
+        await delete_homemade_teaching_toy(
+            async_session,
+            tenant_id=1,
+            user_id=2,
+            toy_id=toy.id,
+        )
+        is True
+    )
+
+    assert (
+        await get_homemade_teaching_toy(
+            async_session,
+            tenant_id=1,
+            user_id=2,
+            toy_id=toy.id,
+        )
+        is None
+    )

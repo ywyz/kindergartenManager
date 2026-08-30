@@ -1,6 +1,6 @@
 # 幼儿园教学管理系统架构文档（初始化）
 
-> **历史文档说明（2026-08-25）**：本文按开发阶段累积，包含已被后续单用户模式取代的登录描述和旧迁移/测试数字。当前架构事实见 [`../CONTEXT.md`](../CONTEXT.md)、[`../docs/design/system-architecture.md`](../docs/design/system-architecture.md)、[`../docs/design/data-model.md`](../docs/design/data-model.md) 和 [`../docs/ADR/README.md`](../docs/ADR/README.md)。受控 Agent 的 F003-F009 已固定 GREEN，具体 Provider、六 Tool executor、组合装配与每日计划 UI 已实现；F009 零持久化、Linux 浏览器 mock 与应用安全配置真实模型验收均已 PASS，最终 closure SHA 证据见 Issue #48。边界见 [`../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md`](../docs/ADR/ADR-0005-controlled-ai-agent-runtime.md) 与 [`../docs/design/agent-runtime.md`](../docs/design/agent-runtime.md)。下文历史内容不授权 Agent WRITE。当前 Alembic head 为 `a6c4d8e2f9b1`。
+> **历史文档说明（2026-08-30）**：本文按开发阶段累积，包含已被后续可信登录恢复取代的单用户描述和旧迁移/测试数字。当前架构事实见 [`../CONTEXT.md`](../CONTEXT.md)、[`../docs/design/system-architecture.md`](../docs/design/system-architecture.md)、[`../docs/design/data-model.md`](../docs/design/data-model.md) 和 [`../docs/ADR/README.md`](../docs/ADR/README.md)。受控 Agent 的 F003-F009 已固定 GREEN；当前分支的可信 UI session、`daily_plan.revision` 与 W005/W006 逐次确认 WRITE 边界见 [`../docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md`](../docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md) 和 [`../specs/agent-write/spec.md`](../specs/agent-write/spec.md)。下文主体保留历史，不授权跳过 W006-W008 门禁。当前 Alembic head 为 `2b7f3d5e9c8a`；其前序 `e5f7a9c2d4b6` 是 W006 evidence schema revision。
 
 ## 1. 历史阶段记录
 
@@ -445,3 +445,16 @@ F009 稳定 RED `34e12f2…` 与后续 Review RED 固定零持久化、POSIX sec
 `0`、Spec `0`，远端 Quality `32808246590` 精确匹配成功。Linux Chrome mock 与应用安全配置真实模型均
 PASS；两者 UI/全逻辑 snapshot compare 均为 `equal=true`，完整脱敏证据位于
 `specs/agent-foundation/evidence/`，最终 closure SHA 的 Review/Quality/Issue 证据见 Issue #48。
+
+## 15. 可信 UI session、daily-plan revision 与 Agent WRITE 冻结边界（2026-08-27 更新）
+
+当前边界以 [ADR-0006](../docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md) 和
+[Agent WRITE spec](../specs/agent-write/spec.md) 为准：UI actor 由 JWT jti + active User 重建；`daily_plan`
+使用精确 plan id + revision；W005 的短命 confirmation store 与 W006 的 version→CAS→audit 同事务、全回滚及
+commit-unknown 只读对账已经闭合。
+
+W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
+Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。不得增加 Provider WRITE、自动重试、批量或跨页面采用、
+设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。当前 W007 的精确本地交付状态、
+Review 轮次、SHA 与测试证据仅以 `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后
+作为外部证据；本文不复制逐轮事实。merge、Issue 关闭与 release 仍须单独授权。

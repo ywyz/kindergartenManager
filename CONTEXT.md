@@ -1,12 +1,13 @@
 # KindergartenManager 项目上下文
 
-> 状态快照：2026-08-25；Agent 安全同步 RED 基线：`5de2e49bee19749f611b50747a31be9464b92d7b`；
-> 当前检出分支：`feat/agent-foundation`（F005-F009 已固定 GREEN；F009 自动矩阵与两类人工验收已 PASS，
-> 最终 closure Review/Quality/Issue 证据见 Issue #48）；
-> 最近远端产品主线：`origin/main@cfeadefd7dfa056c1b3757876658493110d8cf84`。
->
-> 本文件用于回答“当前仓库实际上是什么、哪些事实已经确认、下一步可以做什么”。
-> 历史进度文档可以解释来路，但不能覆盖当前代码、迁移和本文件记录的现状。
+> 状态快照：2026-08-27；合入基线：`main@ca3b7bd922f838c0739ccf9ed0f58655d292dc2f`；
+> 当前分支：`feat/agent-write`。W005/W006 已闭合；W007 当前能力仅为每日计划当前页面、单一 Patch、
+> 用户显式确认后的本地应用层 WRITE。Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。
+> 当前 W007 的精确本地交付状态、Review 轮次、SHA 与测试证据仅以
+> `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后作为外部证据；本文不复制逐轮事实。
+> 不得增加 Provider WRITE、自动重试、批量或跨页面采用、
+> 设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。完整 W007 证据仅见
+> `specs/agent-write/tests/README.md`。
 
 ## 1. 固定阅读顺序
 
@@ -36,9 +37,8 @@
 ## 3. 当前产品定位
 
 KindergartenManager 是一个 Python 3.14.7、NiceGUI 前后端一体化的幼儿园教学管理应用。
-当前检出 `feat/agent-foundation` 已完成 F009 验收，其安全 RED 起点为 `5de2e49bee19749f611b50747a31be9464b92d7b`；
-最近远端产品主线为 `origin/main@cfeadefd7dfa056c1b3757876658493110d8cf84`。两者都保持可打包、可本地运行、
-也可用 Docker 部署的模块化单体定位，主要能力包括：
+当前 `main@ca3b7bd922f838c0739ccf9ed0f58655d292dc2f` 已包含 Agent Foundation 的 merge ancestry。
+本工作树保持可打包、可本地运行、也可用 Docker 部署的模块化单体定位，主要能力包括：
 
 - 每日活动计划：日期/学期、教案拆分、年龄适配、活动生成、差异比对、Word 导出。
 - 游戏观察：图片、视觉 AI、观察记录、历史与 Word 导出。
@@ -54,11 +54,21 @@ KindergartenManager 是一个 Python 3.14.7、NiceGUI 前后端一体化的幼�
 
 ### 4.1 UI 身份
 
-- UI 当前为单用户模式，不提供有效登录流程。
-- `/` 由当前产品根路由直接跳转 `/home`；保留的 `AuthMiddleware` 不在 `app/main.py` 中挂载。
-- `app/core/user_context.py` 返回固定身份：`sub=1`、`tenant_id=1`、`role=sys_admin`、`username=admin`。
-- 页面把 `sub` 转为业务 `user_id` 使用。文档中如写“固定 `user_id=1`”，指的就是此转换结果。
-- `app/auth/`、注册、个人资料和用户管理代码仍被保留，作为低优先级 NiceGUI 多用户预备能力；当前 `app/main.py` 没有注册相关页面，也没有挂载认证中间件，不能据此宣称多用户/RBAC 已启用。
+- 本工作树已恢复 `/login`、`/profile`、`/user-admin` 和退出入口；`/` 跳转 `/login`，不挂载匿名 `/register`。
+- 登录 JWT 含唯一、规范 UUID `jti`，作为本地 `session_id`；受保护页面入口校验 token 后，按
+  `(tenant_id, user_id)` 重读 active 用户，role/name 以数据库当前值为准。
+- 有数据库、AI、网络、导出、配置或删除副作用的长寿命页面 callback 在操作前重验同一 `jti`；外部 await
+  后的成功与异常写回、渲染、文件和下载副作用前再次重验。旧标签页不能跨退出、过期、停用、降权或另一
+  标签页重新登录继续使用捕获的 actor。
+- 写入、Provider、文件与批量导出 callback 在首个认证 await 前同步冻结点击时的 target、selection generation
+  与控件 payload，认证后再验证仍是同一目标；管理员写用例还在同一事务内以 tenant + user 精确
+  `SELECT FOR UPDATE` 重验 active sys_admin，避免认证重读与目标 DML 之间被并发降权。
+- `daily_plan` 只从冻结的 `TrustedUiSession` 构造 `TrustedActor`；固定 `app/core/user_context.py` 已删除。
+- 应用启动不再用源码已知密码自动创建管理员，也不公开匿名自注册。空库初始化与旧固定密码账号恢复都只能
+  通过显式本地 `python -m app.jobs.bootstrap_admin --init`；恢复会保留原 user id。
+- 当前会话恢复已随 W004-W006 进入分支与远端 CI；W007 UI adapter 的 GREEN commit 已存在，并在
+  每次调用 `issue/apply/reconcile` 前重验页面打开时的 session；service 每个入口再重读 active User，且
+  `apply/reconcile` 精确匹配 confirmation 的 `jti`。
 
 ### 4.2 对外 API 身份
 
@@ -67,13 +77,17 @@ KindergartenManager 是一个 Python 3.14.7、NiceGUI 前后端一体化的幼�
 - 每个 API Key 映射到一个 `tenant_id`；查询必须使用该租户条件。
 - 配置 `API_SIGNING_SECRET` 后，时间戳和 HMAC-SHA256 签名成为强制要求。
 
-UI 的固定单用户身份与 API 的租户主体是两个不同边界，不得混为“UI 已支持多租户登录”。
+UI 登录用户与 API 的租户服务主体仍是两个不同边界，不得混用 token、角色或授权语义。
 
 ## 5. 当前数据与部署边界
 
 - 默认数据库：用户可写数据目录中的 SQLite `kindergarten.db`。
 - 可选数据库：通过 `DATABASE_URL` 使用 MySQL 8。
-- Schema 变更：只允许 Alembic；当前迁移 head 为 `a6c4d8e2f9b1`。
+- Schema 变更：只允许 Alembic；本工作树迁移 head 为 `2b7f3d5e9c8a`。其中
+  `b7d9e1f3a5c2` 增加 `daily_plan.revision`，`c1a8e4f6b2d9` 修复 SQLite `user.id` 必须使用精确
+  `INTEGER PRIMARY KEY` 才能自动生成 ID 的兼容性缺陷；`e5f7a9c2d4b6` 增加 W006 的两张 append-only
+  evidence 表及 SQLite/MySQL UPDATE/DELETE 拒绝 trigger；新 head 为 `user` 增加正整数 `auth_epoch`，
+  使任何密码变更都能撤销旧 UI token。MySQL `user.id` 仍为 `BIGINT AUTO_INCREMENT`。
 - 应用启动会先执行 `alembic upgrade head`；桌面、开发和服务器入口统一采用 fail-closed，迁移失败会记录异常并中止启动，不提供隐藏的 fail-open 开关。
 - AI Key 使用 Fernet 在应用层加密；明文只能短暂存在于内存，不得写日志或文档。
 - 图片默认使用 MySQL/SQLite BLOB 抽象；导出文件写入运行时导出目录。
@@ -83,7 +97,7 @@ UI 的固定单用户身份与 API 的租户主体是两个不同边界，不得
 
 | 模块 | 当前代码 | 历史自动证据 | 历史人工证据 | 当前说明 |
 |---|---|---|---|---|
-| 每日活动计划 | 已实现 | 本轮清理后全量回归 535 passed | 曾完成早期主流程验收 | 登录相关历史步骤已失效，仍需按单用户现状重跑人工流程 |
+| 每日活动计划 | 已实现；本工作树增加 revision | 常规 `693 passed`；Foundation `261 passed`；revision/SQLite user/bootstrap 专项 `22 passed` | Foundation F009 曾在固定 SHA 验收 | 页面保存与删除都带回读取到的 plan id + revision；旧标签页 stale 删除失败关闭；当前改动尚未浏览器/MySQL/Word 验收 |
 | 游戏观察 | 已实现 | dev3.0 曾记录 342 passed | 2026-06-11 主流程通过 | 需在当前 SHA 复核图片、AI 与 Word |
 | 一对一倾听 | 已实现 | 曾记录 466 passed | 完整 P8/P8d 验收仍未闭环 | 当前最明确的人工验收缺口 |
 | 自制教玩具 | 已实现 | 2026-06-28 曾记录 497 passed | 主流程通过 | 当前 SHA 尚未复跑 |
@@ -94,13 +108,18 @@ UI 的固定单用户身份与 API 的租户主体是两个不同边界，不得
 
 ## 7. 分支与仓库状态
 
-- Agent F002 原始 RED 证据保留在 `ad13a6aa3e44ff98b2604d4a008649cd66185d80`；
-  安全同步 RED 基线为 merge commit `5de2e49bee19749f611b50747a31be9464b92d7b`，
-  其双亲为 `ad13a6aa…` 和 `main@cfeadefd7dfa056c1b3757876658493110d8cf84`。
-- 最近远端产品主线为 `origin/main@cfeadefd7dfa056c1b3757876658493110d8cf84`；
-  本地 `main` 引用仍落后，不作为当前远端证据。
-- 当前远端仍有 `origin/dev3.4` 和 `origin/dev4.0`；没有发现 `origin/dev5.0`、`origin/dev6.0` 或 `origin/trae-dev-v6.0`。本轮未获授权删除任何分支。
-- `feat/agent-foundation` 的 F005 固定 GREEN 为 `53dd2e8d1af3f6633a114e4892dcfe1216ce091a`；双轴 Review 均为零发现，远端 Quality run `32641923137` 的 `headSha` 完全匹配且成功。F006 稳定 RED 为 `f0ab660f46d9293df53c13f5698c7dffd99892bc`，最终实现/重构候选为 `99167ef4abba447ed5369642e9ed3c855263a4d3`，固定 GREEN 证据 SHA 为 `049b52040c61727b1418dbf3cce018ead76e6edc`；双轴 Review 均为零发现，远端 Quality run `32644290676` 的 `headSha` 完全匹配且成功。F007 初始 RED 为 `55b8702b9acbece01705bbf6961717227e0c7e4f`，最终实现候选为 `51443a374003ddde2509d47262e959e4ad691ad7`，固定 GREEN 证据 SHA 为 `2fb4e6f414853dfb892b2cba0e6c84adbd655187`；双轴 Review 为 Standards `0`、Spec `0`，远端 Quality run `32648599591` 的 `headSha` 完全匹配且成功。F008 最终 RED 为 `b3cad08…`，Review RED 为 `b3c45d2…`、`b0647a9…`，固定 GREEN 候选为 `f1f5e63f0aee1e9ef499ed5d41d800229d37efdf`；双轴 Review 为 Standards `0`、Spec `0`，远端 Quality run `32651221452` 的 `headSha` 精确匹配且成功。F009 最终 `tested_code_sha=a50c6f6b9aa941996052c59a301a7a40bdbd706f`；代码双轴 Review 0/0，Quality `32808246590` 精确匹配成功，两类人工验收均 PASS。最终 `evidence_closure_sha` 证据见 Issue #48；合入 `main`、关闭 Issue 或发布仍未授权。
+- 当前 merge base 为 `main@ca3b7bd922f838c0739ccf9ed0f58655d292dc2f`；
+  远端 `feat/agent-write` 已闭合 W007 并进入 W008 交付门，精确门状态与 SHA 以
+  `specs/agent-write/tests/README.md` 为准；`main` 以 `--no-ff` 语义保留 Agent Foundation 的
+  RED/GREEN ancestry。
+- W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
+  Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确本地交付状态、Review 轮次、
+  SHA 与测试证据仅以 `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后作为外部证据；
+  本文不复制逐轮事实。
+- F009 产品验收仍只绑定 `tested_code_sha=a50c6f6b9aa941996052c59a301a7a40bdbd706f`，closure 证据绑定
+  `0ec2e944…`，详见 Issue #48；后续产品/helper/test 变化不能由该历史人工证据覆盖。
+- PR #53 已绑定 `feat/agent-write` → `main`；本轮已单独授权在 W008 新 SHA 全部门重新闭合后，依次执行
+  `--no-ff` merge、merge-SHA Review/CI、Issue #52 关闭与 release。Issue #48 与 Issue #52 当前仍保持 OPEN。
 
 ## 8. 已确认的下一能力：受控 AI Agent
 
@@ -180,8 +199,12 @@ F008 的固定集成上限为：
 
 F003-F009 各切片的双轴 Review 与远端精确 `headSha` Quality 均已闭合；F004 的每日计划/班级/日历
 Agent 专用窄 Service 投影和 F008 的具体 adapter/executor/composition/UI 已进入当前代码。
-未来 WRITE 属于独立里程碑，至少需恢复可信用户身份、引入显式
-`daily_plan` revision、逐次确认、操作前版本和不可变审计，不由当前设计自动授权。
+[ADR-0006](docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md)、独立 spec 与保持 OPEN 的
+[Issue #52](https://github.com/ywyz/kindergartenManager/issues/52) 已冻结 Agent WRITE 边界。W005 已实现
+`confirmed_write` 的三个公开入口与短命一次性 confirmation store；W006 已实现完整操作前版本、最小不可变
+审计、单次 revision CAS、同事务 commit 与只读 reconcile。W007 只在本地应用层向当前页面的一份 Patch
+提供逐次显式确认，不改变 Provider/Tool 的 READ/DRAFT 能力面，也不开放自动重试、批量/跨页面采用或长期
+Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/README.md` 为准。
 
 ## 9. 当前主要风险与债务
 
@@ -192,23 +215,23 @@ Agent 专用窄 Service 投影和 F008 的具体 adapter/executor/composition/UI
 5. **发布证据漂移**：Linux 本地结果不能代替 Windows 安装、浏览器打开、模板 Word 保真和真实 AI/MySQL 验收。
 6. **远端质量证据需按 SHA 回读**：F005-F009 的既有 push Quality 均已按各自 `headSha` 回读；最终
    `evidence_closure_sha` 仍必须使用自身 Review/CI/远端证据，不能沿用 `tested_code_sha` 的旧 CI。
-7. **Agent 作用域风险**：当前 UI 是网络可达的固定管理员身份；首期 Agent 必须保持零写入，
-   并拒绝 prompt injection、跨 tenant/user、动态工具和过期结果。
+7. **会话与 WRITE 门禁**：可信页面入口与敏感 callback 必须保持 exact-jti 绑定；W007 不能从局部
+   GREEN 推导交付闭合。Provider 与 Tool 保持 READ/DRAFT，完整门禁证据只见
+   `specs/agent-write/tests/README.md`。
 
 ## 10. 当前共同下一步
 
-R1 基础修复和 Agent Foundation F003-F009 的功能分支门禁已经通过，当前共同下一步是：
+当前共同下一步是：
 
-1. 只完成包含脱敏人工证据、状态文档与两套图谱更新的 `evidence_closure_sha`，并以该 SHA 重新闭合
-   Standards/Spec 0/0、Foundation/全量质量、远端精确 `headSha` Quality 和 Issue #48 证据；不再修改
-   `tested_code_sha` 所代表的产品代码或 helper。
-2. 本目标结束后，若要把 Foundation 纳入产品主线，应另行授权以 merge commit 保留 RED ancestry 合入
-   `main`，再核对默认分支 CI 与 Issue 状态；当前目标明确不执行 merge、关闭 Issue 或发布。
-3. 不建议直接进入 Agent WRITE。更合理的新里程碑是先恢复可信 UI actor、为 `daily_plan` 引入显式单调
-   revision，并以新 ADR/spec/Issue/稳定 RED 固定逐次确认、版本校验和不可变审计；READ/DRAFT 验收不能替代
-   这些前置条件。
-4. NiceGUI 多用户预备、Windows/Word/MySQL 和其他业务模块人工回归仍是独立工作，不与 Agent Foundation
-   结果互相替代。
+1. PR #53 回流的 Compose trigger、确定对账容量 finding，以及发布前核出的打包 bootstrap、Compose 密码/数据卷、
+   Debian 非 root 数据权限、过时说明与 MySQL helper lifecycle-lock 前检均已保留稳定 RED lineage 并完成最小
+   修复；现在按 canonical ledger 在新 SHA 重跑本地、双轴 Review、push、精确 SHA CI、MySQL/Chrome 与 Issue 证据。
+2. W007 已闭合；当前按 canonical ledger 完成 W008 的剩余门；因 PR finding 修正，须在新 SHA 重跑
+   对应 Review、CI 和平台证据，不得沿用 `a93b148…` 的终点结论。
+3. W008 全部门闭合后，本轮授权按顺序进入 W009：`--no-ff` merge、merge-SHA Review/CI、Issue #52 关闭、
+   release。不得给 Provider 增加 WRITE、自动重试、批量/跨页面采用、设置/文件/Word/删除/创建写入、
+   长期 Patch 持久化、新 Tool 或多 Agent。
+4. Windows/Word/MySQL 和其他业务模块人工回归仍是独立工作，不与 Agent 结果互相替代。
 
 ## 11. 更新规则
 

@@ -2,6 +2,7 @@
 
 import asyncio
 from collections.abc import Callable
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
@@ -20,7 +21,7 @@ from app.service.agent.contracts import (
     DailyPlanScope,
     TrustedActor,
 )
-from app.service.agent.patch import PlanPatch
+from app.service.agent.patch import PlanPatch, plan_patch_is_canonical
 from app.service.agent.read_service import AgentReadService
 from app.service.agent.registry import AgentToolRegistry, build_foundation_registry
 from app.service.agent.runtime import (
@@ -74,12 +75,14 @@ class AgentPatchOperationSnapshot:
 
 @dataclass(frozen=True, slots=True)
 class AgentPatchSnapshot:
-    """Detached, immutable PlanPatch view without an adoption capability."""
+    """Detached, immutable PlanPatch view without its write authority."""
 
+    patch_id: UUID
+    patch_sha256: str
     daily_plan_id: int
     plan_date: date
     tool_name: str
-    warnings: tuple[str, ...]
+    warnings: tuple[str, ...] = field(repr=False)
     operations: tuple[AgentPatchOperationSnapshot, ...] = field(repr=False)
 
 
@@ -125,6 +128,8 @@ def _default_provider_factory(config: AgentProviderConfig) -> AgentProviderPort:
 
 def _patch_snapshot(patch: PlanPatch) -> AgentPatchSnapshot:
     return AgentPatchSnapshot(
+        patch_id=patch.patch_id,
+        patch_sha256=patch.canonical_sha256,
         daily_plan_id=patch.target.daily_plan_id,
         plan_date=patch.target.plan_date,
         tool_name=patch.tool_name,
@@ -397,6 +402,7 @@ class DailyPlanAgentController:
         self._selected_date: date | None = None
         self._generation = 0
         self._closed = False
+        self._current_patches: dict[UUID, PlanPatch] = {}
         self._snapshot = AgentPanelSnapshot(
             status=AgentPanelStatus.IDLE,
             selected_date=None,
@@ -406,12 +412,65 @@ class DailyPlanAgentController:
     def snapshot(self) -> AgentPanelSnapshot:
         return self._snapshot
 
+    def resolve_current_patch(
+        self,
+        patch_id: UUID,
+        *,
+        expected_plan_id: int,
+    ) -> PlanPatch | None:
+        """Return one detached authoritative Patch only while it is current."""
+        if (
+            self._closed
+            or self._snapshot.status is not AgentPanelStatus.DRAFT_READY
+            or type(patch_id) is not UUID
+            or type(expected_plan_id) is not int
+            or expected_plan_id <= 0
+        ):
+            return None
+        patch = self._current_patches.get(patch_id)
+        if (
+            patch is None
+            or patch.target.daily_plan_id != expected_plan_id
+            or not plan_patch_is_canonical(patch)
+        ):
+            return None
+        copied = deepcopy(patch)
+        if not plan_patch_is_canonical(copied):
+            return None
+        return copied
+
+    def _forget_current_patches(self) -> None:
+        self._current_patches.clear()
+
+    def _capture_current_patches(
+        self,
+        outcome: AgentTurnOutcome,
+    ) -> tuple[PlanPatch, ...] | None:
+        """Detach one generation's canonical capabilities before publication."""
+        if outcome.status is not AgentTurnStatus.DRAFT_READY:
+            return () if not outcome.patches else None
+        if not outcome.patches:
+            return None
+
+        detached: list[PlanPatch] = []
+        patch_ids: set[UUID] = set()
+        for patch in outcome.patches:
+            if not plan_patch_is_canonical(patch) or patch.patch_id in patch_ids:
+                return None
+            copied = deepcopy(patch)
+            if not plan_patch_is_canonical(copied):
+                return None
+            patch_ids.add(copied.patch_id)
+            detached.append(copied)
+        return tuple(detached)
+
     def scope_changed(self, selected_date: date | None) -> AgentPanelSnapshot:
         """Synchronously invalidate prior work before any slow date-side effects."""
         if selected_date is not None and type(selected_date) is not date:
             raise ValueError("agent_scope_invalid")
         self._generation += 1
         self._selected_date = selected_date
+        self._forget_current_patches()
         self._coordinator.invalidate(self._owner_id)
         self._snapshot = AgentPanelSnapshot(
             status=AgentPanelStatus.IDLE,
@@ -429,6 +488,7 @@ class DailyPlanAgentController:
         if self._snapshot.status is AgentPanelStatus.RUNNING:
             return self._snapshot
         generation = self._generation
+        self._forget_current_patches()
         self._snapshot = AgentPanelSnapshot(
             status=AgentPanelStatus.RUNNING,
             selected_date=selected_date,
@@ -468,7 +528,20 @@ class DailyPlanAgentController:
             or self._selected_date != selected_date
         ):
             return self._snapshot
-        self._snapshot = _panel_snapshot(outcome, selected_date=selected_date)
+        patches = self._capture_current_patches(outcome)
+        if patches is None:
+            return self._set_failure("agent.patch_invalid")
+        self._current_patches = {patch.patch_id: patch for patch in patches}
+        detached_outcome = AgentTurnOutcome(
+            status=outcome.status,
+            assistant_content=outcome.assistant_content,
+            patches=patches,
+            error_code=outcome.error_code,
+        )
+        self._snapshot = _panel_snapshot(
+            detached_outcome,
+            selected_date=selected_date,
+        )
         return self._snapshot
 
     async def cancel(self) -> bool:
@@ -484,6 +557,7 @@ class DailyPlanAgentController:
         )
         if self._selected_date == changed_date:
             self._generation += 1
+            self._forget_current_patches()
             self._snapshot = AgentPanelSnapshot(
                 status=AgentPanelStatus.IDLE,
                 selected_date=self._selected_date,
@@ -495,6 +569,7 @@ class DailyPlanAgentController:
         if self._closed:
             return self._snapshot
         self._generation += 1
+        self._forget_current_patches()
         self._coordinator.invalidate(self._owner_id)
         await self._coordinator.cancel(self._owner_id)
         self._snapshot = AgentPanelSnapshot(
@@ -507,6 +582,7 @@ class DailyPlanAgentController:
         """Forget assistant/Patch display state without any business mutation."""
         if self._snapshot.status is AgentPanelStatus.RUNNING:
             return self._snapshot
+        self._forget_current_patches()
         self._snapshot = AgentPanelSnapshot(
             status=AgentPanelStatus.IDLE,
             selected_date=self._selected_date,
@@ -519,6 +595,7 @@ class DailyPlanAgentController:
             return
         self._closed = True
         self._generation += 1
+        self._forget_current_patches()
         self._coordinator.invalidate(self._owner_id)
         await self._coordinator.cancel(self._owner_id)
         self._snapshot = AgentPanelSnapshot(
@@ -527,6 +604,7 @@ class DailyPlanAgentController:
         )
 
     def _set_failure(self, code: str) -> AgentPanelSnapshot:
+        self._forget_current_patches()
         self._snapshot = AgentPanelSnapshot(
             status=AgentPanelStatus.FAILED,
             selected_date=self._selected_date,

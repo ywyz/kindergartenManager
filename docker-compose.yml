@@ -3,6 +3,8 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    environment:
+      CADDY_DOMAIN: ${CADDY_DOMAIN:?set CADDY_DOMAIN in .env}
     ports:
       - "80:80"
       - "443:443"
@@ -22,10 +24,20 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: mysql+aiomysql://${MYSQL_USER:-kindergarten}:${MYSQL_PASSWORD:-kg_pass_2024}@db:3306/${MYSQL_DATABASE:-kindergarten_db}
-    env_file:
-      - .env
+      KINDERGARTEN_DATA_DIR: /data
+      DATABASE_URL: mysql+aiomysql://${MYSQL_USER:-kindergarten}:${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}@db:3306/${MYSQL_DATABASE:-kindergarten_db}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:-}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-60}
+      HOLIDAY_API_URL: ${HOLIDAY_API_URL:-https://timor.tech/api/holiday/info/}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      API_KEYS: ${API_KEYS:-}
+      API_SIGNING_SECRET: ${API_SIGNING_SECRET:-}
+      API_SIGNATURE_MAX_SKEW: ${API_SIGNATURE_MAX_SKEW:-300}
+      IMAGE_STORAGE_BACKEND: ${IMAGE_STORAGE_BACKEND:-mysql_blob}
+      IMAGE_MAX_BYTES: ${IMAGE_MAX_BYTES:-1048576}
     volumes:
+      - app_data:/data
       - exports:/app/exports
     restart: unless-stopped
     networks:
@@ -34,16 +46,21 @@ services:
   # ── 数据库（MySQL，生产模式）──────────────────────────────────────────────
   db:
     image: mysql:8
+    command:
+      - --log-bin-trust-function-creators=1
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-kg_root_2024}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-kindergarten_db}
       MYSQL_USER: ${MYSQL_USER:-kindergarten}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-kg_pass_2024}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root",
-             "-pkg_root_2024"]
+      test:
+        - CMD-SHELL
+        - >-
+          MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}"
+          mysqladmin ping -h localhost -u root --silent
       interval: 10s
       timeout: 5s
       retries: 5
@@ -56,6 +73,7 @@ networks:
     driver: bridge
 
 volumes:
+  app_data:
   db_data:
   exports:
   caddy_data:

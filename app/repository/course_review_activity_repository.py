@@ -69,12 +69,14 @@ async def get_course_review_activity(
     session: AsyncSession,
     *,
     tenant_id: int,
+    user_id: int,
     activity_id: int,
 ) -> CourseReviewActivity | None:
-    """按 id 查询课程审议记录，强制 tenant_id 过滤。"""
+    """按 id 查询课程审议记录，强制 tenant_id + user_id 过滤。"""
     result = await session.execute(
         select(CourseReviewActivity).where(
             CourseReviewActivity.tenant_id == tenant_id,
+            CourseReviewActivity.user_id == user_id,
             CourseReviewActivity.id == activity_id,
         )
     )
@@ -96,7 +98,9 @@ async def list_course_review_activities(
             CourseReviewActivity.tenant_id == tenant_id,
             CourseReviewActivity.user_id == user_id,
         )
-        .order_by(CourseReviewActivity.created_at.desc(), CourseReviewActivity.id.desc())
+        .order_by(
+            CourseReviewActivity.created_at.desc(), CourseReviewActivity.id.desc()
+        )
         .offset(offset)
         .limit(limit)
     )

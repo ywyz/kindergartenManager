@@ -4,8 +4,27 @@ from datetime import date, datetime, timezone
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.exc import StaleDataError
 
 from app.core.models.daily_plan import DailyPlan
+
+
+_EDITABLE_FIELDS = frozenset(
+    {
+        "activity_goal",
+        "activity_prep",
+        "activity_key",
+        "activity_difficult",
+        "activity_process_original",
+        "activity_process_adapted",
+        "morning_activity",
+        "indoor_area",
+        "outdoor_activity",
+        "morning_talk_topic",
+        "morning_talk_questions",
+        "daily_reflection",
+    }
+)
 
 
 async def save_daily_plan(
@@ -17,11 +36,14 @@ async def save_daily_plan(
     weekday_cn: str,
     grade: str,
     class_name: str,
+    *,
+    expected_plan_id: int | None = None,
+    expected_revision: int | None = None,
     **kwargs,
 ) -> DailyPlan:
-    """创建或更新每日活动计划（同一用户同一日期 upsert）。
+    """创建或以调用方观察到的 plan id + revision 更新每日活动计划。
 
-    若当天已存在记录，则更新；否则新建。
+    创建时两个 expected 值都必须为 None；更新时两者都必须精确匹配。
 
     Args:
         session: 异步数据库会话。
@@ -29,11 +51,23 @@ async def save_daily_plan(
         plan_date: 计划日期。
         week_number / weekday_cn: 教学周信息。
         grade / class_name: 班级信息。
+        expected_plan_id / expected_revision: 页面读取到的精确旧身份与版本。
         **kwargs: 其余可选字段（activity_goal 等）。
 
     Returns:
         保存后的 DailyPlan 实例。
     """
+    forbidden_fields = set(kwargs) - _EDITABLE_FIELDS
+    if forbidden_fields:
+        names = ", ".join(sorted(forbidden_fields))
+        raise ValueError(f"daily_plan fields are not caller-writable: {names}")
+    for name, value in (
+        ("expected_plan_id", expected_plan_id),
+        ("expected_revision", expected_revision),
+    ):
+        if value is not None and (type(value) is not int or value <= 0):
+            raise ValueError(f"{name} must be a positive integer or None")
+
     # 查询当天是否已存在记录
     stmt = select(DailyPlan).where(
         DailyPlan.tenant_id == tenant_id,
@@ -44,17 +78,27 @@ async def save_daily_plan(
     existing = result.scalar_one_or_none()
 
     if existing is not None:
-        # 更新现有记录
-        existing.week_number = week_number
-        existing.weekday_cn = weekday_cn
-        existing.grade = grade
-        existing.class_name = class_name
+        if expected_plan_id != existing.id or expected_revision != existing.revision:
+            raise StaleDataError("daily_plan changed; reload before saving")
+        updates: dict[str, object] = {
+            "week_number": week_number,
+            "weekday_cn": weekday_cn,
+            "grade": grade,
+            "class_name": class_name,
+            **kwargs,
+        }
+        if all(getattr(existing, key) == value for key, value in updates.items()):
+            return existing
+
+        # 只有真正的业务变化才形成新 revision。
+        for key, value in updates.items():
+            setattr(existing, key, value)
         existing.updated_at = datetime.now(timezone.utc)
-        for key, value in kwargs.items():
-            if hasattr(existing, key):
-                setattr(existing, key, value)
         await session.flush()
         return existing
+
+    if expected_plan_id is not None or expected_revision is not None:
+        raise StaleDataError("daily_plan no longer exists; reload before saving")
 
     # 新建记录
     plan = DailyPlan(
@@ -65,7 +109,7 @@ async def save_daily_plan(
         weekday_cn=weekday_cn,
         grade=grade,
         class_name=class_name,
-        **{k: v for k, v in kwargs.items() if hasattr(DailyPlan, k)},
+        **kwargs,
     )
     session.add(plan)
     await session.flush()
@@ -217,15 +261,29 @@ async def delete_daily_plan(
     session: AsyncSession,
     tenant_id: int,
     user_id: int,
-    plan_date: date,
+    *,
+    plan_id: int,
+    expected_revision: int,
 ) -> bool:
-    """删除指定日期的每日计划，强制 tenant_id + user_id 双重过滤，返回是否删除成功。"""
+    """按调用方观察到的精确行与 revision 删除每日计划。
+
+    删除使用单条带 tenant/user/id/revision 条件的 SQL；未命中一律视为陈旧
+    页面，避免旧标签页删除后来创建或更新的内容。事务由调用方控制。
+    """
+    for name, value in (("plan_id", plan_id), ("expected_revision", expected_revision)):
+        if type(value) is not int or value <= 0:
+            raise ValueError(f"{name} must be a positive integer")
+
     result = await session.execute(
-        delete(DailyPlan).where(
+        delete(DailyPlan)
+        .where(
             DailyPlan.tenant_id == tenant_id,
             DailyPlan.user_id == user_id,
-            DailyPlan.plan_date == plan_date,
+            DailyPlan.id == plan_id,
+            DailyPlan.revision == expected_revision,
         )
+        .execution_options(synchronize_session=False)
     )
-    await session.commit()
-    return bool(result.rowcount)
+    if result.rowcount != 1:
+        raise StaleDataError("daily_plan changed; reload before deleting")
+    return True

@@ -105,6 +105,16 @@ tool results, patches, or provider-managed memory. WRITE, adoption/confirmation 
 multi-agent workflows require a separate ADR/spec/Issue and stable RED; do not add placeholders for them in the
 Foundation.
 
+The separate WRITE boundary is frozen by
+`docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md` and `specs/agent-write/`. W005/W006 are closed.
+W007 current capability is limited to one current-page Patch applied by the local application only after explicit user
+confirmation; Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。不得增加 Provider WRITE、自动重试、批量或跨页面采用、
+设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。
+
+当前 W007 的精确本地交付状态、Review 轮次、SHA 与测试证据仅以
+`specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后作为外部证据；本文不复制逐轮事实。
+不得从局部 GREEN 推导 Standards/Spec 0/0、merge、Issue 关闭或 release。
+
 F009 adds no Agent capability. Its automated baseline is taken after initialization/seed and dynamically reflects every
 actual database table, protected configuration/export artifacts, caller-owned UI body, the independent audit logger, and
 post-seed DML/DDL attempts. Manual mock and real-model evidence share a `tested_code_sha`; evidence and final graph updates

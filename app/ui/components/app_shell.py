@@ -17,6 +17,8 @@ from typing import AsyncIterator
 
 from nicegui import ui
 
+from app.ui.auth_context import clear_login_state
+
 # ─── 纯函数（单测友好）──────────────────────────────────────────────────────
 
 # 全部菜单项定义（key, label, icon, route, roles=None 表示所有角色可见）
@@ -79,7 +81,28 @@ _ALL_MENU_ITEMS: list[dict] = [
         "route": "/prompts",
         "roles": None,
     },
+    {
+        "group": "账号",
+        "key": "profile",
+        "label": "个人资料",
+        "icon": "person",
+        "route": "/profile",
+        "roles": None,
+    },
+    {
+        "group": "账号",
+        "key": "user-admin",
+        "label": "账号管理",
+        "icon": "manage_accounts",
+        "route": "/user-admin",
+        "roles": {"sys_admin"},
+    },
 ]
+
+
+def _logout() -> None:
+    clear_login_state()
+    ui.navigate.to("/login")
 
 
 def get_menu_items(role: str, active: str | None = None) -> list[dict]:
@@ -110,7 +133,7 @@ def get_display_name(user: dict) -> str:
     """返回顶栏显示名：优先 display_name，回退 username。
 
     Args:
-        user: 包含用户信息的字典，通常来自 decode_access_token
+        user: 不含 bearer token 的 TrustedUiSession 展示投影
 
     Returns:
         非空字符串，最终显示名
@@ -154,11 +177,12 @@ async def app_shell(user: dict, active: str) -> AsyncIterator[None]:
         ).classes("text-white")
         ui.label("幼儿园教学管理系统").classes("text-lg font-bold flex-1")
         ui.label(display_name).classes("text-sm text-blue-100")
+        ui.button(icon="logout", on_click=_logout).props("flat round dense").classes(
+            "text-white"
+        )
 
     # ── 左侧抽屉 ────────────────────────────────────────────────────────────
-    with ui.left_drawer(value=True, bordered=True).classes(
-        "bg-gray-50"
-    ) as drawer:
+    with ui.left_drawer(value=True, bordered=True).classes("bg-gray-50") as drawer:
         for group_name, group_items in groups.items():
             ui.label(group_name).classes(
                 "text-xs font-semibold text-gray-400 uppercase tracking-wide px-3 pt-4 pb-1"
@@ -208,6 +232,9 @@ async def render_shell(user: dict, active: str) -> None:
         ).classes("text-white")
         ui.label("幼儿园教学管理系统").classes("text-lg font-bold flex-1")
         ui.label(display_name).classes("text-sm text-blue-100")
+        ui.button(icon="logout", on_click=_logout).props("flat round dense").classes(
+            "text-white"
+        )
 
     with ui.left_drawer(value=True, bordered=True).classes("bg-gray-50") as drawer:
         for group_name, group_items in groups.items():
