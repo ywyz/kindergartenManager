@@ -15,7 +15,7 @@ def _run_bootstrap_admin_cli() -> None:
 
     from app.jobs import bootstrap_admin
 
-    asyncio.run(bootstrap_admin._main())
+    raise SystemExit(asyncio.run(bootstrap_admin._main()))
 
 
 def _run_entrypoint(argv: list[str] | None = None) -> None:
