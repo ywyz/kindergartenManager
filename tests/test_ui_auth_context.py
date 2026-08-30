@@ -186,6 +186,40 @@ async def test_resolve_current_ui_session_rejects_noncanonical_claim_shapes(
         assert await resolve_current_ui_session(async_session, token) is None
 
 
+async def test_resolve_current_ui_session_rejects_token_without_auth_epoch(
+    async_session,
+) -> None:
+    """升级前或遗漏凭据版本的 token 必须 fail closed 并要求重新登录。"""
+    import jwt
+
+    from app.auth.jwt import _ALGORITHM
+    from app.core.config import settings
+    from app.ui.auth_context import resolve_current_ui_session
+
+    user = await create_user(
+        async_session,
+        tenant_id=9,
+        username="teacher-missing-epoch",
+        hashed_password=hash_password("Pass1234!"),
+        role=UserRole.teacher,
+    )
+    now = datetime.now(timezone.utc)
+    token = jwt.encode(
+        {
+            "sub": str(user.id),
+            "tenant_id": user.tenant_id,
+            "role": user.role.value,
+            "jti": str(uuid4()),
+            "iat": now,
+            "exp": now + timedelta(minutes=30),
+        },
+        settings.JWT_SECRET,
+        algorithm=_ALGORITHM,
+    )
+
+    assert await resolve_current_ui_session(async_session, token) is None
+
+
 async def test_resolve_current_ui_session_rechecks_expiry_after_user_lookup(
     monkeypatch,
 ) -> None:

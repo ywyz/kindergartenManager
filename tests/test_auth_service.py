@@ -395,6 +395,63 @@ async def test_reset_user_password_by_admin(async_session):
     assert token is not None
 
 
+@pytest.mark.parametrize("operation", ("self_change", "admin_reset"))
+async def test_password_mutation_revokes_old_token_and_new_login_recovers(
+    async_session,
+    operation: str,
+) -> None:
+    """任一密码变更都应驱逐旧 JWT，同时允许新密码重新登录。"""
+    from app.ui.auth_context import resolve_current_ui_session
+
+    admin = await _make_user(
+        async_session,
+        username="epoch-admin",
+        role="sys_admin",
+        password="AdminPass!",
+    )
+    target = await _make_user(
+        async_session,
+        username="epoch-target",
+        password="OriginalPass!",
+    )
+    old_token = await login(
+        async_session,
+        tenant_id=1,
+        username=target.username,
+        password="OriginalPass!",
+    )
+    assert await resolve_current_ui_session(async_session, old_token) is not None
+
+    if operation == "self_change":
+        await change_password(
+            async_session,
+            tenant_id=1,
+            user_id=target.id,
+            old_password="OriginalPass!",
+            new_password="ReplacementPass!",
+        )
+    else:
+        await reset_user_password_by_admin(
+            async_session,
+            tenant_id=1,
+            admin_user_id=admin.id,
+            admin_role=UserRole.sys_admin.value,
+            target_user_id=target.id,
+            new_password="ReplacementPass!",
+        )
+
+    async_session.expire_all()
+    assert await resolve_current_ui_session(async_session, old_token) is None
+
+    new_token = await login(
+        async_session,
+        tenant_id=1,
+        username=target.username,
+        password="ReplacementPass!",
+    )
+    assert await resolve_current_ui_session(async_session, new_token) is not None
+
+
 async def test_list_users_for_admin_with_filter(async_session):
     """系统管理员列表支持筛选并返回总数。"""
     admin = await _make_user(
