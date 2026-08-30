@@ -368,6 +368,55 @@ async def test_set_user_active_by_admin(async_session):
     assert token is not None
 
 
+async def test_reenable_does_not_restore_token_issued_before_deactivation(
+    async_session,
+) -> None:
+    """停用再启用必须永久驱逐停用前签发的可信 UI 会话。"""
+    from app.ui.auth_context import resolve_current_ui_session
+
+    admin = await _make_user(
+        async_session, username="epoch-toggle-admin", role="sys_admin"
+    )
+    target = await _make_user(
+        async_session, username="epoch-toggle-target", password="UserPass!"
+    )
+    old_token = await login(
+        async_session,
+        tenant_id=1,
+        username=target.username,
+        password="UserPass!",
+    )
+
+    await set_user_active_by_admin(
+        async_session,
+        tenant_id=1,
+        admin_user_id=admin.id,
+        admin_role=UserRole.sys_admin.value,
+        target_user_id=target.id,
+        is_active=False,
+    )
+    await set_user_active_by_admin(
+        async_session,
+        tenant_id=1,
+        admin_user_id=admin.id,
+        admin_role=UserRole.sys_admin.value,
+        target_user_id=target.id,
+        is_active=True,
+    )
+
+    async_session.expire_all()
+    assert await resolve_current_ui_session(async_session, old_token) is None
+
+    new_token = await login(
+        async_session,
+        tenant_id=1,
+        username=target.username,
+        password="UserPass!",
+    )
+    assert decode_access_token(new_token)["auth_epoch"] == 3
+    assert await resolve_current_ui_session(async_session, new_token) is not None
+
+
 async def test_reset_user_password_by_admin(async_session):
     """系统管理员重置密码后，旧密码失效，新密码生效。"""
     admin = await _make_user(
