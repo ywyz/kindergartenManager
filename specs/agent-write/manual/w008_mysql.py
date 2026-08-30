@@ -186,9 +186,10 @@ async def run_live_acceptance(
     if heads != (CURRENT_HEAD,):
         raise ManualHelperError("live database is not at the exact current head")
 
-    auth_epoch_default, auth_epoch_invalid_errno = (
-        await backend.auth_epoch_schema_evidence()
-    )
+    (
+        auth_epoch_default,
+        auth_epoch_invalid_errno,
+    ) = await backend.auth_epoch_schema_evidence()
     if auth_epoch_default != 1 or auth_epoch_invalid_errno != 3819:
         raise ManualHelperError("auth epoch schema evidence is incomplete")
 
@@ -374,7 +375,9 @@ class LiveMySQLBackend:
                     await session.rollback()
                     raise ManualHelperError("MySQL accepted a non-positive auth epoch")
             if invalid_errno != 3819:
-                raise ManualHelperError("MySQL auth epoch constraint errno was not 3819")
+                raise ManualHelperError(
+                    "MySQL auth epoch constraint errno was not 3819"
+                )
             return default_epoch, invalid_errno
         except ManualHelperError:
             raise
