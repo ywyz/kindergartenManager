@@ -7,7 +7,7 @@ from app.auth.jwt import decode_access_token
 from app.auth.password import hash_password
 from app.core.exceptions import AuthError
 from app.core.models.user import UserRole
-from app.repository.user_repository import create_user
+from app.repository.user_repository import create_user, get_user_by_username
 from app.service.auth_service import (
     approve_user,
     change_password,
@@ -148,6 +148,79 @@ async def test_change_password_wrong_old_password_raises(async_session):
         async_session, tenant_id=1, username="alice", password="OldPass!"
     )
     assert token is not None
+
+
+@pytest.mark.parametrize(
+    "operation",
+    ("change_password", "create_user", "reset_password", "register_user"),
+)
+async def test_plaintext_password_mutations_reject_legacy_sentinel_without_writes(
+    async_session,
+    operation: str,
+) -> None:
+    """旧单用户口令只可被识别和恢复，不得再次设置为新密码。"""
+    sentinel = "not-used-single-user-mode"
+    admin = await _make_user(
+        async_session,
+        username="policy-admin",
+        role="sys_admin",
+        password="AdminPass!",
+    )
+    target = await _make_user(
+        async_session,
+        username="policy-target",
+        password="OriginalPass!",
+    )
+    original_hash = target.hashed_password
+    created_username: str | None = None
+
+    with pytest.raises(ValueError, match="密码"):
+        if operation == "change_password":
+            await change_password(
+                async_session,
+                tenant_id=1,
+                user_id=target.id,
+                old_password="OriginalPass!",
+                new_password=sentinel,
+            )
+        elif operation == "create_user":
+            created_username = "policy-created"
+            await create_user_by_admin(
+                async_session,
+                tenant_id=1,
+                admin_user_id=admin.id,
+                admin_role=UserRole.sys_admin.value,
+                username=created_username,
+                password=sentinel,
+            )
+        elif operation == "reset_password":
+            await reset_user_password_by_admin(
+                async_session,
+                tenant_id=1,
+                admin_user_id=admin.id,
+                admin_role=UserRole.sys_admin.value,
+                target_user_id=target.id,
+                new_password=sentinel,
+            )
+        else:
+            created_username = "policy-registered"
+            await register_user(
+                async_session,
+                username=created_username,
+                password=sentinel,
+            )
+
+    await async_session.refresh(target)
+    assert target.hashed_password == original_hash
+    if created_username is not None:
+        assert (
+            await get_user_by_username(
+                async_session,
+                tenant_id=1,
+                username=created_username,
+            )
+            is None
+        )
 
 
 async def test_create_user_by_admin_success(async_session):

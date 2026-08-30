@@ -1,5 +1,7 @@
 """系统管理员初始化脚本测试。"""
 
+import pytest
+
 from app.auth.password import hash_password, verify_password
 from app.core.models.user import User, UserRole
 from app.jobs.bootstrap_admin import bootstrap_admin
@@ -121,6 +123,71 @@ async def test_bootstrap_admin_remote_blocked(async_session, monkeypatch):
         database_url="mysql+aiomysql://user:pwd@47.116.40.89:3306/kindergarten_db",
     )
     assert message.startswith("error:")
+
+
+@pytest.mark.parametrize("operation", ("init", "reset"))
+async def test_bootstrap_password_mutations_reject_legacy_sentinel_without_writes(
+    async_session,
+    monkeypatch,
+    operation: str,
+) -> None:
+    """bootstrap 同样不得把遗留哨兵重新设为可登录口令。"""
+    from app.jobs import bootstrap_admin as module
+
+    class _SessionFactory:
+        def __call__(self):
+            return self
+
+        async def __aenter__(self):
+            return async_session
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    sentinel = "not-used-single-user-mode"
+    admin = User(
+        tenant_id=1,
+        username="existing-admin",
+        hashed_password=hash_password("OriginalAdminPass!"),
+        role=UserRole.sys_admin,
+        is_active=True,
+    )
+    async_session.add(admin)
+    await async_session.commit()
+    original_hash = admin.hashed_password
+    monkeypatch.setattr(module, "AsyncSessionLocal", _SessionFactory())
+
+    if operation == "init":
+        message = await module.bootstrap_admin(
+            enabled=True,
+            tenant_id=1,
+            username="new-sentinel-admin",
+            password=sentinel,
+            allow_remote=False,
+            database_url="sqlite+aiosqlite:///:memory:",
+        )
+    else:
+        message = await module.reset_admin_password(
+            tenant_id=1,
+            username=admin.username,
+            old_password="OriginalAdminPass!",
+            new_password=sentinel,
+            allow_remote=False,
+            database_url="sqlite+aiosqlite:///:memory:",
+        )
+
+    assert message.startswith("error:")
+    await async_session.refresh(admin)
+    assert admin.hashed_password == original_hash
+    assert not verify_password(sentinel, admin.hashed_password)
+    assert (
+        await get_user_by_username(
+            async_session,
+            tenant_id=1,
+            username="new-sentinel-admin",
+        )
+        is None
+    )
 
 
 async def test_bootstrap_admin_recovers_legacy_single_user_without_changing_owner_id(
