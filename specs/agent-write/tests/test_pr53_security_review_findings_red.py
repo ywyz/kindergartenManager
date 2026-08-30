@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import ast
+import os
 from pathlib import Path
+import subprocess
+import sys
 
 
 _ROOT = Path(__file__).resolve().parents[3]
@@ -60,3 +63,36 @@ def test_deployment_settings_are_sys_admin_only_and_never_echo_db_password() -> 
         assert callback_source.index(
             "await require_deployment_session()"
         ) < callback_source.index("write_dot_env(")
+
+
+def test_bootstrap_cli_migration_failure_has_nonzero_process_exit() -> None:
+    """部署自动化不得把迁移失败误报为成功。"""
+    test_password = "TestOnlyDatabasePassword!"
+    env = os.environ.copy()
+    env.update(
+        {
+            "BOOTSTRAP_ADMIN_ENABLED": "true",
+            "BOOTSTRAP_ADMIN_USERNAME": "sysadmin",
+            "BOOTSTRAP_ADMIN_PASSWORD": "TestOnlyAdminPassword!",
+            "BOOTSTRAP_ADMIN_ALLOW_REMOTE": "false",
+            "DATABASE_URL": (
+                "mysql+aiomysql://test_only_user:"
+                f"{test_password}@127.0.0.1:1/test_only_db"
+            ),
+        }
+    )
+
+    completed = subprocess.run(
+        [sys.executable, "-m", "app.jobs.bootstrap_admin", "--init"],
+        cwd=_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    output = completed.stdout + completed.stderr
+
+    assert "迁移失败" in output
+    assert test_password not in output
+    assert completed.returncode != 0
