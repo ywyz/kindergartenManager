@@ -93,7 +93,7 @@ def test_readme_matches_current_login_agent_and_deployment_boundaries() -> None:
     assert "没有有效登录保护" not in readme
     assert "受控 AI Agent（尚未实现）" not in readme
     assert "创建固定的默认管理员记录" not in readme
-    assert "当前工作树 Alembic head：`e5f7a9c2d4b6`" in readme
+    assert "当前工作树 Alembic head：`2b7f3d5e9c8a`" in readme
     assert "python -m app.jobs.bootstrap_admin --init" in readme
     assert "4 个 READ Tool、2 个 DRAFT Tool" in readme
     assert "Provider WRITE" in readme
@@ -142,10 +142,19 @@ def test_sqlite_environment_comment_names_the_application_data_directory() -> No
 
 def test_current_migration_head_is_consistent_across_operator_docs() -> None:
     """Developer and manual migration checks must reach every current table/trigger."""
-    expected_head = "`e5f7a9c2d4b6`"
+    expected_head = "`2b7f3d5e9c8a`"
     missing = [
         relative_path
-        for relative_path in ("docs/DEVELOPER.md", "docs/MANUAL_TESTING.md")
+        for relative_path in (
+            "README.md",
+            "CONTEXT.md",
+            "docs/ROADMAP.md",
+            "docs/design/data-model.md",
+            "docs/ADR/ADR-0003-sqlite-default-mysql-optional-alembic.md",
+            "docs/DEVELOPER.md",
+            "docs/MANUAL_TESTING.md",
+            "specs/agent-write/manual/README.md",
+        )
         if expected_head not in (_ROOT / relative_path).read_text(encoding="utf-8")
     ]
 
