@@ -97,6 +97,7 @@ async def resolve_current_ui_session(
         return None
 
     tenant_id = _positive_int(payload.get("tenant_id"))
+    token_auth_epoch = _positive_int(payload.get("auth_epoch"))
     user_id = _positive_user_id(payload.get("sub"))
     session_id = _session_id(payload.get("jti"))
     issued_at = _utc_timestamp(payload.get("iat"))
@@ -104,6 +105,7 @@ async def resolve_current_ui_session(
     if (
         tenant_id is None
         or user_id is None
+        or token_auth_epoch is None
         or session_id is None
         or issued_at is None
         or expires_at is None
@@ -113,6 +115,9 @@ async def resolve_current_ui_session(
 
     user = await get_user_by_id(session, tenant_id=tenant_id, user_id=user_id)
     if user is None or not user.is_active or datetime.now(timezone.utc) >= expires_at:
+        return None
+
+    if user.auth_epoch != token_auth_epoch:
         return None
 
     return TrustedUiSession(

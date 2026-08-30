@@ -93,6 +93,7 @@ async def test_resolve_current_ui_session_rebuilds_actor_from_active_user(
         role="sys_admin",
         username="stale-name",
         display_name="旧显示名",
+        auth_epoch=1,
     )
 
     current = await resolve_current_ui_session(async_session, token)
@@ -127,6 +128,7 @@ async def test_resolve_current_ui_session_rejects_inactive_or_wrong_tenant_user(
         user_id=user.id,
         tenant_id=4,
         role="teacher",
+        auth_epoch=1,
     )
     assert await resolve_current_ui_session(async_session, wrong_tenant) is None
 
@@ -136,16 +138,27 @@ async def test_resolve_current_ui_session_rejects_inactive_or_wrong_tenant_user(
         user_id=user.id,
         tenant_id=3,
         role="teacher",
+        auth_epoch=1,
     )
     assert await resolve_current_ui_session(async_session, inactive) is None
 
 
 def test_each_access_token_has_a_distinct_canonical_session_id() -> None:
     first = decode_access_token(
-        create_access_token(user_id=1, tenant_id=1, role="teacher")
+        create_access_token(
+            user_id=1,
+            tenant_id=1,
+            role="teacher",
+            auth_epoch=1,
+        )
     )
     second = decode_access_token(
-        create_access_token(user_id=1, tenant_id=1, role="teacher")
+        create_access_token(
+            user_id=1,
+            tenant_id=1,
+            role="teacher",
+            auth_epoch=1,
+        )
     )
 
     assert UUID(first["jti"])
@@ -172,18 +185,57 @@ async def test_resolve_current_ui_session_rejects_noncanonical_claim_shapes(
         role=UserRole.teacher,
     )
     payload = decode_access_token(
-        create_access_token(user_id=user.id, tenant_id=8, role="teacher")
+        create_access_token(
+            user_id=user.id,
+            tenant_id=8,
+            role="teacher",
+            auth_epoch=1,
+        )
     )
 
     for name, invalid_value in (
         ("sub", f"0{user.id}"),
         ("tenant_id", "8"),
+        ("auth_epoch", 0),
+        ("auth_epoch", -1),
+        ("auth_epoch", True),
+        ("auth_epoch", "1"),
         ("jti", str(UUID(payload["jti"])).upper()),
         ("iat", None),
     ):
         invalid_payload = {**payload, name: invalid_value}
         token = jwt.encode(invalid_payload, settings.JWT_SECRET, algorithm=_ALGORITHM)
         assert await resolve_current_ui_session(async_session, token) is None
+
+
+async def test_resolve_current_ui_session_rejects_auth_epoch_mismatch(
+    async_session,
+) -> None:
+    import jwt
+
+    from app.auth.jwt import _ALGORITHM
+    from app.core.config import settings
+    from app.ui.auth_context import resolve_current_ui_session
+
+    user = await create_user(
+        async_session,
+        tenant_id=10,
+        username="teacher-mismatch",
+        hashed_password=hash_password("Pass1234!"),
+        role=UserRole.teacher,
+    )
+    payload = decode_access_token(
+        create_access_token(
+            user_id=user.id,
+            tenant_id=10,
+            role="teacher",
+            auth_epoch=user.auth_epoch,
+        )
+    )
+    payload["auth_epoch"] = payload["auth_epoch"] + 1
+    token = jwt.encode(payload, settings.JWT_SECRET, algorithm=_ALGORITHM)
+
+    assert await resolve_current_ui_session(async_session, token) is None
 
 
 async def test_resolve_current_ui_session_rejects_token_without_auth_epoch(

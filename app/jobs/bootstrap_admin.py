@@ -83,9 +83,13 @@ async def bootstrap_admin(
             return "error: multiple legacy sys_admin accounts require manual recovery"
         if len(legacy_admins) == 1:
             legacy_admin = legacy_admins[0]
-            legacy_admin.hashed_password = hash_password(password)
-            legacy_admin.is_active = True
-            await session.commit()
+            await update_password(
+                session,
+                tenant_id=tenant_id,
+                user_id=legacy_admin.id,
+                new_hashed_password=hash_password(password),
+                is_active=True,
+            )
             log_audit(
                 "bootstrap_recover_single_user_admin",
                 tenant_id=tenant_id,

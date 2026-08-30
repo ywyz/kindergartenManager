@@ -13,12 +13,13 @@ _ALGORITHM = "HS256"
 
 
 def create_access_token(
+    *,
     user_id: int,
     tenant_id: int,
     role: str,
+    auth_epoch: int,
     username: str = "",
     display_name: str | None = None,
-    *,
     session_id: UUID | None = None,
 ) -> str:
     """生成 JWT access token。
@@ -26,6 +27,7 @@ def create_access_token(
     payload 字段：
     - sub: str(user_id)
     - tenant_id: int
+    - auth_epoch: int
     - role: str
     - username: str
     - display_name: str | None
@@ -35,9 +37,12 @@ def create_access_token(
     issued_at = datetime.now(tz=timezone.utc)
     expire = issued_at + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
     token_session_id = session_id or uuid4()
+    if type(auth_epoch) is not int or auth_epoch <= 0:
+        raise ValueError("auth_epoch must be a positive int")
     payload = {
         "sub": str(user_id),
         "tenant_id": tenant_id,
+        "auth_epoch": auth_epoch,
         "role": role,
         "username": username,
         "display_name": display_name,

@@ -52,6 +52,7 @@ async def test_login_correct_credentials_returns_token(async_session):
     assert payload["sub"] == str(user.id)
     assert payload["tenant_id"] == 1
     assert payload["role"] == "teacher"
+    assert payload["auth_epoch"] == 1
 
 
 async def test_login_wrong_password_raises_auth_error(async_session):
@@ -127,6 +128,7 @@ async def test_change_password_success(async_session):
     token = await login(
         async_session, tenant_id=1, username="alice", password="NewPass!"
     )
+    assert decode_access_token(token)["auth_epoch"] == 2
     assert token is not None
 
 
@@ -392,6 +394,7 @@ async def test_reset_user_password_by_admin(async_session):
     token = await login(
         async_session, tenant_id=1, username="target_user2", password="NewUserPass!"
     )
+    assert decode_access_token(token)["auth_epoch"] == 2
     assert token is not None
 
 
@@ -449,6 +452,7 @@ async def test_password_mutation_revokes_old_token_and_new_login_recovers(
         username=target.username,
         password="ReplacementPass!",
     )
+    assert decode_access_token(new_token)["auth_epoch"] == 2
     assert await resolve_current_ui_session(async_session, new_token) is not None
 
 

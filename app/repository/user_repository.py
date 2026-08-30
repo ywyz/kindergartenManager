@@ -87,15 +87,24 @@ async def update_password(
     tenant_id: int,
     user_id: int,
     new_hashed_password: str,
+    *,
+    is_active: bool | None = None,
 ) -> bool:
-    """在指定租户中更新用户哈希密码，返回是否更新成功。"""
+    """原子更新密码与凭据版本；恢复场景可同时激活账号。"""
+    values: dict[str, object] = {
+        "hashed_password": new_hashed_password,
+        "auth_epoch": User.auth_epoch + 1,
+    }
+    if is_active is not None:
+        values["is_active"] = is_active
+
     result = await session.execute(
         update(User)
         .where(
             User.tenant_id == tenant_id,
             User.id == user_id,
         )
-        .values(hashed_password=new_hashed_password)
+        .values(**values)
     )
     await session.commit()
     return bool(result.rowcount)

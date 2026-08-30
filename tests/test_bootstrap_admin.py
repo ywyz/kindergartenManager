@@ -235,6 +235,7 @@ async def test_bootstrap_admin_recovers_legacy_single_user_without_changing_owne
     assert message.startswith("ok:")
     assert legacy.id == legacy_id
     assert legacy.username == "admin"
+    assert legacy.auth_epoch == 2
     assert verify_password("NewStrongPass!", legacy.hashed_password)
     assert not verify_password("not-used-single-user-mode", legacy.hashed_password)
 
@@ -291,6 +292,7 @@ async def test_bootstrap_recovers_inactive_legacy_admin_when_requested_name_is_o
     assert message.startswith("ok:")
     assert legacy.username == "admin"
     assert legacy.is_active is True
+    assert legacy.auth_epoch == 2
     assert verify_password("RecoveredPass!", legacy.hashed_password)
     assert occupied.role is UserRole.teacher
 

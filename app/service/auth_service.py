@@ -65,6 +65,7 @@ async def login(
         role=user.role.value,
         username=user.username,
         display_name=user.display_name,
+        auth_epoch=user.auth_epoch,
     )
 
 

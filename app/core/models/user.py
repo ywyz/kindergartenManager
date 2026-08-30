@@ -1,7 +1,17 @@
 import enum
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Enum, Integer, String, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Enum,
+    Integer,
+    String,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -36,8 +46,22 @@ class User(Base):
         nullable=False,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    auth_epoch: Mapped[int] = mapped_column(
+        Integer,
+        CheckConstraint(
+            "auth_epoch >= 1",
+            name="ck_user_auth_epoch_positive",
+        ),
+        default=1,
+        server_default=text("1"),
+        nullable=False,
+    )
     # 显示名（真实姓名），可空；为空时 UI 层回退到 username 展示
-    display_name: Mapped[str | None] = mapped_column(String(64), nullable=True, default=None)
+    display_name: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        default=None,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
