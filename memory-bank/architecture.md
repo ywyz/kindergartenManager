@@ -1,6 +1,6 @@
 # 幼儿园教学管理系统架构文档（初始化）
 
-> **历史文档说明（2026-08-26）**：本文按开发阶段累积，包含已被后续可信登录恢复取代的单用户描述和旧迁移/测试数字。当前架构事实见 [`../CONTEXT.md`](../CONTEXT.md)、[`../docs/design/system-architecture.md`](../docs/design/system-architecture.md)、[`../docs/design/data-model.md`](../docs/design/data-model.md) 和 [`../docs/ADR/README.md`](../docs/ADR/README.md)。受控 Agent 的 F003-F009 已固定 GREEN；当前分支的可信 UI session、`daily_plan.revision` 与 W005/W006 逐次确认 WRITE 边界见 [`../docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md`](../docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md) 和 [`../specs/agent-write/spec.md`](../specs/agent-write/spec.md)。下文主体保留历史，不授权跳过 W006-W008 门禁。当前 Alembic head 为 `e5f7a9c2d4b6`。
+> **历史文档说明（2026-08-30）**：本文按开发阶段累积，包含已被后续可信登录恢复取代的单用户描述和旧迁移/测试数字。当前架构事实见 [`../CONTEXT.md`](../CONTEXT.md)、[`../docs/design/system-architecture.md`](../docs/design/system-architecture.md)、[`../docs/design/data-model.md`](../docs/design/data-model.md) 和 [`../docs/ADR/README.md`](../docs/ADR/README.md)。受控 Agent 的 F003-F009 已固定 GREEN；当前分支的可信 UI session、`daily_plan.revision` 与 W005/W006 逐次确认 WRITE 边界见 [`../docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md`](../docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md) 和 [`../specs/agent-write/spec.md`](../specs/agent-write/spec.md)。下文主体保留历史，不授权跳过 W006-W008 门禁。当前 Alembic head 为 `2b7f3d5e9c8a`；其前序 `e5f7a9c2d4b6` 是 W006 evidence schema revision。
 
 ## 1. 历史阶段记录
 

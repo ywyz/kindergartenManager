@@ -154,6 +154,7 @@ def test_current_migration_head_is_consistent_across_operator_docs() -> None:
             "docs/DEVELOPER.md",
             "docs/MANUAL_TESTING.md",
             "specs/agent-write/manual/README.md",
+            "memory-bank/architecture.md",
         )
         if expected_head not in (_ROOT / relative_path).read_text(encoding="utf-8")
     ]
