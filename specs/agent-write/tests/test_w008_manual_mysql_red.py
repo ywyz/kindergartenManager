@@ -24,6 +24,7 @@ TRIGGER_CASES = {
 EXPECTED_REPORT = {
     "tested_code_sha": TESTED_SHA,
     "head": CURRENT_HEAD,
+    "auth_epoch": {"default": 1, "invalid_errno": 3819},
     "trigger_rejections": 4,
     "cas": [False, True],
     "revision": 2,
@@ -56,6 +57,7 @@ class _FakeBackend:
         version: str = "8.0.43",
         schema_scoped_principal: bool = True,
         heads: tuple[str, ...] = (CURRENT_HEAD,),
+        auth_epoch: tuple[int, int] = (1, 3819),
         triggers: set[tuple[str, str]] | None = None,
         cas: tuple[bool, bool, int] = (True, False, 2),
         lock_errno: int = 1205,
@@ -63,6 +65,7 @@ class _FakeBackend:
         self.version = version
         self.schema_scoped_principal = schema_scoped_principal
         self.heads = heads
+        self.auth_epoch = auth_epoch
         self.triggers = TRIGGER_CASES if triggers is None else triggers
         self.cas = cas
         self.lock_errno = lock_errno
@@ -81,6 +84,10 @@ class _FakeBackend:
     async def current_alembic_heads(self) -> tuple[str, ...]:
         self.calls.append("head")
         return self.heads
+
+    async def auth_epoch_schema_evidence(self) -> tuple[int, int]:
+        self.calls.append("auth-epoch")
+        return self.auth_epoch
 
     async def immutable_trigger_rejections(self) -> set[tuple[str, str]]:
         self.calls.append("triggers")
@@ -300,6 +307,7 @@ async def test_live_runner_reports_current_head_four_triggers_cas_and_actor_lock
         "version",
         "principal",
         "head",
+        "auth-epoch",
         "triggers",
         "cas",
         "actor-lock",
@@ -329,6 +337,7 @@ async def test_live_runner_rejects_a_globally_privileged_principal() -> None:
     "backend",
     (
         _FakeBackend(heads=("old-head",)),
+        _FakeBackend(auth_epoch=(0, 0)),
         _FakeBackend(
             triggers={
                 ("daily_plan_operation_version", "UPDATE"),
@@ -339,7 +348,13 @@ async def test_live_runner_rejects_a_globally_privileged_principal() -> None:
         _FakeBackend(cas=(True, True, 3)),
         _FakeBackend(lock_errno=0),
     ),
-    ids=("wrong-head", "missing-trigger", "invalid-cas", "no-lock-contention"),
+    ids=(
+        "wrong-head",
+        "invalid-auth-epoch-schema",
+        "missing-trigger",
+        "invalid-cas",
+        "no-lock-contention",
+    ),
 )
 @pytest.mark.asyncio
 async def test_live_runner_fails_closed_on_incomplete_or_conflicting_evidence(

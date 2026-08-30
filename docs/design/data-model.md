@@ -1,6 +1,6 @@
 # KindergartenManager 数据模型
 
-> 合入基线：`main@ca3b7bd`；当前 `feat/agent-write` Alembic head：`e5f7a9c2d4b6`。
+> 合入基线：`main@ca3b7bd`；当前 `feat/agent-write` Alembic head：`2b7f3d5e9c8a`。
 > W005/W006 已闭合。W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
 > Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确本地交付状态、Review 轮次、
 > SHA 与测试证据仅以 `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后作为外部证据；
@@ -73,8 +73,10 @@ tenant
 
 - `(tenant_id, username)` 唯一。
 - `hashed_password` 使用 Argon2 生成。
+- `auth_epoch` 是默认值为 1 的正整数；任何密码变更与 epoch 递增在同一条租户限定 UPDATE 中完成，
+  token 的 epoch 不存在、非法或与数据库不一致时会话失败关闭。
 - `role` 枚举为 teacher / teaching_admin / sys_admin。
-- UI 登录已在当前工作树恢复：JWT `sub + tenant_id + jti` 先通过签名/时间校验，然后每次受保护页面入口按 tenant/user 重读 active `user`，角色和显示名以数据库为权威。
+- UI 登录已在当前工作树恢复：JWT `sub + tenant_id + jti + auth_epoch` 先通过签名/时间校验，然后每次受保护页面入口按 tenant/user 重读 active `user`，角色、显示名和 epoch 以数据库为权威。
 - 应用启动不再自动创建固定 `admin`，也不挂载匿名自注册；空库初始化与老版固定密码账号恢复只能通过显式本地 admin bootstrap。
 
 ### `semester_config`
@@ -210,8 +212,9 @@ Repository 必须满足：
 ## 13. Agent Foundation 与确认写入的数据边界
 
 当前有 18 张 ORM 业务表。`b7d9e1f3a5c2` 为 `daily_plan` 增加 revision，`c1a8e4f6b2d9` 修复
-SQLite `user.id` 自增类型，当前 head `e5f7a9c2d4b6` 只增加
+SQLite `user.id` 自增类型，`e5f7a9c2d4b6` 只增加
 `daily_plan_operation_version` 与 `agent_write_audit` 两张 W006 evidence 表及其不可变 trigger。
+当前 head `2b7f3d5e9c8a` 只为既有 `user` 表增加 token 撤销所需的 `auth_epoch`。
 [ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md) 确定 Agent Foundation 的零 Agent 持久化边界，该 Foundation 已合入
 `main@ca3b7bd`。
 
@@ -246,7 +249,8 @@ F009 自动矩阵曾在其固定 `tested_code_sha` 动态反射包含 Alembic �
 ## 14. 迁移链
 
 当前单线迁移从空 smoke revision 开始，依次覆盖用户、设置、AI、每日计划、提示词、导出、游戏观察、
-一对一倾听、自制教玩具、课程审议与 Agent WRITE evidence，当前工作树 head 为 `e5f7a9c2d4b6`。
+一对一倾听、自制教玩具、课程审议、Agent WRITE evidence 与 token 撤销 epoch；当前工作树 head 为
+`2b7f3d5e9c8a`。
 `b7d9e1f3a5c2` 以 `a6c4d8e2f9b1` 为 down revision，为 `daily_plan` 增加带服务器默认 1 和正数约束的
 `revision`；现有行回填为 1，并建立 SQLite/MySQL trigger 强制 INSERT 从 1 开始、UPDATE 必须有业务内容
 变化且恰好 `OLD + 1`；downgrade 先移除 trigger，再移除约束与列。
@@ -260,6 +264,10 @@ F009 自动矩阵曾在其固定 `tested_code_sha` 动态反射包含 Alembic �
 `nonce_sha256` 分别使用单列唯一约束。SQLite/MySQL 均各建四个 UPDATE/DELETE 拒绝 trigger；downgrade
 先移除 trigger 再移除两表。MySQL `snapshot_json` 使用 `LONGTEXT`。真实 MySQL 8 往返和触发器行为仍属于
 W008 独立人工门。
+
+`2b7f3d5e9c8a` 以 `e5f7a9c2d4b6` 为 down revision，为 `user` 增加默认值 1、非空且必须大于等于 1 的
+`auth_epoch`。既有用户回填为 1；密码变更通过租户限定的单条 UPDATE 原子递增该值。downgrade 移除约束与列，
+但不删除用户行。
 
 验证要求：
 

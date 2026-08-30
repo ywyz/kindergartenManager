@@ -14,10 +14,11 @@
 - 显式配置时可使用 MySQL 8。
 - 所有 schema 变更通过 Alembic；禁止依赖 `create_all()`。
 - 迁移必须同时考虑 SQLite batch/类型差异和 MySQL enum/BLOB 行为。
-- 当前工作树 head 是 `e5f7a9c2d4b6`；head 变化只由新 revision 产生。其前序
+- 当前工作树 head 是 `2b7f3d5e9c8a`；head 变化只由新 revision 产生。`e5f7a9c2d4b6` 的前序
   `c1a8e4f6b2d9` 只在 SQLite 将历史迁移错误创建的 `user.id BIGINT PRIMARY KEY` 重建为可自动生成
-  ID 的 `INTEGER PRIMARY KEY`；新 head 为 SQLite/MySQL 增加且仅增加两张 Agent WRITE evidence 表和
-  各自的 UPDATE/DELETE 拒绝 trigger。
+  ID 的 `INTEGER PRIMARY KEY`；`e5f7a9c2d4b6` 为 SQLite/MySQL 增加且仅增加两张 Agent WRITE evidence
+  表和各自的 UPDATE/DELETE 拒绝 trigger；新 head 为 `user` 增加正整数 `auth_epoch`，用于密码变更后
+  撤销旧 UI token。
 - 所有应用入口在服务 UI 前执行启动迁移并统一 fail-closed：迁移失败必须中止启动。
 - 不提供按桌面/服务器模式分流或环境变量控制的 fail-open 开关；如未来确有离线只读恢复需求，必须另立 ADR 和验收。
 

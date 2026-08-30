@@ -83,10 +83,11 @@ UI 登录用户与 API 的租户服务主体仍是两个不同边界，不得混
 
 - 默认数据库：用户可写数据目录中的 SQLite `kindergarten.db`。
 - 可选数据库：通过 `DATABASE_URL` 使用 MySQL 8。
-- Schema 变更：只允许 Alembic；本工作树迁移 head 为 `e5f7a9c2d4b6`。其中
+- Schema 变更：只允许 Alembic；本工作树迁移 head 为 `2b7f3d5e9c8a`。其中
   `b7d9e1f3a5c2` 增加 `daily_plan.revision`，`c1a8e4f6b2d9` 修复 SQLite `user.id` 必须使用精确
-  `INTEGER PRIMARY KEY` 才能自动生成 ID 的兼容性缺陷；新 head 只增加 W006 的两张 append-only
-  evidence 表及 SQLite/MySQL UPDATE/DELETE 拒绝 trigger。MySQL `user.id` 仍为 `BIGINT AUTO_INCREMENT`。
+  `INTEGER PRIMARY KEY` 才能自动生成 ID 的兼容性缺陷；`e5f7a9c2d4b6` 增加 W006 的两张 append-only
+  evidence 表及 SQLite/MySQL UPDATE/DELETE 拒绝 trigger；新 head 为 `user` 增加正整数 `auth_epoch`，
+  使任何密码变更都能撤销旧 UI token。MySQL `user.id` 仍为 `BIGINT AUTO_INCREMENT`。
 - 应用启动会先执行 `alembic upgrade head`；桌面、开发和服务器入口统一采用 fail-closed，迁移失败会记录异常并中止启动，不提供隐藏的 fail-open 开关。
 - AI Key 使用 Fernet 在应用层加密；明文只能短暂存在于内存，不得写日志或文档。
 - 图片默认使用 MySQL/SQLite BLOB 抽象；导出文件写入运行时导出目录。

@@ -238,8 +238,9 @@ Review/Quality/远端/Issue 证据见 Issue #48。
 CAS `N→N+1`、最小不可变审计与同 commit，任何已知失败全回滚，commit unknown 只对账不重放。
 
 当前分支已恢复可信 UI session；`b7d9e1f3a5c2` 增加 `daily_plan.revision`，`c1a8e4f6b2d9` 修复
-SQLite `user.id` 自增，当前 head `e5f7a9c2d4b6` 增加且仅增加 14/17 列的两张 append-only evidence 表和
-SQLite/MySQL 四个 UPDATE/DELETE 拒绝 trigger。W005 的 `ConfirmedDailyPlanWriteService` 契约/store 已在
+SQLite `user.id` 自增，`e5f7a9c2d4b6` 增加且仅增加 14/17 列的两张 append-only evidence 表和
+SQLite/MySQL 四个 UPDATE/DELETE 拒绝 trigger；当前 head `2b7f3d5e9c8a` 为 `user` 增加正整数
+`auth_epoch`，密码变更会使旧 UI token 失效。W005 的 `ConfirmedDailyPlanWriteService` 契约/store 已在
 `e4a7f3c…` 取得 Review 0/0、精确 SHA CI、service 验收和 Issue 回写；W006 已实现 version→CAS→audit
 同事务、全回滚、commit-unknown 只读 reconcile，并在 Review 后固定两轮 finding RED。
 

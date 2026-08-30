@@ -19,12 +19,14 @@ Word：Microsoft Word / LibreOffice / 未执行
 
 ## 2. 启动与迁移
 
-- [ ] 全新数据目录启动，迁移到 `e5f7a9c2d4b6`，并确认两张 Agent WRITE evidence 表及不可变 trigger 存在。
+- [ ] 全新数据目录启动，迁移到 `2b7f3d5e9c8a`，确认两张 Agent WRITE evidence 表及不可变 trigger 存在，
+  且 `user.auth_epoch` 默认 1、非空、拒绝非正数。
 - [ ] 空库不自动创建固定管理员；在应用主机显式 bootstrap 后才能登录。
 - [ ] `/` 跳转 `/login`；未登录不能进入 `/home`、`/settings` 等业务页，匿名 `/register` 不挂载。
 - [ ] 登录后 `/home`、`/settings` 可打开；旧 `/setup` 立即跳转 `/settings`。
 - [ ] A 标签页退出并在 B 标签页重新登录后，A 的保存、AI、导出和删除 callback 因 `jti` 不匹配失败关闭。
 - [ ] token 过期、用户停用、角色降权或数据库不可用时清除旧登录态；无 Repository/Provider/文件副作用。
+- [ ] 用户自改密码、管理员重置或 bootstrap 恢复密码后，旧 token 立即失效；重新登录签发的新 token 可用。
 - [ ] 重启后 SQLite、自动密钥和已保存 AI 配置可继续使用。
 - [ ] 迁移失败时明确记录实际行为，不能只记“页面打开”。
 - [ ] 日志不含 AI Key、数据库密码或完整幼儿图片内容。

@@ -40,7 +40,7 @@ from w008_fixed_sha import (
 
 
 MYSQL_URL_ENV = "W008_MYSQL_DATABASE_URL"
-CURRENT_HEAD = "e5f7a9c2d4b6"
+CURRENT_HEAD = "2b7f3d5e9c8a"
 TRIGGER_CASES = frozenset(
     {
         ("daily_plan_operation_version", "UPDATE"),
@@ -75,6 +75,8 @@ class AcceptanceBackend(Protocol):
     async def app_principal_is_schema_scoped(self) -> bool: ...
 
     async def current_alembic_heads(self) -> tuple[str, ...]: ...
+
+    async def auth_epoch_schema_evidence(self) -> tuple[int, int]: ...
 
     async def immutable_trigger_rejections(self) -> set[tuple[str, str]]: ...
 
@@ -184,6 +186,12 @@ async def run_live_acceptance(
     if heads != (CURRENT_HEAD,):
         raise ManualHelperError("live database is not at the exact current head")
 
+    auth_epoch_default, auth_epoch_invalid_errno = (
+        await backend.auth_epoch_schema_evidence()
+    )
+    if auth_epoch_default != 1 or auth_epoch_invalid_errno != 3819:
+        raise ManualHelperError("auth epoch schema evidence is incomplete")
+
     trigger_rejections = await backend.immutable_trigger_rejections()
     if trigger_rejections != set(TRIGGER_CASES):
         raise ManualHelperError("append-only trigger evidence is incomplete")
@@ -204,6 +212,10 @@ async def run_live_acceptance(
     return {
         "tested_code_sha": normalized_sha,
         "head": CURRENT_HEAD,
+        "auth_epoch": {
+            "default": auth_epoch_default,
+            "invalid_errno": auth_epoch_invalid_errno,
+        },
         "trigger_rejections": len(trigger_rejections),
         "cas": sorted(cas_results),
         "revision": revision,
@@ -299,6 +311,75 @@ class LiveMySQLBackend:
             raise
         except Exception:
             raise ManualHelperError("MySQL trigger acceptance failed") from None
+
+    async def auth_epoch_schema_evidence(self) -> tuple[int, int]:
+        """Prove the default, named constraint and rejected non-positive update."""
+        try:
+            await self._ensure_actor_and_plan()
+            async with self._sessions() as session:
+                schema_row = (
+                    await session.execute(
+                        text(
+                            "SELECT c.IS_NULLABLE, c.COLUMN_DEFAULT, "
+                            "cc.CHECK_CLAUSE "
+                            "FROM information_schema.COLUMNS AS c "
+                            "JOIN information_schema.TABLE_CONSTRAINTS AS tc "
+                            "ON tc.CONSTRAINT_SCHEMA = c.TABLE_SCHEMA "
+                            "AND tc.TABLE_NAME = c.TABLE_NAME "
+                            "AND tc.CONSTRAINT_NAME = "
+                            "'ck_user_auth_epoch_positive' "
+                            "AND tc.CONSTRAINT_TYPE = 'CHECK' "
+                            "JOIN information_schema.CHECK_CONSTRAINTS AS cc "
+                            "ON cc.CONSTRAINT_SCHEMA = tc.CONSTRAINT_SCHEMA "
+                            "AND cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME "
+                            "WHERE c.TABLE_SCHEMA = DATABASE() "
+                            "AND c.TABLE_NAME = 'user' "
+                            "AND c.COLUMN_NAME = 'auth_epoch'"
+                        )
+                    )
+                ).one()
+                default_epoch = int(schema_row[1])
+                check_clause = str(schema_row[2]).replace("`", "").replace(" ", "")
+                if (
+                    str(schema_row[0]).upper() != "NO"
+                    or default_epoch != 1
+                    or "auth_epoch>=1" not in check_clause
+                ):
+                    raise ManualHelperError("MySQL auth epoch schema is not exact")
+                stored_epoch = int(
+                    (
+                        await session.execute(
+                            text(
+                                "SELECT auth_epoch FROM `user` "
+                                "WHERE tenant_id = :tenant_id AND id = :user_id"
+                            ),
+                            {"tenant_id": _TENANT_ID, "user_id": _USER_ID},
+                        )
+                    ).scalar_one()
+                )
+                if stored_epoch != 1:
+                    raise ManualHelperError("MySQL auth epoch default was not applied")
+                try:
+                    await session.execute(
+                        text(
+                            "UPDATE `user` SET auth_epoch = 0 "
+                            "WHERE tenant_id = :tenant_id AND id = :user_id"
+                        ),
+                        {"tenant_id": _TENANT_ID, "user_id": _USER_ID},
+                    )
+                except DBAPIError as exc:
+                    await session.rollback()
+                    invalid_errno = _mysql_errno(exc)
+                else:
+                    await session.rollback()
+                    raise ManualHelperError("MySQL accepted a non-positive auth epoch")
+            if invalid_errno != 3819:
+                raise ManualHelperError("MySQL auth epoch constraint errno was not 3819")
+            return default_epoch, invalid_errno
+        except ManualHelperError:
+            raise
+        except Exception:
+            raise ManualHelperError("MySQL auth epoch acceptance failed") from None
 
     async def _trigger_rows(self) -> frozenset[tuple[str, str, str, str]]:
         async with self._sessions() as session:

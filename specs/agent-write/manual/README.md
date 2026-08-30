@@ -158,9 +158,9 @@ W008_MYSQL_DATABASE_URL="$MYSQL_URL" \
 `.kindergarten_secrets.lock`；live helper 不读取该锁，且在任何 application import 前安装 file-free synthetic
 config，因此允许它存在，但仍拒绝 worktree 内任何 `.env` 或 `.kindergarten_secrets`。
 
-三个 `current` 必须依序为 `e5f7a9c2d4b6`、`a6c4d8e2f9b1`、`e5f7a9c2d4b6`。live helper 单次验证：
+三个 `current` 必须依序为 `2b7f3d5e9c8a`、`a6c4d8e2f9b1`、`2b7f3d5e9c8a`。live helper 单次验证：
 
-- 官方 MySQL major 8 与最终 exact head；
+- 官方 MySQL major 8 与最终 exact head；`user.auth_epoch` 默认 1、非空且拒绝非正数；
 - 两张 evidence 表的 UPDATE/DELETE 四个 trigger 精确存在，四次真实 DML 均返回 errno 1644，且全行 digest
   不变；
 - 两个真实 session 对同一 revision 的生产 CAS 恰一真一假，最终 revision 为 2；
