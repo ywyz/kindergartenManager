@@ -26,12 +26,14 @@ def test_deployment_settings_are_sys_admin_only_and_never_echo_db_password() -> 
             node
             for node in ast.walk(page)
             if isinstance(node, ast.If)
-            and ast.unparse(node.test) == "ui_session.role == UserRole.sys_admin.value"
+            and ast.unparse(node.test)
+            == "current_session.role == UserRole.sys_admin.value"
         ),
         None,
     )
 
-    assert admin_branch is not None, "deployment controls need an explicit sys_admin gate"
+    assert admin_branch is not None, "deployment controls need a sys_admin gate"
+    assert "current_session = await require_live_session()" in ast.unparse(page)
     admin_source = ast.unparse(admin_branch)
     assert "read_dot_env()" in admin_source
     assert "数据库配置" in admin_source

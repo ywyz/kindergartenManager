@@ -408,6 +408,7 @@ def test_settings_independent_forms_use_independent_operation_scopes() -> None:
         "generation_name",
         "owner_name",
         "current_check",
+        "session_guard",
         "invalidate_name",
         "controls",
     ),
@@ -418,6 +419,7 @@ def test_settings_independent_forms_use_independent_operation_scopes() -> None:
             "db_config_generation",
             "db_config_owner",
             "_db_config_operation_is_current",
+            "require_deployment_session",
             "_invalidate_db_config",
             (
                 "db_mode_radio",
@@ -434,6 +436,7 @@ def test_settings_independent_forms_use_independent_operation_scopes() -> None:
             "port_generation",
             "port_owner",
             "_port_operation_is_current",
+            "require_deployment_session",
             "_invalidate_port",
             ("port_input",),
         ),
@@ -445,6 +448,7 @@ def test_settings_file_write_is_single_flight_and_discards_a_stale_click(
     generation_name: str,
     owner_name: str,
     current_check: str,
+    session_guard: str,
     invalidate_name: str,
     controls: tuple[str, ...],
 ) -> None:
@@ -461,7 +465,7 @@ def test_settings_file_write_is_single_flight_and_discards_a_stale_click(
         assert control in page
     assert f"control.on_value_change({invalidate_name})" in page
 
-    auth_index = callback.index("await require_live_session()")
+    auth_index = callback.index(f"await {session_guard}()")
     owner_index = callback.index(f"{current_check}(generation, owner)", auth_index)
     write_index = callback.index("write_dot_env(", owner_index)
     assert auth_index < owner_index < write_index

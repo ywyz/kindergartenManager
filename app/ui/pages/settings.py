@@ -12,11 +12,13 @@ from dataclasses import dataclass
 from datetime import date
 
 from nicegui import ui
+from sqlalchemy.engine import URL, make_url
 
 from app.core.config import settings as app_settings
 from app.core.database import AsyncSessionLocal
 from app.core.env_writer import read_dot_env, write_dot_env
 from app.core.exceptions import CryptoError
+from app.core.models.user import UserRole
 from app.repository.ai_key_repository import (
     get_active_ai_key,
     get_decrypted_key,
@@ -98,6 +100,12 @@ async def settings_page() -> None:
 
     async def require_live_session() -> TrustedUiSession | None:
         return await require_bound_ui_session(ui_session)
+
+    async def require_deployment_session() -> TrustedUiSession | None:
+        return await require_bound_ui_session(
+            ui_session,
+            allowed_roles={UserRole.sys_admin.value},
+        )
 
     semester_operations = BoundUiOperationScope(ui_session)
     class_operations = BoundUiOperationScope(ui_session)
@@ -790,7 +798,8 @@ async def settings_page() -> None:
             session, tenant_id, user_id, key_type="vision"
         )
 
-    if await require_live_session() is None:
+    current_session = await require_live_session()
+    if current_session is None:
         return
 
     if semester:
@@ -831,6 +840,7 @@ async def settings_page() -> None:
             vision_msg.text = "视觉模型 Key 解密失败，请重新配置"
             vision_msg.classes(add="text-red-500")
 
+    if current_session.role == UserRole.sys_admin.value:
         # ══════════════════════════════════════════════════════════════════════
         # 区块五：数据库配置
         # ══════════════════════════════════════════════════════════════════════
@@ -852,14 +862,12 @@ async def settings_page() -> None:
             _parsed_dbname = ""
             if is_mysql and "://" in current_db_url:
                 try:
-                    from urllib.parse import urlparse
-
-                    parsed = urlparse(current_db_url.replace("mysql+aiomysql", "mysql"))
-                    _parsed_host = parsed.hostname or ""
+                    parsed = make_url(current_db_url)
+                    _parsed_host = parsed.host or ""
                     _parsed_port = str(parsed.port or 3306)
                     _parsed_user = parsed.username or ""
                     _parsed_password = parsed.password or ""
-                    _parsed_dbname = parsed.path.lstrip("/") if parsed.path else ""
+                    _parsed_dbname = parsed.database or ""
                 except Exception:
                     pass
 
@@ -885,7 +893,8 @@ async def settings_page() -> None:
                 ).classes("w-full")
                 db_pass_input = ui.input(
                     label="密码",
-                    value=_parsed_password,
+                    value="",
+                    placeholder="留空则保留现有密码",
                     password=True,
                     password_toggle_button=True,
                 ).classes("w-full")
@@ -928,7 +937,7 @@ async def settings_page() -> None:
                 owner: object,
                 payload: _DatabasePayload,
             ) -> None:
-                current = await require_live_session()
+                current = await require_deployment_session()
                 if current is None or not _db_config_operation_is_current(
                     generation,
                     owner,
@@ -943,11 +952,24 @@ async def settings_page() -> None:
                         db_status.classes(replace="text-red-600 text-sm mt-2")
                         return
 
-                    new_url = (
-                        "mysql+aiomysql://"
-                        f"{payload.username}:{payload.password}@{payload.host}:"
-                        f"{payload.port}/{payload.database}"
-                    )
+                    try:
+                        database_port = int(payload.port)
+                    except (TypeError, ValueError):
+                        db_status.set_text("❌ 数据库端口格式错误")
+                        db_status.classes(replace="text-red-600 text-sm mt-2")
+                        return
+                    if database_port <= 0 or database_port > 65535:
+                        db_status.set_text("❌ 数据库端口范围 1~65535")
+                        db_status.classes(replace="text-red-600 text-sm mt-2")
+                        return
+                    new_url = URL.create(
+                        "mysql+aiomysql",
+                        username=payload.username,
+                        password=payload.password or _parsed_password,
+                        host=payload.host,
+                        port=database_port,
+                        database=payload.database,
+                    ).render_as_string(hide_password=False)
 
                 try:
                     write_dot_env({"DATABASE_URL": new_url})
@@ -1017,7 +1039,7 @@ async def settings_page() -> None:
                 owner: object,
                 port_value: object,
             ) -> None:
-                current = await require_live_session()
+                current = await require_deployment_session()
                 if current is None or not _port_operation_is_current(
                     generation,
                     owner,
