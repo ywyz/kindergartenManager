@@ -1,11 +1,11 @@
 {
     "schema_version": 2,
-    "commit": "3371f5769a738e571a7d11a0ea30037d3483bdbc",
-    "indexed_at": "2026-08-31T13:41:51Z",
+    "commit": "46815f2f37ece27e5ffabd5ebea8b8f27c573e50",
+    "indexed_at": "2026-08-31T14:47:54Z",
     "project": "kindergartenManager",
-    "nodes": 12957,
-    "edges": 34442,
-    "original_size": 159580160,
-    "compressed_size": 3781537,
+    "nodes": 10848,
+    "edges": 32396,
+    "original_size": 125173760,
+    "compressed_size": 3626796,
     "compression_level": 9
 }
