@@ -11,7 +11,6 @@ import yaml
 
 from scripts import release_convergence
 
-
 ROOT = Path(__file__).parents[1]
 SOURCE_SHA = "e" * 40
 DIGEST = "sha256:" + "a" * 64
@@ -42,9 +41,64 @@ def _descriptor() -> dict[str, Any]:
 
 
 def _release_body() -> str:
-    return "\n".join(
-        (TAG, SOURCE_SHA, REPOSITORY, DIGEST, IMAGE_REF, MEDIA_TYPE, *PLATFORMS)
+    return f"""### Docker 不可变引用说明
+
+| 字段 | 值 |
+|---|---|
+| Release tag | `{TAG}` |
+| Source SHA | `{SOURCE_SHA}` |
+| OCI index digest | `{DIGEST}` |
+| 不可变引用 | `{IMAGE_REF}` |
+| Media type | `{MEDIA_TYPE}` |
+| Platforms | `linux/amd64`, `linux/arm64` |
+
+---"""
+
+
+def _assert_release_rejects_body(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    body: str,
+    message: str,
+) -> None:
+    descriptor_path = tmp_path / "docker-image.json"
+    descriptor_path.write_text(json.dumps(_descriptor()))
+    release = {
+        "tag_name": TAG,
+        "target_commitish": SOURCE_SHA,
+        "body": body,
+        "assets": [
+            {
+                "name": "docker-image.json",
+                "url": "https://api.github.com/assets/123",
+            }
+        ],
+    }
+
+    def fake_api(repo: str, path: str, token: str) -> dict[str, Any]:
+        if path.startswith("git/ref/tags/"):
+            return {"object": {"type": "commit", "sha": SOURCE_SHA}}
+        return release
+
+    monkeypatch.setattr(release_convergence, "_api_json", fake_api)
+    monkeypatch.setattr(
+        release_convergence, "_asset_json", lambda url, token: _descriptor()
     )
+
+    with pytest.raises(release_convergence.ConvergenceError, match=message):
+        release_convergence.verify_release(
+            repo="ywyz/kindergartenManager",
+            token="synthetic-token",
+            descriptor_path=descriptor_path,
+            tag=TAG,
+            source_sha=SOURCE_SHA,
+            repository=REPOSITORY,
+            digest=DIGEST,
+            immutable_ref=IMAGE_REF,
+            media_type=MEDIA_TYPE,
+            platforms=PLATFORMS,
+        )
 
 
 def test_release_workflow_builds_and_exports_immutable_oci_index() -> None:
@@ -233,7 +287,7 @@ def test_release_convergence_accepts_exactly_matching_facts(
     [
         ("tag", "tag target"),
         ("asset", "Published Release asset"),
-        ("body", "Release body"),
+        ("body", "Release body does not match expected release tag"),
     ],
 )
 def test_release_convergence_fails_closed_on_mismatch(
@@ -246,7 +300,10 @@ def test_release_convergence_fails_closed_on_mismatch(
     descriptor_path.write_text(json.dumps(_descriptor()))
     body = _release_body()
     if mutation == "body":
-        body = TAG
+        body = body.replace(
+            "| Release tag | `v9.8.7` |",
+            "| Release tag | `wrong` |",
+        )
     release = {
         "tag_name": TAG,
         "target_commitish": SOURCE_SHA,
@@ -272,6 +329,219 @@ def test_release_convergence_fails_closed_on_mismatch(
     monkeypatch.setattr(release_convergence, "_asset_json", lambda url, token: asset)
 
     with pytest.raises(release_convergence.ConvergenceError, match=message):
+        release_convergence.verify_release(
+            repo="ywyz/kindergartenManager",
+            token="synthetic-token",
+            descriptor_path=descriptor_path,
+            tag=TAG,
+            source_sha=SOURCE_SHA,
+            repository=REPOSITORY,
+            digest=DIGEST,
+            immutable_ref=IMAGE_REF,
+            media_type=MEDIA_TYPE,
+            platforms=PLATFORMS,
+        )
+
+
+def test_release_convergence_rejects_duplicate_docker_fact_fields(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    descriptor_path = tmp_path / "docker-image.json"
+    descriptor_path.write_text(json.dumps(_descriptor()))
+    body = _release_body().replace(
+        f"| Source SHA | `{SOURCE_SHA}` |",
+        f"| Source SHA | `{SOURCE_SHA}` |\n| Source SHA | `{SOURCE_SHA}` |",
+    )
+    release = {
+        "tag_name": TAG,
+        "target_commitish": SOURCE_SHA,
+        "body": body,
+        "assets": [
+            {
+                "name": "docker-image.json",
+                "url": "https://api.github.com/assets/123",
+            }
+        ],
+    }
+
+    def fake_api(repo: str, path: str, token: str) -> dict[str, Any]:
+        if path.startswith("git/ref/tags/"):
+            return {"object": {"type": "commit", "sha": SOURCE_SHA}}
+        return release
+
+    monkeypatch.setattr(release_convergence, "_api_json", fake_api)
+    monkeypatch.setattr(
+        release_convergence, "_asset_json", lambda url, token: _descriptor()
+    )
+
+    with pytest.raises(
+        release_convergence.ConvergenceError, match="duplicate Docker fact field"
+    ):
+        release_convergence.verify_release(
+            repo="ywyz/kindergartenManager",
+            token="synthetic-token",
+            descriptor_path=descriptor_path,
+            tag=TAG,
+            source_sha=SOURCE_SHA,
+            repository=REPOSITORY,
+            digest=DIGEST,
+            immutable_ref=IMAGE_REF,
+            media_type=MEDIA_TYPE,
+            platforms=PLATFORMS,
+        )
+
+
+def test_release_convergence_rejects_duplicate_docker_facts_section_title(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    body = f"""{_release_body()}
+
+### Docker 不可变引用说明
+
+| 字段 | 值 |
+|---|---|
+| Release tag | `{TAG}` |
+| Source SHA | `{SOURCE_SHA}` |
+| OCI index digest | `{DIGEST}` |
+| 不可变引用 | `{IMAGE_REF}` |
+| Media type | `{MEDIA_TYPE}` |
+| Platforms | `linux/amd64`, `linux/arm64` |
+"""
+    _assert_release_rejects_body(
+        tmp_path,
+        monkeypatch,
+        body=body,
+        message="duplicate Docker facts section headings",
+    )
+
+
+def test_release_convergence_rejects_missing_docker_facts_table_separator(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    body = _release_body().replace("|---|---|", "")
+    _assert_release_rejects_body(
+        tmp_path,
+        monkeypatch,
+        body=body,
+        message="separator is missing",
+    )
+
+
+def test_release_convergence_rejects_inline_docker_facts_title(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    body = _release_body().replace(
+        "### Docker 不可变引用说明",
+        "### Docker 不可变引用说明 (inline)",
+    )
+    _assert_release_rejects_body(
+        tmp_path,
+        monkeypatch,
+        body=body,
+        message="malformed Docker facts section heading",
+    )
+
+
+def test_release_convergence_rejects_fenced_code_docker_facts_title(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    body = "```bash\n### Docker 不可变引用说明\n```\n\n" + _release_body()
+    _assert_release_rejects_body(
+        tmp_path,
+        monkeypatch,
+        body=body,
+        message="inside fenced code",
+    )
+
+
+def test_release_convergence_rejects_tilde_fenced_code_docker_facts_title(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    body = "~~~bash\n### Docker 不可变引用说明\n~~~\n\n" + _release_body()
+    _assert_release_rejects_body(
+        tmp_path,
+        monkeypatch,
+        body=body,
+        message="inside fenced code",
+    )
+
+
+def test_release_convergence_rejects_four_space_indented_docker_facts_heading(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    body = _release_body().replace(
+        "### Docker 不可变引用说明",
+        "    ### Docker 不可变引用说明",
+    )
+    _assert_release_rejects_body(
+        tmp_path,
+        monkeypatch,
+        body=body,
+        message="missing the Docker facts section",
+    )
+
+
+def test_release_convergence_rejects_tab_or_mixed_indent_row(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    body = _release_body().replace(
+        f"| Release tag | `{TAG}` |",
+        f" \t| Release tag | `{TAG}` |",
+    )
+    _assert_release_rejects_body(
+        tmp_path,
+        monkeypatch,
+        body=body,
+        message="non-table content",
+    )
+
+
+def test_release_convergence_rejects_long_fence_open_marker_mismatch_closing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    body = "````bash\n### Docker 不可变引用说明\n```\n\n" + _release_body()
+    _assert_release_rejects_body(
+        tmp_path,
+        monkeypatch,
+        body=body,
+        message="inside fenced code",
+    )
+
+
+def test_release_convergence_rejects_conflicting_docker_fact_fields(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    descriptor_path = tmp_path / "docker-image.json"
+    descriptor_path.write_text(json.dumps(_descriptor()))
+    body = _release_body().replace(
+        f"| Source SHA | `{SOURCE_SHA}` |",
+        "| Source SHA | `{}` |\n| Source SHA | `{}` |".format(SOURCE_SHA, "f" * 40),
+    )
+    release = {
+        "tag_name": TAG,
+        "target_commitish": SOURCE_SHA,
+        "body": body,
+        "assets": [
+            {
+                "name": "docker-image.json",
+                "url": "https://api.github.com/assets/123",
+            }
+        ],
+    }
+
+    def fake_api(repo: str, path: str, token: str) -> dict[str, Any]:
+        if path.startswith("git/ref/tags/"):
+            return {"object": {"type": "commit", "sha": SOURCE_SHA}}
+        return release
+
+    monkeypatch.setattr(release_convergence, "_api_json", fake_api)
+    monkeypatch.setattr(
+        release_convergence, "_asset_json", lambda url, token: _descriptor()
+    )
+
+    with pytest.raises(
+        release_convergence.ConvergenceError, match="duplicate Docker fact field"
+    ):
         release_convergence.verify_release(
             repo="ywyz/kindergartenManager",
             token="synthetic-token",

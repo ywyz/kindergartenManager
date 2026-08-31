@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import fcntl
 import json
 import os
 import re
@@ -15,9 +16,6 @@ import tempfile
 import time
 from pathlib import Path
 from urllib import error, parse, request
-
-import fcntl
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 STATE_DIR_NAME = ".deploy"
@@ -446,6 +444,51 @@ def _validate_snapshot_state(current_image: str | None) -> None:
         )
 
 
+def _rollback_or_restore(
+    service: str,
+    *,
+    compose_file: Path,
+    project_dir: Path,
+    override_file: Path,
+    target_image: str,
+    restore_image: str,
+    health_url: str,
+    dry_run: bool,
+) -> None:
+    try:
+        _deploy_once(
+            compose_file=compose_file,
+            project_dir=project_dir,
+            override_file=override_file,
+            service=service,
+            image_ref=target_image,
+            health_url=health_url,
+            dry_run=dry_run,
+        )
+        return
+    except DeployError as exc:
+        if dry_run:
+            raise
+        print(
+            f"{service} action failed; attempting rollback to {restore_image} before reporting failure."
+        )
+        try:
+            _deploy_once(
+                compose_file=compose_file,
+                project_dir=project_dir,
+                override_file=override_file,
+                service=service,
+                image_ref=restore_image,
+                health_url=health_url,
+                dry_run=False,
+            )
+        except DeployError as restore_error:
+            raise DeployError(
+                f"Primary action failed: {exc}; rollback restore to {restore_image} also failed: {restore_error}"
+            ) from restore_error
+        raise
+
+
 @contextlib.contextmanager
 def _deploy_lock(state_dir: Path, timeout_seconds: int):
     lock_path = state_dir / LOCK_FILE_NAME
@@ -551,15 +594,17 @@ def _deploy(args: argparse.Namespace) -> None:
             print(
                 f"Deploy failed; rolling back {args.service} to pre-deploy immutable ref {pre_deploy_image}"
             )
-            restored = _deploy_once(
+            _rollback_or_restore(
+                args.service,
                 compose_file=compose_file,
                 project_dir=project_dir,
                 override_file=override_file,
-                service=args.service,
-                image_ref=pre_deploy_image,
+                target_image=pre_deploy_image,
+                restore_image=pre_deploy_image,
                 health_url=args.health_url,
                 dry_run=False,
             )
+            restored = pre_deploy_image
             _update_service_state(
                 state_file,
                 service=args.service,
@@ -619,15 +664,22 @@ def _rollback(args: argparse.Namespace) -> None:
             print(f"{args.service} already at {target_image}, no change.")
             return
 
-        restored = _deploy_once(
+        if current_image is None:
+            raise DeployError(
+                f"Service {args.service} has no current immutable image to restore on failure."
+            )
+
+        _rollback_or_restore(
+            args.service,
             compose_file=compose_file,
             project_dir=project_dir,
             override_file=override_file,
-            service=args.service,
-            image_ref=target_image,
+            target_image=target_image,
+            restore_image=current_image,
             health_url=args.health_url,
             dry_run=args.dry_run,
         )
+        restored = target_image
 
         if args.dry_run:
             return

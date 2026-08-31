@@ -12,7 +12,6 @@ import pytest
 
 from scripts import deploy
 
-
 HEALTH_ARGS = ("--health-url", "https://manager.ywyz.tech/api/v1/health")
 VALIDATE_OCI_INDEX_REF = deploy._validate_oci_index_ref
 
@@ -320,6 +319,109 @@ def test_failed_legacy_migration_restores_exact_legacy_without_state(
         )
     assert calls == [target_index, legacy_image]
     assert json.loads((tmp_path / ".deploy" / "state.json").read_text()) == {}
+
+
+def test_rollback_to_explicit_target_restores_original_current_on_verify_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _compose(tmp_path)
+    current_image = _image("a")
+    previous_image = _image("b")
+    rollback_target = _image("c")
+    state_path = tmp_path / ".deploy" / "state.json"
+    deploy._ensure_file_permissions(state_path)
+    deploy._update_service_state(
+        state_path,
+        "app",
+        current_image=current_image,
+        previous_image=previous_image,
+    )
+
+    monkeypatch.setattr(
+        deploy, "_snapshot_current_state", lambda *args, **kwargs: current_image
+    )
+    calls: list[str] = []
+
+    def fake_deploy_once(*args: object, image_ref: str, **kwargs: object) -> str:
+        calls.append(image_ref)
+        if image_ref == rollback_target:
+            raise deploy.DeployError("synthetic rollback failure")
+        return image_ref
+
+    monkeypatch.setattr(deploy, "_deploy_once", fake_deploy_once)
+
+    with pytest.raises(SystemExit, match="synthetic rollback failure"):
+        deploy.main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                *HEALTH_ARGS,
+                "rollback",
+                rollback_target,
+            ]
+        )
+
+    assert calls == [rollback_target, current_image]
+    assert json.loads(state_path.read_text()) == {
+        "app": {
+            "current_image": current_image,
+            "previous_image": previous_image,
+        }
+    }
+
+
+def test_rollback_to_explicit_target_reports_double_failure_if_restore_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _compose(tmp_path)
+    current_image = _image("a")
+    previous_image = _image("b")
+    rollback_target = _image("c")
+    state_path = tmp_path / ".deploy" / "state.json"
+    deploy._ensure_file_permissions(state_path)
+    deploy._update_service_state(
+        state_path,
+        "app",
+        current_image=current_image,
+        previous_image=previous_image,
+    )
+
+    monkeypatch.setattr(
+        deploy, "_snapshot_current_state", lambda *args, **kwargs: current_image
+    )
+    calls: list[str] = []
+
+    def fake_deploy_once(*args: object, image_ref: str, **kwargs: object) -> str:
+        calls.append(image_ref)
+        if image_ref == rollback_target:
+            raise deploy.DeployError("synthetic rollback failure")
+        if image_ref == current_image:
+            raise deploy.DeployError("synthetic restore failure")
+        return image_ref
+
+    monkeypatch.setattr(deploy, "_deploy_once", fake_deploy_once)
+
+    with pytest.raises(
+        SystemExit,
+        match="rollback restore to .* also failed: synthetic restore failure",
+    ):
+        deploy.main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                *HEALTH_ARGS,
+                "rollback",
+                rollback_target,
+            ]
+        )
+
+    assert calls == [rollback_target, current_image]
+    assert json.loads(state_path.read_text()) == {
+        "app": {
+            "current_image": current_image,
+            "previous_image": previous_image,
+        }
+    }
 
 
 def test_legacy_migration_dry_run_uses_explicit_legacy_ref(
