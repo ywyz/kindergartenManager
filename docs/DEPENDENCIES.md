@@ -25,7 +25,9 @@
 
 本次 `uv lock --check`、`uv sync` 和 `uv pip check` 均通过。Ruff、pip-audit 与 PyInstaller 的本机工具
 版本分别为 `0.16.5`、`2.10.1`、`6.22.2`；CI workflow 当前仍显式 pin Ruff `0.15.22`，不能把本机最新版
-误写为 CI 已更新。依赖图告警是否 `fixed` 仍须在默认分支刷新后从 GitHub 回读。
+误写为 CI 已更新。本轮分别使用 PyPI 与 OSV 后端执行实时漏洞查询时，代理均返回 503；因此只能确认
+工具版本、锁解析和包兼容性，不能把历史审计结果当作当前漏洞扫描结论。依赖图告警是否 `fixed` 仍须在
+网络恢复后从默认分支和 GitHub 回读。
 
 ## 1. 历史 Dependabot 告警（#11–#38）
 
