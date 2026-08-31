@@ -113,8 +113,8 @@ Word：Microsoft Word / LibreOffice / 未执行
 ### 11.1 通用记录与零写入边界
 
 - [ ] 先固定 `tested_code_sha`（完整 40 位）；其后不得再修改产品代码、自动测试或 manual helper。
-- [ ] 每日活动计划显示“仅生成建议，不会保存或修改当前计划。”，可提交问题、观察运行、取消和丢弃。
-- [ ] Agent 卡内只有运行、取消、丢弃；没有采用、保存建议、确认写入、“总是允许”或隐藏 WRITE handler。
+- [ ] 每日活动计划显示建议/确认边界说明，可提交问题、观察运行、取消和丢弃；Foundation Provider/Tool 不写入。
+- [ ] 页面最多为当前这一份 Patch 提供“准备确认/确认采用”动作；不得出现自动采用、批量/跨页面采用、“总是允许”或隐藏 WRITE handler。
   页面其他合法业务按钮不属于 Agent 卡，验收时不得点击。
 - [ ] 草案显示 Tool、字段路径和 before/after；文本建议/草案/丢弃/失败/取消后页面正文均不变。
 - [ ] 自动矩阵在初始化/seed 后动态反射实际数据库全部表，覆盖受保护文件/exports、独立 audit logger、
@@ -170,7 +170,18 @@ Word：Microsoft Word / LibreOffice / 未执行
   Issue #48 回写均绑定该 closure SHA。验收后不得再修改产品代码；如修改，必须生成新的 tested code SHA 并
   重做两类人工验收。
 
-## 12. 打包与升级
+## 12. W007 当前页面单 Patch 确认
+
+> 本节是 ADR-0006 的本地确认写入验收，必须使用独立临时数据库和新 baseline；不得与第 11 节 F009
+> Foundation 零写入证据共用数据库、baseline 或结果。Provider/Tool 能力面仍保持四 READ + 两 DRAFT。
+
+- [ ] 只针对当前每日计划的一份 Patch 准备确认；页面重验当前 session、plan id、`revision` 和字段 before hash。
+- [ ] 确认采用只由本地应用层短事务执行：操作前版本、CAS `N→N+1`、最小不可变审计同一事务提交。
+- [ ] 过期、重复点击、session/目标/revision/before 不匹配和已知失败均关闭本次确认；不得自动重试或重放 Patch。
+- [ ] commit-unknown 只能人工只读对账，不能依据不确定结果再次采用。
+- [ ] 写入后的计划、revision、版本表和 audit 只作为 W007 证据；不得据此改写或推导 F009 零写入结果。
+
+## 13. 打包与升级
 
 每个平台独立记录：
 
@@ -181,7 +192,7 @@ Word：Microsoft Word / LibreOffice / 未执行
 - [ ] Windows Defender/权限提示与文档一致。
 - [ ] Docker 重建容器后 volume 数据保留。
 
-## 13. 结果表
+## 14. 结果表
 
 | 编号 | 场景 | 结果（通过/失败/未执行） | 证据 | 备注/Issue |
 |---|---|---|---|---|

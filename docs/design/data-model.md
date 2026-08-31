@@ -1,6 +1,6 @@
 # KindergartenManager 数据模型
 
-> 合入基线：`main@ec592def`；当前 Alembic head：`2b7f3d5e9c8a`。
+> 文档审查基线：2026-08-31 当前 `main`；当前 Alembic head：`2b7f3d5e9c8a`。
 > W005-W008 已闭合。当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
 > Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确本地交付状态、Review 轮次、
 > SHA 与测试证据仅以 `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后作为外部证据，现已关闭；
@@ -217,7 +217,7 @@ SQLite `user.id` 自增类型，`e5f7a9c2d4b6` 只增加
 `daily_plan_operation_version` 与 `agent_write_audit` 两张 W006 evidence 表及其不可变 trigger。
 当前 head `2b7f3d5e9c8a` 只为既有 `user` 表增加 token 撤销所需的 `auth_epoch`。
 [ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md) 确定 Agent Foundation 的零 Agent 持久化边界，该 Foundation 已合入
-`main@ca3b7bd`。
+`main`；`ca3b7bd…` 仅保留为历史 Foundation merge 证据，不作为当前主线 SHA。
 
 F009 自动矩阵曾在其固定 `tested_code_sha` 动态反射包含 Alembic 版本表在内的 17 张实际 SQLite 表，
 并验证成功、失败、取消、超时、stale、越权、断开和重启不产生 Agent 持久化。两类人工摘要也只对该 SHA

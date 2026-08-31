@@ -2,7 +2,7 @@
 
 > 文档性质：产品方向与需求拆分基线，不是实现规格、发布承诺或 GREEN 授权。
 >
-> 分析基线：2026-08-31，`feat/agent-write@ba4a9b258a77b51fd0042ce8a995b14f1640743e`。
+> 分析基线：2026-08-31，当前 `main`（以检出时实际 SHA 为准）。
 > “已实现”只表示当前代码存在相应能力；目标平台、Word、MySQL、真实 AI、浏览器和生产门禁仍按
 > [`docs/ROADMAP.md`](ROADMAP.md) 与固定 SHA 证据分别验收。
 > 产品规划跟踪见 [Issue #55](https://github.com/ywyz/kindergartenManager/issues/55)。

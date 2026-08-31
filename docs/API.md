@@ -1,10 +1,11 @@
 # 对外 REST API 参考（v1）
 
-本系统提供**只读**教学计划数据接口，供未来经授权的其他系统集成。它不依赖某个特定“主系统”拓扑；所有端点以 `/api/v1` 为前缀。
+本系统提供**只读**教学计划数据接口，供经授权的其他系统集成。它不依赖某个特定“主系统”拓扑；所有端点以 `/api/v1` 为前缀。
 
 - 基础 URL：`https://<host>/api/v1`
 - 数据格式：JSON（UTF-8）
-- 仅提供 `GET`（只读）
+- 仅提供 `GET`（只读）；API 不具备业务写入能力
+- `/api/v1/health` 只表示 HTTP/进程存活，不表示数据库 readiness 或 UI/业务链路已就绪
 
 ---
 
@@ -89,7 +90,7 @@ GET /api/v1/health
   "status": "ok",
   "service": "kindergarten-teaching-api",
   "version": "v1",
-  "time": "2026-05-31T08:00:00Z"
+  "time": "2026-08-31T08:00:00Z"
 }
 ```
 
@@ -121,6 +122,7 @@ GET /api/v1/daily-plans
       "id": 12,
       "tenant_id": 1,
       "user_id": 11,
+      "revision": 1,
       "plan_date": "2026-03-09",
       "week_number": 2,
       "weekday_cn": "周一",
@@ -144,6 +146,9 @@ GET /api/v1/daily-plans
   ]
 }
 ```
+
+`revision` 是当前每日计划的非空正整数版本；它用于 UI/本地确认写入的乐观并发控制。API 本身仍是只读，
+调用方不能通过 API 修改 revision 或计划正文。
 
 ### 2.3 按 ID 查询单条计划
 

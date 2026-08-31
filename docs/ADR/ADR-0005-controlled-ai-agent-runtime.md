@@ -1,8 +1,8 @@
 # ADR-0005：受控单 AI Agent 运行时
 
-- 状态：接受
+- 状态：接受（Foundation 已合入并发布；本地确认写入由 ADR-0006 单独约束）
 - 日期：2026-08-22
-- 依赖：[ADR-0001](ADR-0001-modular-monolith-current-baseline.md)、[ADR-0002](ADR-0002-single-user-ui-and-tenant-api.md)、[ADR-0004](ADR-0004-ai-and-fixed-word-boundaries.md)
+- 依赖：[ADR-0001](ADR-0001-modular-monolith-current-baseline.md)、[ADR-0002](ADR-0002-single-user-ui-and-tenant-api.md)、[ADR-0004](ADR-0004-ai-and-fixed-word-boundaries.md)、[ADR-0006](ADR-0006-trusted-ui-session-and-confirmed-agent-write.md)
 - 详细设计：[受控 AI Agent Runtime](../design/agent-runtime.md)
 
 ## 背景
@@ -11,9 +11,10 @@ KindergartenManager 已有多个“业务 Service 组织上下文 → OpenAI 兼
 教师编辑或保存”的 AI 用例。下一阶段需要让教师可以用自然语言询问当前每日活动计划、读取必要
 上下文并形成字段级修改建议，但不能让不受信的模型输出获得数据库、文件、网络或任意代码执行权。
 
-本决策复用 child-manager 已验证的受控单 Agent 思路，并针对当前 Web 模块化单体、固定单用户 UI、
-缺少显式业务 revision、Service seam 尚不完整等事实进行收窄。它不把 child-manager 的桌面线程模型、
-迁移编号或已交付状态复制到本项目。
+本决策复用 child-manager 已验证的受控单 Agent 思路，并针对当前 Web 模块化单体和窄 Service seam
+进行收窄。原始固定单用户 UI 与“尚无显式 revision”的历史假设已分别由可信 UI 会话和
+`daily_plan.revision` 更新；本 ADR 仍只约束 Foundation 的 Provider/Tool 能力面，不把本项目的
+W007 本地确认写入混入 Agent Runtime。它不把 child-manager 的桌面线程模型、迁移编号或已交付状态复制到本项目。
 
 ## 决策
 
@@ -115,8 +116,9 @@ Runtime 将 DRAFT 输出重新构造成规范、确定有序的 `PlanPatch`，�
 字段路径。UI 展示目标、字段级 before/after、警告、来源 Tool 和上下文指纹；Patch 本身不是业务状态，
 拒绝、取消、过期或上下文变化后可直接丢弃。
 
-当前 `daily_plan` 没有显式单调 revision，因此 Agent Foundation 不得把 `updated_at` 或内容哈希伪装成
-可安全写入的乐观锁。未来如需 Agent WRITE，必须先通过新规格冻结 revision、确认、事务和迁移方案。
+当前 `daily_plan` 已有显式单调 `revision`，但 Agent Foundation 仍不得把 `updated_at`、内容哈希或
+`base_fingerprint` 伪装成写入授权。任何 WRITE 必须走 [ADR-0006](ADR-0006-trusted-ui-session-and-confirmed-agent-write.md)
+的可信 UI、逐次确认、revision、短事务和审计边界；Provider/Tool 不因此获得 WRITE。
 
 F008 组合装配在应用级共享一个 `DailyPlanAgentCoordinator`（或满足同一关闭契约的等价 seam），由它持有
 唯一 Runtime 并执行全应用 busy/cancel 协调；不得让每个页面或浏览器标签创建独立 Runtime 绕过“同时最多一个
@@ -150,9 +152,13 @@ F009 不改变上述产品能力，只以三个独立门禁证明边界：
 `tested_code_sha`；提交证据形成独立 `evidence_closure_sha`，最终 Review/Quality/Issue 绑定 closure SHA。
 真实模型结果必须为 PASS 才能宣称 Agent Foundation 验收闭合。
 
-### 6. 未来 WRITE 是独立里程碑
+### 6. WRITE 是独立边界（由 ADR-0006 约束）
 
-未来 WRITE 至少需要：可信 UI actor、显式业务 revision、字段级 before hash、规范 Patch hash、绑定
+本 ADR 不实现或授权 Provider WRITE。当前唯一受支持的 WRITE 是 ADR-0006/W007 定义的本地应用层流程：
+每日计划当前页面的一份 Patch、一次显式确认、精确 session/actor/plan id/revision/before hash 绑定、
+短事务 CAS、操作前版本和最小不可变审计。它不是 Provider 或 Tool registry 的能力扩展。
+
+该独立边界需要：可信 UI actor、显式业务 revision、字段级 before hash、规范 Patch hash、绑定
 目标/会话/turn/过期时间/一次性 nonce 的逐次确认、短写事务、操作前版本、最小不可变审计和失败全回滚。
 
 即使未来开放 WRITE，也只允许已登记的每日计划字段；设置、密钥、归档、删除、图片、Word、文件、
@@ -167,7 +173,8 @@ F009 不改变上述产品能力，只以三个独立门禁证明边界：
 4. F003-F007 依序固定单 Runtime、Provider port、关闭 registry、READ/DRAFT、取消、超时与过期丢弃。
 5. F008 先固定 adapter/executor/composition/UI 稳定 RED，再实施最小 GREEN、双轴 Review 与当前 SHA Quality。
 6. F009 才执行零持久化全矩阵、Linux 浏览器 mock 和只使用应用安全配置凭据的真实模型验收。
-7. 如有明确用户故事，再为 Agent WRITE 建立新 spec/Issue/迁移与 RED；不得由本 ADR 自动授权。
+7. Agent WRITE 已由 ADR-0006、独立 spec/Issue 和稳定 RED 单独实施；后续批量、跨页、创建或新 Tool
+   仍须新建/更新 ADR、spec、Issue 与稳定 RED，不得由本 ADR 自动授权。
 
 F008 已按本顺序固定 GREEN：最终 RED `b3cad08…`，Review RED `b3c45d2…`、`b0647a9…`，最终候选
 `f1f5e63…`；Foundation `180 passed`、全量 `551 passed`、双轴 Review 0/0，Quality `32651221452`
@@ -191,7 +198,7 @@ Provider 兼容与关闭诊断边界；最终 `tested_code_sha=a50c6f6…` 为 F
 
 - 首阶段不能由 Agent 直接采用或保存修改，交互便利性低于自治方案。
 - 现有页面直连 Repository 的路径不能直接复用，必须先补窄 Service 投影。
-- 未来 WRITE 需要 revision、审计和确认相关 schema/迁移，不能只增加一个按钮。
+- 扩展 WRITE 仍需要 revision、审计和确认相关 schema/迁移，不能只增加一个按钮；当前单 Patch 边界见 ADR-0006。
 
 ## 被否决方案
 

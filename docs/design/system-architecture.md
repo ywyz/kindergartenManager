@@ -1,6 +1,6 @@
 # KindergartenManager 系统架构设计
 
-> 合入基线为 `main@ec592def`；Agent Foundation 与 Agent WRITE
+> 文档审查基线为 2026-08-31 当前 `main`；Agent Foundation 与 Agent WRITE
 > W005-W008 已通过 PR #53 合入，Issue #52 已关闭。
 > W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
 > Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确本地交付状态、Review 轮次、
@@ -43,10 +43,10 @@ NiceGUI 页面与组件  ───────────────┐
 
 ### 2.1 已合入主线的 Agent Foundation 视图
 
-[ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md) 已确认该能力的架构上限。下图已在
-`feat/agent-foundation` 完成并合入 `main@ca3b7bd`；它仍是主应用内的模块化单体调用链，不代表
-拆分为微服务。F009 自动/人工证据仅对其 `tested_code_sha` 有效；当前工作树已有产品改动，
-因此旧证据只是历史证据，不是当前树的人工验收。
+[ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md) 已确认该能力的架构上限。下图曾在
+`feat/agent-foundation` 完成，并已合入当前 `main`；`ca3b7bd…` 仅是历史 merge 证据。它仍是主应用内的
+模块化单体调用链，不代表拆分为微服务。F009 自动/人工证据仅对其 `tested_code_sha` 有效；后续产品、
+helper、测试或文档变化仍须按受影响门禁重新验收。
 
 ```text
 NiceGUI 每日计划 Agent 面板

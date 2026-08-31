@@ -10,9 +10,26 @@
 不得当作当前环境快照。CI、Docker 和 Release 仍通过安全下限型 `requirements.txt` 安装，尚未
 直接消费精确 `uv.lock`；该差异需单独收敛，不能仅凭本机锁验证宣称发布环境完全可复现。
 
-## 1. 28 项 Dependabot 告警
+2026-08-31 已使用 uv `0.12.7` 完成当前工作区的显式锁刷新与同步；锁文件中的以下包由旧快照升级，
+其余包保持解析结果不变：
 
-GitHub 将 27 项开放告警归因到历史 `uv.lock` 中的漏洞版本。仅删除锁文件并刷新
+| 包 | 当前锁定版本 |
+|---|---:|
+| `bidict` | `0.24.1` |
+| `click` | `8.5.0` |
+| `cryptography` | `50.0.1` |
+| `pydantic` | `2.13.5` |
+| `pydantic-core` | `2.46.5` |
+| `python-engineio` | `4.14.0` |
+| `websockets` | `17.1` |
+
+本次 `uv lock --check`、`uv sync` 和 `uv pip check` 均通过。Ruff、pip-audit 与 PyInstaller 的本机工具
+版本分别为 `0.16.5`、`2.10.1`、`6.22.2`；CI workflow 当前仍显式 pin Ruff `0.15.22`，不能把本机最新版
+误写为 CI 已更新。依赖图告警是否 `fixed` 仍须在默认分支刷新后从 GitHub 回读。
+
+## 1. 历史 Dependabot 告警（#11–#38）
+
+GitHub 曾将 27 项开放告警归因到历史 `uv.lock` 中的漏洞版本。仅删除锁文件并刷新
 `requirements.txt` 后，旧锁快照仍保留在依赖图中；本次恢复 `pyproject.toml` 并重新
 生成安全的 `uv.lock`，用于让依赖图以新快照覆盖旧版本。告警是否转为 `fixed` 仍须在
 变更进入默认分支、依赖图完成刷新后回读，不能作为误报直接关闭。
@@ -72,8 +89,28 @@ python-engineio 4.13.5 和 python-socketio 5.16.4。NiceGUI 3.16.0 与 FastAPI
 
 ## 5. 本地复验
 
-在 Python 3.14.7 新建的隔离环境中执行。迁移复验必须显式指向一次性 SQLite，
-避免读取 `.env` 后修改应用数据库或真实集成数据库；临时目录在当前 shell 退出时清理：
+### 5.1 当前锁定环境
+
+在 Python `3.14.7` 的 uv 环境中执行：
+
+```bash
+uv sync --locked --all-groups
+uv lock --check
+uv pip check
+.venv/bin/python -m pytest tests/ -q
+```
+
+迁移复验必须显式指向一次性 SQLite，避免读取 `.env` 后连接生产或旧开发库；临时目录在当前 shell 退出时清理：
+
+```bash
+quality_db_dir="$(mktemp -d)"
+trap 'rm -rf -- "$quality_db_dir"' EXIT
+quality_database_url="sqlite+aiosqlite:///$quality_db_dir/quality.sqlite3"
+DATABASE_URL="$quality_database_url" .venv/bin/python -m alembic upgrade head
+DATABASE_URL="$quality_database_url" .venv/bin/python -m alembic current
+```
+
+若要复现 CI 的安全下限安装，使用 workflow 中的 Ruff pin；本机最新版工具不改变 CI 的历史验证事实：
 
 ```bash
 uv lock --check
@@ -90,6 +127,8 @@ DATABASE_URL="$quality_database_url" python -m alembic upgrade head
 DATABASE_URL="$quality_database_url" python -m alembic current
 python -m pytest tests/ -q
 ```
+
+### 5.2 历史验收记录
 
 2026-08-23 的 #49 GREEN 复验记录：
 

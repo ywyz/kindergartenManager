@@ -12,7 +12,7 @@
 6. 相关 ADR、设计、测试计划和代码
 
 Agent Foundation 与 Agent WRITE W005-W008 已通过 PR #53 合入，Issue #52 已关闭并发布
-`v3.4.0-beta2`；当前分支还有 merge 后的发布/部署与文档收敛提交。精确 Review、SHA、测试和人工证据只以
+`v3.4.0-beta2`；`main` 还包含后续发布/部署收敛与工具链刷新提交。精确 Review、SHA、测试和人工证据只以
 `specs/agent-write/tests/README.md` 为准；后续产品/helper/test 变化仍需在新 SHA 重跑受影响门禁。
 产品仍是 NiceGUI 模块化单体，不是已拆分的微服务系统。
 
@@ -22,9 +22,10 @@ Agent Foundation 与 Agent WRITE W005-W008 已通过 PR #53 合入，Issue #52 �
 GitHub Release 构建必须保持一致。
 
 ```bash
-python3.14 -m venv .venv
-.venv/bin/pip install --upgrade pip
-.venv/bin/pip install -r requirements.txt
+uv python install 3.14.7
+uv sync --locked --all-groups
+uv lock --check
+uv pip check
 ```
 
 启动：
@@ -41,11 +42,13 @@ python3.14 -m venv .venv
 当前基线、Dependabot 告警映射和更新策略见 [DEPENDENCIES.md](DEPENDENCIES.md)。
 项目、仓库级/系统级 Skills、工具链和安全换机步骤见
 [DEVELOPMENT_WORKSTATION.md](DEVELOPMENT_WORKSTATION.md)。
-修改 `requirements.txt` 后至少执行：
+修改 `requirements.txt` 或 `pyproject.toml` 后至少执行：
 
 ```bash
-.venv/bin/pip install --upgrade -r requirements.txt
-.venv/bin/pip check
+uv lock --upgrade
+uv sync --locked --all-groups
+uv lock --check
+uv pip check
 .venv/bin/python -m pytest tests/ -q
 ```
 
@@ -148,8 +151,8 @@ Runtime 对 ID、周次、metadata、ToolResult 与 provider request-id 设置�
 F005 Patch。F007 已固定 GREEN，Runtime 还使用完整冻结 stamp 做精确取消，以本地硬时限约束单次
 Provider、单 Tool 和总 operation，在每个终态重新检查 UTC TTL/current-context，并在吞取消 port 真正排空前
 保持 busy、丢弃迟到正文/Patch/异常。F008 已固定具体 OpenAI-compatible adapter、六路静态 executor、
-应用级单 coordinator/controller、日期/current-fingerprint 失效和每日计划只读建议面板；持久化、WRITE、
-长期记忆与产品多 Agent 仍未实现。F009 已在 `tested_code_sha=a50c6f6…` 完成自动矩阵、Linux Chrome mock
+应用级单 coordinator/controller、日期/current-fingerprint 失效和每日计划只读建议面板；Foundation 不持久化，
+Provider/Tool 仍无 WRITE。W007 的本地应用层逐次确认写入由 ADR-0006 约束。F009 已在 `tested_code_sha=a50c6f6…` 完成自动矩阵、Linux Chrome mock
 和应用安全配置真实模型验收；closure SHA 的 Review/Quality/Issue 证据见 Issue #48。
 
 ```text
@@ -161,12 +164,12 @@ ui/components/agent_draft
 
 开发硬约束：
 
-- 首期只有精确登记的 4 READ + 2 DRAFT；不新建 WRITE、采用、保存、会话历史或长期记忆路径。
+- Foundation 只有精确登记的 4 READ + 2 DRAFT；不向 Provider/Tool 新建 WRITE、采用、保存、会话历史或长期记忆路径。
 - UI 只提交受限 intent 和当前选择；不传 Session、ORM、Repository、Widget 或自由拼接上下文。
 - Tool 只调用窄 Service/use-case；Provider Adapter 只解析文本/Tool call，不执行 Tool。
 - actor 从受信 UI Context 建立；Provider 参数和自然语言中的 tenant/user/Permission 一律不受信。
 - `AgentContext`、消息窗口、`ToolResult` 和 `PlanPatch` 只存在内存，不进入数据库、备份或日志正文。
-- 首期不引入 Agent 迁移。不使用 `updated_at` 或内容哈希代替将来 WRITE 所需的显式 revision。
+- Foundation 不引入 Agent 迁移；当前本地确认写入使用既有 `daily_plan.revision`，不使用 `updated_at` 或内容哈希替代它。
 
 测试先用确定性 Scripted Provider 建立 RED。F006 覆盖纯文本、串行 Tool loop、未知/WRITE Tool、
 额外参数、绑定错误、超长、busy、Tool/消息上限和异常净化；F007 已覆盖超时、取消、scope/fingerprint

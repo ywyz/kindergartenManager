@@ -89,46 +89,51 @@ TLS、强密码、受控 Bootstrap/轮换和网络访问控制。桌面 frozen �
 ### 4.7 迁移与数据损坏
 
 - 威胁：迁移失败后应用继续写入不兼容 schema；SQLite 文件被同步/复制时不一致。
-- 当前控制：Alembic 单线迁移、异常日志。
-- 必须补强：决定 fail-closed 策略；迁移前备份；全新/升级/回滚测试；SQLite 使用一致快照而非运行中直接复制。
+- 当前控制：Alembic 单线迁移、启动失败 fail-closed、异常日志；应用不会在迁移失败后继续服务旧 schema。
+- 必须补强：迁移前备份；全新/升级/回滚测试；SQLite 使用一致快照而非运行中直接复制；数据库 readiness 仍按 Issue #54 独立闭合。
 
 ### 4.8 逻辑外键孤儿与误删
 
 - 威胁：删除主记录后图片、指标或导出记录残留；错误 tenant 的子记录被删。
-- 当前控制：service/repository 显式清理和隔离测试。
-- 必须补强：事务化聚合删除、失败回滚、孤儿扫描；评审是否引入数据库 FK。
+- 当前控制：观察和倾听聚合保存/覆盖/删除由 service/use-case 持有 Unit of Work，repository 只 flush，
+  并以失败注入和 tenant/user 隔离测试守卫回滚与越权。
+- 必须补强：继续做孤儿扫描和其余单记录路径审计；评审是否引入数据库 FK。
 
 ### 4.9 供应链与发布
 
 - 威胁：宽松依赖解析、被篡改 Action/镜像、未验证安装包。
-- 当前控制：`requirements.txt` 显式安全下限、Dependabot、tag 构建、GitHub Release；
-  2026-08-22 的基线和告警映射见 [DEPENDENCIES.md](../DEPENDENCIES.md)；发布资产新增
+- 当前控制：`requirements.txt` 显式安全下限、`uv.lock` 精确快照、Dependabot、tag 构建、GitHub Release；
+  2026-08-31 的当前锁刷新与历史告警映射见 [DEPENDENCIES.md](../DEPENDENCIES.md)；发布资产新增
   `docker-image.json` 和不可变引用条目，降低“同 tag 重映射”带来的回滚/审计偏移。
 - 必须补强：锁定依赖/哈希、常规质量 CI、Action 固定 SHA 或治理策略、产物校验值、目标平台安装验收。
 
-### 4.10 Agent prompt/Tool injection 与权限扩大（计划）
+### 4.10 Agent prompt/Tool injection 与权限扩大（已实现，持续门禁）
 
 - 威胁：教案、班级配置或模型输出中的文本诱导 Agent 忽略规则、伪造 actor/Permission、
   请求未知/WRITE Tool，或将文件、URL、SQL、MCP/插件动态加入 registry。
 - 设计控制：Runtime 按精确名称从关闭 registry 选 Tool；Schema 拒绝额外参数；actor 来自受信 UI Context；
   Foundation 只登记 4 READ + 2 DRAFT，Provider/Adapter 不执行 Tool。
-- 验证门禁：用 prompt injection、伪造 tenant/user/Permission、未知 Tool、额外参数和越界字段建立稳定负向测试。
+- 验证门禁：固定 Foundation 测试已覆盖 prompt injection、伪造 tenant/user/Permission、未知 Tool、额外参数和越界字段；
+  后续受影响代码变化必须在新 SHA 重跑。
 
-### 4.11 Agent 数据外泄与长期副本（计划）
+### 4.11 Agent 数据外泄与长期副本（已实现，持续门禁）
 
 - 威胁：Context/ToolResult/Provider 原文包含密钥、绝对路径、幼儿身份、图片、完整历史或无关班级，
   并进入日志、数据库、备份、向量库或供应商托管 thread。
 - 设计控制：每 turn 通过 READ Tool 重建最小裁剪 Context；不保存对话、thread、embedding、summary、profile、
   Patch 或隐藏摘要；错误、repr 和运行诊断不包含正文。
-- 验证门禁：证明 Key、路径、图片、无关租户/用户和完整历史不进入 Context/log/repr，应用重启后无 Agent 状态可恢复。
+- 验证门禁：F009 固定 SHA 证明 Key、路径、图片、无关租户/用户和完整历史不进入 Context/log/repr，
+  应用重启后无 Agent 状态可恢复；后续受影响代码变化必须重跑。
 
-### 4.12 Agent 过期结果、资源消耗与未授权写入（计划）
+### 4.12 Agent 过期结果、资源消耗与未授权写入（已实现，持续门禁）
 
 - 威胁：教师切换日期/页面或修改内容后，迟到的 Agent 结果覆盖当前内容；模型递归 Tool loop 耗尽资源；
   DRAFT 隐式写入 preview、audit、版本或数据库。
-- 设计控制：单 operation、串行 Tool call、次数/长度/超时/总时限；校验 operation/scope/fingerprint 并丢弃迟到结果；
-  `PlanPatch` 只在内存展示，没有采用/保存路径。
-- 验证门禁：覆盖 busy、取消、超时、超限、页面/日期切换和迟到响应；成功/失败均证明业务持久化零变化。
+- 设计控制：Foundation 使用单 operation、串行 Tool call、次数/长度/超时/总时限；校验 operation/scope/fingerprint 并丢弃
+  迟到结果，`PlanPatch` 只在内存展示。W007 的本地应用层只允许当前页面一份 Patch 经逐次显式确认后写入，
+  不改变 Provider/Tool 能力面。
+- 验证门禁：固定 Foundation/F009 证据覆盖 busy、取消、超时、超限、页面/日期切换和迟到响应；W007 另以
+  session、plan id、revision、before hash、短事务 CAS、不可变审计和 commit-unknown 对账门禁保护，后续变更仍须重跑。
 
 ## 5. 安全不变量
 
@@ -136,12 +141,13 @@ TLS、强密码、受控 Bootstrap/轮换和网络访问控制。桌面 frozen �
 2. UI 必须保持本地账号/JWT/RBAC、active 重读、`jti`/`auth_epoch` 失效与匿名注册关闭；任何非回环暴露还必须有 TLS、强密码和网络控制。
 3. API 业务端点默认关闭；生产同时使用 TLS、API Key 和 HMAC。
 4. 所有业务查询以可信 tenant 为边界；资源 ID 不是授权。
-5. AI 输出不自动成为不可修改事实，教师拥有最终采用权。
-6. 迁移和备份必须可恢复；不能用“页面启动成功”代表数据库健康。
+5. AI 输出不自动成为不可修改事实；教师通过当前页面的显式确认决定是否采用一份 Patch。
+6. 迁移和备份必须可恢复；迁移失败必须 fail-closed，不能用“页面启动成功”代表数据库健康。
 7. 日志与审计不记录密钥或完整幼儿图片/文档内容。
 8. Agent Foundation 只装配 ADR-0005 的六个 READ/DRAFT Tool，未知和 WRITE Tool 始终拒绝。
 9. Agent Context 是当前 operation 的最小短期快照；不建立对话或向量记忆。
-10. Agent DRAFT 不修改 UI 正文或任何持久化状态；过期、取消和迟到结果必须丢弃。
+10. Agent Foundation DRAFT 不修改 UI 正文或任何持久化状态；过期、取消和迟到结果必须丢弃。W007 的 WRITE
+    只由本地应用层显式确认流程执行，Provider/Tool 仍无 WRITE。
 
 ## 6. 生产前门禁
 
@@ -154,7 +160,8 @@ TLS、强密码、受控 Bootstrap/轮换和网络访问控制。桌面 frozen �
 - [ ] Windows/Linux/Docker 目标部署分别验收。
 - [ ] 发布 tag、source SHA、`docker-image.json`、OCI index digest、不可变引用和回滚说明可逐项收敛；部署只切镜像，不回滚 migration 或删除卷。
 - [ ] 数据库 readiness 按 Issue #54 独立验收；`/api/v1/health` 不得作为数据库可接流量证据。
-- [ ] 如实现 Agent：关闭 Tool/Schema、tenant/user 裁剪、无长期记忆、零写入、取消/过期和 prompt injection 门禁全部通过。
+- [ ] Agent Foundation 的关闭 Tool/Schema、tenant/user 裁剪、无长期记忆、零写入、取消/过期和 prompt injection 门禁
+  按固定 SHA 证据通过；W007 本地确认写入另按 ADR-0006 的 CAS/审计/回滚门禁复核。
 
 ## 7. 非目标
 

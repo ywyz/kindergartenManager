@@ -1,6 +1,6 @@
 # KindergartenManager 产品与工程路线图
 
-> 当前快照：2026-08-30；合入基线 `main@ec592def`；
+> 当前快照：2026-08-31；Agent Foundation/WRITE 已在 `main` 合入；
 > PR #53 已 no-ff 合并，Issue #52 已关闭，`v3.4.0-beta2` 已从该 merge SHA 发布。
 > Agent WRITE 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
 > Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。精确 Review/CI/MySQL/Chrome lineage 仅以
@@ -50,7 +50,8 @@ R0 事实基线与图谱
 
 ## 4. R0：事实基线与图谱
 
-状态：`自动验证`（2026-08-23 本地审查完成；尚未提交/发布，也未执行平台人工验收）。
+状态：`自动验证`（2026-08-31 本地工具、依赖和图谱复核完成；浏览器语义控制仍被插件通道阻塞，
+平台人工验收仍需单独记录）。
 
 范围：
 
@@ -59,12 +60,19 @@ R0 事实基线与图谱
 - 纠正单用户、多用户、微服务、迁移 head 和测试数字的漂移。
 - 建立 codebase-memory 与 Graphify 图谱并验证健康。
 
-本地证据（工作树，基于 `dev4.0@0657c3a` 起点）：
+历史本地证据（基于 `dev4.0@0657c3a` 起点；仅供追溯，不作为当前 SHA 结果）：
 
 - Ruff：`app`/`tests` 0 错误；全量 pytest `535 passed`。
 - 依赖与迁移：Python 3.14.7，83 个已安装包兼容；全新 SQLite 升级到 `a6c4d8e2f9b1`。
 - Graphify：OpenAI-compatible 完成代码/文档提取；其社区命名返回不可解析空 JSON 后，按固定顺序由 DeepSeek 完成命名。本轮非生成变更源全部覆盖，多重边诊断无缺失/悬空端点、自环或重复边；易随文档变化的节点计数不固化在路线图中。
 - codebase-memory：full index 已完成，共享压缩图已写入 `.codebase-memory/graph.db.zst`；易随生成报告变化的节点计数只记录在当次审查报告中。
+
+2026-08-31 当前复核补充：Python `3.14.7`、uv `0.12.7`、Graphify `0.9.53`、codebase-memory-mcp
+`0.10.8`、CodeGraph `1.6.0`、Ruff `0.16.5`、pip-audit `2.10.1`、PyInstaller `6.22.2`、Docker
+Engine `29.7.2`、Compose `5.5.0`、Buildx `0.36.1`、Git `2.53.0`、GitHub CLI `2.98.0`、fd `10.5.0`、
+ast-grep `0.45.3` 和 ripgrep `15.2.0` 已从官方发布渠道核对。Node 已通过 NVM 官方预编译包升级为
+`v26.8.1`（SHA-256 校验通过，未编译）；QEMU/binfmt 已注册并通过 aarch64 Alpine 容器验证。详细状态见
+[开发电脑迁移与环境清单](DEVELOPMENT_WORKSTATION.md)。
 
 出口门禁：
 
@@ -75,7 +83,7 @@ R0 事实基线与图谱
 
 ## 5. R1：质量、迁移与安全基线
 
-状态：`自动验证`（2026-08-23 本地门禁通过；远端 push/PR CI 待固定 SHA 回读）。
+状态：`自动验证`（当前锁定环境本地门禁通过；CI pin 与官方最新版的差异、远端精确 SHA 仍独立回读）。
 
 目标：把“历史上能运行”提升为“当前 SHA 可重复验证”。
 
@@ -83,12 +91,12 @@ R0 事实基线与图谱
 
 - 建立锁定或可审计的开发依赖安装方式。
 - 已新增常规 push/PR 质量 CI，执行依赖检查、Ruff、全新 SQLite Alembic 迁移和全量 pytest；远端结果必须按 `headSha` 回读。
-- 本地全新 SQLite 已升级到 `a6c4d8e2f9b1`，全量 pytest `548 passed`。
+- 历史本地全新 SQLite 已升级到 `a6c4d8e2f9b1`，全量 pytest `548 passed`；该数字不代表本次文档/工具刷新后的新测试结果。
 - 聚合失败注入 RED 已证明部分提交风险；一对一倾听和游戏观察现由 service/use-case 持有事务，内部 repository `flush()`、最外层 commit/rollback。
 - API tenant 投影与 UI tenant + user 投影已显式命名，跨 tenant/user 负向测试覆盖列表、详情和子表。
 - 设置页 AI `/models` HTTP 已移至 integration adapter，由 settings service 编排；大型页面的其余用例继续渐进抽离。
 - 启动迁移已决策为桌面、开发、服务器统一 fail-closed；迁移失败中止启动，不提供 fail-open 开关。
-- 隔离未注册的登录/RBAC 预备代码和单用户产品入口（当前 UI 仍为单用户；多用户优先级低）。
+- 可信登录会话、Profile 与用户管理入口已进入当前 UI；继续保持 API/UI 的 tenant + user 投影和 callback-time 会话绑定。
 - 修复 Compose 默认凭据和健康检查对环境变量不一致的问题。
 - 建立日志、导出、图片和数据库备份/恢复说明。
 
@@ -101,7 +109,7 @@ R0 事实基线与图谱
 按风险和未闭环程度建议顺序：
 
 1. 一对一倾听完整 P8/P8d 人工验收（在聚合事务修复后）。
-2. 每日活动计划在当前单用户模式下重跑主流程与 Word。
+2. 每日活动计划在当前可信登录会话与 tenant/user 隔离边界下重跑主流程与 Word。
 3. 游戏观察图片/视觉 AI/历史/Word 复验。
 4. 自制教玩具与课程审议当前 SHA 回归。
 5. 对外只读 API 的 HMAC、租户越权和真实调用方验收。
@@ -110,7 +118,7 @@ R0 事实基线与图谱
 
 ## 7. R3：Agent Foundation 规格与分支决策
 
-状态：`完成（已合入 main）`（F005-F009 固定 GREEN；F009 自动矩阵与两类人工验收绑定历史固定 SHA；未发布）。
+状态：`完成（已合入并随 v3.4.0-beta2 发布）`（F005-F009 固定 GREEN；F009 自动矩阵与两类人工验收绑定历史固定 SHA）。
 
 已确认：[ADR-0005](ADR/ADR-0005-controlled-ai-agent-runtime.md) 和
 [Agent Runtime 设计](design/agent-runtime.md) 已经固定首期上限，即每日活动计划的单 Agent、
@@ -139,7 +147,7 @@ R0 事实基线与图谱
 
 ## 8. R4A：受控 Agent Foundation READ/DRAFT
 
-状态：`完成（已合入 main）`（F005-F009 固定 GREEN；F009 两类人工验收绑定原固定 SHA；未发布）。
+状态：`完成（已合入并随 v3.4.0-beta2 发布）`（F005-F009 固定 GREEN；F009 两类人工验收绑定原固定 SHA）。
 
 实现范围严格限定为：
 

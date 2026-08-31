@@ -2,7 +2,8 @@
 
 > 状态：已确认设计；F003-F009 已固定 GREEN，F009 自动矩阵与两类人工验收均已 PASS；最终 closure
 > Review/Quality/Issue 证据见 Issue #48。本文落实 [ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md)，
-> 只代表每日计划 READ/DRAFT Agent Foundation 已在功能分支验收，不代表已经合并、发布或开放 WRITE。
+> Foundation 已合入 `main` 并随 `v3.4.0-beta2` 发布。本文仍只约束每日计划 READ/DRAFT Agent；当前页面单 Patch
+> 确认写入由 [ADR-0006](../ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md) 单独约束，Provider/Tool 不开放 WRITE。
 
 ## 1. 目标与非目标
 
@@ -10,7 +11,7 @@
 或形成可审阅的字段级草案。教师可以取消、拒绝或丢弃结果；业务数据库、页面正文、版本、导出和设置
 保持不变。
 
-首阶段不做：正式写入、自动采用、跨页面工作流、后台定时任务、多 Agent、长期记忆、通用工具、文件
+Foundation 首阶段不做：Provider/Tool 正式写入、自动采用、跨页面工作流、后台定时任务、多 Agent、长期记忆、通用工具、文件
 与网络访问、图片理解、Word 操作、备份恢复或设置修改。
 
 ## 2. 适配当前架构
@@ -127,7 +128,7 @@ ToolResult[T]
 - Schema 顶层拒绝未知字段；ID、字符串、集合、日期和调用数量都有明确上限。
 - Runtime 校验 call/operation/turn、Tool 名和 Permission，不做模糊匹配。
 - 原始异常、完整正文、Prompt、Key、路径和供应商响应不得进入 message、repr 或日志。
-- 只有 READ/DRAFT 或 Provider 调用可以按本地策略重试；未来 WRITE 仍禁止自动重试。
+- 只有 READ/DRAFT 或 Provider 调用可以按本地策略重试；ADR-0006 的本地确认 WRITE 禁止自动重试。
 
 ### 4.4 PlanPatch
 
@@ -320,8 +321,9 @@ Agent 面板首阶段只提供：
 - assistant 文本与字段级 before/after 草案。
 - 拒绝/丢弃，以及错误后的显式重新发起。
 
-不提供：采用、保存、确认 WRITE、“本次会话允许”、自动执行、隐藏后台运行、跨页面恢复或会话历史。
-页面只根据 operation ID 接受最新结果；关闭/切换后不得回填迟到结果。
+Foundation 面板不提供自动采用、保存、“本次会话允许”、自动执行、隐藏后台运行、跨页面恢复或会话历史。
+在页面组合了 ADR-0006 的受限 adapter 时，可以针对当前页面的一份 Patch 显示一次“准备确认/确认采用”；
+这不增加 Provider/Tool WRITE，且页面只根据 operation ID 接受最新结果，关闭/切换后不得回填迟到结果。
 
 ### 8.1 F008 组合装配与面板状态 seam
 
@@ -337,8 +339,9 @@ Agent 面板首阶段只提供：
   operation 捕获 generation 与完整 `AgentContextStamp`；只有 generation、operation ID、context/turn/actor/scope/
   fingerprint 全部精确相等，且页面仍存活时，Controller 才发布 assistant 或 Patch。因此 A→B→A 即使重新
   选择相同日期，第一次 A 的迟到结果也不能通过。
-- UI 只提供意图输入、运行、取消、失败后重新发起、assistant、只读字段差异和丢弃。丢弃只清除内存 snapshot；
-  不修改任何每日计划正文，也绝不渲染 adopt/save/confirm、“总是允许”或隐藏 WRITE handler。
+- Foundation UI 只提供意图输入、运行、取消、失败后重新发起、assistant、只读字段差异和丢弃。丢弃只清除内存 snapshot，
+  不修改任何每日计划正文。若启用 ADR-0006 page-local adapter，只渲染当前页面单 Patch 的显式确认控件，
+  不渲染“总是允许”或隐藏 WRITE handler。
 
 ## 9. 数据、事务与审计
 
@@ -351,7 +354,8 @@ Agent Foundation 不新增业务表或 Alembic migration。以下对象只存在
 
 独立 ADR/spec 已在 W005/W006 实现 `daily_plan` revision、短命确认 store、
 `daily_plan_operation_version` 与不可变 `agent_write_audit`；这些本地应用层证据不改变 Foundation
-READ/DRAFT 自身的零写入语义，也不把 W007 局部实现变成 Provider WRITE 或已交付产品能力。
+READ/DRAFT 自身的零写入语义，也不把 W007 的本地应用层确认流程变成 Provider WRITE；W007/W008 的交付状态与
+精确证据以 `specs/agent-write/tests/README.md` 为准。
 
 ## 10. Prompt injection 与 Tool 安全
 
