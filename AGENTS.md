@@ -129,3 +129,22 @@ Recent history uses Conventional Commit style, often with scopes: `feat(listenin
 ## Security & Architecture Notes
 
 Business tables normally include `tenant_id`, `user_id`, `created_at`, and `updated_at`; documented reference/immutable exceptions must be explicit. Queries must enforce tenant isolation. Never commit real secrets, `.env`, exported documents, or decrypted AI keys. Store AI keys encrypted and display them masked. Use Alembic for schema changes; do not rely on application startup `create_all()`. After major architecture or milestone changes, update `CONTEXT.md`, `docs/ROADMAP.md`, the relevant ADR/design, and add a historical pointer in `memory-bank/architecture.md` when needed.
+
+## Production Delivery and Credential Operations
+
+Treat production delivery as separate, evidence-bound gates: immutable image metadata, deployment, liveness, database
+readiness, UI login, password rotation, old-session invalidation, rollback, and release-document convergence do not imply
+one another. `/api/v1/health` is liveness only; database readiness remains the independent Issue #54 until its contract
+is implemented and accepted.
+
+The current Aliyun production Bootstrap administrator password file is
+`/home/ecs-user/compose/kindergarten-production/secrets/bootstrap_admin_password`. It must remain owned by
+`ecs-user` with mode `0600`. Never print, log, diff, commit, copy into an Issue, or pass its contents through command-line
+arguments. Password recovery or rotation must use the supported Bootstrap administrator job, retain a protected backup
+only for the minimum operational window, prove the old credential/session is rejected, prove the final credential can
+reach the application home page, and clear any temporary clipboard or local file afterwards.
+
+Docker releases must converge the release tag, source SHA, `docker-image.json`, release body, and OCI index digest.
+Production deploy/rollback input must be an immutable `repository@sha256:...` reference. The deployment helper must not
+run migrations, rewrite secrets, delete volumes, or treat liveness as database readiness. Record exact-SHA CI and
+post-deploy acceptance separately from local tests and historical release evidence.

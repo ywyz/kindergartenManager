@@ -99,6 +99,11 @@ python3.14 -m venv .venv
 
 Tag 发布工作流可构建 Windows 安装包/便携包、Debian 包/Linux 便携包。发布资产是否可用必须以对应 tag/SHA 的工作流和目标平台人工验收为准。
 
+Docker 发布与生产部署已改为收敛到不可变镜像引用；`docker-image.json` 会随 release 附件上传，并在 release body 中写入
+`tag`、`source SHA`、`OCI index digest`、`repository@sha256`。`/api/v1/health` 仍是现有存活检查，不代表数据库 readiness；
+数据库就绪校验以 [Issue #54](https://github.com/ywyz/kindergartenManager/issues/54) 追踪。生产密码文件、轮换门禁、
+部署状态与回滚边界见 [生产部署指南](docs/DEPLOYMENT.md)。
+
 ### Docker
 
 ```bash
@@ -108,6 +113,16 @@ cp .env.example .env
 # 并固定 ENCRYPTION_KEY、JWT_SECRET；MySQL 密码使用十六进制随机值。
 docker compose up -d
 docker compose exec -e BOOTSTRAP_ADMIN_ALLOW_REMOTE=true app python -m app.jobs.bootstrap_admin --init
+```
+
+部署脚本使用不可变镜像、串行锁、owner-only 状态、失败自动回滚和 dry-run；稳定部署状态目录应独立于按版本切换的 Compose 目录：
+
+```bash
+python scripts/deploy.py --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
+  --health-url https://manager.ywyz.tech/api/v1/health \
+  deploy ghcr.io/ywyz/kindergartenmanager@sha256:<64位digest>
+python scripts/deploy.py --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
+  --health-url https://manager.ywyz.tech/api/v1/health rollback
 ```
 
 该 `BOOTSTRAP_ADMIN_ALLOW_REMOTE` 只作用于这一次交互初始化命令；常驻 app 容器不得设置它，MySQL root

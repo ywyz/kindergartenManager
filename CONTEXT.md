@@ -1,10 +1,11 @@
 # KindergartenManager 项目上下文
 
-> 状态快照：2026-08-27；合入基线：`main@ca3b7bd922f838c0739ccf9ed0f58655d292dc2f`；
-> 当前分支：`feat/agent-write`。W005/W006 已闭合；W007 当前能力仅为每日计划当前页面、单一 Patch、
-> 用户显式确认后的本地应用层 WRITE。Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。
-> 当前 W007 的精确本地交付状态、Review 轮次、SHA 与测试证据仅以
-> `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后作为外部证据；本文不复制逐轮事实。
+> 状态快照：2026-08-31；合入基线：`main@ec592def71658a5036359e7c79e35c9b6b0ab99b`；
+> PR #53 已合并，Issue #52 已关闭，`v3.4.0-beta2` 已从该 merge SHA 发布；当前检出仍为
+> `feat/agent-write@0249b4ea3d1d0a23a1e79eed065d5e844fa31d92`，其 tree 已由上述 no-ff merge 纳入 main。
+> Agent 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
+> Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。精确 lineage 与测试证据仅以
+> `specs/agent-write/tests/README.md` 为准；本文不复制逐轮事实。
 > 不得增加 Provider WRITE、自动重试、批量或跨页面采用、
 > 设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。完整 W007 证据仅见
 > `specs/agent-write/tests/README.md`。
@@ -37,7 +38,7 @@
 ## 3. 当前产品定位
 
 KindergartenManager 是一个 Python 3.14.7、NiceGUI 前后端一体化的幼儿园教学管理应用。
-当前 `main@ca3b7bd922f838c0739ccf9ed0f58655d292dc2f` 已包含 Agent Foundation 的 merge ancestry。
+当前 `main@ec592def71658a5036359e7c79e35c9b6b0ab99b` 已包含 Agent Foundation 与 Agent WRITE 的 merge ancestry。
 本工作树保持可打包、可本地运行、也可用 Docker 部署的模块化单体定位，主要能力包括：
 
 - 每日活动计划：日期/学期、教案拆分、年龄适配、活动生成、差异比对、Word 导出。
@@ -108,18 +109,17 @@ UI 登录用户与 API 的租户服务主体仍是两个不同边界，不得混
 
 ## 7. 分支与仓库状态
 
-- 当前 merge base 为 `main@ca3b7bd922f838c0739ccf9ed0f58655d292dc2f`；
-  远端 `feat/agent-write` 已闭合 W007 并进入 W008 交付门，精确门状态与 SHA 以
-  `specs/agent-write/tests/README.md` 为准；`main` 以 `--no-ff` 语义保留 Agent Foundation 的
-  RED/GREEN ancestry。
-- W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
+- 当前 main 为 `ec592def71658a5036359e7c79e35c9b6b0ab99b`；远端 `feat/agent-write` 为其第二父
+  `0249b4ea3d1d0a23a1e79eed065d5e844fa31d92`，merge tree 与第二父一致，保留 RED/GREEN ancestry。
+- Agent WRITE 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
   Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确本地交付状态、Review 轮次、
   SHA 与测试证据仅以 `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后作为外部证据；
   本文不复制逐轮事实。
 - F009 产品验收仍只绑定 `tested_code_sha=a50c6f6b9aa941996052c59a301a7a40bdbd706f`，closure 证据绑定
   `0ec2e944…`，详见 Issue #48；后续产品/helper/test 变化不能由该历史人工证据覆盖。
-- PR #53 已绑定 `feat/agent-write` → `main`；本轮已单独授权在 W008 新 SHA 全部门重新闭合后，依次执行
-  `--no-ff` merge、merge-SHA Review/CI、Issue #52 关闭与 release。Issue #48 与 Issue #52 当前仍保持 OPEN。
+- PR #53 已于 2026-08-30 no-ff 合并；merge-SHA Review 为 Standards/Spec H0/M0/L0，Quality、CodeQL、
+  Dependency Graph 均在精确 merge SHA 成功。Issue #52 已关闭；Issue #48 仍保持 OPEN。
+- `v3.4.0-beta2` 已发布，Release workflow run `33312637621` 为 success 且 `headSha` 精确等于 merge SHA。
 
 ## 8. 已确认的下一能力：受控 AI Agent
 
@@ -199,8 +199,8 @@ F008 的固定集成上限为：
 
 F003-F009 各切片的双轴 Review 与远端精确 `headSha` Quality 均已闭合；F004 的每日计划/班级/日历
 Agent 专用窄 Service 投影和 F008 的具体 adapter/executor/composition/UI 已进入当前代码。
-[ADR-0006](docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md)、独立 spec 与保持 OPEN 的
-[Issue #52](https://github.com/ywyz/kindergartenManager/issues/52) 已冻结 Agent WRITE 边界。W005 已实现
+[ADR-0006](docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md)、独立 spec 与已关闭的
+[Issue #52](https://github.com/ywyz/kindergartenManager/issues/52) 已冻结并闭合 Agent WRITE 边界。W005 已实现
 `confirmed_write` 的三个公开入口与短命一次性 confirmation store；W006 已实现完整操作前版本、最小不可变
 审计、单次 revision CAS、同事务 commit 与只读 reconcile。W007 只在本地应用层向当前页面的一份 Patch
 提供逐次显式确认，不改变 Provider/Tool 的 READ/DRAFT 能力面，也不开放自动重试、批量/跨页面采用或长期
@@ -213,9 +213,11 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
 3. **投影边界需持续守卫**：API 列表显式使用 tenant 投影，UI 详情和子表使用 tenant + user 投影并已有跨 tenant/user 负向测试；新增查询仍必须选择并测试正确投影。
 4. **类型债务**：Ruff 已清零，但当前 Pyright 仍报告既有第三方类型与结构问题，尚未建立可执行的类型门禁。
 5. **发布证据漂移**：Linux 本地结果不能代替 Windows 安装、浏览器打开、模板 Word 保真和真实 AI/MySQL 验收。
-6. **远端质量证据需按 SHA 回读**：F005-F009 的既有 push Quality 均已按各自 `headSha` 回读；最终
-   `evidence_closure_sha` 仍必须使用自身 Review/CI/远端证据，不能沿用 `tested_code_sha` 的旧 CI。
-7. **会话与 WRITE 门禁**：可信页面入口与敏感 callback 必须保持 exact-jti 绑定；W007 不能从局部
+6. **发布元数据收敛**：release body、`docker-image.json`、`release tag` 和 OCI index digest 的一致性依赖发布后收敛任务检验；
+   `/api/v1/health` 仍是存活检查，不作为数据库 readiness 替代；Issue #54 保留 readiness 范围。
+7. **远端质量证据需按 SHA 回读**：F005-F009 的既有 push Quality 均已按各自 `headSha` 回读；最终
+  `evidence_closure_sha` 仍必须使用自身 Review/CI/远端证据，不能沿用 `tested_code_sha` 的旧 CI。
+8. **会话与 WRITE 门禁**：可信页面入口与敏感 callback 必须保持 exact-jti 绑定；W007 不能从局部
    GREEN 推导交付闭合。Provider 与 Tool 保持 READ/DRAFT，完整门禁证据只见
    `specs/agent-write/tests/README.md`。
 
@@ -223,15 +225,15 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
 
 当前共同下一步是：
 
-1. PR #53 回流的 Compose trigger、确定对账容量 finding，以及发布前核出的打包 bootstrap、Compose 密码/数据卷、
-   Debian 非 root 数据权限、过时说明与 MySQL helper lifecycle-lock 前检均已保留稳定 RED lineage 并完成最小
-   修复；现在按 canonical ledger 在新 SHA 重跑本地、双轴 Review、push、精确 SHA CI、MySQL/Chrome 与 Issue 证据。
-2. W007 已闭合；当前按 canonical ledger 完成 W008 的剩余门；因 PR finding 修正，须在新 SHA 重跑
-   对应 Review、CI 和平台证据，不得沿用 `a93b148…` 的终点结论。
-3. W008 全部门闭合后，本轮授权按顺序进入 W009：`--no-ff` merge、merge-SHA Review/CI、Issue #52 关闭、
-   release。不得给 Provider 增加 WRITE、自动重试、批量/跨页面采用、设置/文件/Word/删除/创建写入、
-   长期 Patch 持久化、新 Tool 或多 Agent。
-4. Windows/Word/MySQL 和其他业务模块人工回归仍是独立工作，不与 Agent 结果互相替代。
+1. 按独立 [Issue #54](https://github.com/ywyz/kindergartenManager/issues/54) 以稳定 RED → 最小 GREEN 实现
+   数据库 readiness 和 Compose 接线；`/api/v1/health` 继续只表示进程/HTTP 存活。
+2. readiness 验收闭合后，再让 digest 部署/回滚脚本以 readiness 作为接流量门禁；不得把数据库迁移失败
+   解释为可自动回滚数据库 revision。
+3. 当前 OCI index digest 描述资产、Release body/tag/SHA/asset 收敛校验和部署/回滚脚本候选需取得本次
+   commit、push、精确 SHA CI 与复审证据；生产管理员登录/最终密码轮换/旧会话失效已于 2026-08-31 验收，
+   但目标页语义浏览器自动化超时仍是独立工具问题。
+4. Windows/Word/真实 MySQL 恢复矩阵和其他业务模块人工回归仍是独立工作，不与 Agent、liveness 或部署
+   脚本结果互相替代。
 
 ## 11. 更新规则
 

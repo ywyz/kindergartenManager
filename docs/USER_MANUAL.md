@@ -46,6 +46,22 @@ docker compose exec -e BOOTSTRAP_ADMIN_ALLOW_REMOTE=true app python -m app.jobs.
 先通过 DNS 解析到部署主机，并允许 Caddy 使用 80/443 端口自动申请和续期 HTTPS 证书。生产或共享环境
 还必须固定加密/JWT 密钥、保留 `app_data`、`db_data` 与 `exports` 卷，并限制 UI 的网络访问。
 
+生产环境可改用不可变镜像脚本：
+
+```bash
+python scripts/deploy.py --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
+  --health-url https://manager.ywyz.tech/api/v1/health \
+  deploy ghcr.io/ywyz/kindergartenmanager@sha256:<64位digest>
+python scripts/deploy.py --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
+  --health-url https://manager.ywyz.tech/api/v1/health rollback
+```
+
+`deploy.py` 仅做健康接口验证，不替代数据库 readiness 检查；相关数据库 readiness 回归与健康模型
+见 [Issue #54](https://github.com/ywyz/kindergartenManager/issues/54)。
+
+生产管理员密码文件属于运维机密，不是普通用户配置。当前 Aliyun 路径、权限要求、轮换验收与清理规则只在
+[生产部署指南](DEPLOYMENT.md#4-bootstrap-管理员生产凭据)维护；不要在用户手册、Issue 或聊天中记录密码值。
+
 ### Windows/Linux 安装包
 
 从与目标版本 tag 对应的 GitHub Release 获取。首次运行可能需要允许防火墙/Defender 提示；应核对发布来源和版本。

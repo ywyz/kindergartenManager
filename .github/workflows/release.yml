@@ -125,8 +125,17 @@ jobs:
   build-docker:
     name: Build & Push Docker Image
     runs-on: ubuntu-latest
+    outputs:
+      image_digest: ${{ steps.image_metadata.outputs.digest }}
+      image_ref: ${{ steps.image_metadata.outputs.ref }}
+      image_repository: ${{ steps.image_metadata.outputs.repository }}
+      source_sha: ${{ github.sha }}
+      image_media_type: ${{ steps.image_media.outputs.media_type }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -138,11 +147,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Resolve lowercase image repository
+        id: image_repository
+        shell: bash
+        run: |
+          owner="${{ github.repository_owner }}"
+          echo "repository=ghcr.io/${owner,,}/kindergartenmanager" >> "$GITHUB_OUTPUT"
+
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/kindergartenmanager
+          images: ${{ steps.image_repository.outputs.repository }}
           # latest 仅随正式版（无 - 后缀 tag）更新，beta/rc 不覆盖 latest
           flavor: |
             latest=auto
@@ -151,14 +167,63 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
 
       - name: Build and push Docker image
+        id: docker_build
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Capture immutable index metadata
+        id: image_metadata
+        shell: bash
+        run: |
+          repository="${{ steps.image_repository.outputs.repository }}"
+          digest="${{ steps.docker_build.outputs.digest }}"
+          immutable_ref="${repository}@${digest}"
+
+          if [[ "${digest}" != sha256:* ]]; then
+            echo "Invalid image digest from build-push-action: ${digest}" >&2
+            exit 1
+          fi
+
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+          echo "ref=${immutable_ref}" >> "$GITHUB_OUTPUT"
+          echo "repository=${repository}" >> "$GITHUB_OUTPUT"
+          echo "source_sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate metadata indicates OCI image index
+        id: image_media
+        shell: bash
+        run: |
+          media_type="$(
+            docker buildx imagetools inspect --raw \
+              "${{ steps.image_metadata.outputs.ref }}" \
+              | python -c '
+          import json, sys
+          payload = json.load(sys.stdin)
+          media_type = payload.get("mediaType", "")
+          expected = {("linux", "amd64"), ("linux", "arm64")}
+          actual = {
+              (platform.get("os"), platform.get("architecture"))
+              for manifest in payload.get("manifests", [])
+              if isinstance(manifest, dict)
+              and isinstance((platform := manifest.get("platform")), dict)
+          }
+          if media_type != "application/vnd.oci.image.index.v1+json":
+              raise SystemExit(f"Unsupported media type: {media_type}")
+          missing = sorted(expected - actual)
+          if missing:
+              raise SystemExit(f"OCI image index missing required platforms: {missing}")
+          print(media_type)
+          '
+          )"
+
+          echo "media_type=$media_type" >> "$GITHUB_OUTPUT"
 
   # ── 创建 GitHub Release ──────────────────────────────────────────────────
   create-release:
@@ -200,11 +265,34 @@ jobs:
       - name: List artifacts
         run: find artifacts/ -type f | sort
 
+      - name: Materialize OCI image descriptor
+        run: |
+          mkdir -p artifacts/docker-image
+          cat > artifacts/docker-image/docker-image.json <<'JSON'
+          {
+            "schema_version": 2,
+            "release_tag": "${{ github.ref_name }}",
+            "source_sha": "${{ github.sha }}",
+            "repository": "${{ needs.build-docker.outputs.image_repository }}",
+            "digest": "${{ needs.build-docker.outputs.image_digest }}",
+            "ref": "${{ needs.build-docker.outputs.image_ref }}",
+            "media_type": "${{ needs.build-docker.outputs.image_media_type }}",
+            "platforms": ["linux/amd64", "linux/arm64"]
+          }
+          JSON
+
+      - name: Upload docker-image descriptor
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: artifacts/docker-image/docker-image.json
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           # tag 中含 "-"（如 beta、rc）则标记为 prerelease
           prerelease: ${{ contains(github.ref_name, '-') }}
+          target_commitish: ${{ github.sha }}
           generate_release_notes: true
           files: artifacts/**/*
           body: |
@@ -218,7 +306,21 @@ jobs:
             | Windows | `KindergartenManager-${{ steps.ver.outputs.version }}-windows-portable.zip` | 便携包（解压即用） |
             | Ubuntu/Debian | `kindergarten-manager_${{ steps.ver.outputs.version }}_amd64.deb` | .deb 安装包（含 systemd） |
             | Ubuntu/Linux | `KindergartenManager-${{ steps.ver.outputs.version }}-linux-portable.tar.gz` | 便携包（解压即用） |
-            | Docker | `ghcr.io/ywyz/kindergartenmanager:${{ steps.ver.outputs.version }}` | 服务器部署 |
+            | Docker | `${{ needs.build-docker.outputs.image_repository }}:${{ steps.ver.outputs.version }}` | 服务器部署 |
+            | Docker（不可变） | `${{ needs.build-docker.outputs.image_ref }}` | 服务器部署 |
+
+            ### Docker 不可变引用说明
+
+            | 字段 | 值 |
+            |---|---|
+            | Release tag | `${{ github.ref_name }}` |
+            | Source SHA | `${{ github.sha }}` |
+            | OCI index digest | `${{ needs.build-docker.outputs.image_digest }}` |
+            | 不可变引用 | `${{ needs.build-docker.outputs.image_ref }}` |
+            | Media type | `${{ needs.build-docker.outputs.image_media_type }}` |
+            | Platforms | `linux/amd64`, `linux/arm64` |
+
+            `docker-image.json` 已随 release 资产发布，需与 Release body 和 tag/SHA 逐项一致；若不一致则视为发布不收敛。
 
             ---
 
@@ -277,6 +379,9 @@ jobs:
             ### 🐳 Docker 服务器版
 
             ```bash
+            # 部署示例（推荐）：python scripts/deploy.py --service app \
+            #   --health-url https://manager.example.com/api/v1/health \
+            #   deploy ${{ needs.build-docker.outputs.image_ref }}
             # 使用仓库中的 docker-compose.yml（含 MySQL 8）
             cp .env.example .env
             # 填写已解析到本机的 CADDY_DOMAIN，并用密码管理器填写
@@ -288,8 +393,8 @@ jobs:
             # 该远程 override 只对本次 exec 生效，不得进入常驻 app 容器环境。
             docker compose exec -e BOOTSTRAP_ADMIN_ALLOW_REMOTE=true app python -m app.jobs.bootstrap_admin --init
 
-            # 或直接拉取镜像（使用外部 MySQL）
-            docker pull ghcr.io/ywyz/kindergartenmanager:${{ steps.ver.outputs.version }}
+            # 或直接拉取本 release 的不可变 OCI index（使用外部 MySQL）
+            docker pull ${{ needs.build-docker.outputs.image_ref }}
             ```
 
             **最简 Docker 启动（SQLite，演示用）**：
@@ -299,11 +404,14 @@ jobs:
               -e ENCRYPTION_KEY="$(head -c 32 /dev/urandom | base64)" \
               -e JWT_SECRET="$(head -c 64 /dev/urandom | base64)" \
               -v kg-data:/data \
-              ghcr.io/ywyz/kindergartenmanager:${{ steps.ver.outputs.version }}
+              ${{ needs.build-docker.outputs.image_ref }}
 
             docker exec -it kindergarten-manager \
               python -m app.jobs.bootstrap_admin --init
             ```
+
+            > 说明：该健康检查示例仅用于存活验证；数据库 readiness 的完整检查目前由
+            > [Issue #54](https://github.com/ywyz/kindergartenManager/issues/54) 负责。
 
             ---
 
@@ -322,3 +430,41 @@ jobs:
             > `db_data` 与 `exports` 卷。
 
             详细使用说明请查阅 [用户手册](docs/USER_MANUAL.md)。
+
+  verify-release:
+    name: Verify release metadata convergence
+    needs: [build-docker, create-release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download docker-image descriptor
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: artifacts/docker-image
+
+      - name: Verify release body and release artifacts match immutable refs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          EXPECTED_REPOSITORY: ${{ needs.build-docker.outputs.image_repository }}
+          EXPECTED_SOURCE_SHA: ${{ github.sha }}
+          EXPECTED_IMAGE_DIGEST: ${{ needs.build-docker.outputs.image_digest }}
+          EXPECTED_IMAGE_REF: ${{ needs.build-docker.outputs.image_ref }}
+          EXPECTED_MEDIA_TYPE: ${{ needs.build-docker.outputs.image_media_type }}
+        run: |
+          python scripts/release_convergence.py \
+            --repo "$GITHUB_REPO" \
+            --descriptor artifacts/docker-image/docker-image.json \
+            --tag "$RELEASE_TAG" \
+            --source-sha "$EXPECTED_SOURCE_SHA" \
+            --repository "$EXPECTED_REPOSITORY" \
+            --digest "$EXPECTED_IMAGE_DIGEST" \
+            --ref "$EXPECTED_IMAGE_REF" \
+            --media-type "$EXPECTED_MEDIA_TYPE" \
+            --platform linux/amd64 \
+            --platform linux/arm64
