@@ -28,7 +28,7 @@ CI 当前仍显式安装 Ruff `0.15.22`，而本机已更新到官方最新版 `
 |---|---:|---|---|
 | Python | `3.14.7` | uv 管理的项目解释器与 `.venv` 为 `3.14.7` | 已满足 |
 | uv / uvx | `0.12.7` | `0.12.7` | 已满足 |
-| Node.js | `v26.8.1` | NVM 已安装 `v26.8.1`（随附 npm `11.19.0`），官方 SHA-256 校验通过；`default -> 26` 当前解析到该版本 | 已满足；本次使用官方预编译包，未编译 |
+| Node.js / npm | `v26.8.1` / `12.0.2` | NVM 已安装 `v26.8.1`，官方 SHA-256 校验通过；npm 已更新为 `12.0.2`，`default -> 26` 当前解析到该版本 | 已满足；本次使用官方预编译包，未编译 |
 | Git | `2.53.0` | `2.53.0` | 已满足 |
 | GitHub CLI | `2.98.0` | `2.98.0` | 已满足 |
 | ripgrep | `15.2.0` | `15.2.0` | 已满足 |
@@ -166,7 +166,7 @@ OpenAI-compatible 与 DeepSeek 首轮均因缺 optional extra 失败；补齐 ex
 - [ ] Python、uv、Graphify、codebase-memory-mcp、CodeGraph 和仓库 Skill 版本符合本文基线。
 - [ ] `uv lock --check`、`uv pip check`、全新 SQLite 迁移和 pytest 通过。
 - [ ] MCP、Graphify 和 CodeGraph 均针对当前 checkout 查询/刷新并通过完整性检查。
-- [ ] `nvm use 26.8.1` 后 `node --version` 显示 `v26.8.1`、`npm --version` 显示随附的 `11.19.0`；本次使用官方预编译包且 SHA-256 匹配，未编译。
+- [ ] `nvm use 26.8.1` 后 `node --version` 显示 `v26.8.1`、`npm --version` 显示 `12.0.2`，且 Codex `0.151.0` 与 CodeGraph `1.6.0` 均从该 NVM 版本目录解析；Node 使用官方预编译包且 SHA-256 匹配，未编译。
 - [ ] QEMU/binfmt 已注册并用目标架构容器验证；正式发布仍须运行对应镜像验收。
 - [ ] 浏览器能导航、读取 DOM、点击、输入和截图；若只可导航且 DOM 超时，先从 ChatGPT 插件 UI 重装 Browser 插件。
 - [ ] 真实浏览器、Word/Office、MySQL 和发布工具按本次开发范围另行验收。
