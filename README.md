@@ -173,16 +173,19 @@ NiceGUI UI / FastAPI-style API
 
 1. [CONTEXT.md](CONTEXT.md) — 当前事实、边界、分支与风险。
 2. [docs/ROADMAP.md](docs/ROADMAP.md) — 里程碑与门禁。
-3. [docs/ADR/README.md](docs/ADR/README.md) — 架构决策。
-4. [docs/design/system-architecture.md](docs/design/system-architecture.md) — 实际系统架构。
-5. [docs/design/agent-runtime.md](docs/design/agent-runtime.md) — 受控 AI Agent 契约与实现门禁。
-6. [docs/design/data-model.md](docs/design/data-model.md) — 数据模型与迁移不变量。
-7. [docs/security/threat-model.md](docs/security/threat-model.md) — 威胁模型。
-8. [docs/DEVELOPER.md](docs/DEVELOPER.md) — 开发者指南。
-9. [docs/MANUAL_TESTING.md](docs/MANUAL_TESTING.md) — 当前人工验收矩阵。
-10. [docs/USER_MANUAL.md](docs/USER_MANUAL.md) — 用户手册。
-11. [docs/API.md](docs/API.md) — 对外只读 API。
-12. [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) — Python 依赖安全基线与 Dependabot 处理规则。
+3. [docs/PRODUCT_MANAGER_GUIDE.md](docs/PRODUCT_MANAGER_GUIDE.md) — 当前产品能力、用户旅程与验收规划。
+4. [docs/PRODUCT_DIRECTION.md](docs/PRODUCT_DIRECTION.md) — 业务功能与系统能力方向、阶段依赖和非目标。
+5. [docs/ADR/README.md](docs/ADR/README.md) — 架构决策。
+6. [docs/design/system-architecture.md](docs/design/system-architecture.md) — 实际系统架构。
+7. [docs/design/agent-runtime.md](docs/design/agent-runtime.md) — 受控 AI Agent 契约与实现门禁。
+8. [docs/design/data-model.md](docs/design/data-model.md) — 数据模型与迁移不变量。
+9. [docs/security/threat-model.md](docs/security/threat-model.md) — 威胁模型。
+10. [docs/DEVELOPER.md](docs/DEVELOPER.md) — 开发者指南。
+11. [docs/DEVELOPMENT_WORKSTATION.md](docs/DEVELOPMENT_WORKSTATION.md) — 开发电脑依赖、Skills 与安全换机清单。
+12. [docs/MANUAL_TESTING.md](docs/MANUAL_TESTING.md) — 当前人工验收矩阵。
+13. [docs/USER_MANUAL.md](docs/USER_MANUAL.md) — 用户手册。
+14. [docs/API.md](docs/API.md) — 对外只读 API。
+15. [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) — Python 依赖安全基线与 Dependabot 处理规则。
 
 `memory-bank/` 保存模块设计和历史进度。若与当前代码或上述事实文档冲突，以当前代码、迁移、测试证据和 `CONTEXT.md` 为准。
 

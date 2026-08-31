@@ -478,7 +478,7 @@ UI/全逻辑摘要分别保持 `f60b310f…` / `bdb45487…`。两者 compare �
    和独立 `evidence_closure_sha` 顺序闭合。任何后续产品代码变化都会使本组人工证据失效。
 6. Graphify/codebase-memory 更新只证明覆盖，不替代测试、Review 和人工验收。
 
-## 13. W005/W006 已闭合边界与 W007 实施门禁
+## 13. W005/W006 基础与 W007/W008 交付已闭合边界
 
 - 可信 actor/session 已恢复；W005 Confirmation 绑定 Patch hash、target、revision、session、turn、expiry 和
   一次性 nonce，确认材料只在有界进程内 store 短命保存。
@@ -489,5 +489,6 @@ UI/全逻辑摘要分别保持 `f60b310f…` / `bdb45487…`。两者 compare �
 - Provider、Tool registry、网络、Word、文件和备份不进入 WRITE 事务；Provider 仍恰好四 READ + 两 DRAFT。
 - W006 fixed SHA `253d37d…` 已取得 Standards/Spec 0/0、本地/精确 SHA CI、Linux service-boundary `10/10`
   与 Issue #52 证据；其独立门已闭合。
-- W007 稳定 RED 已固定在本地 `e5f7317…`，GREEN 候选只在每日计划当前页面接入单 Patch 确认 UI；
-  Review、push、CI、人工验收和 Issue 尚未闭合，且不能增加自动重试、批量/跨页面采用或长期 Patch 持久化。
+- W007/W008 已从稳定 RED 和每日计划当前页面单 Patch 确认 UI，依次完成 Review、push、精确 SHA CI、人工验收、
+  Issue 回写和 no-ff merge；完整证据见 `specs/agent-write/tests/README.md`。闭合不增加自动重试、批量/跨页面
+  采用或长期 Patch 持久化，后续受影响变更仍须在新 SHA 重跑相应门禁。

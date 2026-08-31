@@ -236,6 +236,7 @@ Provider/Runtime 生成回答或 PlanPatch
 - **已交付/已合入的工程边界**：Agent Foundation 的 4 READ + 2 DRAFT、零长期记忆，以及 Agent WRITE 所需的本地确认、revision、操作前版本和最小审计契约已进入当前代码/主线证据；Provider 仍无 WRITE。
 - **当前受限能力**：Agent WRITE 仅限每日计划当前页面的一份 Patch、一次显式确认和本地应用层事务；只对已有记录生效。其他模块继续使用各自的常规 AI/手工/保存流程。
 - **近期规划/待复验**：路线图 R2 优先完成一对一倾听完整 P8/P8d 人工验收，然后复验每日计划、游戏观察、自制教玩具、课程审议和只读 API；R5 下一步优先闭合 Issue #54 的数据库 readiness，再让 digest 部署/回滚使用 readiness 门禁，并继续备份恢复、目标平台、Word、MySQL 和真实 AI 验收。
+- **产品深化方向**：R6 按“Word 模板中心 → 统一教学文档中心 → 教学审核与资源复用 → 幼儿成长档案和管理视图”逐步推进；详细范围、依赖、非目标和待决策项见 [`docs/PRODUCT_DIRECTION.md`](PRODUCT_DIRECTION.md)，规划跟踪见 [Issue #55](https://github.com/ywyz/kindergartenManager/issues/55)。该方向不构成实现授权。
 - **产品建议**：在任何新 Agent Tool、批量采用、跨页面工作流、持久化待确认队列、家长端、多园 SaaS 或公网扩展之前，先冻结用户故事、数据保留/删除、授权粒度和人工恢复策略，再建立新的 ADR/spec/Issue 与稳定 RED。
 
 ### 8.2 主要风险
@@ -281,6 +282,7 @@ Provider/Runtime 生成回答或 PlanPatch
 - [项目上下文与当前事实](../CONTEXT.md)
 - [项目 README 与快速开始](../README.md)
 - [产品与工程路线图](ROADMAP.md)
+- [产品功能与系统能力方向](PRODUCT_DIRECTION.md)
 - [用户手册](USER_MANUAL.md)
 - [当前人工测试矩阵](MANUAL_TESTING.md)
 - [只读 REST API 参考](API.md)

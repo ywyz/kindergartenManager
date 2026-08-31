@@ -1,6 +1,6 @@
 # KindergartenManager 产品与工程路线图
 
-> 当前快照：2026-08-30；合入基线 `main@ec592def71658a5036359e7c79e35c9b6b0ab99b`；
+> 当前快照：2026-08-30；合入基线 `main@ec592def`；
 > PR #53 已 no-ff 合并，Issue #52 已关闭，`v3.4.0-beta2` 已从该 merge SHA 发布。
 > Agent WRITE 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
 > Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。精确 Review/CI/MySQL/Chrome lineage 仅以
@@ -45,6 +45,7 @@ R0 事实基线与图谱
             └─ R4A 受控 Agent READ/DRAFT
                  ├─ R4B Agent WRITE（独立实施门禁）
                  └─ R5 发布与运维复核
+                      └─ R6 产品深化（模板、文档、审核与复用）
 ```
 
 ## 4. R0：事实基线与图谱
@@ -250,7 +251,7 @@ Quality `32954156965` 精确匹配成功，Issue #52 comment `5423617401` 已回
 
 W007/W008 的 Review、push、精确 SHA CI、MySQL、浏览器验收与 Issue 回写保持为独立门禁；完整
 RED/GREEN/Review/precheck SHA、计数和 node hash 统一记录在 `specs/agent-write/tests/README.md`。
-最终 PR #53 merge SHA 为 `ec592def71658a5036359e7c79e35c9b6b0ab99b`；merge-SHA Standards/Spec 均
+最终 PR #53 merge SHA 为 `ec592def`；merge-SHA Standards/Spec 均
 H0/M0/L0，Quality、CodeQL 与 Dependency Graph 精确 SHA 成功，Issue #52 已关闭。Provider/Tool
 能力面仍为四 READ + 两 DRAFT + 零 Provider WRITE。
 
@@ -259,7 +260,7 @@ H0/M0/L0，Quality、CodeQL 与 Dependency Graph 精确 SHA 成功，Issue #52 �
 状态：`实现中（digest 发布/部署候选与生产管理员轮换已完成本地验收，精确 SHA CI 和 readiness 待闭合）`。
 
 当前历史基线：`v3.4.0-beta2` workflow run `33312637621` 在
-`ec592def71658a5036359e7c79e35c9b6b0ab99b` 成功；现网 `manager.ywyz.tech` 固定 linux/amd64 manifest
+`ec592def` 成功；现网 `manager.ywyz.tech` 固定 linux/amd64 manifest
 `sha256:be4ee7e841621f6c9ec7142ec15271a37573a5587658e61c7329a7059f7a4b2c`。新 digest 自动化已形成待提交候选并
 通过本地专项测试；其 commit/push、精确 SHA CI 和新 release 实跑闭合前不得写成已发布能力。
 
@@ -280,7 +281,31 @@ H0/M0/L0，Quality、CodeQL 与 Dependency Graph 精确 SHA 成功，Issue #52 �
 - 独立 Issue #54 的 `/api/v1/readiness`、Compose 接线与真实 MySQL 故障/恢复矩阵；闭合后替换部署脚本当前
   liveness-only 的接流量判断。
 
-## 11. Roadmap 更新规则
+## 11. R6：产品深化（模板、文档、审核与复用）
+
+状态：`规划`。完整方向与阶段依赖见
+[`docs/PRODUCT_DIRECTION.md`](PRODUCT_DIRECTION.md)，规划跟踪见
+[Issue #55](https://github.com/ywyz/kindergartenManager/issues/55)；二者均不构成实现授权。
+
+Agent WRITE 的精确本地交付状态、Review 轮次、SHA 与测试证据仅以
+`specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后作为外部证据；本文不复制逐轮事实。
+
+建议顺序：
+
+1. 在 R2 业务复验和 R5 readiness/恢复门禁推进的同时，冻结三类角色的跨教师读取、审核、导出和删除矩阵。
+2. 为 Word 模板中心新增 ADR，只取代或细化 ADR-0004 的“固定模板权威来源”子决策，固定模板文件权威、版本、
+   受控占位符、权限、安全存储和回滚；ADR-0004 的 AI/教师采用边界继续有效。
+3. 以独立 spec/Issue 和稳定 RED 实现 Word 模板中心第一期，并逐一接入现有五类 exporter。
+4. 在模板版本可追溯后建设统一教学文档中心；审核流和资源复用继续拆成独立 Issue。
+5. 仅在幼儿身份、隐私、保留/删除和跨教师权限冻结后规划成长档案和管理视图。
+
+明确不做：把产品方向混入 Issue #54；开放 Agent Provider WRITE；在同一 Issue 中同时实现模板中心、复杂审批、
+成长档案、家长端和多园 SaaS；没有真实需求时提前拆分微服务。
+
+出口门禁：每个子能力分别完成 spec/Issue、稳定 RED、最小 GREEN、Review、当前 SHA 自动证据，以及需要的
+Word/浏览器/SQLite/MySQL 人工验收。R6 的“规划”不得外推为已实现。
+
+## 12. Roadmap 更新规则
 
 - 状态变化必须附日期、SHA 和证据位置。
 - 历史通过但当前未复跑时写“历史完成”，不写“完成”。

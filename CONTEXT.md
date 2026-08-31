@@ -1,8 +1,9 @@
 # KindergartenManager 项目上下文
 
-> 状态快照：2026-08-31；合入基线：`main@ec592def71658a5036359e7c79e35c9b6b0ab99b`；
+> 状态快照：2026-08-31；合入基线：`main@ec592def`；
 > PR #53 已合并，Issue #52 已关闭，`v3.4.0-beta2` 已从该 merge SHA 发布；当前检出仍为
-> `feat/agent-write@0249b4ea3d1d0a23a1e79eed065d5e844fa31d92`，其 tree 已由上述 no-ff merge 纳入 main。
+> `feat/agent-write` 包含 merge 后的 digest 发布/部署收敛与图谱更新，
+> 不得把这些后续提交误写成已纳入 `main` 或已发布。
 > Agent 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
 > Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。精确 lineage 与测试证据仅以
 > `specs/agent-write/tests/README.md` 为准；本文不复制逐轮事实。
@@ -38,7 +39,7 @@
 ## 3. 当前产品定位
 
 KindergartenManager 是一个 Python 3.14.7、NiceGUI 前后端一体化的幼儿园教学管理应用。
-当前 `main@ec592def71658a5036359e7c79e35c9b6b0ab99b` 已包含 Agent Foundation 与 Agent WRITE 的 merge ancestry。
+当前 `main@ec592def` 已包含 Agent Foundation 与 Agent WRITE 的 merge ancestry。
 本工作树保持可打包、可本地运行、也可用 Docker 部署的模块化单体定位，主要能力包括：
 
 - 每日活动计划：日期/学期、教案拆分、年龄适配、活动生成、差异比对、Word 导出。
@@ -109,7 +110,7 @@ UI 登录用户与 API 的租户服务主体仍是两个不同边界，不得混
 
 ## 7. 分支与仓库状态
 
-- 当前 main 为 `ec592def71658a5036359e7c79e35c9b6b0ab99b`；远端 `feat/agent-write` 为其第二父
+- 当前 main 为 `ec592def`；远端 `feat/agent-write` 为其第二父
   `0249b4ea3d1d0a23a1e79eed065d5e844fa31d92`，merge tree 与第二父一致，保留 RED/GREEN ancestry。
 - Agent WRITE 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
   Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确本地交付状态、Review 轮次、
@@ -234,6 +235,9 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
    但目标页语义浏览器自动化超时仍是独立工具问题。
 4. Windows/Word/真实 MySQL 恢复矩阵和其他业务模块人工回归仍是独立工作，不与 Agent、liveness 或部署
    脚本结果互相替代。
+5. 产品深化按 [`docs/PRODUCT_DIRECTION.md`](docs/PRODUCT_DIRECTION.md) 作为规划基线，优先拆分 Word 模板中心、
+   统一教学文档中心、审核/资源复用和成长档案；任何子能力仍须独立 ADR/spec/Issue/稳定 RED，不因方向文档
+   获得实现授权，也不扩张 Issue #54 的 readiness 范围。
 
 ## 11. 更新规则
 
