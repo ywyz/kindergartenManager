@@ -1,9 +1,9 @@
 # KindergartenManager 数据模型
 
-> 合入基线：`main@ca3b7bd`；当前 `feat/agent-write` Alembic head：`2b7f3d5e9c8a`。
-> W005/W006 已闭合。W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
+> 合入基线：`main@ec592def`；当前 Alembic head：`2b7f3d5e9c8a`。
+> W005-W008 已闭合。当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
 > Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确本地交付状态、Review 轮次、
-> SHA 与测试证据仅以 `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后作为外部证据；
+> SHA 与测试证据仅以 `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后作为外部证据，现已关闭；
 > 本文不复制逐轮事实。
 > 不得增加 Provider WRITE、自动重试、批量或跨页面采用、
 > 设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。完整 W007 证据仅见
@@ -127,7 +127,8 @@ tenant
 公开 ORM 属性只读，SQLite/MySQL trigger 还拒绝非 1 初始值、纯 revision bump 及不满足“内容变化且
 `OLD + 1`”的 UPDATE；MySQL 文本字段先 `CAST(... AS BINARY)` 再做 NULL-safe 比较，避免默认不区分大小写/
 重音的 collation 把字节级真实变化误判为 no-op。只读 API 已显式返回 revision。该先决条件已随 W004-W006
-提交并通过精确 SHA CI 与 Linux service-boundary 验收；最终浏览器矩阵和真实 MySQL 8 验收仍属于 W008。
+提交并通过精确 SHA CI 与 Linux service-boundary 验收；最终浏览器矩阵和真实 MySQL 8 验收已在 W008
+固定 SHA 闭合，后续产品改动仍须重跑受影响证据。
 
 删除同样不能只按日期：页面捕获实际加载的 plan id + revision，Repository 用 tenant/user/id/revision 单条
 条件 DELETE；未命中抛 stale 并回滚。这样旧标签页不能删除另一个标签后来更新或替换的记录。
@@ -262,8 +263,8 @@ F009 自动矩阵曾在其固定 `tested_code_sha` 动态反射包含 Alembic �
 `e5f7a9c2d4b6` 以 `c1a8e4f6b2d9` 为 down revision，创建精确 14 列的
 `daily_plan_operation_version` 与精确 17 列的 `agent_write_audit`；后者对 `confirmation_id`、
 `nonce_sha256` 分别使用单列唯一约束。SQLite/MySQL 均各建四个 UPDATE/DELETE 拒绝 trigger；downgrade
-先移除 trigger 再移除两表。MySQL `snapshot_json` 使用 `LONGTEXT`。真实 MySQL 8 往返和触发器行为仍属于
-W008 独立人工门。
+先移除 trigger 再移除两表。MySQL `snapshot_json` 使用 `LONGTEXT`。真实 MySQL 8 往返和触发器行为已在
+W008 固定 SHA 的独立人工门闭合。
 
 `2b7f3d5e9c8a` 以 `e5f7a9c2d4b6` 为 down revision，为 `user` 增加默认值 1、非空且必须大于等于 1 的
 `auth_epoch`。既有用户回填为 1；密码变更通过租户限定的单条 UPDATE 原子递增该值。downgrade 移除约束与列，
@@ -284,6 +285,5 @@ W008 独立人工门。
 - 表时间戳类型/默认实现不完全统一。
 - `export_records` 没有 `updated_at`，属于明确的不可变例外；仓库总规则应承认该例外。
 - 可信 UI session 已恢复并进入分支/远端 CI，但当前会话不落独立 server-side session 表，后续撤销/运维策略需以独立需求收紧。
-- W005/W006 已闭合逐次确认、操作前版本、不可变审计和原子 CAS；W007 后续交付门的精确本地状态以
-  `specs/agent-write/tests/README.md` 为准，Issue #52 仅记录已回写外部门；真实 MySQL 8 与最终固定 SHA
-  可见验收属于 W008。
+- W005-W008 已闭合逐次确认、操作前版本、不可变审计、原子 CAS、真实 MySQL 8 与固定 SHA 可见验收；
+  精确门禁以 `specs/agent-write/tests/README.md` 为准，后续改动不得沿用历史证据。

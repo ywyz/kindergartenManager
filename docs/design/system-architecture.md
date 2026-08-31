@@ -1,9 +1,10 @@
 # KindergartenManager 系统架构设计
 
-> 合入基线为 `main@ca3b7bd`，Agent Foundation 已合入主线；当前 `feat/agent-write` 已闭合 W005/W006。
+> 合入基线为 `main@ec592def`；Agent Foundation 与 Agent WRITE
+> W005-W008 已通过 PR #53 合入，Issue #52 已关闭。
 > W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
 > Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确本地交付状态、Review 轮次、
-> SHA 与测试证据仅以 `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后作为外部证据；
+> SHA 与测试证据仅以 `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后作为外部证据，现已关闭；
 > 本文不复制逐轮事实。
 > 不得增加 Provider WRITE、自动重试、批量或跨页面采用、
 > 设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。完整 W007 证据仅见
@@ -292,16 +293,15 @@ AI Key 不应写入 `.env`、仓库或测试日志；数据库密文与原 `ENCR
 - UI：纯 helper 自动测试 + 浏览器/人工主流程。
 - Agent Foundation：契约/Schema、未知和 WRITE Tool 拒绝、tenant/user 裁剪、有界 loop、取消/超时/迟到丢弃，
   并证明所有路径零业务持久化。
-- Agent WRITE：W005/W006 公共 seam、绑定、原子事务与 finding 矩阵已闭合；W007 当前只允许每日计划
-  当前页面的一份 Patch 经显式确认后由本地应用层采用。固定 SHA 复审与交付证据的精确状态及详细
+- Agent WRITE：W005-W008 的公共 seam、绑定、原子事务、finding 矩阵、UI 和人工门已在历史固定 SHA 闭合；
+  当前只允许每日计划当前页面的一份 Patch 经显式确认后由本地应用层采用。固定 SHA 复审与交付证据的精确状态及详细
   lineage 仅见 `specs/agent-write/tests/README.md`。
 - Word/打包：目标平台人工验收。
 
 codebase-memory/Graphify 只能发现结构、热点和文档关系，不替代这些测试。
-当前分支的 UI session/revision/W005/W006 已进入远端精确 SHA CI；W006 Linux service-boundary `10/10`
-已闭合。W007 的 finding RED、最小修复、本地 GREEN、fixed-SHA 双轴复审、push、CI、人工验收与 Issue
-回写仍是独立门禁；旧 F009 人工结果不能填补这些门禁。完整证据只记录在
-`specs/agent-write/tests/README.md`。
+UI session/revision/W005-W008 已完成各自的 finding RED、最小修复、本地 GREEN、fixed-SHA 双轴复审、push、
+CI、人工验收、Issue 回写和 no-ff merge；旧 F009 人工结果没有被用来填补这些门禁。完整历史只记录在
+`specs/agent-write/tests/README.md`，后续受影响代码、测试或文档变化仍须在新 SHA 重跑相应证据。
 
 ## 13. 已知架构热点
 
@@ -317,5 +317,5 @@ codebase-memory/Graphify 只能发现结构、热点和文档关系，不替代�
 - 图片后端、备份恢复和数据保留策略。
 - Agent Foundation 已合入主线，仍固定为 4 READ + 2 DRAFT 且零 Agent 持久化。
 - Agent WRITE 的可信 actor、`daily_plan.revision`、逐次确认、操作前版本、短事务、不可变审计与全回滚已在
-  W005/W006 闭合；W007/W008 的精确本地交付门状态和完整历史以
-  `specs/agent-write/tests/README.md` 为准，Issue #52 仅记录已回写外部门，不能跳门。
+  W005-W008 闭合并通过 PR #53 合入；精确交付门和完整历史以
+  `specs/agent-write/tests/README.md` 为准，后续改动不能沿用历史证据跳门。

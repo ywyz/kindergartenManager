@@ -42,6 +42,10 @@ CAPABILITY_DOCS = (
     "specs/agent-write/spec.md",
     "specs/agent-write/tasks.md",
 )
+# These prefixes identify the integrated baseline, release workflow, or an older
+# architecture baseline. They are current-state references, not W007 review
+# lineage copied from the canonical evidence ledger.
+NON_W007_LINEAGE_PREFIXES = frozenset({"ca3b7bd", "ec592de", "3331263"})
 SNAPSHOT_FIELDS = (
     "status",
     "patch_id",
@@ -187,7 +191,9 @@ def test_w007_detailed_lineage_has_one_canonical_evidence_ledger() -> None:
         if EVIDENCE_LEDGER_REF not in content:
             violations.append(f"{relative_path}: missing canonical ledger pointer")
         copied_prefixes = sorted(
-            prefix for prefix in historical_prefixes if prefix in content
+            prefix
+            for prefix in historical_prefixes - NON_W007_LINEAGE_PREFIXES
+            if prefix in content
         )
         # A capability document may cite the one current candidate/fixed SHA;
         # the complete ancestry belongs only in the evidence ledger.

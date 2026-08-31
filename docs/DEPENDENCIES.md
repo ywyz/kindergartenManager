@@ -1,7 +1,14 @@
 # Python 依赖安全基线
 
-> 快照日期：2026-08-23。本文记录默认分支依赖策略、Dependabot #11–#38
-> 的修复边界和质量门禁。后续升级必须重新解析依赖并回读 GitHub 告警。
+> 安全基线日期：2026-08-23；当前环境复核日期：2026-08-31。本文记录默认分支依赖策略、
+> Dependabot #11–#38 的修复边界和质量门禁。完整开发工具与 Skills 换机清单见
+> [DEVELOPMENT_WORKSTATION.md](DEVELOPMENT_WORKSTATION.md)。后续升级必须重新解析依赖并回读 GitHub 告警。
+
+当前复核结果：`.python-version`、Docker 和 CI/Release 均以 Python `3.14.7` 为审查基线；
+`uv.lock` revision 3 当前锁定 80 个包，`uv lock --check`、`uv tree --locked --all-groups`
+与 `.venv/bin/python -m pip check` 均通过。下文的 82/103 等数量是固定 SHA 的历史验收记录，
+不得当作当前环境快照。CI、Docker 和 Release 仍通过安全下限型 `requirements.txt` 安装，尚未
+直接消费精确 `uv.lock`；该差异需单独收敛，不能仅凭本机锁验证宣称发布环境完全可复现。
 
 ## 1. 28 项 Dependabot 告警
 

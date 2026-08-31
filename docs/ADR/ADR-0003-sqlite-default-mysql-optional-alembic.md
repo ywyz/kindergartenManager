@@ -26,8 +26,8 @@
 
 - 每个迁移至少通过全新 SQLite upgrade。
 - MySQL 特定修改必须在真实 MySQL 验证。
-- W006 的 MySQL 离线 DDL 只能证明两表、`LONGTEXT` 与四个 trigger 分支已生成；真实 MySQL 8 的
-  upgrade/downgrade/upgrade 和拒绝行为仍是 W008 独立验收门。
+- W006 的 MySQL 离线 DDL 只证明两表、`LONGTEXT` 与四个 trigger 分支已生成；真实 MySQL 8 的
+  upgrade/downgrade/upgrade 和拒绝行为已在 W008 历史固定 SHA 的独立门闭合。后续受影响变更仍须重跑。
 - PyInstaller 的迁移 URL 和应用 URL 必须指向同一数据文件。
 - 启动迁移异常会使进程启动失败，避免旧 schema 上出现“页面可开但数据操作失败”的假健康状态。
 - 运维必须保留迁移前备份、错误日志和可恢复路径；fail-closed 不等于自动回滚数据库 revision。

@@ -1,10 +1,10 @@
 # ADR-0006：可信 UI 会话、每日计划 revision 与逐次确认写入
 
-- 状态：接受（W005/W006 已闭合；W007/W008 精确本地状态见 canonical ledger，Issue #52 仅记录已回写外部门）
+- 状态：接受（W005-W008 已闭合；PR #53 已合并，精确证据见 canonical ledger）
 - 日期：2026-08-25
 - 依赖：[ADR-0002](ADR-0002-single-user-ui-and-tenant-api.md)、[ADR-0003](ADR-0003-sqlite-default-mysql-optional-alembic.md)、[ADR-0005](ADR-0005-controlled-ai-agent-runtime.md)
 - 冻结规格：[Agent WRITE](../../specs/agent-write/spec.md)
-- 跟踪：[Issue #52](https://github.com/ywyz/kindergartenManager/issues/52)（保持 OPEN）
+- 跟踪：[Issue #52](https://github.com/ywyz/kindergartenManager/issues/52)（已关闭）
 
 ## 背景
 
@@ -21,7 +21,7 @@ W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确
 Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。不得增加 Provider WRITE、自动重试、批量或跨页面采用、
 设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。当前 W007 的精确本地交付状态、
 Review 轮次、SHA 与测试证据仅以 `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后
-作为外部证据；本文不复制逐轮事实。
+作为外部证据，现已完成回写并关闭；本文不复制逐轮事实。
 
 ## 决策
 
@@ -149,10 +149,10 @@ W001-W004 已固定可信 UI session、revision、ADR/spec/Issue 与稳定 RED�
 Review、push、精确 SHA CI、service 验收和 Issue 回写。W006 已在 fixed SHA `253d37d…` 完成双轴 Review
 0/0、push、精确 SHA Quality `32954156965`、Linux service-boundary `10/10` 与 Issue #52 回写。
 
-W007 采用 UI 已存在；当前门禁结论只从 canonical ledger 与 Issue #52 回读，不得由局部 GREEN 推导。
-finding RED、最小修复、本地 GREEN、fixed-SHA 双轴复审、push、精确 SHA CI、人工验收与 Issue 回写仍须依次作为独立门禁，
-全部闭合后才可进入 W008。完整历史只记录在 `specs/agent-write/tests/README.md`；任何
-产品/helper/test 变化都要求在新 SHA 重跑受影响证据，最后才另行讨论 merge、Issue 关闭或 release。
+W007/W008 已按 finding RED、最小修复、本地 GREEN、fixed-SHA 双轴复审、push、精确 SHA CI、人工验收、
+Issue 回写和 no-ff merge 的独立门禁闭合，Issue #52 已关闭并发布 `v3.4.0-beta2`。完整历史只记录在
+`specs/agent-write/tests/README.md`；任何产品/helper/test 变化仍要求在新 SHA 重跑受影响证据，且不得由
+历史闭合推导后续改动自动通过。
 
 ## 后果
 

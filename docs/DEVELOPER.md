@@ -7,12 +7,14 @@
 1. `AGENTS.md`
 2. `CONTEXT.md`
 3. `docs/ROADMAP.md`
-4. 相关 ADR、设计、测试计划和代码
+4. `docs/PRODUCT_MANAGER_GUIDE.md` 与 `docs/PRODUCT_DIRECTION.md`
+5. 换机或重建环境时阅读 `docs/DEVELOPMENT_WORKSTATION.md`
+6. 相关 ADR、设计、测试计划和代码
 
-Agent Foundation 已合入主线，W007 已按独立交付门闭合；当前分支正在完成 W008 的剩余
-发布门。精确本地交付状态、Review 轮次、SHA 与测试证据只以
-`specs/agent-write/tests/README.md` 为准；未经其中对应的 fixed-SHA Review、PR CI、merge 与发布门，
-不得宣称 W008 闭合。产品仍是 NiceGUI 模块化单体，不是已拆分的微服务系统。
+Agent Foundation 与 Agent WRITE W005-W008 已通过 PR #53 合入，Issue #52 已关闭并发布
+`v3.4.0-beta2`；当前分支还有 merge 后的发布/部署与文档收敛提交。精确 Review、SHA、测试和人工证据只以
+`specs/agent-write/tests/README.md` 为准；后续产品/helper/test 变化仍需在新 SHA 重跑受影响门禁。
+产品仍是 NiceGUI 模块化单体，不是已拆分的微服务系统。
 
 ## 2. 环境
 
@@ -37,6 +39,8 @@ python3.14 -m venv .venv
 ### 2.1 依赖安全基线
 
 当前基线、Dependabot 告警映射和更新策略见 [DEPENDENCIES.md](DEPENDENCIES.md)。
+项目、仓库级/系统级 Skills、工具链和安全换机步骤见
+[DEVELOPMENT_WORKSTATION.md](DEVELOPMENT_WORKSTATION.md)。
 修改 `requirements.txt` 后至少执行：
 
 ```bash

@@ -860,3 +860,36 @@ bundle 的只读兼容符号链接恢复连接；随后从 fresh mock、pristine
 包含本段的后续 evidence-closure SHA 仍须取得自身 fixed-SHA Standards/Spec 双轴 0/0/0 Review、PR
 exact-head CI 与远端自动 Review；之后才可重新核对最新 main 漂移并以 `--no-ff` 集成。merge SHA 仍须
 重新完成 Review/CI，才能关闭 Issue #52、发布与部署；Issue #48 始终不在本轮关闭范围。
+
+## 2026-08-30：W008 main integration 与发布闭合
+
+本节只记录上一节之后已经发生且可从远端回读的外部门，不改写此前逐轮 RED/GREEN lineage：
+
+- PR #53 已以 `--no-ff` 合并到 `main`，merge SHA
+  `ec592def71658a5036359e7c79e35c9b6b0ab99b`；第一父为
+  `ca3b7bd922f838c0739ccf9ed0f58655d292dc2f`，第二父为
+  `0249b4ea3d1d0a23a1e79eed065d5e844fa31d92`，merge tree 与第二父一致。
+- merge-SHA Standards/Spec Review 均为 H0/M0/L0；本地合同 `276 passed`、Reviewer 定点 `102 passed`。
+- Quality `33312471532`、CodeQL `33312468722`、Dependency Graph `33312472217` 均 success 且
+  `headSha` 精确等于 merge SHA。
+- Issue #52 已在 integration closure comment 回写上述证据后关闭；Issue #48 仍不在本轮关闭范围。
+- `v3.4.0-beta2` 已从同一 merge SHA 发布；Release workflow run `33312637621` completed/success 且
+  `headSha` 精确等于 merge SHA。
+
+Provider/Tool 能力面仍恰好为四 READ + 两 DRAFT + 零 Provider WRITE；本地应用只在可信会话中逐 Patch
+显式确认。后续 digest 部署/回滚自动化是 R5 的独立未提交候选，不反向改变本节 Agent WRITE 闭合结论。
+
+## 2026-08-31：R5 生产管理员轮换与登录验收（独立于 Agent WRITE lineage）
+
+本节仅记录发布后的生产运维门，不改变上文 W008 的 RED/GREEN、Review、merge 或 release 结论：
+
+- 受保护的生产密码文件与数据库管理员哈希出现漂移后，受控恢复将 `auth_epoch` 从 `2` 递增至 `3`；
+  随后的标准 Bootstrap 管理员重置将其从 `3` 递增至 `4`，两次操作均保留脱敏审计事件。
+- 服务端验证旧恢复凭据被拒绝、最终凭据可用；浏览器中旧会话失效并返回登录页，最终凭据重新登录后可见
+  `https://manager.ywyz.tech/home`。
+- 浏览器扩展、Native Messaging host 与无敏感临时标签控制可用；目标业务页的语义内容控制仍超时，因此
+  表单填写和可见结果确认使用用户在场的受控剪贴板交接。该事实不能外推为目标页自动化已经完全修复。
+- 密码值、用户名、哈希和数据库连接信息均未写入本台账；本机临时密码文件已删除，剪贴板已覆盖为非敏感文本。
+
+数据库 readiness 仍由 Issue #54 单独跟踪；`/api/v1/health` 继续只代表 liveness。R5 digest 发布/部署候选
+必须取得自身 commit、Review、push、精确 SHA CI 与后续 release/生产证据，不能沿用 `v3.4.0-beta2` 的历史 workflow。

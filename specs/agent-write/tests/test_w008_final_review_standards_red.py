@@ -57,23 +57,25 @@ def _shared_gate_imports(path: Path) -> set[str]:
     }
 
 
-def test_context_remote_status_advances_from_w006_to_the_w008_gate() -> None:
+def test_context_remote_status_records_w008_integration_closure() -> None:
     """Current context must not contradict the canonical delivery ledger."""
     context = CONTEXT_PATH.read_text(encoding="utf-8")
     branch_status = _section(context, "## 7. 分支与仓库状态")
 
     assert "已到 W006 fixed SHA" not in branch_status
-    assert "远端 `feat/agent-write` 已闭合 W007 并进入 W008 交付门" in branch_status
+    assert "PR #53 已于 2026-08-30 no-ff 合并" in branch_status
+    assert "Issue #52 已关闭" in branch_status
     assert CANONICAL_LEDGER in branch_status
 
 
-def test_context_current_next_step_is_w008_not_conditional_w007() -> None:
+def test_context_current_next_step_advances_beyond_closed_w008() -> None:
     """The current-next-step section must advance with the delivery ledger."""
     context = CONTEXT_PATH.read_text(encoding="utf-8")
     next_steps = _section(context, "## 10. 当前共同下一步")
 
     assert "W007 上述门全部闭合后才进入 W008" not in next_steps
-    assert "W007 已闭合；当前按 canonical ledger 完成 W008 的剩余门" in next_steps
+    assert "Issue #54" in next_steps
+    assert "docs/PRODUCT_DIRECTION.md" in next_steps
 
 
 def test_w008_manual_helpers_share_one_fixed_sha_worktree_gate() -> None:
