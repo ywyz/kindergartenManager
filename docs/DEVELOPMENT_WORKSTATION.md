@@ -103,7 +103,7 @@ writing-shape
 4. 克隆并恢复当前开发分支：
 
    ```bash
-   git clone https://github.com/ywyz/KindergartenManager.git
+   git clone https://github.com/ywyz/kindergartenManager.git
    cd KindergartenManager
    git fetch --all --prune --tags
    git switch feat/agent-write
