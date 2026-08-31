@@ -74,6 +74,11 @@ ast-grep `0.45.3` 和 ripgrep `15.2.0` 已从官方发布渠道核对。Node 已
 `v26.8.1`（SHA-256 校验通过，未编译）；QEMU/binfmt 已注册并通过 aarch64 Alpine 容器验证。详细状态见
 [开发电脑迁移与环境清单](DEVELOPMENT_WORKSTATION.md)。
 
+本轮 Graphify 已升级到 `0.9.53` 并补齐 `openai` optional extra，但 OpenAI-compatible、DeepSeek 与
+luna fallback 最终都未取得有效语义结果：前两次缺少 extra，补齐后的请求仍遭遇网络连接失败，21 个
+变更文档没有生成节点。旧 Graphify 图不作为当前文档证据；CodeGraph 与 codebase-memory 已按当前
+checkout 成功重建。
+
 出口门禁：
 
 - 文档链接与事实检查通过。

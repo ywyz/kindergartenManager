@@ -40,7 +40,7 @@ CI 当前仍显式安装 Ruff `0.15.22`，而本机已更新到官方最新版 `
 | Docker Engine | `29.7.2` | `29.7.2` | 已满足 |
 | Docker Compose | `5.5.0` | `5.5.0` | 已满足 |
 | Docker Buildx | `0.36.1` | `0.36.1` | 已满足 |
-| Graphify | `0.9.53` | 全局与仓库 Skill 均已同步 `0.9.53` | 已满足；需按当前 checkout 重提取 |
+| Graphify | `0.9.53` | CLI、全局/仓库 Skill 与 `openai` optional extra 均已同步 `0.9.53` | 版本已满足；本轮语义刷新因后端网络连接失败而阻塞，旧图不得作为当前文档证据 |
 | codebase-memory-mcp | `0.10.8` | `0.10.8`；Codex MCP 配置已更新 | 已满足；当前仓库已重建索引 |
 | CodeGraph | `1.6.0` | `1.6.0`；当前仓库已初始化 | 已满足；本地数据库不入 Git |
 | Codex CLI | `0.151.0` | npm PATH 为 `0.151.0` | 已满足；VS Code 内置 alpha 副本不在 PATH 首位 |
@@ -72,7 +72,9 @@ CI 当前仍显式安装 Ruff `0.15.22`，而本机已更新到官方最新版 `
 - `.codebase-memory/`：当前 checkout 的结构图快照；换机后应重建，不能把旧图当作当前事实。
 - `.codegraph/.gitignore`：CodeGraph 本地数据库忽略规则；数据库本体不应提交。
 
-本次已更新并验证 Graphify `0.9.53`、codebase-memory-mcp `0.10.8` 和 CodeGraph `1.6.0`。Graphify
+本次已更新并验证 Graphify `0.9.53`、codebase-memory-mcp `0.10.8` 和 CodeGraph `1.6.0`。Graphify 的
+OpenAI-compatible 与 DeepSeek 首轮均因缺 optional extra 失败；补齐 extra 后，luna fallback 的 OpenAI
+请求仍因网络连接失败，21 个变更文档未生成节点，因此本轮 Graphify 语义图明确不可用。Graphify
 与 codebase-memory 的输出会随源码和文档变化；先检查来源覆盖、端点和完整性诊断，再把结果用于导航，
 不能用生成图谱替代实际代码、迁移、测试或人工验收。仓库 Skills 以 `.agents/skills/` 为唯一副本，
 不要再复制到项目内 `.codex/skills/`。
