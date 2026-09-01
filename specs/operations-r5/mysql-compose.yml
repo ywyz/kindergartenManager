@@ -1,0 +1,61 @@
+# Disposable MySQL 8.4.11 source/restore targets for the R5-R drill.
+#
+# The runner must supply both roles' synthetic credentials and unique Compose
+# project names from its controlled environment.  There are deliberately no
+# ports, bind mounts, named volumes, application services, or production
+# networks in this file.  Each role gets a separate Compose-scoped network.
+
+services:
+  source:
+    image: mysql:8.4.11
+    command:
+      - --log-bin-trust-function-creators=1
+    environment:
+      MYSQL_ROOT_PASSWORD: "${R5_MYSQL_SOURCE_ROOT_PASSWORD:?set R5_MYSQL_SOURCE_ROOT_PASSWORD}"
+      MYSQL_DATABASE: "${R5_MYSQL_SOURCE_DATABASE:?set R5_MYSQL_SOURCE_DATABASE}"
+      MYSQL_USER: "${R5_MYSQL_SOURCE_USER:?set R5_MYSQL_SOURCE_USER}"
+      MYSQL_PASSWORD: "${R5_MYSQL_SOURCE_PASSWORD:?set R5_MYSQL_SOURCE_PASSWORD}"
+    tmpfs:
+      - /var/lib/mysql:rw,noexec,nosuid,nodev
+      - /run/mysqld:rw,noexec,nosuid,nodev
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}"
+          mysqladmin ping --protocol=socket --host=localhost --user=root --silent
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    networks:
+      - source_net
+
+  restore:
+    image: mysql:8.4.11
+    command:
+      - --log-bin-trust-function-creators=1
+    environment:
+      MYSQL_ROOT_PASSWORD: "${R5_MYSQL_RESTORE_ROOT_PASSWORD:?set R5_MYSQL_RESTORE_ROOT_PASSWORD}"
+      MYSQL_DATABASE: "${R5_MYSQL_RESTORE_DATABASE:?set R5_MYSQL_RESTORE_DATABASE}"
+      MYSQL_USER: "${R5_MYSQL_RESTORE_USER:?set R5_MYSQL_RESTORE_USER}"
+      MYSQL_PASSWORD: "${R5_MYSQL_RESTORE_PASSWORD:?set R5_MYSQL_RESTORE_PASSWORD}"
+    tmpfs:
+      - /var/lib/mysql:rw,noexec,nosuid,nodev
+      - /run/mysqld:rw,noexec,nosuid,nodev
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}"
+          mysqladmin ping --protocol=socket --host=localhost --user=root --silent
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    networks:
+      - restore_net
+
+networks:
+  source_net:
+  restore_net:

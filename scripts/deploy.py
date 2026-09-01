@@ -20,7 +20,14 @@ from pathlib import Path
 from typing import Any
 from urllib import error, parse, request
 
-from app.core.backup_evidence import BackupEvidenceError, validate_backup_evidence
+from app.core.backup_evidence import BackupEvidenceError
+from app.core.startup import (
+    configured_database_identity_sha256,
+    read_configured_database_revision,
+)
+from app.jobs.backup_restore import (
+    validate_generated_attestation,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 STATE_DIR_NAME = ".deploy"
@@ -411,6 +418,28 @@ def _deploy_once(
     readiness_url: str,
     dry_run: bool,
 ) -> str:
+    if dry_run:
+        _run_compose(
+            compose_file,
+            override_file,
+            project_dir,
+            "pull",
+            service,
+            dry_run=True,
+        )
+        _run_compose(
+            compose_file,
+            override_file,
+            project_dir,
+            "up",
+            "--no-build",
+            "--no-deps",
+            "-d",
+            service,
+            dry_run=True,
+        )
+        return image_ref
+
     descriptor = os.open(
         override_file,
         os.O_CREAT | os.O_TRUNC | os.O_WRONLY,
@@ -447,9 +476,6 @@ def _deploy_once(
             service,
             dry_run=dry_run,
         )
-
-        if dry_run:
-            return image_ref
 
         _wait_for_deployment_gates(
             health_url,
@@ -494,24 +520,29 @@ def _require_service(service: str) -> None:
 def _require_verified_backup(
     evidence_path: Path | None,
     protected_image: str | None,
-    database_identity_sha256: str | None = None,
 ) -> None:
-    if (
-        evidence_path is None
-        or protected_image is None
-        or database_identity_sha256 is None
-    ):
+    if evidence_path is None or protected_image is None:
         raise DeployError(
-            "Verified backup evidence, protected image, and database identity are required"
+            "Verified producer backup evidence and protected image are required"
         )
     try:
-        validate_backup_evidence(
+        verified = validate_generated_attestation(
             evidence_path,
             expected_protected_image=protected_image,
-            expected_database_identity_sha256=database_identity_sha256,
         )
-    except BackupEvidenceError as exc:
-        raise DeployError("Verified backup evidence is invalid") from exc
+        if (
+            verified.database_identity_sha256 != configured_database_identity_sha256()
+            or verified.database_revision != read_configured_database_revision()
+        ):
+            raise BackupEvidenceError(
+                "Backup evidence does not match the configured database"
+            )
+    except Exception as exc:
+        raise DeployError("Verified backup producer provenance is invalid") from exc
+
+
+def _report_dry_run_not_image_bound() -> None:
+    print("BLOCKED: dry-run is NOT_IMAGE_BOUND and cannot prove actual image binding.")
 
 
 def _require_live_image_binding(
@@ -665,7 +696,6 @@ def _deploy(args: argparse.Namespace) -> None:
     _require_verified_backup(
         args.backup_evidence,
         args.protected_image,
-        args.database_identity_sha256,
     )
     if not is_immutable_image_ref(args.image_ref):
         raise DeployError(
@@ -684,22 +714,31 @@ def _deploy(args: argparse.Namespace) -> None:
     state_file = state_dir / STATE_FILE_NAME
     override_file = state_dir / "compose.image.override.yml"
 
-    with _deploy_lock(state_dir, args.lock_timeout):
-        _ensure_file_permissions(state_file)
+    lock = (
+        contextlib.nullcontext()
+        if args.dry_run
+        else _deploy_lock(state_dir, args.lock_timeout)
+    )
+    with lock:
+        if not args.dry_run:
+            _ensure_file_permissions(state_file)
         current_image, previous_image = _load_service_state(state_file, args.service)
-        live_image = _snapshot_current_state(
-            compose_file=compose_file,
-            project_dir=project_dir,
-            service=args.service,
-            dry_run=args.dry_run,
-        )
+        if args.dry_run:
+            _report_dry_run_not_image_bound()
+            live_image = None
+        else:
+            live_image = _snapshot_current_state(
+                compose_file=compose_file,
+                project_dir=project_dir,
+                service=args.service,
+                dry_run=False,
+            )
         _require_live_image_binding(
             live_image, args.protected_image, dry_run=args.dry_run
         )
         _require_verified_backup(
             args.backup_evidence,
             args.protected_image,
-            args.database_identity_sha256,
         )
         _validate_snapshot_state(live_image)
         for rollback_ref in (current_image, previous_image, live_image):
@@ -782,7 +821,6 @@ def _rollback(args: argparse.Namespace) -> None:
     _require_verified_backup(
         args.backup_evidence,
         args.protected_image,
-        args.database_identity_sha256,
     )
     if args.image_ref and not is_immutable_image_ref(args.image_ref):
         raise DeployError(
@@ -800,22 +838,31 @@ def _rollback(args: argparse.Namespace) -> None:
     state_file = state_dir / STATE_FILE_NAME
     override_file = state_dir / "compose.image.override.yml"
 
-    with _deploy_lock(state_dir, args.lock_timeout):
-        _ensure_file_permissions(state_file)
+    lock = (
+        contextlib.nullcontext()
+        if args.dry_run
+        else _deploy_lock(state_dir, args.lock_timeout)
+    )
+    with lock:
+        if not args.dry_run:
+            _ensure_file_permissions(state_file)
         current_image, previous_image = _load_service_state(state_file, args.service)
-        live_image = _snapshot_current_state(
-            compose_file=compose_file,
-            project_dir=project_dir,
-            service=args.service,
-            dry_run=args.dry_run,
-        )
+        if args.dry_run:
+            _report_dry_run_not_image_bound()
+            live_image = None
+        else:
+            live_image = _snapshot_current_state(
+                compose_file=compose_file,
+                project_dir=project_dir,
+                service=args.service,
+                dry_run=False,
+            )
         _require_live_image_binding(
             live_image, args.protected_image, dry_run=args.dry_run
         )
         _require_verified_backup(
             args.backup_evidence,
             args.protected_image,
-            args.database_identity_sha256,
         )
         _validate_snapshot_state(live_image)
         for rollback_ref in (current_image, previous_image, live_image):
@@ -881,7 +928,6 @@ def _migrate_legacy(args: argparse.Namespace) -> None:
     _require_verified_backup(
         args.backup_evidence,
         args.protected_image,
-        args.database_identity_sha256,
     )
     if not is_immutable_image_ref(args.image_ref):
         raise DeployError(
@@ -900,14 +946,22 @@ def _migrate_legacy(args: argparse.Namespace) -> None:
     state_file = state_dir / STATE_FILE_NAME
     override_file = state_dir / "compose.image.override.yml"
 
-    with _deploy_lock(state_dir, args.lock_timeout):
-        _ensure_file_permissions(state_file)
+    lock = (
+        contextlib.nullcontext()
+        if args.dry_run
+        else _deploy_lock(state_dir, args.lock_timeout)
+    )
+    with lock:
+        if not args.dry_run:
+            _ensure_file_permissions(state_file)
         current_image, previous_image = _load_service_state(state_file, args.service)
         if current_image is not None or previous_image is not None:
             raise DeployError(
                 "Legacy migration requires empty service deployment state"
             )
         legacy_image = args.legacy_image_ref
+        if args.dry_run:
+            _report_dry_run_not_image_bound()
         if not args.dry_run:
             live_image = _snapshot_current_state(
                 compose_file=compose_file,
@@ -915,13 +969,10 @@ def _migrate_legacy(args: argparse.Namespace) -> None:
                 service=args.service,
                 dry_run=False,
             )
-            _require_live_image_binding(
-                live_image, args.protected_image, dry_run=False
-            )
+            _require_live_image_binding(live_image, args.protected_image, dry_run=False)
             _require_verified_backup(
                 args.backup_evidence,
                 args.protected_image,
-                args.database_identity_sha256,
             )
             if live_image != legacy_image:
                 raise DeployError(
@@ -1031,11 +1082,6 @@ def _build_parser() -> argparse.ArgumentParser:
         "--protected-image",
         help="Current immutable image digest, or no-running-image for first install.",
     )
-    parser.add_argument(
-        "--database-identity-sha256",
-        help="Credential-free identity hash recorded by the verified backup workflow.",
-    )
-
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     deploy_parser = subparsers.add_parser("deploy", help="Deploy immutable image ref.")
