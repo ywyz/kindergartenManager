@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import io
+import zipfile
 from datetime import date
 
 from docx import Document
@@ -95,6 +96,25 @@ def test_batch_by_child_emits_one_filtered_document_per_child_in_order() -> None
         assert len(Document(io.BytesIO(data)).tables) == 1
 
 
+def test_batch_by_domain_treats_requested_domains_as_a_template_ordered_set() -> None:
+    children = [(_record("小明"), [_domain("艺术"), _domain("健康")])]
+
+    files = listening_exporter.export_batch_by_domain(
+        children,
+        domain_order=["艺术", "健康"],
+    )
+
+    assert list(files) == ["健康", "艺术"]
+
+
+def test_batch_by_domain_empty_selection_emits_no_files() -> None:
+    children = [(_record("小明"), [_domain("健康")])]
+
+    files = listening_exporter.export_batch_by_domain(children, domain_order=[])
+
+    assert files == {}
+
+
 def test_ordered_selection_helper_never_sorts_user_choice() -> None:
     update = getattr(one_on_one_listening, "ordered_selection_after", None)
     assert callable(update)
@@ -106,6 +126,28 @@ def test_ordered_selection_helper_never_sorts_user_choice() -> None:
     selected = update(selected, 2, True)
 
     assert selected == (9, 7, 2)
+
+
+def test_selected_domains_are_filtered_and_restored_to_template_order() -> None:
+    domains = [_domain("艺术"), _domain("健康"), _domain("语言")]
+
+    selected = one_on_one_listening.select_export_domains(
+        domains,
+        ("艺术", "健康"),
+    )
+
+    assert [item["domain"] for item in selected] == ["健康", "艺术"]
+
+
+def test_child_zip_keeps_order_and_prevents_duplicate_name_overwrite() -> None:
+    data = one_on_one_listening.pack_child_files_to_zip(
+        [("同名", b"first"), ("同名", b"second")]
+    )
+
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        assert archive.namelist() == ["01_同名.docx", "02_同名.docx"]
+        assert archive.read("01_同名.docx") == b"first"
+        assert archive.read("02_同名.docx") == b"second"
 
 
 def test_page_exposes_domain_selection_and_all_three_batch_modes() -> None:

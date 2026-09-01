@@ -1,4 +1,5 @@
 """P6 — 一对一倾听 Word 导出器测试（真实模板）。"""
+
 import io
 from datetime import date
 from pathlib import Path
@@ -8,15 +9,16 @@ from docx.oxml.ns import qn
 
 from app.integration.word_export.listening_exporter import (
     DOMAINS,
+    _norm,
     export_batch_by_domain,
     export_combined,
     export_split_by_domain,
-    _norm,
 )
 
 
 def _tiny_jpeg() -> bytes:
     from PIL import Image
+
     buf = io.BytesIO()
     Image.new("RGB", (40, 30), (180, 100, 60)).save(buf, format="JPEG")
     return buf.getvalue()
@@ -30,13 +32,19 @@ _IND_COUNT = {"健康": 7, "语言": 6, "社会": 7, "科学": 6, "艺术": 4}
 def _domain_payload(domain: str, star_for_idx1: int = 2) -> dict:
     n = _IND_COUNT[domain]
     return {
-        "domain": domain, "obs_year": 2026, "obs_month": 4,
-        "date_1": date(2026, 4, 1), "date_2": date(2026, 4, 6), "date_3": date(2026, 4, 13),
+        "domain": domain,
+        "obs_year": 2026,
+        "obs_month": 4,
+        "date_1": date(2026, 4, 1),
+        "date_2": date(2026, 4, 6),
+        "date_3": date(2026, 4, 13),
         "goals": f"{domain}目标A；{domain}目标B",
-        "evaluation": f"{domain}综合评价正文", "support_strategy": f"{domain}支持策略正文",
-        "images": [(_IMG, f"{domain}图{i+1}描述") for i in range(3)],
+        "evaluation": f"{domain}综合评价正文",
+        "support_strategy": f"{domain}支持策略正文",
+        "images": [(_IMG, f"{domain}图{i + 1}描述") for i in range(3)],
         "indicators": [
-            {"sort_order": i, "stars": (star_for_idx1 if i == 1 else 3)} for i in range(n)
+            {"sort_order": i, "stars": (star_for_idx1 if i == 1 else 3)}
+            for i in range(n)
         ],
     }
 
@@ -119,7 +127,7 @@ def test_chinese_font_song():
 def test_split_by_domain_keys():
     result = export_split_by_domain(_RECORD, _all_domains())
     assert set(result.keys()) == set(DOMAINS)
-    for d, b in result.items():
+    for b in result.values():
         sd = Document(io.BytesIO(b))
         assert len(sd.tables) == 1
         assert len(sd.inline_shapes) == 3
@@ -127,7 +135,9 @@ def test_split_by_domain_keys():
 
 def test_split_only_domains_with_data():
     """仅含数据的领域才导出。"""
-    result = export_split_by_domain(_RECORD, [_domain_payload("健康"), _domain_payload("语言")])
+    result = export_split_by_domain(
+        _RECORD, [_domain_payload("健康"), _domain_payload("语言")]
+    )
     assert set(result.keys()) == {"健康", "语言"}
 
 
@@ -136,7 +146,9 @@ def test_split_only_domains_with_data():
 
 def test_batch_by_domain_two_children():
     record2 = {"child_name": "小红", "adult_count": 1, "child_age": "4岁"}
-    result = export_batch_by_domain([(_RECORD, _all_domains()), (record2, _all_domains())])
+    result = export_batch_by_domain(
+        [(_RECORD, _all_domains()), (record2, _all_domains())]
+    )
     assert set(result.keys()) == set(DOMAINS)
     hb = Document(io.BytesIO(result["健康"]))
     assert len(hb.tables) == 2  # 2 幼儿
@@ -148,14 +160,16 @@ def test_batch_by_domain_two_children():
 def test_batch_custom_domain_order():
     order = ["语言", "艺术", "健康"]
     result = export_batch_by_domain([(_RECORD, _all_domains())], domain_order=order)
-    assert list(result.keys()) == order
+    assert list(result.keys()) == ["健康", "语言", "艺术"]
 
 
 # ─── 模板缺失降级 ────────────────────────────────────────────────────────────
 
 
 def test_template_missing_fallback_combined():
-    data = export_combined(_RECORD, _all_domains(), template_path=Path("/nonexistent/x.docx"))
+    data = export_combined(
+        _RECORD, _all_domains(), template_path=Path("/nonexistent/x.docx")
+    )
     doc = Document(io.BytesIO(data))
     text = "\n".join(p.text for p in doc.paragraphs)
     assert "健康" in text
@@ -163,6 +177,8 @@ def test_template_missing_fallback_combined():
 
 
 def test_template_missing_fallback_split():
-    result = export_split_by_domain(_RECORD, [_domain_payload("健康")], template_path=Path("/no/x.docx"))
+    result = export_split_by_domain(
+        _RECORD, [_domain_payload("健康")], template_path=Path("/no/x.docx")
+    )
     assert "健康" in result
     Document(io.BytesIO(result["健康"]))  # 可打开，不抛异常

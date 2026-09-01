@@ -16,8 +16,11 @@
 三种导出模式：
   export_combined        单幼儿 5 领域 → 1 个 docx
   export_split_by_domain 单幼儿 5 领域 → {领域: bytes}（UI 打包 zip）
+  export_batch_combined  多幼儿按选择顺序 → 1 个 docx
+  export_batch_by_child  多幼儿按选择顺序 → 每人 1 个合并 docx
   export_batch_by_domain 多幼儿按领域 → {领域: bytes}（每档含所有幼儿该领域表）
 """
+
 from __future__ import annotations
 
 import copy
@@ -33,7 +36,11 @@ from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
-TEMPLATE_PATH = Path(__file__).resolve().parents[3] / "templates" / "OneOnOneListeningSmallSecond.docx"
+TEMPLATE_PATH = (
+    Path(__file__).resolve().parents[3]
+    / "templates"
+    / "OneOnOneListeningSmallSecond.docx"
+)
 
 # 五大领域（模板表格顺序）
 DOMAINS = ["健康", "语言", "社会", "科学", "艺术"]
@@ -45,7 +52,9 @@ _IMG_WIDTH = Cm(6.5)
 # ─── 通用单元格辅助 ──────────────────────────────────────────────────────────
 
 
-def _set_font(run, size_pt: float = 11, bold: bool = False, color: RGBColor | None = None) -> None:
+def _set_font(
+    run, size_pt: float = 11, bold: bool = False, color: RGBColor | None = None
+) -> None:
     """统一设置 run 宋体 + eastAsia，避免中文乱码。"""
     run.font.name = "宋体"
     run.font.size = Pt(size_pt)
@@ -85,7 +94,7 @@ def _put_image(cell, img_bytes: bytes | None) -> None:
     run = para.add_run()
     try:
         run.add_picture(io.BytesIO(img_bytes), width=_IMG_WIDTH)
-    except Exception as exc:  # 非法图片字节不应中断整份导出
+    except Exception as exc:  # noqa: BLE001 - invalid image types vary by backend
         logger.warning("插入图片失败，跳过", extra={"error": str(exc)})
 
 
@@ -253,7 +262,7 @@ def _extract_block(doc, domain: str):
     children = list(doc.element.body.iterchildren())
     for i, child in enumerate(children):
         if child.tag == qn("w:p") and _domain_of_title(_para_text(child)) == domain:
-            for nxt in children[i + 1:]:
+            for nxt in children[i + 1 :]:
                 if nxt.tag == qn("w:tbl"):
                     return child, nxt
                 if nxt.tag == qn("w:p") and _domain_of_title(_para_text(nxt)):
@@ -270,7 +279,78 @@ def _remove_all_blocks(doc) -> None:
             body.remove(child)
 
 
-def _build_domain_doc(domain: str, children: list[tuple[dict, list[dict]]], tpl: Path) -> bytes:
+def _ordered_available_domains(
+    domains: list[dict], domain_order: list[str] | None = None
+) -> list[str]:
+    """Return available domains in the frozen template order."""
+    selected = set(domain_order) if domain_order is not None else set(DOMAINS)
+    return [
+        d for d in DOMAINS if d in selected and _find_domain(domains, d) is not None
+    ]
+
+
+def _build_combined_doc(
+    children: list[tuple[dict, list[dict]]],
+    tpl: Path,
+    domain_order: list[str] | None = None,
+) -> bytes:
+    """Build selected domain blocks while preserving child and template order."""
+    available_children = [
+        (record, domains, _ordered_available_domains(domains, domain_order))
+        for record, domains in children
+    ]
+    available_children = [item for item in available_children if item[2]]
+
+    if not tpl.exists():
+        logger.warning("一对一倾听模板缺失，降级从零构建", extra={"template": str(tpl)})
+        doc = Document()
+        for child_index, (record, domains, ordered_domains) in enumerate(
+            available_children
+        ):
+            if child_index:
+                doc.add_page_break()
+            for domain in ordered_domains:
+                dom_data = _find_domain(domains, domain)
+                if dom_data is not None:
+                    _scratch_domain(doc, domain, record, dom_data)
+        return _save_bytes(doc)
+
+    pristine = Document(str(tpl))
+    blocks = {domain: _extract_block(pristine, domain) for domain in DOMAINS}
+    doc = Document(str(tpl))
+    _remove_all_blocks(doc)
+    body = doc.element.body
+    sect_pr = body.find(qn("w:sectPr"))
+
+    for child_index, (record, domains, ordered_domains) in enumerate(
+        available_children
+    ):
+        if child_index:
+            doc.add_page_break()
+        for domain in ordered_domains:
+            title_el, table_el = blocks[domain]
+            dom_data = _find_domain(domains, domain)
+            if table_el is None or dom_data is None:
+                continue
+            if title_el is not None:
+                new_title = copy.deepcopy(title_el)
+                if sect_pr is not None:
+                    sect_pr.addprevious(new_title)
+                else:
+                    body.append(new_title)
+            new_table = copy.deepcopy(table_el)
+            if sect_pr is not None:
+                sect_pr.addprevious(new_table)
+            else:
+                body.append(new_table)
+            _fill_domain_table(doc.tables[-1], record, dom_data)
+
+    return _save_bytes(doc)
+
+
+def _build_domain_doc(
+    domain: str, children: list[tuple[dict, list[dict]]], tpl: Path
+) -> bytes:
     """构建仅含指定领域的文档，按 children 顺序为每个幼儿追加一份该领域表格。"""
     if not tpl.exists():
         logger.warning("一对一倾听模板缺失，降级从零构建", extra={"template": str(tpl)})
@@ -307,26 +387,12 @@ def _build_domain_doc(domain: str, children: list[tuple[dict, list[dict]]], tpl:
 # ─── 公开导出接口 ────────────────────────────────────────────────────────────
 
 
-def export_combined(record: dict, domains: list[dict], template_path: Path | None = None) -> bytes:
-    """单幼儿 5 领域合并导出为 1 个 docx。"""
+def export_combined(
+    record: dict, domains: list[dict], template_path: Path | None = None
+) -> bytes:
+    """单幼儿仅将有数据的领域按模板顺序合并为 1 个 docx。"""
     tpl = template_path or TEMPLATE_PATH
-    if not tpl.exists():
-        logger.warning("一对一倾听模板缺失，降级从零构建", extra={"template": str(tpl)})
-        doc = Document()
-        for d in DOMAINS:
-            dom_data = _find_domain(domains, d)
-            if dom_data is not None:
-                _scratch_domain(doc, d, record, dom_data)
-        return _save_bytes(doc)
-
-    doc = Document(str(tpl))
-    for domain, table in _map_tables_to_domains(doc):
-        if domain is None:
-            continue
-        dom_data = _find_domain(domains, domain)
-        if dom_data is not None:
-            _fill_domain_table(table, record, dom_data)
-    return _save_bytes(doc)
+    return _build_combined_doc([(record, domains)], tpl)
 
 
 def export_split_by_domain(
@@ -350,16 +416,49 @@ def export_batch_by_domain(
 
     Args:
         children: [(record, domains), ...] 每个幼儿的数据。
-        domain_order: 领域顺序（默认模板顺序）。
+        domain_order: 领域选择集合；输出始终使用模板顺序。
         template_path: 模板路径。
     """
     tpl = template_path or TEMPLATE_PATH
-    order = domain_order or DOMAINS
+    selected = set(DOMAINS) if domain_order is None else set(domain_order)
+    order = [domain for domain in DOMAINS if domain in selected]
     result: dict[str, bytes] = {}
     for d in order:
-        kids = [(rec, doms) for rec, doms in children if _find_domain(doms, d) is not None]
+        kids = [
+            (rec, doms) for rec, doms in children if _find_domain(doms, d) is not None
+        ]
         if kids:
             result[d] = _build_domain_doc(d, kids, tpl)
+    return result
+
+
+def export_batch_combined(
+    children: list[tuple[dict, list[dict]]],
+    domain_order: list[str] | None = None,
+    template_path: Path | None = None,
+) -> bytes:
+    """Export one combined DOCX in selected-child then template-domain order."""
+    return _build_combined_doc(
+        children,
+        template_path or TEMPLATE_PATH,
+        domain_order,
+    )
+
+
+def export_batch_by_child(
+    children: list[tuple[dict, list[dict]]],
+    domain_order: list[str] | None = None,
+    template_path: Path | None = None,
+) -> list[tuple[str, bytes]]:
+    """Export one filtered combined DOCX per child, preserving child order."""
+    tpl = template_path or TEMPLATE_PATH
+    result: list[tuple[str, bytes]] = []
+    for record, domains in children:
+        ordered = _ordered_available_domains(domains, domain_order)
+        if not ordered:
+            continue
+        name = str(record.get("child_name") or "幼儿")
+        result.append((name, _build_combined_doc([(record, domains)], tpl, ordered)))
     return result
 
 

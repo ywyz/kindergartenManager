@@ -34,7 +34,7 @@
 
 | ID | gate/module | tested_code_sha | evidence_closure_sha | 当前状态 | 当前证据 / 下一门 |
 |---|---|---|---|---|---|
-| A | R2 五模块复验 | `54357f5f4479cdf08da2793957ce7cbd23dd88df`（仅自动盘点） | 待固定 | `IN_PROGRESS` | 定向 212 passed；一对一倾听冻结违规待 stable RED，全部人工门待执行 |
+| A | R2 五模块复验 | 待提交倾听 GREEN SHA | 待固定 | `IN_PROGRESS` | 基线定向 212 passed；倾听冻结 RED 与格式 GREEN 已实现，但 Review M 和全部人工门仍待闭合 |
 | B | R5-54 readiness + Compose + deploy/rollback 双门 | `0b3f2408984d717b9692cfa003ee2740e4219341` | 待固定 | `LOCAL_GREEN` | stable RED、两轮 Review finding、当前 SHA 全量与隔离 MySQL 故障恢复均通过；生产部署门未执行 |
 | C | R5-R 备份与恢复 | 待固定 | 待固定 | `BLOCKED` | 尚无实现/演练；应用启动自动迁移使 image rollback 不能恢复 schema/data |
 | D | R5-P release/digest/deploy/rollback 收敛 | 待固定 | 待固定 | `PLANNED` | 只做本地/隔离演练；无 push、Release 或生产操作授权 |
@@ -100,3 +100,15 @@ Python/数据库/migration head、tenant/user/role、模板文件与 SHA-256、�
 - 自制教玩具：`23 passed`。
 - 课程审议：`29 passed`。
 - 合计：`212 passed`。这些结果不替代浏览器、真实 MySQL、真实 AI 或 Windows Word 2010+。
+
+### 一对一倾听冻结 RED / GREEN candidate
+
+- stable RED 提交：`5024fdc`；命令
+  `.venv/bin/pytest tests/test_listening_freeze_contracts_red.py -q` 连续两次均 `6 failed`，失败分布完全一致。
+- Review finding RED：按领域 public exporter 的逆序/空选择两个用例连续两次均 `2 failed / 8 deselected`。
+- 修复后：`tests/test_listening*.py` 为 `72 passed`；冻结/exporter/helper 定向为 `34 passed`；相关 4 个 Python
+  文件 Ruff/format 通过，`git diff --check` 通过。
+- 两位只读 reviewer 均确认领域过滤、三种批量模式、幼儿选择顺序、至少 15 图取前 15、同名 ZIP 与幼儿间
+  硬分页实现；Windows Word 2010+、浏览器、真实 MySQL/视觉 AI 尚未执行。
+- Review M 保持 OPEN：ExportRecord commit 与独立 audit/download 的 generation/session 窄窗口尚无原子契约；
+  该 finding 阻止倾听模块和 R2 标记 PASS，需独立 stable RED 后处理。

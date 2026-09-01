@@ -38,7 +38,10 @@ from app.integration.image_processing import (
 )
 from app.integration.image_storage import get_storage_backend
 from app.integration.word_export.listening_exporter import (
+    DOMAINS,
+    export_batch_by_child,
     export_batch_by_domain,
+    export_batch_combined,
     export_combined,
     export_split_by_domain,
 )
@@ -71,7 +74,7 @@ from app.ui.helpers import validate_image_count
 logger = get_logger(__name__)
 
 # 五大领域（页面展示顺序）
-_UI_DOMAINS = ["健康", "语言", "社会", "艺术", "科学"]
+_UI_DOMAINS = list(DOMAINS)
 _MONTHS = list(range(1, 13))
 
 
@@ -85,7 +88,7 @@ def infer_age_by_grade(grade: str | None) -> str:
 
 def default_year_month(today: date | None = None) -> tuple[int, int]:
     """返回默认观察年月（当前年月）。"""
-    d = today or date.today()
+    d = today or date.today()  # noqa: DTZ011 - use the teacher's local calendar date
     return d.year, d.month
 
 
@@ -113,11 +116,18 @@ def build_export_filename(
 
 
 def build_batch_export_filename(
-    tenant_id: int, user_id: int, year: int, month: int, count: int
+    tenant_id: int,
+    user_id: int,
+    year: int,
+    month: int,
+    count: int,
+    mode: str = "按领域",
 ) -> str:
-    """构造批量按领域导出的 zip 文件名。"""
+    """构造批量导出文件名。"""
+    extension = ".docx" if mode == "合并" else ".zip"
     return (
-        f"{tenant_id}_{user_id}_{year}年{month}月_一对一倾听_批量按领域_{count}人.zip"
+        f"{tenant_id}_{user_id}_{year}年{month}月_一对一倾听_批量{mode}_{count}人"
+        f"{extension}"
     )
 
 
@@ -154,6 +164,39 @@ def pack_domain_files_to_zip(files: dict[str, bytes]) -> bytes:
         for domain, content in files.items():
             zf.writestr(f"{domain}.docx", content)
     return buf.getvalue()
+
+
+def pack_child_files_to_zip(files: list[tuple[str, bytes]]) -> bytes:
+    """按选择顺序打包幼儿文档，序号同时避免同名文件覆盖。"""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for index, (child_name, content) in enumerate(files, start=1):
+            safe_name = (
+                (child_name or "幼儿").strip().replace("/", "_").replace(" ", "")
+            )
+            zf.writestr(f"{index:02d}_{safe_name or '幼儿'}.docx", content)
+    return buf.getvalue()
+
+
+def ordered_selection_after(
+    selected: tuple[int, ...], record_id: int, checked: bool
+) -> tuple[int, ...]:
+    """Update a checkbox selection without losing the user's selection order."""
+    remaining = tuple(item for item in selected if item != record_id)
+    if checked:
+        return (*remaining, record_id)
+    return remaining
+
+
+def select_export_domains(
+    domains: list[dict], selected_domains: tuple[str, ...]
+) -> list[dict]:
+    """Keep selected, available domains in the frozen template order."""
+    selected = set(selected_domains)
+    by_name = {str(item.get("domain")): item for item in domains}
+    return [
+        by_name[name] for name in _UI_DOMAINS if name in selected and name in by_name
+    ]
 
 
 def format_record_summary(
@@ -361,7 +404,8 @@ async def one_on_one_listening_page() -> None:
 
             ui.separator().classes("my-1")
             ui.label(
-                "一键导入照片（恰好 15 张，按文件名排序自动分配五领域，每领域 3 张，统一横版）"
+                "一键导入照片（至少 15 张，按文件名稳定排序取前 15 张，"
+                "自动分配五领域，每领域 3 张，统一横版）"
             ).classes("text-sm text-gray-600")
             with ui.row().classes("w-full gap-3 items-center flex-wrap"):
                 bulk_count_label = ui.label("已选 0 张").classes(
@@ -393,6 +437,13 @@ async def one_on_one_listening_page() -> None:
         domains_container = ui.column().classes("w-full gap-3")
 
         # ── 操作按钮 ──────────────────────────────────────────────
+        ui.label("选择导出领域（默认全选；仅导出当前可用领域）").classes(
+            "text-sm text-gray-600"
+        )
+        with ui.row().classes("w-full gap-3 flex-wrap"):
+            form_export_domain_checks = {
+                domain: ui.checkbox(domain, value=True) for domain in _UI_DOMAINS
+            }
         with ui.row().classes("w-full gap-3 justify-end mt-2"):
             save_btn = ui.button("保存", icon="save").classes("bg-blue-600 text-white")
             export_combined_btn = ui.button("导出合并 Word", icon="download").classes(
@@ -1275,6 +1326,12 @@ async def one_on_one_listening_page() -> None:
     def trigger_export_combined(*_event_args: object):
         generation = form_generation[0]
         _record_full, domains = _collect()
+        selected_domains = tuple(
+            domain
+            for domain, checkbox in form_export_domain_checks.items()
+            if checkbox.value
+        )
+        domains = select_export_domains(domains, selected_domains)
         record = _export_record_dict()
         child_name = str(child_name_input.value or "幼儿")
         year = int(year_input.value or cur_year)
@@ -1301,6 +1358,12 @@ async def one_on_one_listening_page() -> None:
     def trigger_export_split(*_event_args: object):
         generation = form_generation[0]
         _record_full, domains = _collect()
+        selected_domains = tuple(
+            domain
+            for domain, checkbox in form_export_domain_checks.items()
+            if checkbox.value
+        )
+        domains = select_export_domains(domains, selected_domains)
         record = _export_record_dict()
         child_name = str(child_name_input.value or "幼儿")
         year = int(year_input.value or cur_year)
@@ -1451,7 +1514,7 @@ async def one_on_one_listening_page() -> None:
     cancel_edit_btn.on("click", trigger_cancel_edit)
 
     # ── 历史记录区 ─────────────────────────────────────────────────
-    selected_ids: set[int] = set()
+    selected_ids: list[int] = []
 
     with ui.column().classes("w-full max-w-5xl mx-auto px-6 pb-10 gap-3"):
         ui.separator()
@@ -1467,9 +1530,28 @@ async def one_on_one_listening_page() -> None:
             ).classes("w-28")
             filter_name = ui.input(label="幼儿姓名").classes("w-40")
             refresh_btn = ui.button("查询", icon="search").props("outline")
-            batch_export_btn = ui.button(
-                "批量按领域导出(zip)", icon="folder_zip"
-            ).classes("bg-orange-500 text-white")
+        ui.label("选择导出领域（默认全选；仅导出当前可用领域）").classes(
+            "text-sm text-gray-600"
+        )
+        with ui.row().classes("w-full gap-3 flex-wrap"):
+            history_export_domain_checks = {
+                domain: ui.checkbox(domain, value=True) for domain in _UI_DOMAINS
+            }
+        with ui.row().classes("w-full gap-3 flex-wrap"):
+            batch_combined_btn = ui.button("批量合并 Word", icon="download").classes(
+                "bg-orange-500 text-white"
+            )
+            batch_by_child_btn = ui.button(
+                "批量 ZIP（按幼儿）", icon="folder_zip"
+            ).props("outline")
+            batch_by_domain_btn = ui.button(
+                "批量 ZIP（按领域）", icon="folder_zip"
+            ).props("outline")
+            batch_export_buttons = {
+                "combined": batch_combined_btn,
+                "by_child": batch_by_child_btn,
+                "by_domain": batch_by_domain_btn,
+            }
         history_container = ui.column().classes("w-full gap-2")
 
     for control in (filter_year, filter_month, filter_name):
@@ -1537,6 +1619,7 @@ async def one_on_one_listening_page() -> None:
         child_name: str,
         year: int,
         month: int,
+        selected_domains: tuple[str, ...],
     ) -> None:
         if not await _require_bound_session():
             return
@@ -1553,6 +1636,10 @@ async def one_on_one_listening_page() -> None:
                     show_error("记录不存在")
                     return
                 record, domains = to_export_payload(detail)
+                domains = select_export_domains(domains, selected_domains)
+                if not domains:
+                    show_error("所选领域无可导出内容")
+                    return
                 data = export_combined(record, domains)
                 fname = build_export_filename(
                     tenant_id,
@@ -1600,6 +1687,7 @@ async def one_on_one_listening_page() -> None:
         child_name: str,
         year: int,
         month: int,
+        selected_domains: tuple[str, ...],
     ) -> None:
         if not await _require_bound_session():
             return
@@ -1616,6 +1704,10 @@ async def one_on_one_listening_page() -> None:
                     show_error("记录不存在")
                     return
                 record, domains = to_export_payload(detail)
+                domains = select_export_domains(domains, selected_domains)
+                if not domains:
+                    show_error("所选领域无可导出内容")
+                    return
                 files = export_split_by_domain(record, domains)
                 zip_bytes = pack_domain_files_to_zip(files)
                 zip_name = build_export_filename(
@@ -1665,13 +1757,20 @@ async def one_on_one_listening_page() -> None:
         month: int,
     ):
         generation = history_generation[0]
+        selected_domains = tuple(
+            domain
+            for domain, checkbox in history_export_domain_checks.items()
+            if checkbox.value
+        )
         owner = action_guard.claim("listening.history-export")
         if owner is None:
             return None
         return _run_claimed_action(
             "listening.history-export",
             owner,
-            _reexport_combined(generation, rid, child_name, year, month),
+            _reexport_combined(
+                generation, rid, child_name, year, month, selected_domains
+            ),
         )
 
     def trigger_reexport_split(
@@ -1681,13 +1780,18 @@ async def one_on_one_listening_page() -> None:
         month: int,
     ):
         generation = history_generation[0]
+        selected_domains = tuple(
+            domain
+            for domain, checkbox in history_export_domain_checks.items()
+            if checkbox.value
+        )
         owner = action_guard.claim("listening.history-export")
         if owner is None:
             return None
         return _run_claimed_action(
             "listening.history-export",
             owner,
-            _reexport_split(generation, rid, child_name, year, month),
+            _reexport_split(generation, rid, child_name, year, month, selected_domains),
         )
 
     async def _delete_listening_record(
@@ -1713,7 +1817,7 @@ async def one_on_one_listening_page() -> None:
             ):
                 return
             try:
-                async with AsyncSessionLocal() as session:
+                async with AsyncSessionLocal() as session:  # noqa: SIM117
                     async with AsyncSessionUnitOfWork(session):
                         await delete_images_by_record(session, tenant_id, user_id, rid)
                         await delete_indicator_results_by_record(
@@ -1749,14 +1853,11 @@ async def one_on_one_listening_page() -> None:
         )
 
     def _toggle_select(rid: int, checked: bool) -> None:
-        if checked:
-            selected_ids.add(rid)
-        else:
-            selected_ids.discard(rid)
+        selected_ids[:] = ordered_selection_after(tuple(selected_ids), rid, checked)
         _advance_history_generation()
 
     def _build_history_row(rec) -> None:
-        with ui.card().classes("w-full"):
+        with ui.card().classes("w-full"):  # noqa: SIM117 - nested NiceGUI parents
             with ui.row().classes(
                 "w-full justify-between items-center flex-wrap gap-2"
             ):
@@ -1870,6 +1971,8 @@ async def one_on_one_listening_page() -> None:
         ids: tuple[int, ...],
         year: int,
         month: int,
+        selected_domains: tuple[str, ...],
+        mode: str,
         owner: object,
     ) -> None:
         if not await _require_bound_session():
@@ -1879,9 +1982,13 @@ async def one_on_one_listening_page() -> None:
         if not ids:
             show_error("请先勾选要导出的幼儿记录")
             return
-        batch_export_btn.props("loading=true")
+        if not selected_domains:
+            show_error("请至少选择一个导出领域")
+            return
+        batch_button = batch_export_buttons[mode]
+        batch_button.props("loading=true")
         try:
-            children = []
+            children: list[tuple[dict, list[dict]]] = []
             async with AsyncSessionLocal() as session:
                 for rid in ids:
                     detail = await load_record_detail(session, tenant_id, user_id, rid)
@@ -1890,7 +1997,10 @@ async def one_on_one_listening_page() -> None:
                     ):
                         return
                     if detail:
-                        children.append(to_export_payload(detail))
+                        record, domains = to_export_payload(detail)
+                        domains = select_export_domains(domains, selected_domains)
+                        if domains:
+                            children.append((record, domains))
             if not await _require_bound_session() or not _history_is_current(
                 generation
             ):
@@ -1898,14 +2008,31 @@ async def one_on_one_listening_page() -> None:
             if not children:
                 show_error("所选记录无可导出内容")
                 return
-            files = export_batch_by_domain(children)
-            zip_bytes = pack_domain_files_to_zip(files)
-            zip_name = build_batch_export_filename(
+
+            if mode == "combined":
+                content = export_batch_combined(children)
+                file_mode = "合并"
+                audit_mode = "batch_combined"
+            elif mode == "by_child":
+                content = pack_child_files_to_zip(export_batch_by_child(children))
+                file_mode = "按幼儿"
+                audit_mode = "batch_by_child"
+            else:
+                files = export_batch_by_domain(
+                    children,
+                    domain_order=list(selected_domains),
+                )
+                content = pack_domain_files_to_zip(files)
+                file_mode = "按领域"
+                audit_mode = "batch_by_domain"
+
+            file_name = build_batch_export_filename(
                 tenant_id,
                 user_id,
                 year,
                 month,
                 len(children),
+                file_mode,
             )
             async with AsyncSessionLocal() as session:
                 await save_export_record(
@@ -1913,8 +2040,8 @@ async def one_on_one_listening_page() -> None:
                     tenant_id=tenant_id,
                     user_id=user_id,
                     daily_plan_id=None,
-                    file_name=zip_name,
-                    file_path=f"exports/{zip_name}",
+                    file_name=file_name,
+                    file_path=f"exports/{file_name}",
                     listening_record_id=None,
                 )
                 await session.commit()
@@ -1926,42 +2053,57 @@ async def one_on_one_listening_page() -> None:
                 "export_listening",
                 tenant_id=tenant_id,
                 user_id=user_id,
-                file_name=zip_name,
-                mode="batch",
+                file_name=file_name,
+                mode=audit_mode,
                 count=len(children),
             )
-            ui.download(zip_bytes, zip_name)
-            show_info(f"批量导出成功：{zip_name}（{len(children)} 人）", ok=True)
+            ui.download(content, file_name)
+            show_info(f"批量导出成功：{file_name}（{len(children)} 人）", ok=True)
         except Exception as ex:  # noqa: BLE001
             if not await _require_bound_session() or not _history_is_current(
                 generation
             ):
                 return
-            logger.error("批量按领域导出失败 error_type=%s", type(ex).__name__)
+            logger.error("批量导出失败 error_type=%s", type(ex).__name__)
             show_error(f"批量导出失败：{type(ex).__name__}")
         finally:
             if (
                 action_guard.owns("listening.history-export", owner)
                 and await _require_bound_session()
             ):
-                batch_export_btn.props(remove="loading")
+                batch_button.props(remove="loading")
 
-    def trigger_batch_export(*_event_args: object):
+    def trigger_batch_export(mode: str):
         generation = history_generation[0]
-        ids = tuple(sorted(selected_ids))
+        ids = tuple(selected_ids)
         year = int(filter_year.value) if filter_year.value else cur_year
         month = int(filter_month.value) or cur_month
+        selected_domains = tuple(
+            domain
+            for domain, checkbox in history_export_domain_checks.items()
+            if checkbox.value
+        )
         owner = action_guard.claim("listening.history-export")
         if owner is None:
             return None
         return _run_claimed_action(
             "listening.history-export",
             owner,
-            do_batch_export(generation, ids, year, month, owner),
+            do_batch_export(
+                generation,
+                ids,
+                year,
+                month,
+                selected_domains,
+                mode,
+                owner,
+            ),
         )
 
     refresh_btn.on("click", trigger_refresh_history)
-    batch_export_btn.on("click", trigger_batch_export)
+    batch_combined_btn.on("click", lambda: trigger_batch_export("combined"))
+    batch_by_child_btn.on("click", lambda: trigger_batch_export("by_child"))
+    batch_by_domain_btn.on("click", lambda: trigger_batch_export("by_domain"))
 
     await render_domains(form_generation[0], str(stage_select.value or default_stage))
     await refresh_history(history_generation[0], None, None, None)
