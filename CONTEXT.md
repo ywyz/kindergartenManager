@@ -214,9 +214,10 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
 3. **投影边界需持续守卫**：API 列表显式使用 tenant 投影，UI 详情和子表使用 tenant + user 投影并已有跨 tenant/user 负向测试；新增查询仍必须选择并测试正确投影。
 4. **类型债务**：Ruff 已清零，但当前 Pyright 仍报告既有第三方类型与结构问题，尚未建立可执行的类型门禁。
 5. **发布证据漂移**：Linux 本地结果不能代替 Windows 安装、浏览器打开、模板 Word 保真和真实 AI/MySQL 验收。
-6. **发布元数据与迁移后恢复仍待环境验收**：R5-P 候选已把唯一元组固定为 tag、source SHA、repository、
+6. **发布元数据与迁移后恢复已完成隔离验收、仍待生产**：R5-P 候选已把唯一元组固定为 tag、source SHA、repository、
    双平台 OCI index digest、`docker-image.json` 与 Release body，并改为 draft 验证后 publish；migration receipt
-   解决迁移前 evidence 与迁移后 revision 的证据连续性，但旧镜像/新 schema 兼容性仍须隔离 MySQL 和生产门证明；
+   解决迁移前 evidence 与迁移后 revision 的证据连续性；`340d23d…` 已用真实双平台 loopback OCI、MySQL 8.4.11、
+   临时凭据完成迁移后目标失败和旧镜像回切，旧镜像在新 schema 上通过完整验收。生产门与 Release closure 仍须独立证明；
    `/api/v1/health` 仍是存活检查，不作为数据库 readiness 替代；Issue #54 保留 readiness 范围。
 7. **远端质量证据需按 SHA 回读**：F005-F009 的既有 push Quality 均已按各自 `headSha` 回读；最终
   `evidence_closure_sha` 仍必须使用自身 Review/CI/远端证据，不能沿用 `tested_code_sha` 的旧 CI。
@@ -233,8 +234,8 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
    `/api/v1/health` 继续只表示进程/HTTP 存活。
 2. 应用与 Bootstrap 启动均不执行 Alembic；迁移只由已验证备份门后的显式 job 执行。R5-P 候选新增关闭的
    migration receipt 与迁移后失败回切协调 seam；镜像 rollback 不恢复 schema/data，且不得自动 downgrade。
-3. 当前 OCI index digest 描述资产、Release body/tag/SHA/asset 收敛校验和部署/回滚脚本候选需取得本次
-   commit、push、精确 SHA CI 与复审证据；生产管理员登录/最终密码轮换/旧会话失效已于 2026-08-31 验收，
+3. 当前 OCI index digest 描述资产、Release body/tag/SHA/asset 收敛校验和部署/回滚脚本候选已取得隔离全链
+   GREEN，精确事实见 evidence ledger；仍需本次 push、精确 SHA CI、生产窗口验收与 Release closure。生产管理员登录/最终密码轮换/旧会话失效已于 2026-08-31 验收，
    但目标页语义浏览器自动化超时仍是独立工具问题。
 4. R5-R 的隔离真实 MySQL 与 Linux python-docx 恢复矩阵已通过；Windows Word、生产恢复和其他业务模块人工
    回归仍是独立工作，不与 Agent、liveness 或部署脚本结果互相替代。

@@ -293,8 +293,10 @@ H0/M0/L0，Quality、CodeQL 与 Dependency Graph 精确 SHA 成功，Issue #52 �
 - `scripts/deploy.py` 的不可变部署与回滚操作（dry-run、串行锁、rollback）。
 - 独立 Issue #54 的 `/api/v1/readiness` 双门与 R5-R backup→restore→evidence 已固定 `LOCAL_GREEN`；R5-R 已完成
   三轮 Review、当前 SHA 全量回归、隔离 Compose/真实 MySQL live 和完整破坏恢复演练。R5-P 的目标镜像迁移、
-  deployment state 延迟收敛、失败回切、生产证据与 release closure 仍待独立闭合；当前候选已建立 migration
-  receipt、回切 stable RED/GREEN 与 draft→verify→publish 元数据门，但不能在隔离 OCI/MySQL 和生产验收前标为 PASS。
+  deployment state 延迟收敛、失败回切的隔离 OCI/MySQL 全链已在 `340d23d…` 进入 `ISOLATION_GREEN`：目标镜像
+  完整门后故障注入、旧镜像在新 schema 上回切及五模块/图片/AI/Word/快照均通过且状态未更新。生产证据与
+  release closure 仍待独立闭合；migration receipt、回切 stable RED/GREEN 与 draft→verify→publish 元数据门
+  不能代替精确 SHA CI、生产维护窗口或最终 Release 验收。
 
 ## 11. R6：产品深化（模板、文档、审核与复用）
 

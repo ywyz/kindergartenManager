@@ -37,7 +37,7 @@
 | A | R2 五模块复验 | `5fb4f31dc2a0cd73f786cba4795f5a579f5816ba`（倾听 GREEN candidate） | 待固定 | `IN_PROGRESS` | 倾听冻结 RED、格式 GREEN 与当前 SHA 全量已固定；Review M 和全部人工门仍待闭合 |
 | B | R5-54 readiness + Compose + deploy/rollback 双门 | `0b3f2408984d717b9692cfa003ee2740e4219341` | 待固定 | `LOCAL_GREEN` | stable RED、两轮 Review finding、当前 SHA 全量与隔离 MySQL 故障恢复均通过；生产部署门未执行 |
 | C | R5-R 备份与恢复 | `b329bf6cf4bbf5518390644b24908ce29bd16894` | `8b06f89bf8a7533788bec8e4d19c2be4ae289541` | `LOCAL_GREEN` | SQLite/MySQL producer→隔离 restore→受控 attestation、deploy 当前库自动绑定与完整破坏恢复演练均通过；无生产、push、Release 或目标镜像部署证据 |
-| D | R5-P release/digest/deploy/rollback 收敛 | `8b06a0416da65ec75d638a60b8e025a420dc9f3b` | 待固定 | `ENV_BLOCKED` | 自动门 GREEN；候选双平台构建被 Python 包索引 503/空响应阻断，无 digest，未进入 MySQL/生产 |
+| D | R5-P release/digest/deploy/rollback 收敛 | `340d23d1581038056ce3eed27517fb1d5a953175` | 待固定 | `ISOLATION_GREEN` | Cernet 直连双平台候选、pre-head MySQL backup/restore、migration receipt、目标验收故障注入与旧镜像回切均通过；精确 SHA CI、生产和 Release closure 待独立闭合 |
 | E | 最终证据闭合 | 待固定 | 待固定 | `BLOCKED` | 依赖 A-D 各自原始证据；不能吞并它们 |
 
 ## 每次证据记录的必填字段
@@ -171,10 +171,25 @@ Python/数据库/migration head、tenant/user/role、模板文件与 SHA-256、�
   `tested_code_sha=8b06a0416da65ec75d638a60b8e025a420dc9f3b`：全量
   `1092 passed / 1 skipped in 68.41s`；Ruff lint/format、Python compile、Compose config、workflow/Compose YAML
   解析与 `git diff --check` 通过；三轮独立 Review 的 P0/P1 finding 均进入修复与回归。
-- 双平台 OCI 构建三条路径均未产生 digest：并行构建先遇到依赖下载 connection reset；基础 tag 镜像代理随后
+- 历史环境阻断：双平台 OCI 构建三条路径曾均未产生 digest；并行构建先遇到依赖下载 connection reset；基础 tag 镜像代理随后
   不一致地返回 not found（已以第一次解析出的官方 digest 固定 build context）；分平台构建仍分别在 arm64
   FastAPI 与 amd64 SQLAlchemy 索引解析收到空版本。主机 wheelhouse 路径也由出口代理返回 503。所有失败都发生
   在 `pip install`，没有推送 target manifest/index，没有启动合成 MySQL、没有生成 backup evidence/receipt。
-- 当前仍是自动 GREEN、隔离 `ENV_BLOCKED`，不是隔离或生产 GREEN：尚未用合成 MySQL、临时凭据和真实候选 OCI index digest 完成
-  `backup evidence → migration receipt → target → gates → failure injection → old image rollback`，也未证明旧镜像
-  与新 schema 兼容，未 push/tag/创建或发布 Release，未更新 Issue/production state。
+- 环境修复只作用于构建进程：Cernet `https://mirrors.cernet.edu.cn/pypi/web/simple` 绕过失效代理直连返回
+  HTTP 200；Docker Hub 固定基础 digest 通过现有镜像加速源导入。Dockerfile 保留官方 PyPI 默认值，仅允许显式
+  `PIP_INDEX_URL` build arg，本次未修改全局代理。
+- 最终隔离候选 `tested_code_sha=340d23d1581038056ce3eed27517fb1d5a953175`：全量
+  `1096 passed / 1 skipped in 68.29s`，Ruff lint/format 与 `git diff --check` 通过。真实目标 OCI index 为
+  `localhost:5001/kindergarten-manager@sha256:2dc4def4a8c2db4685252382c5e42cac3efdeec4d43ec6683f23b00e3921c8b1`，
+  恰含 `linux/amd64`、`linux/arm64`，两平台 revision label 均精确等于 tested SHA。兼容旧镜像 index 为
+  `localhost:5001/kindergarten-manager@sha256:120a8f050a5a255c536d8a1582030bc7a49aad3edcdf4c8e8772444b73a460cc`。
+- 隔离 run `local-20260902-a1b2` 使用 MySQL `8.4.11`、随机临时凭据和 tmpfs；从
+  `e5f7a9c2d4b6` 生成新鲜 dump，完整恢复到全新 MySQL 并比较所有表/租户/Blob，随后由关闭的 migration job
+  升级到 `2b7f3d5e9c8a` 并生成 receipt。目标镜像依次通过 liveness、readiness、真实登录和完整业务矩阵后注入
+  business failure；deploy helper 自动回切旧镜像。旧镜像在新 schema 上重新通过 readiness、登录、五模块、
+  图片 Blob、AI key 解密、Word 导出和全表快照；deployment state 原始字节与 release state 均未更新。
+  脱敏证据位于 owner-only `/tmp/kg-r5p-live.6yywcuho/`；随机 env 文件已删除，容器已清理。
+- 演练发现镜像切换瞬间的 `ConnectionResetError` 曾被错误归类为双重 gate 失败；新增 stable RED 后修复为等待器
+  重试瞬时连接重置，部署/回切专项 `56 passed`，随后才取得上述全链 GREEN。
+- 当前为 `ISOLATION_GREEN`，仍不是生产或 Release PASS：未 push/tag、未创建/发布 Release、未连接生产，精确 SHA
+  CI、生产新鲜备份/部署/失败回切和 Release 元数据收敛必须分别留证。
