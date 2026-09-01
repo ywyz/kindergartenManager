@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-
 _ROOT = Path(__file__).parents[1]
 
 _PAGE_CALLBACKS = {
@@ -519,7 +518,7 @@ def test_game_multiple_upload_keeps_siblings_but_discards_an_old_batch() -> None
             "trigger_batch_export",
             (
                 "history_generation[0]",
-                "tuple(sorted(selected_ids))",
+                "tuple(selected_ids)",
                 "filter_year.value",
                 "filter_month.value",
             ),
