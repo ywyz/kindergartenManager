@@ -26,6 +26,40 @@ VALIDATE_OCI_INDEX_REF = deploy._validate_oci_index_ref
 @pytest.fixture(autouse=True)
 def _avoid_registry_access(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(deploy, "_validate_oci_index_ref", lambda *args, **kwargs: None)
+    monkeypatch.setattr(deploy, "_require_verified_backup", lambda *args, **kwargs: None)
+
+
+def test_deploy_requires_verified_backup_before_docker_or_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _compose(tmp_path)
+    calls: list[str] = []
+
+    def reject(*args: object, **kwargs: object) -> None:
+        calls.append("backup")
+        raise deploy.DeployError("verified backup required")
+
+    monkeypatch.setattr(deploy, "_require_verified_backup", reject)
+    monkeypatch.setattr(
+        deploy, "_run_command", lambda *args, **kwargs: calls.append("docker")
+    )
+    monkeypatch.setattr(
+        deploy, "_write_atomic_json", lambda *args, **kwargs: calls.append("state")
+    )
+
+    with pytest.raises(SystemExit, match="verified backup required"):
+        deploy.main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                "--backup-evidence",
+                str(tmp_path / "proof.json"),
+                *HEALTH_ARGS,
+                "deploy",
+                _image("a"),
+            ]
+        )
+    assert calls == ["backup"]
 
 
 def _image(character: str) -> str:

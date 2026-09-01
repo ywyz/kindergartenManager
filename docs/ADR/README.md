@@ -19,6 +19,7 @@ ADR 记录会长期影响多个模块、难以通过普通代码注释表达的�
 | [ADR-0004](ADR-0004-ai-and-fixed-word-boundaries.md) | AI 适配器、教师采用与固定 Word 模板边界 | 接受 |
 | [ADR-0005](ADR-0005-controlled-ai-agent-runtime.md) | 受控单 AI Agent、关闭 READ/DRAFT Tool 与零持久化 | 接受 |
 | [ADR-0006](ADR-0006-trusted-ui-session-and-confirmed-agent-write.md) | 可信 UI 会话、每日计划 revision 与逐次确认 Agent WRITE | 接受（W005/W006 基础与 W007/W008 交付已闭合；PR #53/Issue #52 证据见 canonical ledger） |
+| [ADR-0007](ADR-0007-explicit-migration-and-verified-backup-gate.md) | 取消启动自动迁移，迁移与部署前要求已验证备份证据 | 接受 |
 
 ## 何时新增 ADR
 

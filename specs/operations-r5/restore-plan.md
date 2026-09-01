@@ -12,9 +12,9 @@
 旧 session 安全边界、密钥可用但不回显、五模块记录、图片/BLOB、Word 重导出、readiness 与 Alembic head。
 失败恢复只回到原隔离环境/备份，不自动 downgrade 数据库。镜像 rollback 与数据 restore 是两个门禁。
 
-## 当前 blocker
+## 已冻结的迁移/部署边界
 
-`scripts/deploy.py` 不直接调用 Alembic，但 `app/main.py` 在每次目标容器启动时执行 fail-closed
-`alembic upgrade head`。因此“新镜像启动并迁移 → readiness/业务失败 → 切回旧镜像”可能让旧镜像面对新
-schema；仅切换 image 无法恢复数据库。R5-P 在建立并演练预部署一致性备份、恢复到隔离副本、以及新
-schema→旧镜像兼容/恢复决策前保持 BLOCKED；禁止把 `alembic downgrade` 作为自动恢复。
+[ADR-0007](../../docs/ADR/ADR-0007-explicit-migration-and-verified-backup-gate.md) 已冻结取消应用/Bootstrap
+启动自动迁移，改为独立显式迁移门，并要求迁移和镜像变更前消费已验证备份证据。该代码门本身不等于
+恢复演练通过：R5-P 在一致性备份生产、隔离恢复、必要资产验证以及新 schema→旧镜像兼容/恢复决策完成前
+仍保持 BLOCKED；禁止把 `alembic downgrade` 作为自动恢复。
