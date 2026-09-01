@@ -317,7 +317,7 @@ def _wait_for_http_gate(
                     gate=gate,
                 ):
                     return
-        except (error.URLError, TimeoutError):
+        except (error.URLError, TimeoutError, ConnectionError):
             pass
         time.sleep(2)
 

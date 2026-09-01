@@ -1193,6 +1193,43 @@ def test_probe_gates_require_their_exact_safe_json_contracts() -> None:
     )
 
 
+def test_http_gate_retries_connection_reset_during_image_switch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    attempts = iter(
+        [
+            ConnectionResetError("synthetic image-switch reset"),
+            _ProbeResponse(
+                LIVENESS_ARGS[1],
+                {
+                    "status": "ok",
+                    "service": "kindergarten-teaching-api",
+                    "version": "v1",
+                },
+            ),
+        ]
+    )
+
+    def urlopen(*_args: object, **_kwargs: object) -> _ProbeResponse:
+        result = next(attempts)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    monkeypatch.setattr(deploy.request, "urlopen", urlopen)
+    monkeypatch.setattr(deploy.time, "sleep", lambda _seconds: None)
+
+    assert (
+        deploy._wait_for_http_gate(
+            LIVENESS_ARGS[1],
+            timeout_seconds=1,
+            dry_run=False,
+            gate="liveness",
+        )
+        is None
+    )
+
+
 @pytest.mark.parametrize(
     "response",
     [
