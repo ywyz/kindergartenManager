@@ -1,10 +1,12 @@
 """对外 REST API 路由集成测试（httpx ASGITransport + SQLite 内存库）。"""
+import asyncio
 import hashlib
 import hmac
 import time
 from datetime import date
 
 import pytest_asyncio
+import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
@@ -90,6 +92,182 @@ class TestAuth:
         assert resp.status_code == 200
         assert resp.json()["status"] == "ok"
 
+    async def test_health_never_opens_a_database_session(self, api_client, monkeypatch):
+        from app.api import routes
+
+        def forbidden_session():
+            raise AssertionError("liveness must not touch the database")
+
+        monkeypatch.setattr(routes, "AsyncSessionLocal", forbidden_session)
+
+        resp = await api_client.get("/api/v1/health")
+
+        assert resp.status_code == 200
+
+
+class _ReadinessSession:
+    def __init__(self, *, error: Exception | None = None, block: bool = False) -> None:
+        self.error = error
+        self.block = block
+        self.statements: list[str] = []
+        self.entered = False
+        self.exited = False
+        self.cancelled = False
+        self.commit_calls = 0
+        self.flush_calls = 0
+
+    async def __aenter__(self):
+        self.entered = True
+        return self
+
+    async def __aexit__(self, *_args: object) -> None:
+        self.exited = True
+
+    async def execute(self, statement: object) -> object:
+        self.statements.append(str(statement))
+        if self.error is not None:
+            raise self.error
+        if self.block:
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                self.cancelled = True
+                raise
+        return object()
+
+    async def commit(self) -> None:
+        self.commit_calls += 1
+        raise AssertionError("readiness must not commit")
+
+    async def flush(self) -> None:
+        self.flush_calls += 1
+        raise AssertionError("readiness must not flush")
+
+
+class _ReadinessFactory:
+    def __init__(self, sessions: list[_ReadinessSession]) -> None:
+        self.pending = list(sessions)
+        self.created: list[_ReadinessSession] = []
+
+    def __call__(self) -> _ReadinessSession:
+        session = self.pending.pop(0)
+        self.created.append(session)
+        return session
+
+
+class TestReadiness:
+    async def test_readiness_is_unauthenticated_and_executes_only_select_one(
+        self, api_client, monkeypatch
+    ) -> None:
+        from app.api import routes
+
+        session = _ReadinessSession()
+        monkeypatch.setattr(routes, "AsyncSessionLocal", _ReadinessFactory([session]))
+
+        response = await api_client.get("/api/v1/readiness")
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "status": "ready",
+            "service": "kindergarten-teaching-api",
+            "version": "v1",
+            "time": response.json()["time"],
+            "checks": {"database": "ok"},
+        }
+        assert session.entered and session.exited
+        assert session.statements == ["SELECT 1"]
+        assert session.commit_calls == session.flush_calls == 0
+
+    @pytest.mark.parametrize(
+        "failure",
+        [
+            RuntimeError("connection refused at mysql://secret-user:secret-pass@db"),
+            ValueError("SELECT 1 failed with api-key=secret-key tenant=77 user=88"),
+        ],
+    )
+    async def test_readiness_failure_is_503_and_redacted(
+        self, api_client, monkeypatch, caplog, failure
+    ) -> None:
+        from app.api import routes
+
+        session = _ReadinessSession(error=failure)
+        monkeypatch.setattr(routes, "AsyncSessionLocal", _ReadinessFactory([session]))
+
+        response = await api_client.get("/api/v1/readiness")
+
+        assert response.status_code == 503
+        assert response.json()["status"] == "not_ready"
+        assert response.json()["checks"] == {"database": "failed"}
+        exposed = response.text + caplog.text
+        for secret in ("secret-user", "secret-pass", "secret-key", "tenant=77", "user=88", "SELECT 1"):
+            assert secret not in exposed
+
+    async def test_readiness_timeout_cancels_query_and_closes_session(
+        self, api_client, monkeypatch
+    ) -> None:
+        from app.api import routes
+
+        session = _ReadinessSession(block=True)
+        monkeypatch.setattr(routes, "AsyncSessionLocal", _ReadinessFactory([session]))
+        monkeypatch.setattr(routes, "READINESS_TIMEOUT_SECONDS", 0.01)
+
+        response = await api_client.get("/api/v1/readiness")
+
+        assert response.status_code == 503
+        assert session.cancelled
+        assert session.exited
+
+    async def test_host_cancellation_propagates(self, monkeypatch) -> None:
+        from app.api import routes
+
+        session = _ReadinessSession(block=True)
+        monkeypatch.setattr(routes, "AsyncSessionLocal", _ReadinessFactory([session]))
+        task = asyncio.create_task(routes.readiness())
+        await asyncio.sleep(0)
+        task.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert session.cancelled
+        assert session.exited
+
+    async def test_database_recovery_uses_a_new_session_without_app_restart(
+        self, api_client, monkeypatch
+    ) -> None:
+        from app.api import routes
+
+        failed = _ReadinessSession(error=ConnectionError("synthetic disconnect"))
+        recovered = _ReadinessSession()
+        factory = _ReadinessFactory([failed, recovered])
+        monkeypatch.setattr(routes, "AsyncSessionLocal", factory)
+
+        first = await api_client.get("/api/v1/readiness")
+        second = await api_client.get("/api/v1/readiness")
+
+        assert first.status_code == 503
+        assert second.status_code == 200
+        assert factory.created == [failed, recovered]
+
+    async def test_concurrent_readiness_requests_use_independent_sessions(
+        self, api_client, monkeypatch
+    ) -> None:
+        from app.api import routes
+
+        first = _ReadinessSession()
+        second = _ReadinessSession()
+        factory = _ReadinessFactory([first, second])
+        monkeypatch.setattr(routes, "AsyncSessionLocal", factory)
+
+        responses = await asyncio.gather(
+            api_client.get("/api/v1/readiness"),
+            api_client.get("/api/v1/readiness"),
+        )
+
+        assert [response.status_code for response in responses] == [200, 200]
+        assert factory.created == [first, second]
+
+
+class TestApiKeyAuth:
     async def test_missing_api_key_rejected(self, api_client):
         resp = await api_client.get("/api/v1/daily-plans")
         assert resp.status_code == 401

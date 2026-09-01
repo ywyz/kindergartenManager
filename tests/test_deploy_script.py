@@ -13,6 +13,10 @@ import pytest
 from scripts import deploy
 
 HEALTH_ARGS = ("--health-url", "https://manager.ywyz.tech/api/v1/health")
+READINESS_ARGS = (
+    "--readiness-url",
+    "https://manager.ywyz.tech/api/v1/readiness",
+)
 VALIDATE_OCI_INDEX_REF = deploy._validate_oci_index_ref
 
 
@@ -537,6 +541,47 @@ def test_liveness_url_is_required_and_rejects_embedded_credentials(
                 _image("a"),
             ]
         )
+
+
+def test_readiness_url_is_independently_required(tmp_path: Path) -> None:
+    _compose(tmp_path)
+
+    with pytest.raises(SystemExit) as missing:
+        deploy.main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                "--dry-run",
+                *HEALTH_ARGS,
+                "deploy",
+                _image("a"),
+            ]
+        )
+
+    assert missing.value.code == 2
+
+
+def test_deployment_gates_check_liveness_then_readiness(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, str]] = []
+
+    def fake_wait(url: str, *, timeout_seconds: int, dry_run: bool, gate: str) -> None:
+        calls.append((gate, url))
+
+    monkeypatch.setattr(deploy, "_wait_for_http_gate", fake_wait)
+
+    deploy._wait_for_deployment_gates(
+        HEALTH_ARGS[1],
+        READINESS_ARGS[1],
+        timeout_seconds=17,
+        dry_run=False,
+    )
+
+    assert calls == [
+        ("liveness", HEALTH_ARGS[1]),
+        ("readiness", READINESS_ARGS[1]),
+    ]
 
 
 def test_non_digest_ref_is_rejected(tmp_path: Path) -> None:

@@ -55,6 +55,28 @@ def test_app_service_does_not_receive_mysql_root_credentials() -> None:
     assert "BOOTSTRAP_ADMIN_ALLOW_REMOTE" not in application["environment"]
 
 
+def test_app_healthcheck_uses_python_stdlib_readiness_probe() -> None:
+    compose = yaml.safe_load((_ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
+    healthcheck = compose["services"]["app"]["healthcheck"]
+    rendered = " ".join(str(part) for part in healthcheck["test"])
+
+    assert "python" in rendered
+    assert "urllib.request" in rendered
+    assert "http://127.0.0.1:8080/api/v1/readiness" in rendered
+    assert "curl" not in rendered
+
+
+def test_caddy_waits_for_the_application_to_be_ready() -> None:
+    compose = yaml.safe_load((_ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
+
+    assert compose["services"]["caddy"]["depends_on"]["app"] == {
+        "condition": "service_healthy"
+    }
+    assert compose["services"]["app"]["depends_on"]["db"] == {
+        "condition": "service_healthy"
+    }
+
+
 def test_production_caddy_requires_a_domain_and_explicit_tls() -> None:
     """The default topology must fail closed instead of serving an HTTP-only :80 site."""
     compose = yaml.safe_load((_ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
