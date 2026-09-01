@@ -37,7 +37,7 @@
 | A | R2 五模块复验 | `5fb4f31dc2a0cd73f786cba4795f5a579f5816ba`（倾听 GREEN candidate） | 待固定 | `IN_PROGRESS` | 倾听冻结 RED、格式 GREEN 与当前 SHA 全量已固定；Review M 和全部人工门仍待闭合 |
 | B | R5-54 readiness + Compose + deploy/rollback 双门 | `0b3f2408984d717b9692cfa003ee2740e4219341` | 待固定 | `LOCAL_GREEN` | stable RED、两轮 Review finding、当前 SHA 全量与隔离 MySQL 故障恢复均通过；生产部署门未执行 |
 | C | R5-R 备份与恢复 | `b329bf6cf4bbf5518390644b24908ce29bd16894` | `8b06f89bf8a7533788bec8e4d19c2be4ae289541` | `LOCAL_GREEN` | SQLite/MySQL producer→隔离 restore→受控 attestation、deploy 当前库自动绑定与完整破坏恢复演练均通过；无生产、push、Release 或目标镜像部署证据 |
-| D | R5-P release/digest/deploy/rollback 收敛 | 待固定 | 待固定 | `PLANNED` | 只做本地/隔离演练；无 push、Release 或生产操作授权 |
+| D | R5-P release/digest/deploy/rollback 收敛 | `8b06a0416da65ec75d638a60b8e025a420dc9f3b` | 待固定 | `ENV_BLOCKED` | 自动门 GREEN；候选双平台构建被 Python 包索引 503/空响应阻断，无 digest，未进入 MySQL/生产 |
 | E | 最终证据闭合 | 待固定 | 待固定 | `BLOCKED` | 依赖 A-D 各自原始证据；不能吞并它们 |
 
 ## 每次证据记录的必填字段
@@ -156,7 +156,7 @@ Python/数据库/migration head、tenant/user/role、模板文件与 SHA-256、�
 
 ## R5-P 迁移后失败回切与发布元数据候选
 
-- R5-R 的 `tested_code_sha=b329bf6...` 保持不变；本节是后续未提交 R5-P 候选，不回写或冒充 R5-R 证据。
+- R5-R 的 `tested_code_sha=b329bf6...` 保持不变；本节是独立 R5-P 候选，不回写或冒充 R5-R 证据。
 - 迁移后回切 stable RED：`tests/test_r5_post_migration_rollback.py` 连续两次均 `8 failed`，collection clean；
   失败全部来自尚不存在的协调 seam。最小 GREEN 后与既有 deploy/release/migration/attestation 专项合计
   `84 passed`。
@@ -165,6 +165,16 @@ Python/数据库/migration head、tenant/user/role、模板文件与 SHA-256、�
   与 source SHA。
 - release Review RED：deploy/release 专项连续两次均 `57 passed / 3 failed`，分别固定额外第三平台、缺失
   Repository tuple member、Release 先公开后验证。最小 GREEN 后扩展 R5-P 专项为 `91 passed`。
-- 当前仍是自动候选，不是隔离或生产 GREEN：尚未用合成 MySQL、临时凭据和真实候选 OCI index digest 完成
+- Review findings 补充 RED/GREEN 已固定 malformed source、真实 gate 粒度、关闭 acceptance JSON/最小环境、
+  已有 state 原始字节不变、双平台 source revision label、本地 migration checkout 绑定、finalize 前 DB 复读、
+  loopback-only isolation candidate，以及 publish 失败恢复 draft/重读。最终自动候选
+  `tested_code_sha=8b06a0416da65ec75d638a60b8e025a420dc9f3b`：全量
+  `1092 passed / 1 skipped in 68.41s`；Ruff lint/format、Python compile、Compose config、workflow/Compose YAML
+  解析与 `git diff --check` 通过；三轮独立 Review 的 P0/P1 finding 均进入修复与回归。
+- 双平台 OCI 构建三条路径均未产生 digest：并行构建先遇到依赖下载 connection reset；基础 tag 镜像代理随后
+  不一致地返回 not found（已以第一次解析出的官方 digest 固定 build context）；分平台构建仍分别在 arm64
+  FastAPI 与 amd64 SQLAlchemy 索引解析收到空版本。主机 wheelhouse 路径也由出口代理返回 503。所有失败都发生
+  在 `pip install`，没有推送 target manifest/index，没有启动合成 MySQL、没有生成 backup evidence/receipt。
+- 当前仍是自动 GREEN、隔离 `ENV_BLOCKED`，不是隔离或生产 GREEN：尚未用合成 MySQL、临时凭据和真实候选 OCI index digest 完成
   `backup evidence → migration receipt → target → gates → failure injection → old image rollback`，也未证明旧镜像
   与新 schema 兼容，未 push/tag/创建或发布 Release，未更新 Issue/production state。
