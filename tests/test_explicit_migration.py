@@ -120,3 +120,34 @@ def test_explicit_migration_rejects_evidence_for_different_current_revision(
         )
         == 1
     )
+
+
+def test_explicit_migration_redacts_database_probe_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    from app.jobs import migrate_database
+
+    leaked = "mysql://user:secret@example.invalid/database"
+    monkeypatch.setattr(
+        migrate_database,
+        "configured_database_identity_sha256",
+        lambda: (_ for _ in ()).throw(RuntimeError(leaked)),
+    )
+    monkeypatch.setattr(
+        migrate_database,
+        "run_migrations",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("must not migrate")),
+    )
+
+    assert (
+        migrate_database.main(
+            [
+                "--backup-evidence",
+                str(tmp_path / "proof.json"),
+                "--protected-image",
+                "no-running-image",
+            ]
+        )
+        == 1
+    )
+    assert leaked not in capsys.readouterr().out

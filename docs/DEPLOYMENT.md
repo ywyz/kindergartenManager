@@ -105,8 +105,8 @@ index 写成唯一基线（`previous_image=null`），不把单平台历史写�
 
 ## 3. 健康/就绪边界
 
-`/api/v1/health` 仅表示进程/HTTP 存活且不访问数据库。`/api/v1/readiness` 每次通过独立短 session 执行
-`SELECT 1`；失败为 503。deploy、自动恢复、显式 rollback 与 legacy migration 只有在目标镜像两门均通过后
+`/api/v1/health` 仅表示进程/HTTP 存活且不访问数据库。`/api/v1/readiness` 每次通过独立短 session 检查
+`SELECT 1` 与实际 Alembic revision 等于当前镜像唯一 head；任一失败为 503。deploy、自动恢复、显式 rollback 与 legacy migration 只有在目标镜像两门均通过后
 才更新状态；恢复镜像也必须重过两门。真实 MySQL 停止/恢复与零业务变化仍须按 Issue #54 独立验收。
 
 ## 4. Bootstrap 管理员生产凭据

@@ -32,7 +32,7 @@ def main(argv: list[str] | None = None) -> int:
             raise BackupEvidenceError(
                 "Backup evidence revision does not match the configured database"
             )
-    except BackupEvidenceError:
+    except Exception:  # noqa: BLE001 - redact config/driver/connection details
         print("❌ 已验证备份证据无效，数据库迁移未执行")
         return 1
     try:
