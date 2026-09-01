@@ -175,6 +175,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          provenance: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -217,8 +218,12 @@ jobs:
           if media_type != "application/vnd.oci.image.index.v1+json":
               raise SystemExit(f"Unsupported media type: {media_type}")
           missing = sorted(expected - actual)
-          if missing:
-              raise SystemExit(f"OCI image index missing required platforms: {missing}")
+          unexpected = sorted(actual - expected)
+          if actual != expected or len(payload.get("manifests", [])) != len(expected):
+              raise SystemExit(
+                  "OCI image index must contain exactly required platforms; "
+                  f"missing required platforms: {missing}; unexpected platforms: {unexpected}"
+              )
           print(media_type)
           '
           )"
@@ -230,6 +235,8 @@ jobs:
     name: Create GitHub Release
     needs: [build-windows, build-linux, build-docker]
     runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.release.outputs.id }}
     steps:
       - uses: actions/checkout@v4
 
@@ -288,8 +295,10 @@ jobs:
           path: artifacts/docker-image/docker-image.json
 
       - name: Create GitHub Release
+        id: release
         uses: softprops/action-gh-release@v2
         with:
+          draft: true
           # tag 中含 "-"（如 beta、rc）则标记为 prerelease
           prerelease: ${{ contains(github.ref_name, '-') }}
           target_commitish: ${{ github.sha }}
@@ -315,6 +324,7 @@ jobs:
             |---|---|
             | Release tag | `${{ github.ref_name }}` |
             | Source SHA | `${{ github.sha }}` |
+            | Repository | `${{ needs.build-docker.outputs.image_repository }}` |
             | OCI index digest | `${{ needs.build-docker.outputs.image_digest }}` |
             | 不可变引用 | `${{ needs.build-docker.outputs.image_ref }}` |
             | Media type | `${{ needs.build-docker.outputs.image_media_type }}` |
@@ -379,8 +389,11 @@ jobs:
             ### 🐳 Docker 服务器版
 
             ```bash
-            # 部署示例（推荐）：python scripts/deploy.py --service app \
+            # 部署示例（推荐）：python -m scripts.deploy --service app \
+            #   --backup-evidence /secure/path/backup-evidence.json \
+            #   --protected-image <当前不可变镜像ref> \
             #   --health-url https://manager.example.com/api/v1/health \
+            #   --readiness-url https://manager.example.com/api/v1/readiness \
             #   deploy ${{ needs.build-docker.outputs.image_ref }}
             # 使用仓库中的 docker-compose.yml（含 MySQL 8）
             cp .env.example .env
@@ -456,9 +469,11 @@ jobs:
           EXPECTED_IMAGE_DIGEST: ${{ needs.build-docker.outputs.image_digest }}
           EXPECTED_IMAGE_REF: ${{ needs.build-docker.outputs.image_ref }}
           EXPECTED_MEDIA_TYPE: ${{ needs.build-docker.outputs.image_media_type }}
+          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
         run: |
           python scripts/release_convergence.py \
             --repo "$GITHUB_REPO" \
+            --release-id "$RELEASE_ID" \
             --descriptor artifacts/docker-image/docker-image.json \
             --tag "$RELEASE_TAG" \
             --source-sha "$EXPECTED_SOURCE_SHA" \

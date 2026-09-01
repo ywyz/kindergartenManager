@@ -158,7 +158,10 @@ TLS、强密码、受控 Bootstrap/轮换和网络访问控制。桌面 frozen �
 - [ ] API HMAC、TLS、Key 轮换和日志脱敏验证。
 - [ ] 依赖与容器扫描、常规质量 CI 通过。
 - [ ] Windows/Linux/Docker 目标部署分别验收。
-- [ ] 发布 tag、source SHA、`docker-image.json`、OCI index digest、不可变引用和回滚说明可逐项收敛；部署只切镜像，不回滚 migration 或删除卷。
+- [ ] 唯一发布元组 tag、source SHA、repository、双平台 OCI index digest、`docker-image.json` 与 Release body
+  在 draft 中逐项收敛后才 publish；部署 helper 只切镜像，不执行 migration、不改 secrets、不删除卷。
+- [ ] 迁移后旧镜像在新 schema 上重新通过 readiness、登录和关键业务；不兼容时已有明确数据库恢复方案，
+  不把 liveness 或单纯镜像回切冒充恢复。
 - [ ] 数据库 readiness 按 Issue #54 独立验收；`/api/v1/health` 不得作为数据库可接流量证据。
 - [ ] Agent Foundation 的关闭 Tool/Schema、tenant/user 裁剪、无长期记忆、零写入、取消/过期和 prompt injection 门禁
   按固定 SHA 证据通过；W007 本地确认写入另按 ADR-0006 的 CAS/审计/回滚门禁复核。

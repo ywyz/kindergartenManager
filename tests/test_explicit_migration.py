@@ -26,8 +26,10 @@ def test_explicit_migration_validates_backup_before_upgrade(
     monkeypatch.setattr(
         migrate_database,
         "validate_backup_evidence",
-        lambda path, **kwargs: calls.append("validate")
-        or type("Evidence", (), {"database_revision": "old-revision"})(),
+        lambda path, **kwargs: (
+            calls.append("validate")
+            or type("Evidence", (), {"database_revision": "old-revision"})()
+        ),
     )
     monkeypatch.setattr(
         migrate_database, "configured_database_identity_sha256", lambda: "b" * 64
@@ -35,6 +37,7 @@ def test_explicit_migration_validates_backup_before_upgrade(
     monkeypatch.setattr(
         migrate_database, "read_configured_database_revision", lambda: "old-revision"
     )
+    monkeypatch.setattr(migrate_database, "get_migration_head", lambda: "old-revision")
     monkeypatch.setattr(
         migrate_database,
         "run_migrations",
@@ -53,6 +56,46 @@ def test_explicit_migration_validates_backup_before_upgrade(
         == 0
     )
     assert calls == ["validate", "upgrade"]
+
+
+def test_revision_change_requires_complete_receipt_before_upgrade(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.jobs import migrate_database
+
+    calls: list[str] = []
+    monkeypatch.setattr(
+        migrate_database,
+        "validate_backup_evidence",
+        lambda *args, **kwargs: type(
+            "Evidence", (), {"database_revision": "old-revision"}
+        )(),
+    )
+    monkeypatch.setattr(
+        migrate_database, "configured_database_identity_sha256", lambda: "b" * 64
+    )
+    monkeypatch.setattr(
+        migrate_database, "read_configured_database_revision", lambda: "old-revision"
+    )
+    monkeypatch.setattr(migrate_database, "get_migration_head", lambda: "new-revision")
+    monkeypatch.setattr(
+        migrate_database,
+        "run_migrations",
+        lambda **kwargs: calls.append("upgrade"),
+    )
+
+    assert (
+        migrate_database.main(
+            [
+                "--backup-evidence",
+                str(tmp_path / "proof.json"),
+                "--protected-image",
+                "no-running-image",
+            ]
+        )
+        == 1
+    )
+    assert calls == []
 
 
 def test_explicit_migration_invalid_evidence_never_calls_upgrade(

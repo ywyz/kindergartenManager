@@ -21,6 +21,10 @@ from typing import Any
 from urllib import error, parse, request
 
 from app.core.backup_evidence import BackupEvidenceError
+from app.core.migration_receipt import (
+    MigrationReceiptError,
+    validate_migration_receipt,
+)
 from app.core.startup import (
     configured_database_identity_sha256,
     read_configured_database_revision,
@@ -28,6 +32,7 @@ from app.core.startup import (
 from app.jobs.backup_restore import (
     validate_generated_attestation,
 )
+from scripts.r5_post_migration_rollback import run_post_migration_rollback
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 STATE_DIR_NAME = ".deploy"
@@ -37,8 +42,31 @@ DIGEST_RE = re.compile(r"^[a-z0-9][a-z0-9._:/-]*[a-z0-9]@sha256:[0-9a-f]{64}$")
 SERVICE_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
 DEFAULT_HEALTH_TIMEOUT_SECONDS = 120
 DEFAULT_COMMAND_TIMEOUT_SECONDS = 300
+MAX_ACCEPTANCE_RESULT_BYTES = 64 * 1024
 OCI_INDEX_MEDIA_TYPE = "application/vnd.oci.image.index.v1+json"
 REQUIRED_PLATFORMS = {("linux", "amd64"), ("linux", "arm64")}
+ACCEPTANCE_RESULT_FIELDS = {
+    "schema_version",
+    "status",
+    "phase",
+    "image_ref",
+    "gate",
+    "checks",
+}
+ACCEPTANCE_CHECKS = {
+    "login": {"login"},
+    "business": {
+        "daily_plan",
+        "game_observation",
+        "one_on_one_listening",
+        "homemade_teaching",
+        "course_review",
+        "image_blob",
+        "ai_key_decryption",
+        "word_export",
+        "data_snapshot",
+    },
+}
 
 
 class DeployError(RuntimeError):
@@ -84,7 +112,6 @@ def _write_atomic_json(
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(tmp_path, state_path)
-        state_path.chmod(0o600)
     finally:
         if descriptor >= 0:
             os.close(descriptor)
@@ -114,7 +141,8 @@ def _secure_state_file(path: Path) -> None:
 
 def _ensure_file_permissions(state_file: Path) -> None:
     _secure_dir(state_file.parent, 0o700)
-    _secure_state_file(state_file)
+    if state_file.exists() or state_file.is_symlink():
+        _secure_state_file(state_file)
 
 
 def _compose_override(*, service: str, image_ref: str) -> str:
@@ -191,15 +219,63 @@ def _validate_oci_index_ref(image_ref: str, *, dry_run: bool) -> None:
     manifests = payload.get("manifests")
     if not isinstance(manifests, list):
         raise DeployError("OCI image index has no platform manifests")
+    if len(manifests) != len(REQUIRED_PLATFORMS):
+        raise DeployError(
+            "OCI image index has missing required or unexpected manifests; "
+            "it must contain the exactly required set of exactly two platforms"
+        )
     platforms = {
         (platform.get("os"), platform.get("architecture"))
         for manifest in manifests
         if isinstance(manifest, dict)
         and isinstance((platform := manifest.get("platform")), dict)
     }
-    missing = REQUIRED_PLATFORMS - platforms
-    if missing:
-        raise DeployError("OCI image index is missing required release platforms")
+    if platforms != REQUIRED_PLATFORMS:
+        raise DeployError(
+            "OCI image index is missing required or has unexpected platforms; "
+            "it must contain exactly required release platforms"
+        )
+
+
+def _validate_oci_source_revision(image_ref: str, source_sha: str) -> None:
+    """Require every platform manifest to carry the exact source revision label."""
+    inspected = _run_command(
+        ["docker", "buildx", "imagetools", "inspect", "--raw", image_ref],
+        dry_run=False,
+    )
+    try:
+        index = json.loads(inspected.stdout)
+    except json.JSONDecodeError as exc:
+        raise DeployError("OCI image index metadata is invalid") from exc
+    repository = image_ref.partition("@")[0]
+    manifests = index.get("manifests") if isinstance(index, dict) else None
+    if not isinstance(manifests, list) or len(manifests) != 2:
+        raise DeployError("OCI source revision requires exactly two manifests")
+    revisions: list[str] = []
+    for manifest in manifests:
+        digest = manifest.get("digest") if isinstance(manifest, dict) else None
+        if not isinstance(digest, str):
+            raise DeployError("OCI platform manifest digest is invalid")
+        image = _run_command(
+            [
+                "docker",
+                "buildx",
+                "imagetools",
+                "inspect",
+                "--format",
+                "{{json .Image}}",
+                f"{repository}@{digest}",
+            ],
+            dry_run=False,
+        )
+        try:
+            payload = json.loads(image.stdout)
+            revision = payload["config"]["Labels"]["org.opencontainers.image.revision"]
+        except (json.JSONDecodeError, KeyError, TypeError) as exc:
+            raise DeployError("OCI platform source revision label is invalid") from exc
+        revisions.append(revision)
+    if revisions != [source_sha, source_sha]:
+        raise DeployError("OCI platform source revision does not match release SHA")
 
 
 def _run_compose(
@@ -440,6 +516,33 @@ def _deploy_once(
         )
         return image_ref
 
+    _start_image(
+        compose_file=compose_file,
+        project_dir=project_dir,
+        override_file=override_file,
+        service=service,
+        image_ref=image_ref,
+        dry_run=False,
+    )
+    _wait_for_deployment_gates(
+        health_url,
+        readiness_url,
+        timeout_seconds=DEFAULT_HEALTH_TIMEOUT_SECONDS,
+        dry_run=False,
+    )
+    return image_ref
+
+
+def _start_image(
+    *,
+    compose_file: Path,
+    project_dir: Path,
+    override_file: Path,
+    service: str,
+    image_ref: str,
+    dry_run: bool,
+) -> None:
+    """Start and bind one image without collapsing later acceptance gates."""
     descriptor = os.open(
         override_file,
         os.O_CREAT | os.O_TRUNC | os.O_WRONLY,
@@ -477,13 +580,6 @@ def _deploy_once(
             dry_run=dry_run,
         )
 
-        _wait_for_deployment_gates(
-            health_url,
-            readiness_url,
-            timeout_seconds=DEFAULT_HEALTH_TIMEOUT_SECONDS,
-            dry_run=dry_run,
-        )
-
         current_image = _read_container_image(
             compose_file=compose_file,
             project_dir=project_dir,
@@ -495,7 +591,6 @@ def _deploy_once(
                 f"Deployed image mismatch for {service}. expected={image_ref} actual={current_image}"
             )
 
-        return current_image
     finally:
         if override_file.exists():
             override_file.unlink()
@@ -539,6 +634,277 @@ def _require_verified_backup(
             )
     except Exception as exc:
         raise DeployError("Verified backup producer provenance is invalid") from exc
+
+
+def _require_post_migration_backup(
+    evidence_path: Path | None,
+    protected_image: str | None,
+    receipt_path: Path | None,
+    target_image: str,
+    source_sha: str | None,
+) -> None:
+    if (
+        evidence_path is None
+        or protected_image is None
+        or receipt_path is None
+        or source_sha is None
+    ):
+        raise DeployError(
+            "Verified backup evidence and migration receipt binding are required"
+        )
+    try:
+        verified = validate_generated_attestation(
+            evidence_path,
+            expected_protected_image=protected_image,
+        )
+        current_identity = configured_database_identity_sha256()
+        current_revision = read_configured_database_revision()
+        receipt = validate_migration_receipt(
+            receipt_path,
+            evidence_path=evidence_path,
+            expected_protected_image=protected_image,
+            expected_target_image=target_image,
+            expected_source_sha=source_sha,
+            expected_database_identity_sha256=current_identity,
+            expected_after_revision=current_revision,
+        )
+        if (
+            verified.database_identity_sha256 != current_identity
+            or verified.database_revision != receipt.before_revision
+            or verified.artifact_sha256 != receipt.backup_artifact_sha256
+            or receipt.after_revision != current_revision
+        ):
+            raise MigrationReceiptError(
+                "Migration receipt does not bridge the verified backup and current database"
+            )
+    except Exception as exc:
+        raise DeployError("Verified post-migration backup binding is invalid") from exc
+
+
+def _require_deploy_evidence(args: argparse.Namespace) -> None:
+    post_migration_values = (
+        args.migration_receipt,
+        args.source_sha,
+        args.acceptance_runner,
+    )
+    if any(post_migration_values) and not all(post_migration_values):
+        raise DeployError(
+            "Post-migration deploy requires migration receipt, source SHA, "
+            "and acceptance runner together"
+        )
+    if not any(post_migration_values):
+        _require_verified_backup(args.backup_evidence, args.protected_image)
+        return
+    _require_post_migration_backup(
+        args.backup_evidence,
+        args.protected_image,
+        args.migration_receipt,
+        args.image_ref,
+        args.source_sha,
+    )
+    _require_acceptance_runner(args.acceptance_runner)
+
+
+def _open_acceptance_runner(path: Path | None) -> int:
+    if path is None or not path.is_absolute():
+        raise DeployError("Post-migration acceptance runner path is unsafe")
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise DeployError("Post-migration acceptance runner is unavailable") from exc
+    info = os.fstat(descriptor)
+    if (
+        not stat.S_ISREG(info.st_mode)
+        or (hasattr(os, "geteuid") and info.st_uid != os.geteuid())
+        or stat.S_IMODE(info.st_mode) != 0o700
+    ):
+        os.close(descriptor)
+        raise DeployError(
+            "Post-migration acceptance runner must be owner-only executable mode 0700"
+        )
+    return descriptor
+
+
+def _require_acceptance_runner(path: Path | None) -> Path:
+    descriptor = _open_acceptance_runner(path)
+    os.close(descriptor)
+    assert path is not None
+    return path
+
+
+def _validate_acceptance_result(
+    payload: object,
+    *,
+    phase: str,
+    image_ref: str,
+    gate: str,
+) -> None:
+    expected_checks = ACCEPTANCE_CHECKS.get(gate)
+    if (
+        expected_checks is None
+        or not isinstance(payload, dict)
+        or set(payload) != ACCEPTANCE_RESULT_FIELDS
+        or payload.get("schema_version") != 1
+        or payload.get("status") != "passed"
+        or payload.get("phase") != phase
+        or payload.get("image_ref") != image_ref
+        or payload.get("gate") != gate
+    ):
+        raise DeployError("Post-migration acceptance result is invalid")
+    checks = payload.get("checks")
+    if (
+        not isinstance(checks, dict)
+        or set(checks) != expected_checks
+        or any(value != "passed" for value in checks.values())
+    ):
+        raise DeployError("Post-migration acceptance result is incomplete")
+
+
+def _run_acceptance_gate(path: Path, *, phase: str, image_ref: str, gate: str) -> None:
+    descriptor = _open_acceptance_runner(path)
+    environment = {
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "R5_ACCEPTANCE_PHASE": phase,
+        "R5_ACCEPTANCE_IMAGE": image_ref,
+        "R5_ACCEPTANCE_GATE": gate,
+    }
+    try:
+        try:
+            process = subprocess.run(
+                [f"/proc/self/fd/{descriptor}"],
+                check=False,
+                text=False,
+                capture_output=True,
+                timeout=DEFAULT_COMMAND_TIMEOUT_SECONDS,
+                env=environment,
+                pass_fds=(descriptor,),
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise DeployError("Post-migration acceptance runner failed") from exc
+    finally:
+        os.close(descriptor)
+    if process.returncode != 0:
+        raise DeployError("Post-migration acceptance gates failed")
+    if len(process.stdout) > MAX_ACCEPTANCE_RESULT_BYTES:
+        raise DeployError("Post-migration acceptance result is too large")
+    try:
+        payload = json.loads(process.stdout)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise DeployError("Post-migration acceptance result is invalid") from exc
+    _validate_acceptance_result(payload, phase=phase, image_ref=image_ref, gate=gate)
+
+
+def _run_post_migration_deploy(
+    args: argparse.Namespace,
+    *,
+    compose_file: Path,
+    project_dir: Path,
+    override_file: Path,
+    state_file: Path,
+    current_image: str,
+) -> None:
+    acceptance_runner = _require_acceptance_runner(args.acceptance_runner)
+
+    def start_image(image_ref: str) -> None:
+        _start_image(
+            compose_file=compose_file,
+            project_dir=project_dir,
+            override_file=override_file,
+            service=args.service,
+            image_ref=image_ref,
+            dry_run=False,
+        )
+
+    def finalize_target() -> None:
+        _require_post_migration_backup(
+            args.backup_evidence,
+            args.protected_image,
+            args.migration_receipt,
+            args.image_ref,
+            args.source_sha,
+        )
+        _update_service_state(
+            state_file,
+            service=args.service,
+            current_image=args.image_ref,
+            previous_image=current_image,
+        )
+
+    result = run_post_migration_rollback(
+        migrate=lambda: None,
+        target_start=lambda: start_image(args.image_ref),
+        target_liveness=lambda: _wait_for_http_gate(
+            args.health_url,
+            timeout_seconds=DEFAULT_HEALTH_TIMEOUT_SECONDS,
+            dry_run=False,
+            gate="liveness",
+        ),
+        target_readiness=lambda: _wait_for_http_gate(
+            args.readiness_url,
+            timeout_seconds=DEFAULT_HEALTH_TIMEOUT_SECONDS,
+            dry_run=False,
+            gate="readiness",
+        ),
+        target_login=lambda: _run_acceptance_gate(
+            acceptance_runner,
+            phase="target",
+            image_ref=args.image_ref,
+            gate="login",
+        ),
+        target_business=lambda: _run_acceptance_gate(
+            acceptance_runner,
+            phase="target",
+            image_ref=args.image_ref,
+            gate="business",
+        ),
+        rollback_start=lambda: start_image(current_image),
+        rollback_liveness=lambda: _wait_for_http_gate(
+            args.health_url,
+            timeout_seconds=DEFAULT_HEALTH_TIMEOUT_SECONDS,
+            dry_run=False,
+            gate="liveness",
+        ),
+        rollback_readiness=lambda: _wait_for_http_gate(
+            args.readiness_url,
+            timeout_seconds=DEFAULT_HEALTH_TIMEOUT_SECONDS,
+            dry_run=False,
+            gate="readiness",
+        ),
+        rollback_login=lambda: _run_acceptance_gate(
+            acceptance_runner,
+            phase="rollback",
+            image_ref=current_image,
+            gate="login",
+        ),
+        rollback_business=lambda: _run_acceptance_gate(
+            acceptance_runner,
+            phase="rollback",
+            image_ref=current_image,
+            gate="business",
+        ),
+        finalize_deployment=finalize_target,
+    )
+    if result.status == "DEPLOYED":
+        return
+    if result.status == "ROLLED_BACK":
+        raise DeployError(
+            "Post-migration target failed; old image passed all rollback gates"
+        )
+    if result.status == "DATABASE_RESTORE_REQUIRED":
+        raise DeployError(
+            "Old image is incompatible with the migrated database; "
+            f"DATABASE_RESTORE_REQUIRED primary={result.primary_failure} "
+            f"rollback={result.rollback_failure}"
+        )
+    if result.status == "ROLLBACK_FAILED":
+        raise DeployError(
+            "Post-migration target and image rollback both failed; "
+            f"primary={result.primary_failure} rollback={result.rollback_failure}"
+        )
+    raise DeployError("Post-migration deployment state requires manual reconciliation")
 
 
 def _report_dry_run_not_image_bound() -> None:
@@ -693,10 +1059,7 @@ def _deploy_lock(state_dir: Path, timeout_seconds: int):
 
 
 def _deploy(args: argparse.Namespace) -> None:
-    _require_verified_backup(
-        args.backup_evidence,
-        args.protected_image,
-    )
+    _require_deploy_evidence(args)
     if not is_immutable_image_ref(args.image_ref):
         raise DeployError(
             f"Image must be immutable digest ref ending with @sha256:<64 lower hex>: {args.image_ref}"
@@ -736,10 +1099,7 @@ def _deploy(args: argparse.Namespace) -> None:
         _require_live_image_binding(
             live_image, args.protected_image, dry_run=args.dry_run
         )
-        _require_verified_backup(
-            args.backup_evidence,
-            args.protected_image,
-        )
+        _require_deploy_evidence(args)
         _validate_snapshot_state(live_image)
         for rollback_ref in (current_image, previous_image, live_image):
             if rollback_ref:
@@ -751,6 +1111,23 @@ def _deploy(args: argparse.Namespace) -> None:
             raise DeployError(
                 "Running image differs from deployment state; reconcile it explicitly"
             )
+
+        if args.migration_receipt is not None:
+            if args.dry_run:
+                return
+            if current_image is None:
+                raise DeployError(
+                    "Post-migration deploy requires a current immutable rollback image"
+                )
+            _run_post_migration_deploy(
+                args,
+                compose_file=compose_file,
+                project_dir=project_dir,
+                override_file=override_file,
+                state_file=state_file,
+                current_image=current_image,
+            )
+            return
 
         if args.image_ref == current_image:
             _wait_for_deployment_gates(
@@ -807,17 +1184,15 @@ def _deploy(args: argparse.Namespace) -> None:
                 readiness_url=args.readiness_url,
                 dry_run=False,
             )
-            restored = pre_deploy_image
-            _update_service_state(
-                state_file,
-                service=args.service,
-                current_image=restored,
-                previous_image=previous_image,
-            )
             raise
 
 
 def _rollback(args: argparse.Namespace) -> None:
+    if any((args.migration_receipt, args.source_sha, args.acceptance_runner)):
+        raise DeployError(
+            "Post-migration deploy options are valid only for the immediate "
+            "post-migration deploy; rollback requires fresh current-database evidence"
+        )
     _require_verified_backup(
         args.backup_evidence,
         args.protected_image,
@@ -925,6 +1300,10 @@ def _rollback(args: argparse.Namespace) -> None:
 
 def _migrate_legacy(args: argparse.Namespace) -> None:
     """Establish an index-only baseline from one explicitly accepted legacy ref."""
+    if any((args.migration_receipt, args.source_sha, args.acceptance_runner)):
+        raise DeployError(
+            "Post-migration deploy options are not valid for legacy migration"
+        )
     _require_verified_backup(
         args.backup_evidence,
         args.protected_image,
@@ -1081,6 +1460,23 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--protected-image",
         help="Current immutable image digest, or no-running-image for first install.",
+    )
+    parser.add_argument(
+        "--migration-receipt",
+        type=Path,
+        help="Owner-only receipt bridging pre-migration evidence to the current DB.",
+    )
+    parser.add_argument(
+        "--source-sha",
+        help="Exact release source SHA bound by --migration-receipt.",
+    )
+    parser.add_argument(
+        "--acceptance-runner",
+        type=Path,
+        help=(
+            "Absolute owner-only executable which checks login and critical business "
+            "gates for post-migration target and rollback phases."
+        ),
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 

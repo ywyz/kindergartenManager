@@ -17,12 +17,18 @@
 5. 证据只保护它绑定的迁移/部署前状态，最长有效 24 小时。`protected_image` 必须是当前不可变镜像 digest；首次安装允许显式的 `no-running-image`，但不得用它覆盖一个实际运行镜像。
 6. 镜像回滚与数据恢复仍是独立人工门。系统不自动执行 `alembic downgrade`，也不在部署失败后自动恢复数据。
 7. readiness 除连接探测外，还必须确认数据库 revision 等于当前代码/镜像的唯一 Alembic head；漏跑显式迁移时部署不得接流量或写入成功状态。
+8. 迁移前 producer evidence 的 revision 不得在 migration 后伪装成“仍匹配当前库”。当 revision 实际变化时，
+   显式 migration job 必须生成 owner-only migration receipt，绑定原 evidence/artifact hash、数据库 identity、
+   before/after revision、受保护镜像、目标 OCI index 和 source SHA。目标 deploy 必须同时复验 producer evidence、
+   receipt 与当前数据库；identity/revision 仍由程序复读，不接受操作者手写。receipt 不替代备份、隔离恢复或旧镜像
+   与新 schema 的兼容性验收。
 
 ## 顺序
 
 ```text
 一致性备份 -> 隔离恢复验证 -> owner-only 证据
-           -> 显式迁移门 -> 启动/部署目标镜像 -> liveness -> readiness
+           -> 显式迁移门 -> owner-only migration receipt
+           -> 启动/部署目标镜像 -> liveness -> readiness -> 登录 -> 关键业务
 ```
 
 每个箭头均失败关闭。dry-run 也必须验证真实证据，不能打印或跳过凭据与备份校验。

@@ -47,6 +47,7 @@ def _release_body() -> str:
 |---|---|
 | Release tag | `{TAG}` |
 | Source SHA | `{SOURCE_SHA}` |
+| Repository | `{REPOSITORY}` |
 | OCI index digest | `{DIGEST}` |
 | 不可变引用 | `{IMAGE_REF}` |
 | Media type | `{MEDIA_TYPE}` |
@@ -175,7 +176,7 @@ def test_release_workflow_uploads_descriptor_as_artifact_and_release_asset() -> 
         "${{ needs.build-docker.outputs.image_ref }}",
     ):
         assert value in body
-    assert "deploy --service app" not in body
+    assert "scripts/deploy.py --service app" not in body
     assert body.index("--service app") < body.index("deploy ${{")
 
 
@@ -213,6 +214,103 @@ def test_release_workflow_runs_testable_post_release_convergence() -> None:
         convergence["env"]["EXPECTED_REPOSITORY"]
         == "${{ needs.build-docker.outputs.image_repository }}"
     )
+
+
+def test_release_remains_draft_until_separate_production_closure() -> None:
+    workflow = _workflow()
+    create = workflow["jobs"]["create-release"]
+    release = next(
+        step for step in create["steps"] if step.get("name") == "Create GitHub Release"
+    )
+    assert release["id"] == "release"
+    assert release["with"]["draft"] is True
+    assert create["outputs"]["release_id"] == "${{ steps.release.outputs.id }}"
+
+    verify = workflow["jobs"]["verify-release"]
+    convergence = next(
+        step
+        for step in verify["steps"]
+        if step.get("name")
+        == "Verify release body and release artifacts match immutable refs"
+    )
+    assert "--release-id" in convergence["run"]
+
+    assert "publish-release" not in workflow["jobs"]
+
+
+def test_controlled_publish_re_reads_same_release_after_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, bool | None]] = []
+
+    def verify(**kwargs: Any) -> None:
+        calls.append((kwargs["release_id"], kwargs["expected_draft"]))
+
+    monkeypatch.setattr(release_convergence, "verify_release", verify)
+    monkeypatch.setattr(
+        release_convergence,
+        "_patch_api_json",
+        lambda repo, path, token, payload: {"id": 123, "draft": False},
+    )
+    release_convergence.publish_verified_release(
+        repo="ywyz/kindergartenManager",
+        token="synthetic-token",
+        descriptor_path=Path("docker-image.json"),
+        tag=TAG,
+        source_sha=SOURCE_SHA,
+        repository=REPOSITORY,
+        digest=DIGEST,
+        immutable_ref=IMAGE_REF,
+        media_type=MEDIA_TYPE,
+        platforms=PLATFORMS,
+        release_id="123",
+    )
+
+    assert calls == [("123", True), ("123", False)]
+
+
+def test_controlled_publish_failure_restores_and_reverifies_draft(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, bool | None]] = []
+    mutations: list[bool] = []
+
+    def verify(**kwargs: Any) -> None:
+        calls.append((kwargs["release_id"], kwargs["expected_draft"]))
+        if kwargs["expected_draft"] is False:
+            raise release_convergence.ConvergenceError("post-publish mismatch")
+
+    def patch(
+        repo: str, path: str, token: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        mutations.append(payload["draft"])
+        return {"id": 123, "draft": payload["draft"]}
+
+    monkeypatch.setattr(release_convergence, "verify_release", verify)
+    monkeypatch.setattr(release_convergence, "_patch_api_json", patch)
+    with pytest.raises(release_convergence.ConvergenceError, match="restored to draft"):
+        release_convergence.publish_verified_release(
+            repo="ywyz/kindergartenManager",
+            token="synthetic-token",
+            descriptor_path=Path("docker-image.json"),
+            tag=TAG,
+            source_sha=SOURCE_SHA,
+            repository=REPOSITORY,
+            digest=DIGEST,
+            immutable_ref=IMAGE_REF,
+            media_type=MEDIA_TYPE,
+            platforms=PLATFORMS,
+            release_id="123",
+        )
+
+    assert mutations == [False, True]
+    assert calls == [("123", True), ("123", False), ("123", True)]
+
+
+def test_release_body_repository_is_an_explicit_tuple_member() -> None:
+    facts = release_convergence._parse_release_body_facts(_release_body())
+
+    assert facts["repository"] == REPOSITORY
 
 
 def test_deployment_docs_keep_global_options_before_subcommands() -> None:
@@ -560,7 +658,7 @@ def test_release_convergence_rejects_missing_platform() -> None:
     with pytest.raises(
         release_convergence.ConvergenceError, match="platforms are incomplete"
     ):
-        release_convergence._validate_expected_values(
+        release_convergence.validate_expected_values(
             tag=TAG,
             source_sha=SOURCE_SHA,
             repository=REPOSITORY,

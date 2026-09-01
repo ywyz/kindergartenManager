@@ -49,18 +49,25 @@ docker compose exec -e BOOTSTRAP_ADMIN_ALLOW_REMOTE=true app python -m app.jobs.
 生产环境可改用不可变镜像脚本：
 
 ```bash
-python scripts/deploy.py --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
+python -m scripts.deploy --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
   --backup-evidence /secure/path/backup-evidence.json \
-  --protected-image <当前不可变镜像ref> --database-identity-sha256 <64位hash> \
+  --protected-image <当前不可变镜像ref> \
   --health-url https://manager.ywyz.tech/api/v1/health \
   --readiness-url https://manager.ywyz.tech/api/v1/readiness \
   deploy ghcr.io/ywyz/kindergartenmanager@sha256:<64位digest>
-python scripts/deploy.py --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
+python -m scripts.deploy --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
   --backup-evidence /secure/path/backup-evidence.json \
-  --protected-image <当前不可变镜像ref> --database-identity-sha256 <64位hash> \
+  --protected-image <当前不可变镜像ref> \
   --health-url https://manager.ywyz.tech/api/v1/health \
   --readiness-url https://manager.ywyz.tech/api/v1/readiness rollback
 ```
+
+`--backup-evidence` 必须指向备份 producer 生成的 owner-only evidence；不要手工传入 database identity 或
+revision。producer 从实际配置数据库记录 identity/revision，`deploy.py` 在任何 Docker 变更或部署状态写入前
+自动复读当前配置数据库并精确核对两者，同时核对 `--protected-image` 与当前运行镜像的绑定。
+迁移前 evidence 只绑定迁移前的数据库 revision；迁移成功后 revision 改变，不能把原 evidence 跨迁移复用于
+deploy/rollback。R5-P 已有 stable RED 与自动候选，但隔离 MySQL/真实候选 OCI、生产窗口、生产验收和 Release
+closure 仍是独立门；不要把本页通用命令或 dry-run 当成这些门已经通过。
 
 `deploy.py` 要求 liveness 与 database readiness 依次通过后才更新部署状态。它仍不证明迁移兼容、登录、
 五模块业务或数据恢复；真实 MySQL 故障/恢复矩阵见 [Issue #54](https://github.com/ywyz/kindergartenManager/issues/54)。

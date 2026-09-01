@@ -45,12 +45,16 @@ Provider WRITE、自动重试、批量/跨页面采用、新 Tool、多 Agent �
 ```bash
 python3.14 -m venv .venv
 .venv/bin/pip install -r requirements.txt
+# 仅用于 schema 已在当前 Alembic head 时的幂等校验；revision 变化必须改用部署指南的完整 Release + receipt 流程
 .venv/bin/python -m app.jobs.migrate_database \
   --backup-evidence /absolute/path/backup-evidence.json \
   --protected-image no-running-image
 .venv/bin/python -m app.jobs.bootstrap_admin --init
 .venv/bin/python -m app.main
 ```
+
+revision 变化时不得直接使用上述简化命令；完整的 draft Release、OCI/source revision、migration receipt 与
+post-migration acceptance 参数见 [部署指南](docs/DEPLOYMENT.md)。
 
 浏览器访问 `http://localhost:8080`。首次运行会：
 
@@ -117,6 +121,7 @@ cp .env.example .env
 # MYSQL_ROOT_PASSWORD、MYSQL_PASSWORD，
 # 并固定 ENCRYPTION_KEY、JWT_SECRET；MySQL 密码使用十六进制随机值。
 docker compose up -d
+# 下列简化迁移只允许数据库已经在当前 Alembic head 时作幂等复核；新库/升级请按部署指南先建完整候选/Release 绑定
 docker compose exec app python -m app.jobs.migrate_database \
   --backup-evidence /absolute/container/path/backup-evidence.json \
   --protected-image no-running-image
@@ -126,15 +131,13 @@ docker compose exec -e BOOTSTRAP_ADMIN_ALLOW_REMOTE=true app python -m app.jobs.
 部署脚本使用不可变镜像、串行锁、owner-only 状态、失败自动回滚和 dry-run；稳定部署状态目录应独立于按版本切换的 Compose 目录：
 
 ```bash
-python scripts/deploy.py --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
+python -m scripts.deploy --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
   --backup-evidence /secure/path/backup-evidence.json --protected-image <当前不可变镜像ref> \
-  --database-identity-sha256 <证据中的64位identity-hash> \
   --health-url https://manager.ywyz.tech/api/v1/health \
   --readiness-url https://manager.ywyz.tech/api/v1/readiness \
   deploy ghcr.io/ywyz/kindergartenmanager@sha256:<64位digest>
-python scripts/deploy.py --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
+python -m scripts.deploy --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
   --backup-evidence /secure/path/backup-evidence.json --protected-image <当前不可变镜像ref> \
-  --database-identity-sha256 <证据中的64位identity-hash> \
   --health-url https://manager.ywyz.tech/api/v1/health \
   --readiness-url https://manager.ywyz.tech/api/v1/readiness rollback
 ```

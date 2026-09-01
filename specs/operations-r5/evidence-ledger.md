@@ -153,3 +153,18 @@ Python/数据库/migration head、tenant/user/role、模板文件与 SHA-256、�
 - **R5-R 当前为 `LOCAL_GREEN`，不是生产 PASS。** 本轮未连接生产、未读取真实凭据、未 push、未创建 Release、
   未执行目标镜像迁移/部署/失败回切。下一门固定为 R5-P 的目标 OCI image 迁移、部署、失败回切与 release 元数据收敛；
   dry-run、Linux python-docx 和本地合成数据均不能代替实际镜像绑定、生产数据恢复或 Windows Word 人工证据。
+
+## R5-P 迁移后失败回切与发布元数据候选
+
+- R5-R 的 `tested_code_sha=b329bf6...` 保持不变；本节是后续未提交 R5-P 候选，不回写或冒充 R5-R 证据。
+- 迁移后回切 stable RED：`tests/test_r5_post_migration_rollback.py` 连续两次均 `8 failed`，collection clean；
+  失败全部来自尚不存在的协调 seam。最小 GREEN 后与既有 deploy/release/migration/attestation 专项合计
+  `84 passed`。
+- migration receipt stable RED：`tests/test_migration_receipt.py` 连续两次均 `4 failed`；最小 GREEN 后关闭格式
+  receipt 会绑定 producer evidence/artifact hash、自动复读的 identity/before/after revision、受保护/目标 OCI ref
+  与 source SHA。
+- release Review RED：deploy/release 专项连续两次均 `57 passed / 3 failed`，分别固定额外第三平台、缺失
+  Repository tuple member、Release 先公开后验证。最小 GREEN 后扩展 R5-P 专项为 `91 passed`。
+- 当前仍是自动候选，不是隔离或生产 GREEN：尚未用合成 MySQL、临时凭据和真实候选 OCI index digest 完成
+  `backup evidence → migration receipt → target → gates → failure injection → old image rollback`，也未证明旧镜像
+  与新 schema 兼容，未 push/tag/创建或发布 Release，未更新 Issue/production state。

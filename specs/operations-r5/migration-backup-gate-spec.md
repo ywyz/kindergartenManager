@@ -13,6 +13,9 @@
 - `protected_image` 精确绑定门看到的当前不可变镜像；无运行镜像时仅接受 `no-running-image`。
 - 消费时重新计算 artifact SHA-256；大小与证据记录必须精确一致。
 - readiness 必须同时验证连接与实际 revision 等于当前代码唯一 Alembic head；漏跑迁移的目标镜像不得通过部署门。
+- revision 发生变化时，migration job 原子生成 owner-only migration receipt，绑定原 evidence/artifact hash、
+  数据库 identity、before/after revision、受保护镜像、目标 OCI index 和 source SHA；post-migration deploy 同时
+  复验 receipt、producer evidence 与当前数据库。receipt 不接受操作者提供 identity/revision，也不替代备份。
 
 ## 稳定 RED
 
@@ -20,6 +23,8 @@
 2. 缺失、宽权限、symlink、未知字段、过期、未来、超长窗口、失败 check、错误 image 绑定及 artifact 篡改均先失败。
 3. 显式迁移在有效证据下只调用一次 `upgrade head`，无效证据零调用。
 4. 三个部署动作缺证据或绑定不一致时，在 Docker/状态写入前失败。
+5. 迁移后复用原 evidence 而缺少 receipt、receipt/evidence 被篡改、before/after revision、目标 digest 或 source
+   SHA 不一致时，在 Docker/状态写入前失败。
 
 ## 非目标
 

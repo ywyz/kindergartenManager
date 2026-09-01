@@ -26,7 +26,9 @@ VALIDATE_OCI_INDEX_REF = deploy._validate_oci_index_ref
 @pytest.fixture(autouse=True)
 def _avoid_registry_access(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(deploy, "_validate_oci_index_ref", lambda *args, **kwargs: None)
-    monkeypatch.setattr(deploy, "_require_verified_backup", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        deploy, "_require_verified_backup", lambda *args, **kwargs: None
+    )
 
 
 def test_deploy_requires_verified_backup_before_docker_or_state(
@@ -201,7 +203,7 @@ def test_first_deploy_does_not_persist_live_snapshot_before_dual_gate(
         **kwargs: object,
     ) -> str:
         calls.append((image_ref, health_url, readiness_url))
-        assert json.loads(state_path.read_text()) == {}
+        assert not state_path.exists()
         if image_ref == failed_image:
             raise deploy.DeployError("synthetic readiness failure")
         return image_ref
@@ -223,9 +225,7 @@ def test_first_deploy_does_not_persist_live_snapshot_before_dual_gate(
         (failed_image, LIVENESS_ARGS[1], READINESS_ARGS[1]),
         (old_image, LIVENESS_ARGS[1], READINESS_ARGS[1]),
     ]
-    assert json.loads(state_path.read_text()) == {
-        "app": {"current_image": old_image, "previous_image": None}
-    }
+    assert not state_path.exists()
 
 
 def test_failed_deploy_rolls_back_to_pre_deploy_image_and_preserves_history(
@@ -267,6 +267,339 @@ def test_failed_deploy_rolls_back_to_pre_deploy_image_and_preserves_history(
         "current_image": current_image,
         "previous_image": previous_image,
     }
+
+
+def test_post_migration_business_failure_rolls_back_without_state_update(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _compose(tmp_path)
+    old_image = _image("a")
+    target_image = _image("b")
+    runner = tmp_path / "acceptance-runner"
+    runner.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    runner.chmod(0o700)
+    monkeypatch.setattr(deploy, "_require_deploy_evidence", lambda *a, **k: None)
+    monkeypatch.setattr(
+        deploy, "_snapshot_current_state", lambda *args, **kwargs: old_image
+    )
+    images: list[str] = []
+    phases: list[str] = []
+    monkeypatch.setattr(
+        deploy,
+        "_start_image",
+        lambda *args, image_ref, **kwargs: images.append(image_ref),
+    )
+    monkeypatch.setattr(deploy, "_wait_for_http_gate", lambda *a, **k: None)
+
+    def acceptance(path: Path, *, phase: str, image_ref: str, gate: str) -> None:
+        phases.append(f"{phase}_{gate}")
+        if phase == "target" and gate == "business":
+            raise deploy.DeployError("synthetic business failure")
+
+    monkeypatch.setattr(deploy, "_run_acceptance_gate", acceptance)
+
+    with pytest.raises(SystemExit, match="old image passed all rollback gates"):
+        deploy.main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                "--protected-image",
+                old_image,
+                "--migration-receipt",
+                str(tmp_path / "receipt.json"),
+                "--source-sha",
+                "c" * 40,
+                "--acceptance-runner",
+                str(runner),
+                *HEALTH_ARGS,
+                "deploy",
+                target_image,
+            ]
+        )
+
+    assert images == [target_image, old_image]
+    assert phases == [
+        "target_login",
+        "target_business",
+        "rollback_login",
+        "rollback_business",
+    ]
+    assert not (tmp_path / ".deploy" / "state.json").exists()
+
+
+def test_post_migration_old_image_incompatibility_requires_database_restore(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _compose(tmp_path)
+    old_image = _image("a")
+    target_image = _image("b")
+    runner = tmp_path / "acceptance-runner"
+    runner.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    runner.chmod(0o700)
+    monkeypatch.setattr(deploy, "_require_deploy_evidence", lambda *a, **k: None)
+    monkeypatch.setattr(
+        deploy, "_snapshot_current_state", lambda *args, **kwargs: old_image
+    )
+    monkeypatch.setattr(
+        deploy,
+        "_start_image",
+        lambda *args, image_ref, **kwargs: None,
+    )
+    monkeypatch.setattr(deploy, "_wait_for_http_gate", lambda *a, **k: None)
+
+    def acceptance(path: Path, *, phase: str, image_ref: str, gate: str) -> None:
+        if phase == "target" and gate == "business":
+            raise deploy.DeployError("synthetic target incompatibility")
+        if phase == "rollback" and gate == "business":
+            raise deploy.DeployError("synthetic rollback incompatibility")
+
+    monkeypatch.setattr(deploy, "_run_acceptance_gate", acceptance)
+
+    with pytest.raises(SystemExit, match="DATABASE_RESTORE_REQUIRED"):
+        deploy.main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                "--protected-image",
+                old_image,
+                "--migration-receipt",
+                str(tmp_path / "receipt.json"),
+                "--source-sha",
+                "c" * 40,
+                "--acceptance-runner",
+                str(runner),
+                *HEALTH_ARGS,
+                "deploy",
+                target_image,
+            ]
+        )
+
+    assert not (tmp_path / ".deploy" / "state.json").exists()
+
+
+def test_acceptance_result_requires_closed_login_and_business_checks() -> None:
+    login = {
+        "schema_version": 1,
+        "status": "passed",
+        "phase": "target",
+        "image_ref": _image("a"),
+        "gate": "login",
+        "checks": {"login": "passed"},
+    }
+    deploy._validate_acceptance_result(
+        login, phase="target", image_ref=_image("a"), gate="login"
+    )
+
+    incomplete = {
+        **login,
+        "gate": "business",
+        "checks": {"daily_plan": "passed"},
+    }
+    with pytest.raises(deploy.DeployError, match="acceptance result"):
+        deploy._validate_acceptance_result(
+            incomplete,
+            phase="target",
+            image_ref=_image("a"),
+            gate="business",
+        )
+
+
+def test_acceptance_runner_gets_minimal_environment_and_must_emit_closed_json(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runner = tmp_path / "acceptance-runner"
+    runner.write_text(
+        """#!/usr/bin/env python3
+import json
+import os
+if "DATABASE_URL" in os.environ or "ENCRYPTION_KEY" in os.environ:
+    raise SystemExit(9)
+gate = os.environ["R5_ACCEPTANCE_GATE"]
+checks = {"login": "passed"}
+if gate == "business":
+    checks = {name: "passed" for name in (
+        "daily_plan", "game_observation", "one_on_one_listening",
+        "homemade_teaching", "course_review", "image_blob",
+        "ai_key_decryption", "word_export", "data_snapshot",
+    )}
+print(json.dumps({
+    "schema_version": 1,
+    "status": "passed",
+    "phase": os.environ["R5_ACCEPTANCE_PHASE"],
+    "image_ref": os.environ["R5_ACCEPTANCE_IMAGE"],
+    "gate": gate,
+    "checks": checks,
+}))
+""",
+        encoding="utf-8",
+    )
+    runner.chmod(0o700)
+    monkeypatch.setenv("DATABASE_URL", "must-not-leak")
+    monkeypatch.setenv("ENCRYPTION_KEY", "must-not-leak")
+
+    deploy._run_acceptance_gate(
+        runner, phase="target", image_ref=_image("a"), gate="login"
+    )
+    deploy._run_acceptance_gate(
+        runner, phase="target", image_ref=_image("a"), gate="business"
+    )
+
+
+def test_oci_source_revision_requires_both_platform_labels(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_sha = "d" * 40
+    index = {
+        "manifests": [
+            {"digest": "sha256:" + "1" * 64},
+            {"digest": "sha256:" + "2" * 64},
+        ]
+    }
+    calls = 0
+
+    def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        nonlocal calls
+        calls += 1
+        if "--raw" in command:
+            return subprocess.CompletedProcess(command, 0, json.dumps(index), "")
+        revision = source_sha if calls == 2 else "e" * 40
+        payload = {
+            "config": {"Labels": {"org.opencontainers.image.revision": revision}}
+        }
+        return subprocess.CompletedProcess(command, 0, json.dumps(payload), "")
+
+    monkeypatch.setattr(deploy, "_run_command", run)
+    with pytest.raises(deploy.DeployError, match="source revision"):
+        deploy._validate_oci_source_revision(_image("a"), source_sha)
+
+
+def test_post_migration_cli_keeps_gate_granularity_and_state_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _compose(tmp_path)
+    old_image = _image("a")
+    previous_image = _image("c")
+    target_image = _image("b")
+    state_dir = tmp_path / ".deploy"
+    state_dir.mkdir(mode=0o700)
+    state_path = state_dir / "state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "app": {
+                    "current_image": old_image,
+                    "previous_image": previous_image,
+                }
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    state_path.chmod(0o600)
+    before = state_path.read_bytes()
+    runner = tmp_path / "acceptance-runner"
+    runner.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    runner.chmod(0o700)
+    monkeypatch.setattr(deploy, "_require_deploy_evidence", lambda *a, **k: None)
+    monkeypatch.setattr(deploy, "_snapshot_current_state", lambda *a, **k: old_image)
+    events: list[str] = []
+    monkeypatch.setattr(
+        deploy,
+        "_start_image",
+        lambda *a, image_ref, **k: events.append(f"start:{image_ref}"),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        deploy,
+        "_wait_for_http_gate",
+        lambda url, *, gate, **k: events.append(f"{gate}:{url}"),
+    )
+
+    def acceptance(path: Path, *, phase: str, image_ref: str, gate: str) -> None:
+        events.append(f"{phase}_{gate}")
+        if phase == "target" and gate == "login":
+            raise deploy.DeployError("synthetic login failure")
+
+    monkeypatch.setattr(deploy, "_run_acceptance_gate", acceptance)
+
+    with pytest.raises(SystemExit, match="old image passed all rollback gates"):
+        deploy.main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                "--protected-image",
+                old_image,
+                "--migration-receipt",
+                str(tmp_path / "receipt.json"),
+                "--source-sha",
+                "d" * 40,
+                "--acceptance-runner",
+                str(runner),
+                *HEALTH_ARGS,
+                "deploy",
+                target_image,
+            ]
+        )
+
+    assert events == [
+        f"start:{target_image}",
+        f"liveness:{LIVENESS_ARGS[1]}",
+        f"readiness:{READINESS_ARGS[1]}",
+        "target_login",
+        f"start:{old_image}",
+        f"liveness:{LIVENESS_ARGS[1]}",
+        f"readiness:{READINESS_ARGS[1]}",
+        "rollback_login",
+        "rollback_business",
+    ]
+    assert state_path.read_bytes() == before
+
+
+def test_post_migration_rechecks_receipt_before_state_finalize(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _compose(tmp_path)
+    old_image = _image("a")
+    target_image = _image("b")
+    runner = tmp_path / "acceptance-runner"
+    runner.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    runner.chmod(0o700)
+    checks = 0
+
+    def evidence(*args: object, **kwargs: object) -> None:
+        nonlocal checks
+        checks += 1
+        raise deploy.DeployError("database changed during acceptance")
+
+    monkeypatch.setattr(deploy, "_require_deploy_evidence", lambda *a, **k: None)
+    monkeypatch.setattr(deploy, "_require_post_migration_backup", evidence)
+    monkeypatch.setattr(deploy, "_snapshot_current_state", lambda *a, **k: old_image)
+    monkeypatch.setattr(deploy, "_start_image", lambda *a, **k: None)
+    monkeypatch.setattr(deploy, "_wait_for_http_gate", lambda *a, **k: None)
+    monkeypatch.setattr(deploy, "_run_acceptance_gate", lambda *a, **k: None)
+
+    with pytest.raises(SystemExit, match="manual reconciliation"):
+        deploy.main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                "--protected-image",
+                old_image,
+                "--migration-receipt",
+                str(tmp_path / "receipt.json"),
+                "--source-sha",
+                "d" * 40,
+                "--acceptance-runner",
+                str(runner),
+                *HEALTH_ARGS,
+                "deploy",
+                target_image,
+            ]
+        )
+
+    assert checks == 1
+    assert not (tmp_path / ".deploy" / "state.json").exists()
 
 
 def test_rollback_reads_state_only_after_lock_is_held(
@@ -407,7 +740,7 @@ def test_failed_legacy_migration_restores_exact_legacy_without_state(
             ]
         )
     assert calls == [target_index, legacy_image]
-    assert json.loads((tmp_path / ".deploy" / "state.json").read_text()) == {}
+    assert not (tmp_path / ".deploy" / "state.json").exists()
 
 
 def test_failed_legacy_migration_reports_target_and_restore_failures(
@@ -968,6 +1301,50 @@ def test_oci_index_validation_requires_both_release_platforms(
         ),
     )
     with pytest.raises(deploy.DeployError, match="missing required"):
+        VALIDATE_OCI_INDEX_REF(_image("a"), dry_run=False)
+
+
+def test_oci_index_validation_rejects_any_extra_platform(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "mediaType": deploy.OCI_INDEX_MEDIA_TYPE,
+        "manifests": [
+            {"platform": {"os": "linux", "architecture": "amd64"}},
+            {"platform": {"os": "linux", "architecture": "arm64"}},
+            {"platform": {"os": "linux", "architecture": "s390x"}},
+        ],
+    }
+    monkeypatch.setattr(
+        deploy,
+        "_run_command",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 0, json.dumps(payload), ""
+        ),
+    )
+    with pytest.raises(deploy.DeployError, match="exactly required"):
+        VALIDATE_OCI_INDEX_REF(_image("a"), dry_run=False)
+
+
+def test_oci_index_validation_rejects_duplicate_platform_manifest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "mediaType": deploy.OCI_INDEX_MEDIA_TYPE,
+        "manifests": [
+            {"platform": {"os": "linux", "architecture": "amd64"}},
+            {"platform": {"os": "linux", "architecture": "amd64"}},
+            {"platform": {"os": "linux", "architecture": "arm64"}},
+        ],
+    }
+    monkeypatch.setattr(
+        deploy,
+        "_run_command",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 0, json.dumps(payload), ""
+        ),
+    )
+    with pytest.raises(deploy.DeployError, match="exactly two"):
         VALIDATE_OCI_INDEX_REF(_image("a"), dry_run=False)
 
 

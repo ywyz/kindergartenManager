@@ -31,6 +31,7 @@ DOCKER_FACTS_SECTION_TITLE = "### Docker 不可变引用说明"
 DOCKER_FACTS_HEADER_TO_KEY = {
     "release tag": "release_tag",
     "source sha": "source_sha",
+    "repository": "repository",
     "oci index digest": "digest",
     "不可变引用": "ref",
     "media type": "media_type",
@@ -72,11 +73,41 @@ def _api_json(repo: str, path: str, token: str) -> dict[str, Any]:
     )
 
 
+def _patch_api_json(
+    repo: str, path: str, token: str, payload: dict[str, Any]
+) -> dict[str, Any]:
+    api_request = urllib.request.Request(
+        f"https://api.github.com/repos/{repo}/{path}",
+        data=json.dumps(payload).encode("utf-8"),
+        method="PATCH",
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+    )
+    try:
+        with urllib.request.urlopen(api_request, timeout=30) as response:
+            result = json.load(response)
+    except (
+        urllib.error.HTTPError,
+        urllib.error.URLError,
+        TimeoutError,
+        json.JSONDecodeError,
+        UnicodeDecodeError,
+    ) as exc:
+        raise ConvergenceError("GitHub Release publish request failed") from exc
+    if not isinstance(result, dict):
+        raise ConvergenceError("GitHub Release publish returned an invalid payload")
+    return result
+
+
 def _asset_json(url: str, token: str) -> dict[str, Any]:
     return _request_json(url, token, accept="application/octet-stream")
 
 
-def _validate_expected_values(
+def validate_expected_values(
     *,
     tag: str,
     source_sha: str,
@@ -315,9 +346,11 @@ def verify_release(
     immutable_ref: str,
     media_type: str,
     platforms: list[str],
+    release_id: str | None = None,
+    expected_draft: bool | None = None,
 ) -> None:
     """Verify workflow artifact, tag, release body, and Release asset agree."""
-    _validate_expected_values(
+    validate_expected_values(
         tag=tag,
         source_sha=source_sha,
         repository=repository,
@@ -348,7 +381,16 @@ def verify_release(
         raise ConvergenceError("Release tag target does not match source SHA")
 
     quoted_tag = urllib.parse.quote(tag, safe="")
-    release = _api_json(repo, f"releases/tags/{quoted_tag}", token)
+    if release_id is not None:
+        if not release_id.isdecimal():
+            raise ConvergenceError("Release id is invalid")
+        release = _api_json(repo, f"releases/{release_id}", token)
+        required_draft = True if expected_draft is None else expected_draft
+        if release.get("draft") is not required_draft:
+            expected = "draft" if required_draft else "published"
+            raise ConvergenceError(f"Release must be {expected} during convergence")
+    else:
+        release = _api_json(repo, f"releases/tags/{quoted_tag}", token)
     if release.get("tag_name") != tag:
         raise ConvergenceError("Release tag name does not match workflow tag")
 
@@ -364,6 +406,8 @@ def verify_release(
         raise ConvergenceError("Release body does not match expected release tag")
     if release_facts.get("source_sha") != source_sha:
         raise ConvergenceError("Release body does not match expected source SHA")
+    if release_facts.get("repository") != repository:
+        raise ConvergenceError("Release body does not match expected repository")
     if release_facts.get("digest") != digest:
         raise ConvergenceError("Release body does not match expected image digest")
     if release_facts.get("ref") != immutable_ref:
@@ -419,6 +463,46 @@ def verify_release(
         )
 
 
+def publish_verified_release(**facts: Any) -> None:
+    """Publish one converged draft, then re-read the same release id."""
+    release_id = facts.get("release_id")
+    if not isinstance(release_id, str) or not release_id.isdecimal():
+        raise ConvergenceError("Release id is required for controlled publish")
+    verify_release(**facts, expected_draft=True)
+    try:
+        published = _patch_api_json(
+            facts["repo"],
+            f"releases/{release_id}",
+            facts["token"],
+            {"draft": False},
+        )
+        if (
+            published.get("id") != int(release_id)
+            or published.get("draft") is not False
+        ):
+            raise ConvergenceError("GitHub Release publish acknowledgement is invalid")
+        verify_release(**facts, expected_draft=False)
+    except Exception as publish_error:
+        try:
+            restored = _patch_api_json(
+                facts["repo"],
+                f"releases/{release_id}",
+                facts["token"],
+                {"draft": True},
+            )
+            if (
+                restored.get("id") != int(release_id)
+                or restored.get("draft") is not True
+            ):
+                raise ConvergenceError("Draft restore acknowledgement is invalid")
+            verify_release(**facts, expected_draft=True)
+        except Exception as restore_error:
+            raise ConvergenceError("PUBLISH_RECONCILE_REQUIRED") from restore_error
+        raise ConvergenceError(
+            "Release publish failed and was restored to draft"
+        ) from (publish_error)
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Verify immutable Docker release metadata convergence."
@@ -432,6 +516,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ref", required=True, dest="immutable_ref")
     parser.add_argument("--media-type", required=True)
     parser.add_argument("--platform", required=True, action="append", dest="platforms")
+    parser.add_argument("--release-id")
+    parser.add_argument(
+        "--publish",
+        action="store_true",
+        help="Publish the converged draft and re-read the exact release id.",
+    )
     return parser
 
 
@@ -441,7 +531,12 @@ def main(argv: list[str] | None = None) -> int:
     if not token:
         raise SystemExit("GITHUB_TOKEN is required")
     try:
-        verify_release(token=token, **vars(args))
+        values = vars(args)
+        publish = values.pop("publish")
+        if publish:
+            publish_verified_release(token=token, **values)
+        else:
+            verify_release(token=token, **values)
     except ConvergenceError as exc:
         raise SystemExit(f"Release convergence failed: {exc}") from exc
     print("Release metadata convergence checks passed.")
