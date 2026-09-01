@@ -17,6 +17,11 @@ def test_docker_image_pins_reviewed_runtime():
     dockerfile = (PROJECT_ROOT / "Dockerfile").read_text(encoding="utf-8")
 
     assert dockerfile.startswith(f"FROM python:{EXPECTED_PYTHON_VERSION}-slim\n")
+    assert "ARG PIP_INDEX_URL=https://pypi.org/simple" in dockerfile
+    assert (
+        'pip install --no-cache-dir --index-url "${PIP_INDEX_URL}" -r requirements.txt'
+        in dockerfile
+    )
 
 
 def test_release_jobs_pin_reviewed_runtime():
