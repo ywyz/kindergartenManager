@@ -12,6 +12,7 @@ import pytest
 
 
 PROTECTED_IMAGE = "ghcr.io/ywyz/kindergartenmanager@sha256:" + "a" * 64
+DATABASE_IDENTITY = "b" * 64
 
 
 def _write_evidence(tmp_path: Path) -> tuple[Path, Path, dict[str, object]]:
@@ -25,6 +26,7 @@ def _write_evidence(tmp_path: Path) -> tuple[Path, Path, dict[str, object]]:
         "created_at": now.isoformat().replace("+00:00", "Z"),
         "expires_at": (now + timedelta(hours=1)).isoformat().replace("+00:00", "Z"),
         "protected_image": PROTECTED_IMAGE,
+        "database_identity_sha256": DATABASE_IDENTITY,
         "database_revision": "20260825_0001",
         "artifact": {
             "path": str(artifact),
@@ -50,6 +52,7 @@ def test_valid_backup_evidence_is_rechecked_at_consumption(tmp_path: Path) -> No
     result = validate_backup_evidence(
         evidence,
         expected_protected_image=PROTECTED_IMAGE,
+        expected_database_identity_sha256=DATABASE_IDENTITY,
         now=datetime(2026, 9, 1, 4, 30, tzinfo=UTC),
     )
 
@@ -89,6 +92,7 @@ def test_backup_evidence_rejects_untrusted_claims(
         validate_backup_evidence(
             evidence,
             expected_protected_image=PROTECTED_IMAGE,
+            expected_database_identity_sha256=DATABASE_IDENTITY,
             now=datetime(2026, 9, 1, 4, 30, tzinfo=UTC),
         )
 
@@ -101,6 +105,7 @@ def test_backup_evidence_rejects_expired_or_tampered_artifact(tmp_path: Path) ->
         validate_backup_evidence(
             evidence,
             expected_protected_image=PROTECTED_IMAGE,
+            expected_database_identity_sha256=DATABASE_IDENTITY,
             now=datetime(2026, 9, 1, 6, 0, tzinfo=UTC),
         )
 
@@ -109,6 +114,7 @@ def test_backup_evidence_rejects_expired_or_tampered_artifact(tmp_path: Path) ->
         validate_backup_evidence(
             evidence,
             expected_protected_image=PROTECTED_IMAGE,
+            expected_database_identity_sha256=DATABASE_IDENTITY,
             now=datetime(2026, 9, 1, 4, 30, tzinfo=UTC),
         )
 
@@ -120,7 +126,11 @@ def test_backup_evidence_rejects_wide_mode_and_symlink(tmp_path: Path) -> None:
     evidence, artifact, _ = _write_evidence(tmp_path)
     evidence.chmod(0o640)
     with pytest.raises(BackupEvidenceError, match="0600"):
-        validate_backup_evidence(evidence, expected_protected_image=PROTECTED_IMAGE)
+        validate_backup_evidence(
+            evidence,
+            expected_protected_image=PROTECTED_IMAGE,
+            expected_database_identity_sha256=DATABASE_IDENTITY,
+        )
 
     evidence.chmod(0o600)
     link = tmp_path / "artifact-link"
@@ -132,5 +142,19 @@ def test_backup_evidence_rejects_wide_mode_and_symlink(tmp_path: Path) -> None:
         validate_backup_evidence(
             evidence,
             expected_protected_image=PROTECTED_IMAGE,
+            expected_database_identity_sha256=DATABASE_IDENTITY,
+            now=datetime(2026, 9, 1, 4, 30, tzinfo=UTC),
+        )
+
+
+def test_backup_evidence_is_bound_to_actual_database_identity(tmp_path: Path) -> None:
+    from app.core.backup_evidence import BackupEvidenceError, validate_backup_evidence
+
+    evidence, _, _ = _write_evidence(tmp_path)
+    with pytest.raises(BackupEvidenceError, match="database identity"):
+        validate_backup_evidence(
+            evidence,
+            expected_protected_image=PROTECTED_IMAGE,
+            expected_database_identity_sha256="c" * 64,
             now=datetime(2026, 9, 1, 4, 30, tzinfo=UTC),
         )

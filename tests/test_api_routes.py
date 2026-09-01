@@ -164,7 +164,11 @@ class _ReadinessSession:
             except asyncio.CancelledError:
                 self.cancelled = True
                 raise
-        return object()
+        class Result:
+            def scalar_one_or_none(self) -> str:
+                return "expected-head"
+
+        return Result()
 
     async def commit(self) -> None:
         self.commit_calls += 1
@@ -194,6 +198,7 @@ class TestReadiness:
 
         session = _ReadinessSession()
         monkeypatch.setattr(routes, "AsyncSessionLocal", _ReadinessFactory([session]))
+        monkeypatch.setattr(routes, "get_migration_head", lambda: "expected-head")
 
         response = await api_client.get("/api/v1/readiness")
 
@@ -206,7 +211,7 @@ class TestReadiness:
             "checks": {"database": "ok"},
         }
         assert session.entered and session.exited
-        assert session.statements == ["SELECT 1"]
+        assert session.statements == ["SELECT 1", "SELECT version_num FROM alembic_version"]
         assert session.commit_calls == session.flush_calls == 0
 
     @pytest.mark.parametrize(
@@ -239,6 +244,20 @@ class TestReadiness:
             "SELECT 1",
         ):
             assert secret not in exposed
+
+    async def test_readiness_rejects_schema_revision_mismatch(
+        self, api_client, monkeypatch
+    ) -> None:
+        from app.api import routes
+
+        session = _ReadinessSession()
+        monkeypatch.setattr(routes, "AsyncSessionLocal", _ReadinessFactory([session]))
+        monkeypatch.setattr(routes, "get_migration_head", lambda: "different-head")
+
+        response = await api_client.get("/api/v1/readiness")
+
+        assert response.status_code == 503
+        assert response.json()["checks"] == {"database": "failed"}
 
     async def test_readiness_timeout_cancels_query_and_closes_session(
         self, api_client, monkeypatch

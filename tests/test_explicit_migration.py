@@ -26,7 +26,14 @@ def test_explicit_migration_validates_backup_before_upgrade(
     monkeypatch.setattr(
         migrate_database,
         "validate_backup_evidence",
-        lambda path, *, expected_protected_image: calls.append("validate"),
+        lambda path, **kwargs: calls.append("validate")
+        or type("Evidence", (), {"database_revision": "old-revision"})(),
+    )
+    monkeypatch.setattr(
+        migrate_database, "configured_database_identity_sha256", lambda: "b" * 64
+    )
+    monkeypatch.setattr(
+        migrate_database, "read_configured_database_revision", lambda: "old-revision"
     )
     monkeypatch.setattr(
         migrate_database,
@@ -70,6 +77,43 @@ def test_explicit_migration_invalid_evidence_never_calls_upgrade(
             [
                 "--backup-evidence",
                 str(tmp_path / "bad.json"),
+                "--protected-image",
+                "no-running-image",
+            ]
+        )
+        == 1
+    )
+
+
+def test_explicit_migration_rejects_evidence_for_different_current_revision(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.jobs import migrate_database
+
+    monkeypatch.setattr(
+        migrate_database,
+        "validate_backup_evidence",
+        lambda *args, **kwargs: type(
+            "Evidence", (), {"database_revision": "revision-a"}
+        )(),
+    )
+    monkeypatch.setattr(
+        migrate_database, "configured_database_identity_sha256", lambda: "b" * 64
+    )
+    monkeypatch.setattr(
+        migrate_database, "read_configured_database_revision", lambda: "revision-b"
+    )
+    monkeypatch.setattr(
+        migrate_database,
+        "run_migrations",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("must not migrate")),
+    )
+
+    assert (
+        migrate_database.main(
+            [
+                "--backup-evidence",
+                str(tmp_path / "proof.json"),
                 "--protected-image",
                 "no-running-image",
             ]
