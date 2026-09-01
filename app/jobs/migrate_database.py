@@ -6,7 +6,11 @@ import argparse
 from pathlib import Path
 
 from app.core.backup_evidence import BackupEvidenceError, validate_backup_evidence
-from app.core.startup import run_migrations
+from app.core.startup import (
+    configured_database_identity_sha256,
+    read_configured_database_revision,
+    run_migrations,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -19,10 +23,15 @@ def _build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     try:
-        validate_backup_evidence(
+        evidence = validate_backup_evidence(
             args.backup_evidence,
             expected_protected_image=args.protected_image,
+            expected_database_identity_sha256=configured_database_identity_sha256(),
         )
+        if evidence.database_revision != read_configured_database_revision():
+            raise BackupEvidenceError(
+                "Backup evidence revision does not match the configured database"
+            )
     except BackupEvidenceError:
         print("❌ 已验证备份证据无效，数据库迁移未执行")
         return 1

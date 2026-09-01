@@ -494,15 +494,21 @@ def _require_service(service: str) -> None:
 def _require_verified_backup(
     evidence_path: Path | None,
     protected_image: str | None,
+    database_identity_sha256: str | None = None,
 ) -> None:
-    if evidence_path is None or protected_image is None:
+    if (
+        evidence_path is None
+        or protected_image is None
+        or database_identity_sha256 is None
+    ):
         raise DeployError(
-            "A verified backup evidence path and protected image are required"
+            "Verified backup evidence, protected image, and database identity are required"
         )
     try:
         validate_backup_evidence(
             evidence_path,
             expected_protected_image=protected_image,
+            expected_database_identity_sha256=database_identity_sha256,
         )
     except BackupEvidenceError as exc:
         raise DeployError("Verified backup evidence is invalid") from exc
@@ -656,7 +662,11 @@ def _deploy_lock(state_dir: Path, timeout_seconds: int):
 
 
 def _deploy(args: argparse.Namespace) -> None:
-    _require_verified_backup(args.backup_evidence, args.protected_image)
+    _require_verified_backup(
+        args.backup_evidence,
+        args.protected_image,
+        args.database_identity_sha256,
+    )
     if not is_immutable_image_ref(args.image_ref):
         raise DeployError(
             f"Image must be immutable digest ref ending with @sha256:<64 lower hex>: {args.image_ref}"
@@ -685,6 +695,11 @@ def _deploy(args: argparse.Namespace) -> None:
         )
         _require_live_image_binding(
             live_image, args.protected_image, dry_run=args.dry_run
+        )
+        _require_verified_backup(
+            args.backup_evidence,
+            args.protected_image,
+            args.database_identity_sha256,
         )
         _validate_snapshot_state(live_image)
         for rollback_ref in (current_image, previous_image, live_image):
@@ -764,7 +779,11 @@ def _deploy(args: argparse.Namespace) -> None:
 
 
 def _rollback(args: argparse.Namespace) -> None:
-    _require_verified_backup(args.backup_evidence, args.protected_image)
+    _require_verified_backup(
+        args.backup_evidence,
+        args.protected_image,
+        args.database_identity_sha256,
+    )
     if args.image_ref and not is_immutable_image_ref(args.image_ref):
         raise DeployError(
             f"Image must be immutable digest ref ending with @sha256:<64 lower hex>: {args.image_ref}"
@@ -792,6 +811,11 @@ def _rollback(args: argparse.Namespace) -> None:
         )
         _require_live_image_binding(
             live_image, args.protected_image, dry_run=args.dry_run
+        )
+        _require_verified_backup(
+            args.backup_evidence,
+            args.protected_image,
+            args.database_identity_sha256,
         )
         _validate_snapshot_state(live_image)
         for rollback_ref in (current_image, previous_image, live_image):
@@ -854,7 +878,11 @@ def _rollback(args: argparse.Namespace) -> None:
 
 def _migrate_legacy(args: argparse.Namespace) -> None:
     """Establish an index-only baseline from one explicitly accepted legacy ref."""
-    _require_verified_backup(args.backup_evidence, args.protected_image)
+    _require_verified_backup(
+        args.backup_evidence,
+        args.protected_image,
+        args.database_identity_sha256,
+    )
     if not is_immutable_image_ref(args.image_ref):
         raise DeployError(
             f"Image must be immutable digest ref ending with @sha256:<64 lower hex>: {args.image_ref}"
@@ -889,6 +917,11 @@ def _migrate_legacy(args: argparse.Namespace) -> None:
             )
             _require_live_image_binding(
                 live_image, args.protected_image, dry_run=False
+            )
+            _require_verified_backup(
+                args.backup_evidence,
+                args.protected_image,
+                args.database_identity_sha256,
             )
             if live_image != legacy_image:
                 raise DeployError(
@@ -997,6 +1030,10 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--protected-image",
         help="Current immutable image digest, or no-running-image for first install.",
+    )
+    parser.add_argument(
+        "--database-identity-sha256",
+        help="Credential-free identity hash recorded by the verified backup workflow.",
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)

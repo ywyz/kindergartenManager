@@ -13,9 +13,10 @@
 1. 应用启动与 Bootstrap 管理员任务不得运行 Alembic。它们只消费已经迁移到目标 revision 的数据库；schema 不兼容时由 readiness 或业务入口失败关闭。
 2. 数据库迁移只能由独立命令 `python -m app.jobs.migrate_database` 发起。命令必须先验证备份证据，再执行一次 `upgrade head`；验证失败时不得调用 Alembic。
 3. `scripts/deploy.py` 的 `deploy`、`rollback` 与 `migrate-legacy` 在任何 Compose 变更或部署状态写入前，必须消费同一关闭格式的备份证据。无证据、过期、权限不安全、内容或备份文件被篡改、未完成隔离恢复验证、或未绑定当前受保护镜像时均失败关闭。
-4. 备份证据不是“文件存在”声明。它必须由恢复演练产生，采用 owner-only 的普通文件，包含备份 artifact 的 SHA-256、数据库 revision、受保护镜像、生成/过期时间，以及数据库完整性、隔离恢复、必要资产校验的成功结果。消费时重新计算 artifact hash。
+4. 备份证据不是“文件存在”声明。它必须由恢复演练产生，采用 owner-only 的普通文件，包含备份 artifact 的 SHA-256、不含凭据的数据库 identity hash、数据库 revision、受保护镜像、生成/过期时间，以及数据库完整性、隔离恢复、必要资产校验的成功结果。消费时重新计算 artifact hash；迁移前从实际配置库复读 identity/revision。
 5. 证据只保护它绑定的迁移/部署前状态，最长有效 24 小时。`protected_image` 必须是当前不可变镜像 digest；首次安装允许显式的 `no-running-image`，但不得用它覆盖一个实际运行镜像。
 6. 镜像回滚与数据恢复仍是独立人工门。系统不自动执行 `alembic downgrade`，也不在部署失败后自动恢复数据。
+7. readiness 除连接探测外，还必须确认数据库 revision 等于当前代码/镜像的唯一 Alembic head；漏跑显式迁移时部署不得接流量或写入成功状态。
 
 ## 顺序
 

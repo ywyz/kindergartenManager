@@ -363,9 +363,9 @@ def _launch_product_app(args: argparse.Namespace) -> None:
     from app.auth.middleware import AuthMiddleware
     from app.core.bootstrap import run_bootstrap
     from app.core.config import settings
-    from app.core.startup import run_startup_migrations
+    from app.core.startup import run_migrations
 
-    run_startup_migrations()
+    run_migrations()
     app.on_startup(run_bootstrap)
     app.add_middleware(AuthMiddleware)
     app.include_router(create_api_router())

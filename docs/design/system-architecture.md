@@ -94,7 +94,7 @@ Internet/LAN → Caddy → app:8080 → MySQL 8
 ```
 
 Compose 启动链为 db `service_healthy` → app readiness `service_healthy` → Caddy。app readiness 只用独立短
-session 执行 `SELECT 1`；它不替代迁移、登录或业务验收。运行期 Caddy 自动摘除 unready upstream 不在当前范围。
+session 检查 `SELECT 1` 与实际 Alembic revision 等于代码 head；它不替代登录、业务或恢复验收。运行期 Caddy 自动摘除 unready upstream 不在当前范围。
 
 没有独立 AI、Word 或 Holiday 容器。开发 override 可直接暴露 app 端口并挂载源码/模板。
 

@@ -18,11 +18,20 @@ def _run_bootstrap_admin_cli() -> None:
     raise SystemExit(asyncio.run(bootstrap_admin._main()))
 
 
+def _run_migration_cli(args: list[str]) -> None:
+    from app.jobs import migrate_database
+
+    migration_args = [arg for arg in args[1:] if arg != "--migrate-database"]
+    raise SystemExit(migrate_database.main(migration_args))
+
+
 def _run_entrypoint(argv: list[str] | None = None) -> None:
     """入口分派：检测 init / reset-password 参数并路由到对应启动路径。"""
 
     args = argv if argv is not None else sys.argv
-    if "--init" in args or "--reset-password" in args:
+    if "--migrate-database" in args:
+        _run_migration_cli(args)
+    elif "--init" in args or "--reset-password" in args:
         _run_bootstrap_admin_cli()
     else:
         _run_main_app()

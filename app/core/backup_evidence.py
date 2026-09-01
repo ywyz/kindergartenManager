@@ -22,6 +22,7 @@ ROOT_FIELDS = {
     "created_at",
     "expires_at",
     "protected_image",
+    "database_identity_sha256",
     "database_revision",
     "artifact",
     "checks",
@@ -37,6 +38,7 @@ class BackupEvidenceError(ValueError):
 @dataclass(frozen=True)
 class VerifiedBackupEvidence:
     protected_image: str
+    database_identity_sha256: str
     database_revision: str
     artifact_path: Path
     artifact_sha256: str
@@ -112,6 +114,7 @@ def validate_backup_evidence(
     evidence_path: Path,
     *,
     expected_protected_image: str,
+    expected_database_identity_sha256: str | None = None,
     now: datetime | None = None,
 ) -> VerifiedBackupEvidence:
     """Validate closed evidence and re-hash its protected backup artifact."""
@@ -129,6 +132,16 @@ def validate_backup_evidence(
         raise BackupEvidenceError("Backup evidence status is not verified")
     if payload["protected_image"] != expected_protected_image:
         raise BackupEvidenceError("Backup evidence image binding does not match")
+    database_identity = payload["database_identity_sha256"]
+    if not isinstance(database_identity, str) or not re.fullmatch(
+        r"[0-9a-f]{64}", database_identity
+    ):
+        raise BackupEvidenceError("Backup evidence database identity is invalid")
+    if (
+        expected_database_identity_sha256 is not None
+        and database_identity != expected_database_identity_sha256
+    ):
+        raise BackupEvidenceError("Backup evidence database identity does not match")
     revision = payload["database_revision"]
     if not isinstance(revision, str) or not revision or len(revision) > 128:
         raise BackupEvidenceError("Backup evidence database revision is invalid")
@@ -173,6 +186,7 @@ def validate_backup_evidence(
 
     return VerifiedBackupEvidence(
         protected_image=expected_protected_image,
+        database_identity_sha256=database_identity,
         database_revision=revision,
         artifact_path=artifact_path,
         artifact_sha256=actual_sha256,

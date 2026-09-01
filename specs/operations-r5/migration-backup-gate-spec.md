@@ -8,9 +8,11 @@
 - deploy/rollback/migrate-legacy 在证据验证前零 Compose 变更、零部署状态写入。
 - 证据文件和 backup artifact 均须是绝对路径、非 symlink、当前 euid 所有、mode `0600` 的普通文件。
 - JSON 只接受 `schema_version=1` 的关闭字段集；`status=verified`，三项 checks（`database_integrity`、`isolated_restore`、`required_assets`）均须为 `passed`。
+- 证据以不含凭据的 `database_identity_sha256` 绑定实际目标库，并记录备份时 Alembic revision；显式迁移在调用 Alembic 前必须从配置的实际数据库复读并精确匹配两者。
 - `created_at`/`expires_at` 使用 UTC RFC3339；不得来自未来，有效窗口不得超过 24 小时，消费时不得过期。
 - `protected_image` 精确绑定门看到的当前不可变镜像；无运行镜像时仅接受 `no-running-image`。
 - 消费时重新计算 artifact SHA-256；大小与证据记录必须精确一致。
+- readiness 必须同时验证连接与实际 revision 等于当前代码唯一 Alembic head；漏跑迁移的目标镜像不得通过部署门。
 
 ## 稳定 RED
 

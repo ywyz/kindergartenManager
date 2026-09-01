@@ -30,6 +30,7 @@ from app.api.schemas import (
     SemesterOut,
 )
 from app.core.database import AsyncSessionLocal
+from app.core.startup import get_migration_head
 from app.repository.class_repository import list_class_configs_for_tenant
 from app.repository.daily_plan_repository import (
     get_daily_plan_by_id_for_tenant,
@@ -62,6 +63,11 @@ async def readiness() -> JSONResponse:
         async with asyncio.timeout(READINESS_TIMEOUT_SECONDS):
             async with AsyncSessionLocal() as session:
                 await session.execute(text("SELECT 1"))
+                revision_result = await session.execute(
+                    text("SELECT version_num FROM alembic_version")
+                )
+                if revision_result.scalar_one_or_none() != get_migration_head():
+                    raise RuntimeError("database schema revision mismatch")
     except Exception:  # noqa: BLE001 - infrastructure boundary must fail closed
         # Deliberately omit the exception and SQL from both response and logs.
         database_status = "failed"

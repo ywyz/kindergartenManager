@@ -100,7 +100,8 @@ GET /api/v1/health
 GET /api/v1/readiness
 ```
 
-免鉴权。每次请求使用独立短 session，只执行一次无副作用的 `SELECT 1`。成功返回 200：
+免鉴权。每次请求使用独立短 session，执行无副作用的 `SELECT 1`，并确认实际 `alembic_version`
+等于当前代码/镜像唯一 head。两项均通过才返回 200：
 
 ```json
 {"status":"ready","service":"kindergarten-teaching-api","version":"v1","time":"...","checks":{"database":"ok"}}

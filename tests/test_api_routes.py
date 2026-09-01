@@ -137,7 +137,13 @@ class TestAuth:
 
 
 class _ReadinessSession:
-    def __init__(self, *, error: Exception | None = None, block: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        error: Exception | None = None,
+        block: bool = False,
+        revision: str | None = None,
+    ) -> None:
         self.error = error
         self.block = block
         self.statements: list[str] = []
@@ -146,6 +152,7 @@ class _ReadinessSession:
         self.cancelled = False
         self.commit_calls = 0
         self.flush_calls = 0
+        self.revision = revision
 
     async def __aenter__(self):
         self.entered = True
@@ -164,9 +171,15 @@ class _ReadinessSession:
             except asyncio.CancelledError:
                 self.cancelled = True
                 raise
+        revision = self.revision
+
         class Result:
             def scalar_one_or_none(self) -> str:
-                return "expected-head"
+                if revision is not None:
+                    return revision
+                from app.core.startup import get_migration_head
+
+                return get_migration_head()
 
         return Result()
 
@@ -191,12 +204,12 @@ class _ReadinessFactory:
 
 
 class TestReadiness:
-    async def test_readiness_is_unauthenticated_and_executes_only_select_one(
+    async def test_readiness_is_unauthenticated_and_checks_connection_and_schema(
         self, api_client, monkeypatch
     ) -> None:
         from app.api import routes
 
-        session = _ReadinessSession()
+        session = _ReadinessSession(revision="expected-head")
         monkeypatch.setattr(routes, "AsyncSessionLocal", _ReadinessFactory([session]))
         monkeypatch.setattr(routes, "get_migration_head", lambda: "expected-head")
 

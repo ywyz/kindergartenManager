@@ -65,6 +65,21 @@ def test_run_dispatch_to_main_without_bootstrap_args(monkeypatch):
     assert called["bootstrap"] == 0
 
 
+def test_run_dispatches_packaged_explicit_migration(monkeypatch):
+    observed: list[list[str]] = []
+    monkeypatch.setattr(run, "_run_migration_cli", lambda args: observed.append(args))
+    monkeypatch.setattr(
+        run,
+        "_run_main_app",
+        lambda: (_ for _ in ()).throw(AssertionError("must not start app")),
+    )
+
+    args = ["run.py", "--migrate-database", "--backup-evidence", "/proof.json"]
+    run._run_entrypoint(args)
+
+    assert observed == [args]
+
+
 @pytest.mark.parametrize("exit_code", [0, 1, 2])
 def test_packaged_bootstrap_cli_propagates_exit_code(monkeypatch, exit_code):
     """打包入口必须把初始化成功、失败和取消状态传给调用进程。"""

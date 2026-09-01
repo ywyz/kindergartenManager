@@ -51,6 +51,7 @@ python scripts/deploy.py \
   --state-dir /var/lib/kindergarten-manager/deploy-state \
   --backup-evidence /secure/path/backup-evidence.json \
   --protected-image ghcr.io/ywyz/kindergartenmanager@sha256:<当前digest> \
+  --database-identity-sha256 <备份证据中的64位identity-hash> \
   --health-url https://manager.ywyz.tech/api/v1/health \
   --readiness-url https://manager.ywyz.tech/api/v1/readiness \
   deploy ghcr.io/ywyz/kindergartenmanager@sha256:872e9854fcdf62df1f510e4b825ccb4a25022e1b06383672f0712cf9c6ba7246
@@ -63,6 +64,7 @@ python scripts/deploy.py \
   --state-dir /var/lib/kindergarten-manager/deploy-state \
   --backup-evidence /secure/path/backup-evidence.json \
   --protected-image ghcr.io/ywyz/kindergartenmanager@sha256:<当前digest> \
+  --database-identity-sha256 <备份证据中的64位identity-hash> \
   --health-url https://manager.ywyz.tech/api/v1/health \
   --readiness-url https://manager.ywyz.tech/api/v1/readiness rollback
 ```
@@ -83,6 +85,7 @@ python scripts/deploy.py \
   --state-dir /var/lib/kindergarten-manager/deploy-state \
   --backup-evidence /secure/path/backup-evidence.json \
   --protected-image <当前运行的精确legacy-manifest-ref> \
+  --database-identity-sha256 <备份证据中的64位identity-hash> \
   --health-url https://manager.ywyz.tech/api/v1/health \
   --readiness-url https://manager.ywyz.tech/api/v1/readiness \
   migrate-legacy \

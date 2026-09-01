@@ -74,7 +74,7 @@ KindergartenManager 是一个 Python 3.14.7、NiceGUI 前后端一体化的幼�
 
 ### 4.2 对外 API 身份
 
-- `/api/v1/health` 与 `/api/v1/readiness` 免鉴权；前者只表示 liveness，后者只执行 database `SELECT 1`。
+- `/api/v1/health` 与 `/api/v1/readiness` 免鉴权；前者只表示 liveness，后者在独立短 session 中检查 database `SELECT 1` 与实际 Alembic revision 是否等于当前代码 head。
 - 其余只读端点在未配置 `API_KEYS` 时默认关闭。
 - 每个 API Key 映射到一个 `tenant_id`；查询必须使用该租户条件。
 - 配置 `API_SIGNING_SECRET` 后，时间戳和 HMAC-SHA256 签名成为强制要求。

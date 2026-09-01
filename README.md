@@ -106,7 +106,7 @@ Tag 发布工作流可构建 Windows 安装包/便携包、Debian 包/Linux 便�
 
 Docker 发布与生产部署已改为收敛到不可变镜像引用；`docker-image.json` 会随 release 附件上传，并在 release body 中写入
 `tag`、`source SHA`、`OCI index digest`、`repository@sha256`。`/api/v1/health` 仍只表示进程存活；
-`/api/v1/readiness` 独立执行数据库 `SELECT 1`。Issue #54 的真实 MySQL 故障/恢复验收仍未由本地实现替代。生产密码文件、轮换门禁、
+`/api/v1/readiness` 独立检查数据库连接与 schema revision。Issue #54 的真实 MySQL 故障/恢复验收仍未由本地实现替代。生产密码文件、轮换门禁、
 部署状态与回滚边界见 [生产部署指南](docs/DEPLOYMENT.md)。
 
 ### Docker
@@ -128,11 +128,13 @@ docker compose exec -e BOOTSTRAP_ADMIN_ALLOW_REMOTE=true app python -m app.jobs.
 ```bash
 python scripts/deploy.py --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
   --backup-evidence /secure/path/backup-evidence.json --protected-image <当前不可变镜像ref> \
+  --database-identity-sha256 <证据中的64位identity-hash> \
   --health-url https://manager.ywyz.tech/api/v1/health \
   --readiness-url https://manager.ywyz.tech/api/v1/readiness \
   deploy ghcr.io/ywyz/kindergartenmanager@sha256:<64位digest>
 python scripts/deploy.py --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
   --backup-evidence /secure/path/backup-evidence.json --protected-image <当前不可变镜像ref> \
+  --database-identity-sha256 <证据中的64位identity-hash> \
   --health-url https://manager.ywyz.tech/api/v1/health \
   --readiness-url https://manager.ywyz.tech/api/v1/readiness rollback
 ```

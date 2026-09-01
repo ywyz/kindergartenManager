@@ -286,9 +286,9 @@ def _seed(args: argparse.Namespace) -> None:
     database = _database_path(args.database, exists=False)
     _reserve_database(database)
     _synthetic_env(database, mock=mock)
-    from app.core.startup import run_startup_migrations  # delayed by gate
+    from app.core.startup import run_migrations  # delayed by isolation gate
 
-    run_startup_migrations()
+    run_migrations()
     asyncio.run(_seed_rows(mock=mock))
     print(
         json.dumps(
