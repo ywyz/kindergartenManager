@@ -34,7 +34,7 @@
 
 | ID | gate/module | tested_code_sha | evidence_closure_sha | 当前状态 | 当前证据 / 下一门 |
 |---|---|---|---|---|---|
-| A | R2 五模块复验 | 待提交倾听 GREEN SHA | 待固定 | `IN_PROGRESS` | 基线定向 212 passed；倾听冻结 RED 与格式 GREEN 已实现，但 Review M 和全部人工门仍待闭合 |
+| A | R2 五模块复验 | `5fb4f31dc2a0cd73f786cba4795f5a579f5816ba`（倾听 GREEN candidate） | 待固定 | `IN_PROGRESS` | 倾听冻结 RED、格式 GREEN 与当前 SHA 全量已固定；Review M 和全部人工门仍待闭合 |
 | B | R5-54 readiness + Compose + deploy/rollback 双门 | `0b3f2408984d717b9692cfa003ee2740e4219341` | 待固定 | `LOCAL_GREEN` | stable RED、两轮 Review finding、当前 SHA 全量与隔离 MySQL 故障恢复均通过；生产部署门未执行 |
 | C | R5-R 备份与恢复 | 待固定 | 待固定 | `BLOCKED` | 尚无实现/演练；应用启动自动迁移使 image rollback 不能恢复 schema/data |
 | D | R5-P release/digest/deploy/rollback 收敛 | 待固定 | 待固定 | `PLANNED` | 只做本地/隔离演练；无 push、Release 或生产操作授权 |
@@ -108,6 +108,11 @@ Python/数据库/migration head、tenant/user/role、模板文件与 SHA-256、�
 - Review finding RED：按领域 public exporter 的逆序/空选择两个用例连续两次均 `2 failed / 8 deselected`。
 - 修复后：`tests/test_listening*.py` 为 `72 passed`；冻结/exporter/helper 定向为 `34 passed`；相关 4 个 Python
   文件 Ruff/format 通过，`git diff --check` 通过。
+- GREEN 功能提交：`eb8236a`；全量首跑暴露一个旧守卫仍要求 `sorted(selected_ids)`，结果为
+  `984 passed / 1 failed`，未计作 GREEN。守卫改为保留教师勾选顺序后，当前
+  `tested_code_sha=5fb4f31dc2a0cd73f786cba4795f5a579f5816ba` 全量为 `985 passed in 64.59s`。
+- 从基线 `c7ab7e0` 到当前 SHA 的 13 个变更 Python 文件 Ruff/format 全部通过；`uv lock --check` 通过。
+- 当前 CodeGraph 为 309 files / 6,181 nodes / 18,693 edges，状态 `up to date`。
 - 两位只读 reviewer 均确认领域过滤、三种批量模式、幼儿选择顺序、至少 15 图取前 15、同名 ZIP 与幼儿间
   硬分页实现；Windows Word 2010+、浏览器、真实 MySQL/视觉 AI 尚未执行。
 - Review M 保持 OPEN：ExportRecord commit 与独立 audit/download 的 generation/session 窄窗口尚无原子契约；
