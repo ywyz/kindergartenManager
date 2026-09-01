@@ -90,6 +90,8 @@ Word：Microsoft Word / LibreOffice / 未执行
 ## 9. 只读 API
 
 - [ ] `/api/v1/health` 可访问且不暴露敏感信息。
+- [ ] 数据库可用时 `/api/v1/readiness` 返回 200；数据库停止时返回 503，而 health 仍为 200。
+- [ ] 数据库恢复后无需重启 app，后续 readiness 恢复 200；故障日志无 URL、SQL、账号、密码、Key 或 tenant/user。
 - [ ] 未配置 `API_KEYS` 时业务端点返回 401。
 - [ ] 正确 Key 只能读取其 tenant。
 - [ ] 错误 Key、错误/过期 HMAC 返回 401。

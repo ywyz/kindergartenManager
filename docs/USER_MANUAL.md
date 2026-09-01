@@ -51,13 +51,15 @@ docker compose exec -e BOOTSTRAP_ADMIN_ALLOW_REMOTE=true app python -m app.jobs.
 ```bash
 python scripts/deploy.py --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
   --health-url https://manager.ywyz.tech/api/v1/health \
+  --readiness-url https://manager.ywyz.tech/api/v1/readiness \
   deploy ghcr.io/ywyz/kindergartenmanager@sha256:<64位digest>
 python scripts/deploy.py --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
-  --health-url https://manager.ywyz.tech/api/v1/health rollback
+  --health-url https://manager.ywyz.tech/api/v1/health \
+  --readiness-url https://manager.ywyz.tech/api/v1/readiness rollback
 ```
 
-`deploy.py` 仅做健康接口验证，不替代数据库 readiness 检查；相关数据库 readiness 回归与健康模型
-见 [Issue #54](https://github.com/ywyz/kindergartenManager/issues/54)。
+`deploy.py` 要求 liveness 与 database readiness 依次通过后才更新部署状态。它仍不证明迁移兼容、登录、
+五模块业务或数据恢复；真实 MySQL 故障/恢复矩阵见 [Issue #54](https://github.com/ywyz/kindergartenManager/issues/54)。
 
 生产管理员密码文件属于运维机密，不是普通用户配置。当前 Aliyun 路径、权限要求、轮换验收与清理规则只在
 [生产部署指南](DEPLOYMENT.md#4-bootstrap-管理员生产凭据)维护；不要在用户手册、Issue 或聊天中记录密码值。

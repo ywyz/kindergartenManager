@@ -291,8 +291,8 @@ H0/M0/L0，Quality、CodeQL 与 Dependency Graph 精确 SHA 成功，Issue #52 �
 - Release SHA、资产、校验值、变更日志和回滚说明。
 - `docker-image.json` 与 Release Notes 的收敛校验与自动化验证。
 - `scripts/deploy.py` 的不可变部署与回滚操作（dry-run、串行锁、rollback）。
-- 独立 Issue #54 的 `/api/v1/readiness`、Compose 接线与真实 MySQL 故障/恢复矩阵；闭合后替换部署脚本当前
-  liveness-only 的接流量判断。
+- 独立 Issue #54 的 `/api/v1/readiness`、Compose 与部署双门已有本地实现候选；当前 SHA Review、全量回归、
+  隔离 Compose/真实 MySQL 故障—恢复矩阵和最终证据 closure 仍待闭合。
 
 ## 11. R6：产品深化（模板、文档、审核与复用）
 

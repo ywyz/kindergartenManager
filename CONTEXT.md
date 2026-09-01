@@ -74,7 +74,7 @@ KindergartenManager 是一个 Python 3.14.7、NiceGUI 前后端一体化的幼�
 
 ### 4.2 对外 API 身份
 
-- `/api/v1/health` 免鉴权。
+- `/api/v1/health` 与 `/api/v1/readiness` 免鉴权；前者只表示 liveness，后者只执行 database `SELECT 1`。
 - 其余只读端点在未配置 `API_KEYS` 时默认关闭。
 - 每个 API Key 映射到一个 `tenant_id`；查询必须使用该租户条件。
 - 配置 `API_SIGNING_SECRET` 后，时间戳和 HMAC-SHA256 签名成为强制要求。
@@ -226,10 +226,10 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
 
 当前共同下一步是：
 
-1. 按独立 [Issue #54](https://github.com/ywyz/kindergartenManager/issues/54) 以稳定 RED → 最小 GREEN 实现
-   数据库 readiness 和 Compose 接线；`/api/v1/health` 继续只表示进程/HTTP 存活。
-2. readiness 验收闭合后，再让 digest 部署/回滚脚本以 readiness 作为接流量门禁；不得把数据库迁移失败
-   解释为可自动回滚数据库 revision。
+1. Issue #54 的 readiness、Compose 与 deploy/rollback 双门已有本地候选；继续完成当前 SHA Review、全量测试、
+   隔离 Compose/真实 MySQL 停止—恢复矩阵。`/api/v1/health` 继续只表示进程/HTTP 存活。
+2. 应用容器启动会执行 fail-closed Alembic upgrade；镜像 rollback 不恢复 schema/data。发布前必须闭合备份恢复
+   与新 schema→旧镜像兼容路径，且不得自动 downgrade 数据库 revision。
 3. 当前 OCI index digest 描述资产、Release body/tag/SHA/asset 收敛校验和部署/回滚脚本候选需取得本次
    commit、push、精确 SHA CI 与复审证据；生产管理员登录/最终密码轮换/旧会话失效已于 2026-08-31 验收，
    但目标页语义浏览器自动化超时仍是独立工具问题。

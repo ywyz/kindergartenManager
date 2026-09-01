@@ -3,20 +3,23 @@
 from __future__ import annotations
 
 import contextlib
+import http.client
 import json
 import stat
 import subprocess
 from pathlib import Path
+from typing import Self
 
 import pytest
 
 from scripts import deploy
 
-HEALTH_ARGS = ("--health-url", "https://manager.ywyz.tech/api/v1/health")
+LIVENESS_ARGS = ("--health-url", "https://manager.ywyz.tech/api/v1/health")
 READINESS_ARGS = (
     "--readiness-url",
     "https://manager.ywyz.tech/api/v1/readiness",
 )
+HEALTH_ARGS = (*LIVENESS_ARGS, *READINESS_ARGS)
 VALIDATE_OCI_INDEX_REF = deploy._validate_oci_index_ref
 
 
@@ -87,6 +90,7 @@ def test_relative_compose_and_state_paths_resolve_from_project_dir(
         service: str,
         image_ref: str,
         health_url: str,
+        readiness_url: str,
         dry_run: bool,
     ) -> str:
         observed["compose"] = compose_file
@@ -141,6 +145,53 @@ def test_first_deploy_snapshots_live_current_image(
     }
     assert stat.S_IMODE((tmp_path / ".deploy").stat().st_mode) == 0o700
     assert stat.S_IMODE(state_path.stat().st_mode) == 0o600
+
+
+def test_first_deploy_does_not_persist_live_snapshot_before_dual_gate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _compose(tmp_path)
+    old_image = _image("a")
+    failed_image = _image("b")
+    state_path = tmp_path / ".deploy" / "state.json"
+    monkeypatch.setattr(
+        deploy, "_snapshot_current_state", lambda *args, **kwargs: old_image
+    )
+    calls: list[tuple[str, str, str]] = []
+
+    def fake_deploy_once(
+        *args: object,
+        image_ref: str,
+        health_url: str,
+        readiness_url: str,
+        **kwargs: object,
+    ) -> str:
+        calls.append((image_ref, health_url, readiness_url))
+        assert json.loads(state_path.read_text()) == {}
+        if image_ref == failed_image:
+            raise deploy.DeployError("synthetic readiness failure")
+        return image_ref
+
+    monkeypatch.setattr(deploy, "_deploy_once", fake_deploy_once)
+
+    with pytest.raises(SystemExit, match="synthetic readiness failure"):
+        deploy.main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                *HEALTH_ARGS,
+                "deploy",
+                failed_image,
+            ]
+        )
+
+    assert calls == [
+        (failed_image, LIVENESS_ARGS[1], READINESS_ARGS[1]),
+        (old_image, LIVENESS_ARGS[1], READINESS_ARGS[1]),
+    ]
+    assert json.loads(state_path.read_text()) == {
+        "app": {"current_image": old_image, "previous_image": None}
+    }
 
 
 def test_failed_deploy_rolls_back_to_pre_deploy_image_and_preserves_history(
@@ -323,6 +374,42 @@ def test_failed_legacy_migration_restores_exact_legacy_without_state(
         )
     assert calls == [target_index, legacy_image]
     assert json.loads((tmp_path / ".deploy" / "state.json").read_text()) == {}
+
+
+def test_failed_legacy_migration_reports_target_and_restore_failures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _compose(tmp_path)
+    legacy_image = _image("a")
+    target_index = _image("b")
+    monkeypatch.setattr(
+        deploy, "_snapshot_current_state", lambda *args, **kwargs: legacy_image
+    )
+
+    def fake_deploy_once(*args: object, image_ref: str, **kwargs: object) -> str:
+        if image_ref == target_index:
+            raise deploy.DeployError("synthetic target readiness failure")
+        raise deploy.DeployError("synthetic legacy restore failure")
+
+    monkeypatch.setattr(deploy, "_deploy_once", fake_deploy_once)
+
+    with pytest.raises(
+        SystemExit,
+        match=(
+            "synthetic target readiness failure.*"
+            "legacy restore.*synthetic legacy restore failure"
+        ),
+    ):
+        deploy.main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                *HEALTH_ARGS,
+                "migrate-legacy",
+                legacy_image,
+                target_index,
+            ]
+        )
 
 
 def test_rollback_to_explicit_target_restores_original_current_on_verify_failure(
@@ -537,6 +624,7 @@ def test_liveness_url_is_required_and_rejects_embedded_credentials(
                 str(tmp_path),
                 "--health-url",
                 "https://user:password@manager.ywyz.tech/api/v1/health",
+                *READINESS_ARGS,
                 "deploy",
                 _image("a"),
             ]
@@ -552,13 +640,95 @@ def test_readiness_url_is_independently_required(tmp_path: Path) -> None:
                 "--project-dir",
                 str(tmp_path),
                 "--dry-run",
-                *HEALTH_ARGS,
+                *LIVENESS_ARGS,
+                "deploy",
+                _image("a"),
+            ]
+        )
+    assert missing.value.code == 2
+
+    with pytest.raises(SystemExit, match="Readiness URL must be .*without credentials"):
+        deploy.main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                *LIVENESS_ARGS,
+                "--readiness-url",
+                "https://user:password@manager.ywyz.tech/api/v1/readiness",
                 "deploy",
                 _image("a"),
             ]
         )
 
-    assert missing.value.code == 2
+
+@pytest.mark.parametrize(
+    "readiness_alias",
+    [
+        LIVENESS_ARGS[1],
+        LIVENESS_ARGS[1] + "/",
+        "https://manager.ywyz.tech/api/v1/%68ealth",
+    ],
+)
+def test_liveness_and_readiness_urls_must_be_distinct(
+    tmp_path: Path, readiness_alias: str
+) -> None:
+    _compose(tmp_path)
+
+    with pytest.raises(SystemExit, match="must be different"):
+        deploy.main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                "--dry-run",
+                *LIVENESS_ARGS,
+                "--readiness-url",
+                readiness_alias,
+                "deploy",
+                _image("a"),
+            ]
+        )
+
+
+def test_explicit_noop_rollback_still_requires_both_gates(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _compose(tmp_path)
+    current_image = _image("a")
+    previous_image = _image("b")
+    state_path = tmp_path / ".deploy" / "state.json"
+    deploy._ensure_file_permissions(state_path)
+    deploy._update_service_state(
+        state_path,
+        "app",
+        current_image=current_image,
+        previous_image=previous_image,
+    )
+    monkeypatch.setattr(
+        deploy, "_snapshot_current_state", lambda *args, **kwargs: current_image
+    )
+
+    def failed_gates(*args: object, **kwargs: object) -> None:
+        raise deploy.DeployError("synthetic readiness failure")
+
+    monkeypatch.setattr(deploy, "_wait_for_deployment_gates", failed_gates)
+
+    with pytest.raises(SystemExit, match="synthetic readiness failure"):
+        deploy.main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                *HEALTH_ARGS,
+                "rollback",
+                current_image,
+            ]
+        )
+
+    assert json.loads(state_path.read_text()) == {
+        "app": {
+            "current_image": current_image,
+            "previous_image": previous_image,
+        }
+    }
 
 
 def test_deployment_gates_check_liveness_then_readiness(
@@ -572,16 +742,135 @@ def test_deployment_gates_check_liveness_then_readiness(
     monkeypatch.setattr(deploy, "_wait_for_http_gate", fake_wait)
 
     deploy._wait_for_deployment_gates(
-        HEALTH_ARGS[1],
+        LIVENESS_ARGS[1],
         READINESS_ARGS[1],
         timeout_seconds=17,
         dry_run=False,
     )
 
     assert calls == [
-        ("liveness", HEALTH_ARGS[1]),
+        ("liveness", LIVENESS_ARGS[1]),
         ("readiness", READINESS_ARGS[1]),
     ]
+
+
+class _ProbeResponse:
+    def __init__(
+        self,
+        url: str,
+        payload: object | bytes,
+        *,
+        status: int = 200,
+        read_error: Exception | None = None,
+    ) -> None:
+        self.status = status
+        self._url = url
+        self._payload = (
+            payload if isinstance(payload, bytes) else json.dumps(payload).encode()
+        )
+        self._read_error = read_error
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        return None
+
+    def geturl(self) -> str:
+        return self._url
+
+    def read(self, _limit: int) -> bytes:
+        if self._read_error is not None:
+            raise self._read_error
+        return self._payload
+
+
+def test_readiness_gate_rejects_a_liveness_only_200_response() -> None:
+    response = _ProbeResponse(
+        READINESS_ARGS[1],
+        {
+            "status": "ok",
+            "service": "kindergarten-teaching-api",
+            "version": "v1",
+            "time": "2026-09-01T00:00:00Z",
+        },
+    )
+
+    assert not deploy._probe_response_is_valid(
+        response,
+        requested_url=READINESS_ARGS[1],
+        gate="readiness",
+    )
+
+
+def test_probe_gates_require_their_exact_safe_json_contracts() -> None:
+    liveness = _ProbeResponse(
+        LIVENESS_ARGS[1],
+        {"status": "ok", "service": "kindergarten-teaching-api", "version": "v1"},
+    )
+    readiness = _ProbeResponse(
+        READINESS_ARGS[1],
+        {
+            "status": "ready",
+            "service": "kindergarten-teaching-api",
+            "version": "v1",
+            "checks": {"database": "ok"},
+        },
+    )
+
+    assert deploy._probe_response_is_valid(
+        liveness, requested_url=LIVENESS_ARGS[1], gate="liveness"
+    )
+    assert deploy._probe_response_is_valid(
+        readiness, requested_url=READINESS_ARGS[1], gate="readiness"
+    )
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        _ProbeResponse(
+            "https://redirected.invalid/api/v1/health",
+            {
+                "status": "ok",
+                "service": "kindergarten-teaching-api",
+                "version": "v1",
+            },
+        ),
+        _ProbeResponse(LIVENESS_ARGS[1], b"not-json"),
+        _ProbeResponse(LIVENESS_ARGS[1], b"x" * 1025),
+    ],
+)
+def test_probe_gate_rejects_redirect_invalid_json_and_oversize_body(
+    response: _ProbeResponse,
+) -> None:
+    assert not deploy._probe_response_is_valid(
+        response,
+        requested_url=LIVENESS_ARGS[1],
+        gate="liveness",
+    )
+
+
+def test_body_disconnect_becomes_gate_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    response = _ProbeResponse(
+        LIVENESS_ARGS[1],
+        b"",
+        read_error=http.client.IncompleteRead(b'{"status":', 100),
+    )
+    times = iter((0.0, 0.0, 2.0))
+    monkeypatch.setattr(deploy.request, "urlopen", lambda *_args, **_kwargs: response)
+    monkeypatch.setattr(deploy.time, "time", lambda: next(times))
+    monkeypatch.setattr(deploy.time, "sleep", lambda _seconds: None)
+
+    with pytest.raises(deploy.DeployError, match="Liveness check timed out"):
+        deploy._wait_for_http_gate(
+            LIVENESS_ARGS[1],
+            timeout_seconds=1,
+            dry_run=False,
+            gate="liveness",
+        )
 
 
 def test_non_digest_ref_is_rejected(tmp_path: Path) -> None:

@@ -12,3 +12,9 @@
 旧 session 安全边界、密钥可用但不回显、五模块记录、图片/BLOB、Word 重导出、readiness 与 Alembic head。
 失败恢复只回到原隔离环境/备份，不自动 downgrade 数据库。镜像 rollback 与数据 restore 是两个门禁。
 
+## 当前 blocker
+
+`scripts/deploy.py` 不直接调用 Alembic，但 `app/main.py` 在每次目标容器启动时执行 fail-closed
+`alembic upgrade head`。因此“新镜像启动并迁移 → readiness/业务失败 → 切回旧镜像”可能让旧镜像面对新
+schema；仅切换 image 无法恢复数据库。R5-P 在建立并演练预部署一致性备份、恢复到隔离副本、以及新
+schema→旧镜像兼容/恢复决策前保持 BLOCKED；禁止把 `alembic downgrade` 作为自动恢复。

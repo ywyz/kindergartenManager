@@ -5,7 +5,7 @@
 - 基础 URL：`https://<host>/api/v1`
 - 数据格式：JSON（UTF-8）
 - 仅提供 `GET`（只读）；API 不具备业务写入能力
-- `/api/v1/health` 只表示 HTTP/进程存活，不表示数据库 readiness 或 UI/业务链路已就绪
+- `/api/v1/health` 只表示 HTTP/进程存活；`/api/v1/readiness` 只表示当前数据库探针成功。两者都不代表 UI/完整业务链路已验收
 
 ---
 
@@ -94,7 +94,22 @@ GET /api/v1/health
 }
 ```
 
-### 2.2 查询每日活动计划（分页）
+### 2.2 数据库就绪检查
+
+```
+GET /api/v1/readiness
+```
+
+免鉴权。每次请求使用独立短 session，只执行一次无副作用的 `SELECT 1`。成功返回 200：
+
+```json
+{"status":"ready","service":"kindergarten-teaching-api","version":"v1","time":"...","checks":{"database":"ok"}}
+```
+
+连接、查询或硬超时失败返回 503，`status=not_ready`、`checks.database=failed`；响应和日志不包含原始异常、
+SQL、数据库地址或身份/凭据。探针不读取业务表、不写审计、不 commit/flush，也不执行迁移或业务重试。
+
+### 2.3 查询每日活动计划（分页）
 
 ```
 GET /api/v1/daily-plans

@@ -3,13 +3,19 @@
 所有业务端点强制经过 API Key 鉴权，并以鉴权得到的 tenant_id 作为查询隔离条件，
 调用方无法越权读取其他租户数据。
 """
+# ruff: noqa: B008
+
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+import asyncio
+from datetime import UTC, date, datetime
 
 from fastapi import APIRouter, Depends, Query
 from fastapi import status as http_status
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import HTTPException
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from app.api.auth import ApiPrincipal, get_api_principal
 from app.api.deps import get_db
@@ -19,8 +25,11 @@ from app.api.schemas import (
     DailyPlanOut,
     HealthOut,
     PageMeta,
+    ReadinessChecks,
+    ReadinessOut,
     SemesterOut,
 )
+from app.core.database import AsyncSessionLocal
 from app.repository.class_repository import list_class_configs_for_tenant
 from app.repository.daily_plan_repository import (
     get_daily_plan_by_id_for_tenant,
@@ -29,11 +38,42 @@ from app.repository.daily_plan_repository import (
 from app.repository.semester_repository import list_semesters_for_tenant
 
 router = APIRouter(prefix="/api/v1", tags=["v1"])
+READINESS_TIMEOUT_SECONDS = 3.0
 
 
 @router.get("/health", response_model=HealthOut, summary="健康检查（免鉴权）")
 async def health() -> HealthOut:
-    return HealthOut(time=datetime.now(timezone.utc))
+    return HealthOut(time=datetime.now(UTC))
+
+
+@router.get(
+    "/readiness",
+    response_model=ReadinessOut,
+    responses={503: {"model": ReadinessOut}},
+    summary="数据库就绪检查（免鉴权）",
+)
+async def readiness() -> JSONResponse:
+    """Probe the database without reading or mutating application data."""
+    database_status = "ok"
+    response_status = "ready"
+    status_code = http_status.HTTP_200_OK
+
+    try:
+        async with asyncio.timeout(READINESS_TIMEOUT_SECONDS):
+            async with AsyncSessionLocal() as session:
+                await session.execute(text("SELECT 1"))
+    except Exception:  # noqa: BLE001 - infrastructure boundary must fail closed
+        # Deliberately omit the exception and SQL from both response and logs.
+        database_status = "failed"
+        response_status = "not_ready"
+        status_code = http_status.HTTP_503_SERVICE_UNAVAILABLE
+
+    payload = ReadinessOut(
+        status=response_status,
+        time=datetime.now(UTC),
+        checks=ReadinessChecks(database=database_status),
+    )
+    return JSONResponse(status_code=status_code, content=jsonable_encoder(payload))
 
 
 @router.get(

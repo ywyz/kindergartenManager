@@ -93,6 +93,9 @@ python -m app.main
 Internet/LAN → Caddy → app:8080 → MySQL 8
 ```
 
+Compose 启动链为 db `service_healthy` → app readiness `service_healthy` → Caddy。app readiness 只用独立短
+session 执行 `SELECT 1`；它不替代迁移、登录或业务验收。运行期 Caddy 自动摘除 unready upstream 不在当前范围。
+
 没有独立 AI、Word 或 Holiday 容器。开发 override 可直接暴露 app 端口并挂载源码/模板。
 
 ## 4. 代码组织与依赖方向
@@ -144,6 +147,7 @@ app/jobs        ─┘
 | 方法 | 路径 | 鉴权 |
 |---|---|---|
 | GET | `/health` | 无 |
+| GET | `/readiness` | 无；基础设施数据库探针 |
 | GET | `/daily-plans` | API Key；可选强制 HMAC |
 | GET | `/daily-plans/{plan_id}` | 同上 |
 | GET | `/semesters` | 同上 |

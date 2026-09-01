@@ -1,12 +1,13 @@
 """对外 REST API 路由集成测试（httpx ASGITransport + SQLite 内存库）。"""
+
 import asyncio
 import hashlib
 import hmac
 import time
 from datetime import date
 
-import pytest_asyncio
 import pytest
+import pytest_asyncio
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
@@ -45,42 +46,72 @@ async def _seed(session):
     session.add_all(
         [
             DailyPlan(
-                tenant_id=TENANT, user_id=11, plan_date=date(2026, 3, 2),
-                week_number=1, weekday_cn="周一", grade="小班", class_name="阳光班",
+                tenant_id=TENANT,
+                user_id=11,
+                plan_date=date(2026, 3, 2),
+                week_number=1,
+                weekday_cn="周一",
+                grade="小班",
+                class_name="阳光班",
                 activity_goal="目标A",
             ),
             DailyPlan(
-                tenant_id=TENANT, user_id=12, plan_date=date(2026, 3, 9),
-                week_number=2, weekday_cn="周一", grade="中班", class_name="星星班",
+                tenant_id=TENANT,
+                user_id=12,
+                plan_date=date(2026, 3, 9),
+                week_number=2,
+                weekday_cn="周一",
+                grade="中班",
+                class_name="星星班",
                 activity_goal="目标B",
             ),
             DailyPlan(
-                tenant_id=OTHER_TENANT, user_id=99, plan_date=date(2026, 3, 2),
-                week_number=1, weekday_cn="周一", grade="大班", class_name="月亮班",
+                tenant_id=OTHER_TENANT,
+                user_id=99,
+                plan_date=date(2026, 3, 2),
+                week_number=1,
+                weekday_cn="周一",
+                grade="大班",
+                class_name="月亮班",
             ),
         ]
     )
     session.add(
         SemesterConfig(
-            tenant_id=TENANT, user_id=11, semester_name="2026春季",
-            start_date=date(2026, 2, 23), end_date=date(2026, 7, 1), is_active=True,
+            tenant_id=TENANT,
+            user_id=11,
+            semester_name="2026春季",
+            start_date=date(2026, 2, 23),
+            end_date=date(2026, 7, 1),
+            is_active=True,
         )
     )
     session.add(
         SemesterConfig(
-            tenant_id=OTHER_TENANT, user_id=99, semester_name="其它租户学期",
-            start_date=date(2026, 2, 23), end_date=date(2026, 7, 1), is_active=True,
+            tenant_id=OTHER_TENANT,
+            user_id=99,
+            semester_name="其它租户学期",
+            start_date=date(2026, 2, 23),
+            end_date=date(2026, 7, 1),
+            is_active=True,
         )
     )
     session.add(
         ClassConfig(
-            tenant_id=TENANT, user_id=11, grade="小班", class_name="阳光班",
-            indoor_areas="积木区", outdoor_content="攀爬",
+            tenant_id=TENANT,
+            user_id=11,
+            grade="小班",
+            class_name="阳光班",
+            indoor_areas="积木区",
+            outdoor_content="攀爬",
         )
     )
     session.add(
         ClassConfig(
-            tenant_id=OTHER_TENANT, user_id=99, grade="大班", class_name="其它租户班级",
+            tenant_id=OTHER_TENANT,
+            user_id=99,
+            grade="大班",
+            class_name="其它租户班级",
         )
     )
     await session.flush()
@@ -199,7 +230,14 @@ class TestReadiness:
         assert response.json()["status"] == "not_ready"
         assert response.json()["checks"] == {"database": "failed"}
         exposed = response.text + caplog.text
-        for secret in ("secret-user", "secret-pass", "secret-key", "tenant=77", "user=88", "SELECT 1"):
+        for secret in (
+            "secret-user",
+            "secret-pass",
+            "secret-key",
+            "tenant=77",
+            "user=88",
+            "SELECT 1",
+        ):
             assert secret not in exposed
 
     async def test_readiness_timeout_cancels_query_and_closes_session(
@@ -297,7 +335,9 @@ class TestDailyPlans:
         tenants = {item["tenant_id"] for item in body["items"]}
         assert tenants == {TENANT}
 
-    async def test_tenant_projection_includes_multiple_users(self, api_client, async_session):
+    async def test_tenant_projection_includes_multiple_users(
+        self, api_client, async_session
+    ):
         """API Key 代表 tenant；不传 user 过滤时可读本 tenant 内多个教师。"""
         await _seed(async_session)
         resp = await api_client.get(
@@ -377,9 +417,7 @@ class TestDailyPlans:
 class TestConfigEndpoints:
     async def test_semesters(self, api_client, async_session):
         await _seed(async_session)
-        resp = await api_client.get(
-            "/api/v1/semesters", headers={"X-Api-Key": API_KEY}
-        )
+        resp = await api_client.get("/api/v1/semesters", headers={"X-Api-Key": API_KEY})
         assert resp.status_code == 200
         data = resp.json()
         assert len(data) == 1
@@ -388,9 +426,7 @@ class TestConfigEndpoints:
 
     async def test_classes(self, api_client, async_session):
         await _seed(async_session)
-        resp = await api_client.get(
-            "/api/v1/classes", headers={"X-Api-Key": API_KEY}
-        )
+        resp = await api_client.get("/api/v1/classes", headers={"X-Api-Key": API_KEY})
         assert resp.status_code == 200
         data = resp.json()
         assert len(data) == 1

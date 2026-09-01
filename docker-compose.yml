@@ -13,7 +13,8 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     networks:
       - kindergarten_net
 
@@ -39,6 +40,18 @@ services:
     volumes:
       - app_data:/data
       - exports:/app/exports
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8080/api/v1/readiness', timeout=4).close()
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
     networks:
       - kindergarten_net

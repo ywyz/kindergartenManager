@@ -17,8 +17,9 @@ def test_only_login_is_a_public_ui_auth_route():
     assert "/register" not in UNRESTRICTED_PAGE_ROUTES
 
 
-def test_unrestricted_routes_include_health_only_outside_auth_pages():
+def test_unrestricted_routes_include_infrastructure_probes_outside_auth_pages():
     assert "/api/v1/health" in UNRESTRICTED_PAGE_ROUTES
+    assert "/api/v1/readiness" in UNRESTRICTED_PAGE_ROUTES
     assert "/home" not in UNRESTRICTED_PAGE_ROUTES
 
 

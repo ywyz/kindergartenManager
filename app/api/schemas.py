@@ -21,6 +21,18 @@ class HealthOut(BaseModel):
     time: datetime
 
 
+class ReadinessChecks(BaseModel):
+    database: str
+
+
+class ReadinessOut(BaseModel):
+    status: str
+    service: str = "kindergarten-teaching-api"
+    version: str = "v1"
+    time: datetime
+    checks: ReadinessChecks
+
+
 class PageMeta(BaseModel):
     total: int = Field(..., description="符合条件的记录总数")
     limit: int = Field(..., description="本页最大返回条数")
@@ -53,7 +65,7 @@ class DailyPlanOut(BaseModel):
     updated_at: datetime
 
     @classmethod
-    def from_model(cls, m: DailyPlan) -> "DailyPlanOut":
+    def from_model(cls, m: DailyPlan) -> DailyPlanOut:
         return cls(
             id=m.id,
             tenant_id=m.tenant_id,
@@ -96,7 +108,7 @@ class SemesterOut(BaseModel):
     is_active: bool
 
     @classmethod
-    def from_model(cls, m: SemesterConfig) -> "SemesterOut":
+    def from_model(cls, m: SemesterConfig) -> SemesterOut:
         return cls(
             id=m.id,
             tenant_id=m.tenant_id,
@@ -119,7 +131,7 @@ class ClassConfigOut(BaseModel):
     outdoor_content: str | None = None
 
     @classmethod
-    def from_model(cls, m: ClassConfig) -> "ClassConfigOut":
+    def from_model(cls, m: ClassConfig) -> ClassConfigOut:
         return cls(
             id=m.id,
             tenant_id=m.tenant_id,

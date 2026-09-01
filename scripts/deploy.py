@@ -6,8 +6,10 @@ from __future__ import annotations
 import argparse
 import contextlib
 import fcntl
+import http.client
 import json
 import os
+import posixpath
 import re
 import shlex
 import stat
@@ -15,6 +17,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
+from typing import Any
 from urllib import error, parse, request
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -208,29 +211,93 @@ def _run_compose(
     )
 
 
-def _wait_for_liveness(
-    health_url: str,
+def _wait_for_http_gate(
+    url: str,
     *,
     timeout_seconds: int,
     dry_run: bool,
+    gate: str,
 ) -> None:
     if dry_run:
-        print(f"[dry-run] wait for liveness URL: {health_url}")
+        print(f"[dry-run] wait for {gate} URL: {url}")
         return
 
     deadline = time.time() + timeout_seconds
     while time.time() < deadline:
         try:
-            with request.urlopen(health_url, timeout=4) as response:
-                if response.status == 200:
+            with request.urlopen(url, timeout=4) as response:
+                if _probe_response_is_valid(
+                    response,
+                    requested_url=url,
+                    gate=gate,
+                ):
                     return
         except (error.URLError, TimeoutError):
             pass
         time.sleep(2)
 
-    raise DeployError(
-        f"Liveness check timed out after {timeout_seconds}s. "
-        "Issue #54: DB readiness is not part of this check."
+    raise DeployError(f"{gate.capitalize()} check timed out after {timeout_seconds}s.")
+
+
+def _probe_response_is_valid(
+    response: Any,
+    *,
+    requested_url: str,
+    gate: str,
+) -> bool:
+    try:
+        if response.status != 200 or response.geturl() != requested_url:
+            return False
+        raw_payload = response.read(1025)
+        if len(raw_payload) > 1024:
+            return False
+        payload = json.loads(raw_payload)
+    except (
+        OSError,
+        http.client.HTTPException,
+        json.JSONDecodeError,
+        UnicodeDecodeError,
+        TypeError,
+        ValueError,
+    ):
+        return False
+    if not isinstance(payload, dict):
+        return False
+    if (
+        payload.get("service") != "kindergarten-teaching-api"
+        or payload.get("version") != "v1"
+    ):
+        return False
+    if gate == "liveness":
+        return payload.get("status") == "ok"
+    if gate == "readiness":
+        checks = payload.get("checks")
+        return (
+            payload.get("status") == "ready"
+            and isinstance(checks, dict)
+            and checks.get("database") == "ok"
+        )
+    return False
+
+
+def _wait_for_deployment_gates(
+    health_url: str,
+    readiness_url: str,
+    *,
+    timeout_seconds: int,
+    dry_run: bool,
+) -> None:
+    _wait_for_http_gate(
+        health_url,
+        timeout_seconds=timeout_seconds,
+        dry_run=dry_run,
+        gate="liveness",
+    )
+    _wait_for_http_gate(
+        readiness_url,
+        timeout_seconds=timeout_seconds,
+        dry_run=dry_run,
+        gate="readiness",
     )
 
 
@@ -339,6 +406,7 @@ def _deploy_once(
     service: str,
     image_ref: str,
     health_url: str,
+    readiness_url: str,
     dry_run: bool,
 ) -> str:
     descriptor = os.open(
@@ -381,8 +449,9 @@ def _deploy_once(
         if dry_run:
             return image_ref
 
-        _wait_for_liveness(
+        _wait_for_deployment_gates(
             health_url,
+            readiness_url,
             timeout_seconds=DEFAULT_HEALTH_TIMEOUT_SECONDS,
             dry_run=dry_run,
         )
@@ -420,8 +489,8 @@ def _require_service(service: str) -> None:
         raise DeployError(f"Invalid compose service name: {service}")
 
 
-def _require_health_url(health_url: str) -> None:
-    parsed = parse.urlsplit(health_url)
+def _require_probe_url(url: str, *, gate: str) -> None:
+    parsed = parse.urlsplit(url)
     if (
         parsed.scheme not in {"http", "https"}
         or not parsed.hostname
@@ -431,8 +500,38 @@ def _require_health_url(health_url: str) -> None:
         or parsed.fragment
     ):
         raise DeployError(
-            "Liveness URL must be an HTTP(S) URL without credentials, query, or fragment"
+            f"{gate.capitalize()} URL must be an HTTP(S) URL without credentials, query, or fragment"
         )
+
+
+def _require_health_url(health_url: str) -> None:
+    _require_probe_url(health_url, gate="liveness")
+
+
+def _require_readiness_url(readiness_url: str) -> None:
+    _require_probe_url(readiness_url, gate="readiness")
+
+
+def _probe_url_identity(url: str) -> tuple[str, str, int, str]:
+    parsed = parse.urlsplit(url)
+    port = parsed.port
+    if port is None:
+        port = 443 if parsed.scheme.lower() == "https" else 80
+    decoded_path = parse.unquote(parsed.path or "/")
+    normalized_path = posixpath.normpath("/" + decoded_path.lstrip("/"))
+    return (
+        parsed.scheme.lower(),
+        (parsed.hostname or "").lower(),
+        port,
+        normalized_path.rstrip("/") or "/",
+    )
+
+
+def _require_distinct_probe_urls(health_url: str, readiness_url: str) -> None:
+    _require_health_url(health_url)
+    _require_readiness_url(readiness_url)
+    if _probe_url_identity(health_url) == _probe_url_identity(readiness_url):
+        raise DeployError("Liveness and readiness URLs must be different endpoints")
 
 
 def _validate_snapshot_state(current_image: str | None) -> None:
@@ -453,6 +552,7 @@ def _rollback_or_restore(
     target_image: str,
     restore_image: str,
     health_url: str,
+    readiness_url: str,
     dry_run: bool,
 ) -> None:
     try:
@@ -463,6 +563,7 @@ def _rollback_or_restore(
             service=service,
             image_ref=target_image,
             health_url=health_url,
+            readiness_url=readiness_url,
             dry_run=dry_run,
         )
         return
@@ -480,6 +581,7 @@ def _rollback_or_restore(
                 service=service,
                 image_ref=restore_image,
                 health_url=health_url,
+                readiness_url=readiness_url,
                 dry_run=False,
             )
         except DeployError as restore_error:
@@ -526,7 +628,7 @@ def _deploy(args: argparse.Namespace) -> None:
         )
 
     _require_service(args.service)
-    _require_health_url(args.health_url)
+    _require_distinct_probe_urls(args.health_url, args.readiness_url)
     _validate_oci_index_ref(args.image_ref, dry_run=args.dry_run)
 
     project_dir = args.project_dir
@@ -553,18 +655,25 @@ def _deploy(args: argparse.Namespace) -> None:
         if current_image is None and live_image:
             current_image = live_image
             previous_image = None
-            _update_service_state(
-                state_file,
-                service=args.service,
-                current_image=current_image,
-                previous_image=previous_image,
-            )
         elif live_image and current_image and live_image != current_image:
             raise DeployError(
                 "Running image differs from deployment state; reconcile it explicitly"
             )
 
         if args.image_ref == current_image:
+            _wait_for_deployment_gates(
+                args.health_url,
+                args.readiness_url,
+                timeout_seconds=DEFAULT_HEALTH_TIMEOUT_SECONDS,
+                dry_run=args.dry_run,
+            )
+            if not args.dry_run:
+                _update_service_state(
+                    state_file,
+                    service=args.service,
+                    current_image=current_image,
+                    previous_image=previous_image,
+                )
             print(f"{args.service} already at {args.image_ref}, no change.")
             return
 
@@ -578,6 +687,7 @@ def _deploy(args: argparse.Namespace) -> None:
                 service=args.service,
                 image_ref=args.image_ref,
                 health_url=args.health_url,
+                readiness_url=args.readiness_url,
                 dry_run=args.dry_run,
             )
             if args.dry_run:
@@ -602,6 +712,7 @@ def _deploy(args: argparse.Namespace) -> None:
                 target_image=pre_deploy_image,
                 restore_image=pre_deploy_image,
                 health_url=args.health_url,
+                readiness_url=args.readiness_url,
                 dry_run=False,
             )
             restored = pre_deploy_image
@@ -621,7 +732,7 @@ def _rollback(args: argparse.Namespace) -> None:
         )
 
     _require_service(args.service)
-    _require_health_url(args.health_url)
+    _require_distinct_probe_urls(args.health_url, args.readiness_url)
 
     project_dir = args.project_dir
     compose_file = _resolve_within_project(project_dir, args.compose_file)
@@ -661,6 +772,12 @@ def _rollback(args: argparse.Namespace) -> None:
         _validate_oci_index_ref(target_image, dry_run=args.dry_run)
 
         if target_image == current_image:
+            _wait_for_deployment_gates(
+                args.health_url,
+                args.readiness_url,
+                timeout_seconds=DEFAULT_HEALTH_TIMEOUT_SECONDS,
+                dry_run=args.dry_run,
+            )
             print(f"{args.service} already at {target_image}, no change.")
             return
 
@@ -677,6 +794,7 @@ def _rollback(args: argparse.Namespace) -> None:
             target_image=target_image,
             restore_image=current_image,
             health_url=args.health_url,
+            readiness_url=args.readiness_url,
             dry_run=args.dry_run,
         )
         restored = target_image
@@ -701,7 +819,7 @@ def _migrate_legacy(args: argparse.Namespace) -> None:
     if not is_immutable_image_ref(args.legacy_image_ref):
         raise DeployError("Legacy image must be an immutable digest ref")
     _require_service(args.service)
-    _require_health_url(args.health_url)
+    _require_distinct_probe_urls(args.health_url, args.readiness_url)
     _validate_oci_index_ref(args.image_ref, dry_run=args.dry_run)
 
     project_dir = args.project_dir
@@ -742,22 +860,30 @@ def _migrate_legacy(args: argparse.Namespace) -> None:
                 service=args.service,
                 image_ref=args.image_ref,
                 health_url=args.health_url,
+                readiness_url=args.readiness_url,
                 dry_run=args.dry_run,
             )
-        except DeployError:
+        except DeployError as target_error:
             if not args.dry_run:
                 print(
                     "Legacy migration failed; restoring the exact pre-migration digest"
                 )
-                _deploy_once(
-                    compose_file=compose_file,
-                    project_dir=project_dir,
-                    override_file=override_file,
-                    service=args.service,
-                    image_ref=legacy_image,
-                    health_url=args.health_url,
-                    dry_run=False,
-                )
+                try:
+                    _deploy_once(
+                        compose_file=compose_file,
+                        project_dir=project_dir,
+                        override_file=override_file,
+                        service=args.service,
+                        image_ref=legacy_image,
+                        health_url=args.health_url,
+                        readiness_url=args.readiness_url,
+                        dry_run=False,
+                    )
+                except DeployError as restore_error:
+                    raise DeployError(
+                        f"Legacy migration target failed: {target_error}; "
+                        f"legacy restore also failed: {restore_error}"
+                    ) from restore_error
             raise
 
         if not args.dry_run:
@@ -799,7 +925,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--health-url",
         required=True,
-        help="Reachable liveness endpoint. DB readiness is not checked here (Issue #54).",
+        help="Reachable liveness endpoint.",
+    )
+    parser.add_argument(
+        "--readiness-url",
+        required=True,
+        help="Independent database readiness endpoint.",
     )
     parser.add_argument(
         "--lock-timeout",

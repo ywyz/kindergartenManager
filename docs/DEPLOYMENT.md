@@ -35,7 +35,7 @@
 - 写入/更新部署状态文件（owner-only）
 - 执行 `docker compose pull` + `up --no-build`
 - 校验 `.Config.Image` 与请求 image ref 完全一致
-- 等待现有 liveness endpoint（例如 `/api/v1/health`）返回，**不替代数据库就绪检查**
+- 依次等待 liveness（`/api/v1/health`）与 database readiness（`/api/v1/readiness`）通过
 - 部署失败自动尝试回退到部署前实际运行的 immutable image
 - `rollback` 子命令：显式回退到历史 immutable ref（或可指定目标）
 - `--dry-run`：仅展示计划，不执行 Docker 变更
@@ -49,6 +49,7 @@ python scripts/deploy.py \
   --service app \
   --state-dir /var/lib/kindergarten-manager/deploy-state \
   --health-url https://manager.ywyz.tech/api/v1/health \
+  --readiness-url https://manager.ywyz.tech/api/v1/readiness \
   deploy ghcr.io/ywyz/kindergartenmanager@sha256:872e9854fcdf62df1f510e4b825ccb4a25022e1b06383672f0712cf9c6ba7246
 ```
 
@@ -57,13 +58,15 @@ python scripts/deploy.py \
   --project-dir /home/ecs-user/compose/kindergarten-production \
   --service app \
   --state-dir /var/lib/kindergarten-manager/deploy-state \
-  --health-url https://manager.ywyz.tech/api/v1/health rollback
+  --health-url https://manager.ywyz.tech/api/v1/health \
+  --readiness-url https://manager.ywyz.tech/api/v1/readiness rollback
 ```
 
 建议在部署前先用 `docker compose config` 或 CI 校验确认 compose 文件可解析。
 
-`--health-url` 必须是当前 Compose 经 Caddy/目标域名实际路由到的 liveness 地址，不能填另一个恰好返回 200
-的服务。脚本还会核对运行容器的 `.Config.Image`，但这不能替代正确的目标 URL 或后续 readiness 双重验收。
+`--health-url` 与 `--readiness-url` 必须是当前 Compose 经 Caddy/目标域名实际路由到的两个独立探针地址，
+不能填另一个恰好返回 200 的服务。脚本还会核对运行容器的 `.Config.Image`；这些检查仍不能替代迁移兼容、
+登录、业务或数据恢复验收。
 
 > 遗留迁移说明：当前历史生产实例记录的是单平台 manifest digest。新脚本会对此失败关闭，不能直接把它
 > 当作可回滚的 OCI index。首次采用新自动化前，应在部署状态为空时显式执行一次：
@@ -74,6 +77,7 @@ python scripts/deploy.py \
   --service app \
   --state-dir /var/lib/kindergarten-manager/deploy-state \
   --health-url https://manager.ywyz.tech/api/v1/health \
+  --readiness-url https://manager.ywyz.tech/api/v1/readiness \
   migrate-legacy \
   <当前运行的精确legacy-manifest-ref> \
   ghcr.io/ywyz/kindergartenmanager@sha256:<release中的OCI-index-digest>
@@ -85,14 +89,15 @@ index 写成唯一基线（`previous_image=null`），不把单平台历史写�
 显式迁移中恢复操作前的精确 legacy digest；恢复成功后仍不建立 deployment state，需排障后重新发起。
 `--dry-run` 使用显式 legacy ref 生成完整计划但不查询或改变容器。
 
-> 安全说明：脚本不会读取/打印数据库迁移版本，也不会自动执行 Alembic upgrade；卷和 secret
-> 仅在运行时由 compose 保持，不会被脚本重建。
+> 安全说明：部署脚本自身不会调用 Alembic、读取/打印迁移版本、删除卷或改写 secret；但目标应用容器启动时
+> 会按既有 fail-closed 契约执行 `alembic upgrade head`。因此镜像 rollback 不能还原数据库 schema/data，
+> 发布前必须有经验证备份与新 schema→旧镜像兼容/恢复方案；禁止自动 downgrade。
 
 ## 3. 健康/就绪边界
 
-`/api/v1/health` 仍作为现有 HTTP 存活检查；它用于流程收敛，不代表数据库迁移和 readiness 全通过。
-
-数据库就绪专项不在该脚本内实现，进展与校验要求见 [Issue #54](https://github.com/ywyz/kindergartenManager/issues/54)。
+`/api/v1/health` 仅表示进程/HTTP 存活且不访问数据库。`/api/v1/readiness` 每次通过独立短 session 执行
+`SELECT 1`；失败为 503。deploy、自动恢复、显式 rollback 与 legacy migration 只有在目标镜像两门均通过后
+才更新状态；恢复镜像也必须重过两门。真实 MySQL 停止/恢复与零业务变化仍须按 Issue #54 独立验收。
 
 ## 4. Bootstrap 管理员生产凭据
 

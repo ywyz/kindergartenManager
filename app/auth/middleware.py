@@ -13,6 +13,7 @@ UNRESTRICTED_PAGE_ROUTES: set[str] = {
     "/",
     "/login",
     "/api/v1/health",
+    "/api/v1/readiness",
 }
 
 

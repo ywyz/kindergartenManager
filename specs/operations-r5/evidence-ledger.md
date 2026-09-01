@@ -34,9 +34,9 @@
 
 | ID | gate/module | tested_code_sha | evidence_closure_sha | 当前状态 | 当前证据 / 下一门 |
 |---|---|---|---|---|---|
-| A | R2 五模块复验 | 待固定 | 待固定 | `IN_PROGRESS` | 本轮矩阵见 `module-revalidation-plan.md`；自动与人工逐模块独立 |
-| B | R5-54 readiness + Compose + deploy/rollback 双门 | 待提交 RED SHA | 待固定 | `STABLE_RED` | Issue #54 OPEN；两次均 `44 passed / 12 failed`，进入最小 GREEN |
-| C | R5-R 备份与恢复 | 待固定 | 待固定 | `PLANNED` | 权威来源/方法见 `restore-plan.md`；须隔离环境演练 |
+| A | R2 五模块复验 | `54357f5f4479cdf08da2793957ce7cbd23dd88df`（仅自动盘点） | 待固定 | `IN_PROGRESS` | 定向 212 passed；一对一倾听冻结违规待 stable RED，全部人工门待执行 |
+| B | R5-54 readiness + Compose + deploy/rollback 双门 | 待提交 GREEN SHA | 待固定 | `GREEN_CANDIDATE` | stable RED 已固定；Review findings 已补 RED/修复；真实 MySQL 门未执行 |
+| C | R5-R 备份与恢复 | 待固定 | 待固定 | `BLOCKED` | 尚无实现/演练；应用启动自动迁移使 image rollback 不能恢复 schema/data |
 | D | R5-P release/digest/deploy/rollback 收敛 | 待固定 | 待固定 | `PLANNED` | 只做本地/隔离演练；无 push、Release 或生产操作授权 |
 | E | 最终证据闭合 | 待固定 | 待固定 | `BLOCKED` | 依赖 A-D 各自原始证据；不能吞并它们 |
 
@@ -61,3 +61,23 @@ Python/数据库/migration head、tenant/user/role、模板文件与 SHA-256、�
 - RED #2：`44 passed / 12 failed`，1.59s。
 - 失败分布一致：API readiness seam 8、Compose 接线 2、deploy 双门 seam 2；旧用例 44 项继续 GREEN。
 - 禁止项核对：无 skip/xfail、无真实网络/凭据、无固定长 sleep、无业务或数据库写入。
+
+### R5-54 Review finding RED
+
+- 独立 reviewer 首轮：H2/M1。
+- H finding RED（同一/别名 URL 绕过、显式 no-op rollback 跳过双门）：连续两次均 `2 failed`。
+- M finding RED：legacy target 与 restore 双失败必须同时保留在错误证据中。
+- 第二轮 H finding RED（HTTP body 中途断开不得逃逸恢复边界）：连续两次均
+  `35 passed / 1 failed`；修复后 deploy 专项及 reviewer 独立复跑均为 `36 passed`。
+- redirect、invalid JSON、超过 1 KiB body 也已进入负向测试；同一 reviewer 复审结论为当前范围无 H/M。
+- 修复后扩展自动候选（API/Compose/deploy/middleware/release）：`93 passed`。
+- 全量候选在首轮 finding 修复前为 `964 passed`；所有 finding 修复后的当前 SHA 全量结果仍须重跑。
+
+## R2 当前自动盘点（非人工验收）
+
+- 每日活动计划：`58 passed`。
+- 游戏观察：`40 passed`。
+- 一对一倾听：`62 passed`，但现有测试未覆盖冻结导出/领域顺序缺口。
+- 自制教玩具：`23 passed`。
+- 课程审议：`29 passed`。
+- 合计：`212 passed`。这些结果不替代浏览器、真实 MySQL、真实 AI 或 Windows Word 2010+。
