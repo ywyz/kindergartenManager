@@ -62,6 +62,14 @@ _REQUIRED_ENV = tuple(
     for role in ("SOURCE", "RESTORE")
     for field in ("ROOT_PASSWORD", "DATABASE", "USER", "PASSWORD")
 )
+_SUBPROCESS_ENV_ALLOWLIST = (
+    "PATH",
+    "LANG",
+    "LC_ALL",
+    "DOCKER_HOST",
+    "DOCKER_CONTEXT",
+    "DOCKER_CONFIG",
+)
 _LIVE_TIMEOUT = 180
 _CONTROLLED_COMPOSE_FILE = (
     Path(__file__).parents[1] / "specs" / "operations-r5" / "mysql-compose.yml"
@@ -361,7 +369,11 @@ def _live_env(values: Mapping[str, str] | None) -> dict[str, str]:
         not supplied[name] for name in _REQUIRED_ENV
     ):
         raise MySQLBackupRestoreError("Synthetic MySQL environment is incomplete")
-    combined = os.environ.copy()
+    combined = {
+        name: os.environ[name]
+        for name in _SUBPROCESS_ENV_ALLOWLIST
+        if os.environ.get(name)
+    }
     combined.update(supplied)
     return combined
 
@@ -1148,7 +1160,8 @@ def main(argv: list[str] | None = None) -> int:
         )
     ):
         return 0
-    result = run_live_drill(**vars(args))
+    controlled_env = {name: os.environ.get(name, "") for name in _REQUIRED_ENV}
+    result = run_live_drill(**vars(args), env=controlled_env)
     print(json.dumps(result, sort_keys=True))
     return 0 if result["status"] == "verified" else 1
 

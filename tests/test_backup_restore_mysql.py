@@ -307,13 +307,68 @@ def test_mysql_producer_identity_matches_migration_job_identity() -> None:
     from app.core.startup import database_identity_sha256
 
     database_url = (
-        "mysql+aiomysql://app:secret@source.example:3306/synthetic_db"
-        "?charset=utf8mb4"
+        "mysql+aiomysql://app:secret@source.example:3306/synthetic_db?charset=utf8mb4"
     )
 
     assert module.mysql_identity_digest(database_url) == database_identity_sha256(
         database_url
     )
+
+
+def test_cli_passes_only_the_closed_synthetic_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _mysql_module()
+    captured: dict[str, Any] = {}
+    for index, name in enumerate(module._REQUIRED_ENV):
+        monkeypatch.setenv(name, f"synthetic-{index}")
+    monkeypatch.setenv("UNRELATED_SECRET", "must-not-cross-boundary")
+    monkeypatch.setattr(
+        module,
+        "run_live_drill",
+        lambda **kwargs: captured.update(kwargs) or {"status": "verified"},
+    )
+
+    result = module.main(
+        [
+            "--compose-file",
+            str(COMPOSE_FILE),
+            "--source-project",
+            "r5-r-cli-source",
+            "--restore-project",
+            "r5-r-cli-restore",
+            "--protected-image",
+            IMAGE,
+            "--evidence-path",
+            str(tmp_path / "evidence.json"),
+        ]
+    )
+
+    assert result == 0
+    assert captured["env"] == {
+        name: f"synthetic-{index}" for index, name in enumerate(module._REQUIRED_ENV)
+    }
+    assert "UNRELATED_SECRET" not in captured["env"]
+
+
+def test_live_subprocess_environment_drops_unrelated_host_secrets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _mysql_module()
+    supplied = {
+        name: f"synthetic-{index}" for index, name in enumerate(module._REQUIRED_ENV)
+    }
+    monkeypatch.setenv("UNRELATED_SECRET", "must-not-cross-boundary")
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")
+
+    environment = module._live_env(supplied)
+
+    assert environment["PATH"] == "/usr/bin:/bin"
+    assert all(environment[name] == value for name, value in supplied.items())
+    assert set(environment) <= set(module._REQUIRED_ENV) | set(
+        module._SUBPROCESS_ENV_ALLOWLIST
+    )
+    assert "UNRELATED_SECRET" not in environment
 
 
 def test_innodb_preflight_accepts_real_engines_and_rejects_non_innodb() -> None:
