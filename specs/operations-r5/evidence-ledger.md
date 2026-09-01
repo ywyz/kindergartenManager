@@ -35,7 +35,7 @@
 | ID | gate/module | tested_code_sha | evidence_closure_sha | 当前状态 | 当前证据 / 下一门 |
 |---|---|---|---|---|---|
 | A | R2 五模块复验 | `54357f5f4479cdf08da2793957ce7cbd23dd88df`（仅自动盘点） | 待固定 | `IN_PROGRESS` | 定向 212 passed；一对一倾听冻结违规待 stable RED，全部人工门待执行 |
-| B | R5-54 readiness + Compose + deploy/rollback 双门 | 待提交 GREEN SHA | 待固定 | `GREEN_CANDIDATE` | stable RED 已固定；Review findings 已补 RED/修复；真实 MySQL 门未执行 |
+| B | R5-54 readiness + Compose + deploy/rollback 双门 | `0b3f2408984d717b9692cfa003ee2740e4219341` | 待固定 | `LOCAL_GREEN` | stable RED、两轮 Review finding、当前 SHA 全量与隔离 MySQL 故障恢复均通过；生产部署门未执行 |
 | C | R5-R 备份与恢复 | 待固定 | 待固定 | `BLOCKED` | 尚无实现/演练；应用启动自动迁移使 image rollback 不能恢复 schema/data |
 | D | R5-P release/digest/deploy/rollback 收敛 | 待固定 | 待固定 | `PLANNED` | 只做本地/隔离演练；无 push、Release 或生产操作授权 |
 | E | 最终证据闭合 | 待固定 | 待固定 | `BLOCKED` | 依赖 A-D 各自原始证据；不能吞并它们 |
@@ -71,7 +71,26 @@ Python/数据库/migration head、tenant/user/role、模板文件与 SHA-256、�
   `35 passed / 1 failed`；修复后 deploy 专项及 reviewer 独立复跑均为 `36 passed`。
 - redirect、invalid JSON、超过 1 KiB body 也已进入负向测试；同一 reviewer 复审结论为当前范围无 H/M。
 - 修复后扩展自动候选（API/Compose/deploy/middleware/release）：`93 passed`。
-- 全量候选在首轮 finding 修复前为 `964 passed`；所有 finding 修复后的当前 SHA 全量结果仍须重跑。
+- 全量候选在首轮 finding 修复前为 `964 passed`；所有 finding 修复后的当前 SHA 结果见下一节。
+
+## R5-54 当前 SHA 自动与隔离 MySQL 证据
+
+- `tested_code_sha`：`0b3f2408984d717b9692cfa003ee2740e4219341`。
+- `.venv/bin/pytest tests/ -q`：`975 passed in 60.88s`，无 skip/xfail。
+- 定向 API/Compose/deploy/middleware/release：`93 passed`；deploy reviewer 独立复跑：`36 passed`。
+- `ruff check` 与 `ruff format --check`（本切片 8 个 Python 文件）：通过。
+- 使用合成环境变量的 `docker compose config --quiet` 与 `uv lock --check`：通过。
+- 全新临时 SQLite 从空库执行 `.venv/bin/alembic upgrade head`，随后 `alembic current` 为
+  `2b7f3d5e9c8a (head)`；临时数据库与随机本地 secrets 文件已删除。
+- 隔离 Compose 项目：`kg-r5-readiness`；Docker Engine `29.7.2`、Compose `5.5.0`、
+  Python `3.14.7`、MySQL `8.4.11`、migration head `2b7f3d5e9c8a`；仅使用合成凭据和空业务库。
+- 初始探测：`/health -> 200/ok`，`/readiness -> 200/ready`。停止 MySQL 后，同一 app 容器保持
+  运行，结果为 `200/ok` 与 `503/not_ready`，响应无异常、SQL、主机或凭据。启动同一 MySQL 后，
+  readiness 在第 2 次探测自动恢复 `200/ready`，app 容器 ID 前后一致。
+- 故障前后动态枚举的 19 张表逐表计数完全一致：仅 `alembic_version=1`、
+  `indicator_catalog=30`，其余业务表均为 0；未用生产或幼儿数据。
+- 验收后已删除该隔离项目的 2 个容器、3 个卷和专用网络；没有触碰其他 Compose 项目、生产或凭据。
+- CodeGraph 在该提交上为 308 files / 6,151 nodes / 18,585 edges，状态 `up to date`。
 
 ## R2 当前自动盘点（非人工验收）
 
