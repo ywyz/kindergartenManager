@@ -6,10 +6,10 @@
 - Docker 模式：与开发模式相同
 """
 
+import hashlib
 import logging
 import os
 import sys
-import hashlib
 
 from app.core.paths import app_data_dir
 
@@ -46,20 +46,30 @@ def build_sync_url(database_url: str | None) -> str:
     return database_url
 
 
-def configured_database_identity_sha256() -> str:
-    """Return a credential-free identity hash for the configured database target."""
-    from sqlalchemy.engine import make_url
+def database_identity_sha256(database_url: str | None) -> str:
+    """Return the canonical credential-free identity for a database target."""
+    from sqlalchemy.engine import URL, make_url
 
-    from app.core.config import settings
-
-    url = make_url(build_sync_url(settings.DATABASE_URL))
+    url = make_url(build_sync_url(database_url))
     if url.get_backend_name() == "sqlite" and url.database:
         database = os.path.abspath(url.database)
-        url = url.set(database=database)
-    normalized = url.set(username=None, password=None, query={}).render_as_string(
-        hide_password=True
-    )
+        normalized_url = URL.create(drivername=url.drivername, database=database)
+    else:
+        normalized_url = URL.create(
+            drivername=url.drivername,
+            host=url.host.casefold().rstrip(".") if url.host else None,
+            port=url.port,
+            database=url.database,
+        )
+    normalized = normalized_url.render_as_string(hide_password=True)
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def configured_database_identity_sha256() -> str:
+    """Return the canonical identity for the configured database target."""
+    from app.core.config import settings
+
+    return database_identity_sha256(settings.DATABASE_URL)
 
 
 def read_configured_database_revision() -> str:

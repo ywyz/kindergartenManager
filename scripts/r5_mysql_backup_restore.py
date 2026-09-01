@@ -34,7 +34,7 @@ from app.core.models.homemade_teaching import HomemadeTeachingToy
 from app.core.models.listening_image import ListeningImage
 from app.core.models.listening_record import ListeningRecord
 from app.core.models.user import User, UserRole
-from app.core.startup import get_migration_head
+from app.core.startup import database_identity_sha256, get_migration_head
 from app.jobs.backup_restore import validate_generated_attestation
 
 
@@ -175,14 +175,7 @@ def mysql_identity_digest(database_url: str) -> str:
         raise MySQLBackupRestoreError("Invalid MySQL target") from exc
     if url.get_backend_name() != "mysql" or not url.host or not url.database:
         raise MySQLBackupRestoreError("Invalid MySQL target")
-    identity = {
-        "backend": "mysql",
-        "host": url.host.casefold().rstrip("."),
-        "port": url.port or 3306,
-        "database": url.database,
-    }
-    encoded = json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()
-    return hashlib.sha256(encoded).hexdigest()
+    return database_identity_sha256(database_url)
 
 
 def validate_innodb_tables(engines: Mapping[str, str | None]) -> None:

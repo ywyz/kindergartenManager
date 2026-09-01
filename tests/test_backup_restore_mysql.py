@@ -302,6 +302,20 @@ def test_mysql_identity_builder_has_no_password_or_query_parameter_inputs() -> N
     )
 
 
+def test_mysql_producer_identity_matches_migration_job_identity() -> None:
+    module = _mysql_module()
+    from app.core.startup import database_identity_sha256
+
+    database_url = (
+        "mysql+aiomysql://app:secret@source.example:3306/synthetic_db"
+        "?charset=utf8mb4"
+    )
+
+    assert module.mysql_identity_digest(database_url) == database_identity_sha256(
+        database_url
+    )
+
+
 def test_innodb_preflight_accepts_real_engines_and_rejects_non_innodb() -> None:
     module = _mysql_module()
     engines = {
