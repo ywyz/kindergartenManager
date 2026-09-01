@@ -36,7 +36,6 @@ from app.auth.middleware import AuthMiddleware
 from app.core.bootstrap import run_bootstrap
 from app.core.config import settings
 from app.core.logging import get_logger
-from app.core.startup import run_startup_migrations
 
 logger = get_logger("app.main")
 
@@ -54,9 +53,6 @@ def _on_global_exception(exc: Exception) -> None:
 
 
 def main() -> None:
-    # 启动前同步执行数据库迁移；失败时 fail-closed，中止进程。
-    run_startup_migrations()
-
     # 认证模式不自动创建固定管理员；首次安装/旧版恢复走显式初始化。
     app.on_startup(run_bootstrap)
 

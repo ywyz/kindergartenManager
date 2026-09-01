@@ -31,7 +31,7 @@ def test_explicit_migration_validates_backup_before_upgrade(
     monkeypatch.setattr(
         migrate_database,
         "run_migrations",
-        lambda: calls.append("upgrade"),
+        lambda **kwargs: calls.append("upgrade"),
     )
 
     assert (
@@ -62,7 +62,7 @@ def test_explicit_migration_invalid_evidence_never_calls_upgrade(
     monkeypatch.setattr(
         migrate_database,
         "run_migrations",
-        lambda: (_ for _ in ()).throw(AssertionError("must not migrate")),
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("must not migrate")),
     )
 
     assert (

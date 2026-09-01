@@ -129,4 +129,8 @@ def test_backup_evidence_rejects_wide_mode_and_symlink(tmp_path: Path) -> None:
     payload["artifact"]["path"] = str(link)
     evidence.write_text(json.dumps(payload))
     with pytest.raises(BackupEvidenceError, match="symlink"):
-        validate_backup_evidence(evidence, expected_protected_image=PROTECTED_IMAGE)
+        validate_backup_evidence(
+            evidence,
+            expected_protected_image=PROTECTED_IMAGE,
+            now=datetime(2026, 9, 1, 4, 30, tzinfo=UTC),
+        )

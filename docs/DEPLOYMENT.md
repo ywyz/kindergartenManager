@@ -30,6 +30,7 @@
 仓库新增 `scripts/deploy.py`：
 
 - `deploy` 子命令：仅接收 digest 形式的 image ref（`...@sha256:...`）
+- 三个镜像变更命令均须先验证 `--backup-evidence`，并以 `--protected-image` 绑定当前运行镜像
 - 部署前通过 `docker buildx imagetools inspect --raw` 确认它是同时含 `linux/amd64`、`linux/arm64` 的 OCI index
 - 使用文件锁串行化操作
 - 写入/更新部署状态文件（owner-only）
@@ -48,6 +49,8 @@ python scripts/deploy.py \
   --project-dir /home/ecs-user/compose/kindergarten-production \
   --service app \
   --state-dir /var/lib/kindergarten-manager/deploy-state \
+  --backup-evidence /secure/path/backup-evidence.json \
+  --protected-image ghcr.io/ywyz/kindergartenmanager@sha256:<当前digest> \
   --health-url https://manager.ywyz.tech/api/v1/health \
   --readiness-url https://manager.ywyz.tech/api/v1/readiness \
   deploy ghcr.io/ywyz/kindergartenmanager@sha256:872e9854fcdf62df1f510e4b825ccb4a25022e1b06383672f0712cf9c6ba7246
@@ -58,6 +61,8 @@ python scripts/deploy.py \
   --project-dir /home/ecs-user/compose/kindergarten-production \
   --service app \
   --state-dir /var/lib/kindergarten-manager/deploy-state \
+  --backup-evidence /secure/path/backup-evidence.json \
+  --protected-image ghcr.io/ywyz/kindergartenmanager@sha256:<当前digest> \
   --health-url https://manager.ywyz.tech/api/v1/health \
   --readiness-url https://manager.ywyz.tech/api/v1/readiness rollback
 ```
@@ -76,6 +81,8 @@ python scripts/deploy.py \
   --project-dir /home/ecs-user/compose/kindergarten-production \
   --service app \
   --state-dir /var/lib/kindergarten-manager/deploy-state \
+  --backup-evidence /secure/path/backup-evidence.json \
+  --protected-image <当前运行的精确legacy-manifest-ref> \
   --health-url https://manager.ywyz.tech/api/v1/health \
   --readiness-url https://manager.ywyz.tech/api/v1/readiness \
   migrate-legacy \
@@ -89,9 +96,9 @@ index 写成唯一基线（`previous_image=null`），不把单平台历史写�
 显式迁移中恢复操作前的精确 legacy digest；恢复成功后仍不建立 deployment state，需排障后重新发起。
 `--dry-run` 使用显式 legacy ref 生成完整计划但不查询或改变容器。
 
-> 安全说明：部署脚本自身不会调用 Alembic、读取/打印迁移版本、删除卷或改写 secret；但目标应用容器启动时
-> 会按既有 fail-closed 契约执行 `alembic upgrade head`。因此镜像 rollback 不能还原数据库 schema/data，
-> 发布前必须有经验证备份与新 schema→旧镜像兼容/恢复方案；禁止自动 downgrade。
+> 安全说明：应用与 Bootstrap 启动均不调用 Alembic。迁移必须先用同一备份证据执行独立
+> `python -m app.jobs.migrate_database`；deploy/rollback/migrate-legacy 也会在 Docker 变更前重新验证证据并
+> 核对其与当前运行镜像的绑定。镜像 rollback 仍不能还原数据库 schema/data；禁止自动 downgrade。
 
 ## 3. 健康/就绪边界
 

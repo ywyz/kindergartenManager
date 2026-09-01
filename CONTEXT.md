@@ -90,7 +90,7 @@ UI 登录用户与 API 的租户服务主体仍是两个不同边界，不得混
   `INTEGER PRIMARY KEY` 才能自动生成 ID 的兼容性缺陷；`e5f7a9c2d4b6` 增加 W006 的两张 append-only
   evidence 表及 SQLite/MySQL UPDATE/DELETE 拒绝 trigger；新 head 为 `user` 增加正整数 `auth_epoch`，
   使任何密码变更都能撤销旧 UI token。MySQL `user.id` 仍为 `BIGINT AUTO_INCREMENT`。
-- 应用启动会先执行 `alembic upgrade head`；桌面、开发和服务器入口统一采用 fail-closed，迁移失败会记录异常并中止启动，不提供隐藏的 fail-open 开关。
+- 应用与 Bootstrap 启动不执行 Alembic。schema 变更只允许由 `app.jobs.migrate_database` 显式执行，且必须先消费绑定当前受保护镜像、未过期、artifact hash 可复算并已完成隔离恢复验证的 owner-only 备份证据；见 ADR-0007。
 - AI Key 使用 Fernet 在应用层加密；明文只能短暂存在于内存，不得写日志或文档。
 - 图片默认使用 MySQL/SQLite BLOB 抽象；导出文件写入运行时导出目录。
 - PyInstaller、Debian 和 Docker 发布流程存在，但本快照没有重新完成各平台人工安装验收。

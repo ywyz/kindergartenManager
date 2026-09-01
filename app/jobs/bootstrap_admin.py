@@ -29,7 +29,6 @@ from app.core.audit import log_audit
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.core.models.user import UserRole
-from app.core.startup import run_startup_migrations
 from app.repository.user_repository import (
     create_user,
     get_user_by_username,
@@ -185,16 +184,7 @@ def _prompt_password(prompt_text: str) -> str:
 
 async def _run_init() -> int:
     """--init 模式：创建 sys_admin 账号。"""
-    print("\n[Step 1/3] 执行数据库迁移...")
-    try:
-        run_startup_migrations(log_failure_detail=False)
-        print("[Step 1/3] ✅ 迁移完成")
-    except Exception:
-        # 数据库异常可能携带连接串或 SQL 参数，不跨 CLI 边界输出正文。
-        print("[Step 1/3] ❌ 迁移失败，已停止管理员初始化")
-        return 1
-
-    print("\n[Step 2/3] 配置管理员账号...")
+    print("\n[Step 1/2] 配置管理员账号...")
 
     enabled = settings.BOOTSTRAP_ADMIN_ENABLED
     if not enabled:
@@ -217,7 +207,7 @@ async def _run_init() -> int:
     )
     allow_remote = settings.BOOTSTRAP_ADMIN_ALLOW_REMOTE
 
-    print("\n[Step 3/3] 创建管理员账号...")
+    print("\n[Step 2/2] 创建管理员账号...")
     try:
         message = await bootstrap_admin(
             enabled=enabled,
@@ -229,18 +219,18 @@ async def _run_init() -> int:
         )
     except Exception:
         # SQLAlchemy 异常参数可能包含密码哈希；只输出固定失败文案。
-        print("[Step 3/3] ❌ 创建失败：请检查数据库迁移与连接状态")
+        print("[Step 2/2] ❌ 创建失败：请先运行显式数据库迁移并检查连接状态")
         return 1
     # 同 _run_reset：bootstrap_admin 接收明文密码参数，避免将其返回值直接内插
     # 日志，改为按状态前缀输出固定文案，规避 CodeQL 明文记录密码的误报。
     if message.startswith("ok"):
-        print("[Step 3/3] ✅ 系统管理员账号已创建完成")
+        print("[Step 2/2] ✅ 系统管理员账号已创建完成")
         return 0
     elif message.startswith("skip"):
-        print("[Step 3/3] ⏭️  系统管理员账号已存在或未启用，已跳过")
+        print("[Step 2/2] ⏭️  系统管理员账号已存在或未启用，已跳过")
         return 0
     else:
-        print("[Step 3/3] ❌ 创建失败：请检查环境变量配置与数据库连接")
+        print("[Step 2/2] ❌ 创建失败：请检查环境变量配置与数据库连接")
         return 1
 
 

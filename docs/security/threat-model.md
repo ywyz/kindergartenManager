@@ -89,8 +89,8 @@ TLS、强密码、受控 Bootstrap/轮换和网络访问控制。桌面 frozen �
 ### 4.7 迁移与数据损坏
 
 - 威胁：迁移失败后应用继续写入不兼容 schema；SQLite 文件被同步/复制时不一致。
-- 当前控制：Alembic 单线迁移、启动失败 fail-closed、异常日志；应用不会在迁移失败后继续服务旧 schema。
-- 必须补强：迁移前备份；全新/升级/回滚测试；SQLite 使用一致快照而非运行中直接复制；数据库 readiness 仍按 Issue #54 独立闭合。
+- 当前控制：Alembic 单线显式迁移；迁移和镜像变更前验证 owner-only、短期、绑定当前镜像且 artifact hash 可复算的恢复证据；应用/Bootstrap 启动零迁移。
+- 必须补强：完成 SQLite/MySQL 一致备份生产与隔离恢复演练；全新/升级/回滚测试；数据库 readiness 仍按 Issue #54 独立闭合。
 
 ### 4.8 逻辑外键孤儿与误删
 

@@ -100,7 +100,7 @@ checkout 成功重建。
 - 聚合失败注入 RED 已证明部分提交风险；一对一倾听和游戏观察现由 service/use-case 持有事务，内部 repository `flush()`、最外层 commit/rollback。
 - API tenant 投影与 UI tenant + user 投影已显式命名，跨 tenant/user 负向测试覆盖列表、详情和子表。
 - 设置页 AI `/models` HTTP 已移至 integration adapter，由 settings service 编排；大型页面的其余用例继续渐进抽离。
-- 启动迁移已决策为桌面、开发、服务器统一 fail-closed；迁移失败中止启动，不提供 fail-open 开关。
+- ADR-0007 已取消桌面、开发、服务器的启动自动迁移；显式迁移与三个镜像变更动作均必须先通过已验证备份证据门。
 - 可信登录会话、Profile 与用户管理入口已进入当前 UI；继续保持 API/UI 的 tenant + user 投影和 callback-time 会话绑定。
 - 修复 Compose 默认凭据和健康检查对环境变量不一致的问题。
 - 建立日志、导出、图片和数据库备份/恢复说明。

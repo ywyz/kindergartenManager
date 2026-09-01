@@ -45,6 +45,9 @@ Provider WRITE、自动重试、批量/跨页面采用、新 Tool、多 Agent �
 ```bash
 python3.14 -m venv .venv
 .venv/bin/pip install -r requirements.txt
+.venv/bin/python -m app.jobs.migrate_database \
+  --backup-evidence /absolute/path/backup-evidence.json \
+  --protected-image no-running-image
 .venv/bin/python -m app.jobs.bootstrap_admin --init
 .venv/bin/python -m app.main
 ```
@@ -53,7 +56,7 @@ python3.14 -m venv .venv
 
 1. 解析 `.env` 与环境变量。
 2. 在未设置 `DATABASE_URL` 时，源码模式默认为当前工作目录中的 SQLite；打包模式才使用平台用户数据目录。
-3. 尝试执行 `alembic upgrade head`。
+3. 应用启动不执行迁移；迁移只由已验证备份门保护的显式命令执行。
 4. 不自动创建默认管理员；管理员由上述受控命令交互初始化。
 5. 进入 `/login`，认证成功后再访问业务页面。
 
@@ -67,7 +70,9 @@ python3.14 -m venv .venv
 
 ```bash
 .venv/bin/python -m pytest tests/ -q
-.venv/bin/alembic upgrade head
+.venv/bin/python -m app.jobs.migrate_database \
+  --backup-evidence /absolute/path/backup-evidence.json \
+  --protected-image no-running-image
 ```
 
 当前工作树 Alembic head：`2b7f3d5e9c8a`。该 revision 为用户增加正整数
@@ -112,6 +117,9 @@ cp .env.example .env
 # MYSQL_ROOT_PASSWORD、MYSQL_PASSWORD，
 # 并固定 ENCRYPTION_KEY、JWT_SECRET；MySQL 密码使用十六进制随机值。
 docker compose up -d
+docker compose exec app python -m app.jobs.migrate_database \
+  --backup-evidence /absolute/container/path/backup-evidence.json \
+  --protected-image no-running-image
 docker compose exec -e BOOTSTRAP_ADMIN_ALLOW_REMOTE=true app python -m app.jobs.bootstrap_admin --init
 ```
 
@@ -119,10 +127,12 @@ docker compose exec -e BOOTSTRAP_ADMIN_ALLOW_REMOTE=true app python -m app.jobs.
 
 ```bash
 python scripts/deploy.py --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
+  --backup-evidence /secure/path/backup-evidence.json --protected-image <当前不可变镜像ref> \
   --health-url https://manager.ywyz.tech/api/v1/health \
   --readiness-url https://manager.ywyz.tech/api/v1/readiness \
   deploy ghcr.io/ywyz/kindergartenmanager@sha256:<64位digest>
 python scripts/deploy.py --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
+  --backup-evidence /secure/path/backup-evidence.json --protected-image <当前不可变镜像ref> \
   --health-url https://manager.ywyz.tech/api/v1/health \
   --readiness-url https://manager.ywyz.tech/api/v1/readiness rollback
 ```

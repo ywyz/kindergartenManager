@@ -20,6 +20,8 @@ from pathlib import Path
 from typing import Any
 from urllib import error, parse, request
 
+from app.core.backup_evidence import BackupEvidenceError, validate_backup_evidence
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 STATE_DIR_NAME = ".deploy"
 STATE_FILE_NAME = "state.json"
@@ -489,6 +491,38 @@ def _require_service(service: str) -> None:
         raise DeployError(f"Invalid compose service name: {service}")
 
 
+def _require_verified_backup(
+    evidence_path: Path | None,
+    protected_image: str | None,
+) -> None:
+    if evidence_path is None or protected_image is None:
+        raise DeployError(
+            "A verified backup evidence path and protected image are required"
+        )
+    try:
+        validate_backup_evidence(
+            evidence_path,
+            expected_protected_image=protected_image,
+        )
+    except BackupEvidenceError as exc:
+        raise DeployError("Verified backup evidence is invalid") from exc
+
+
+def _require_live_image_binding(
+    live_image: str | None,
+    protected_image: str | None,
+    *,
+    dry_run: bool,
+) -> None:
+    if dry_run or protected_image is None:
+        return
+    expected = live_image or "no-running-image"
+    if protected_image != expected:
+        raise DeployError(
+            "Verified backup evidence is not bound to the currently running image"
+        )
+
+
 def _require_probe_url(url: str, *, gate: str) -> None:
     parsed = parse.urlsplit(url)
     if (
@@ -622,6 +656,7 @@ def _deploy_lock(state_dir: Path, timeout_seconds: int):
 
 
 def _deploy(args: argparse.Namespace) -> None:
+    _require_verified_backup(args.backup_evidence, args.protected_image)
     if not is_immutable_image_ref(args.image_ref):
         raise DeployError(
             f"Image must be immutable digest ref ending with @sha256:<64 lower hex>: {args.image_ref}"
@@ -647,6 +682,9 @@ def _deploy(args: argparse.Namespace) -> None:
             project_dir=project_dir,
             service=args.service,
             dry_run=args.dry_run,
+        )
+        _require_live_image_binding(
+            live_image, args.protected_image, dry_run=args.dry_run
         )
         _validate_snapshot_state(live_image)
         for rollback_ref in (current_image, previous_image, live_image):
@@ -726,6 +764,7 @@ def _deploy(args: argparse.Namespace) -> None:
 
 
 def _rollback(args: argparse.Namespace) -> None:
+    _require_verified_backup(args.backup_evidence, args.protected_image)
     if args.image_ref and not is_immutable_image_ref(args.image_ref):
         raise DeployError(
             f"Image must be immutable digest ref ending with @sha256:<64 lower hex>: {args.image_ref}"
@@ -750,6 +789,9 @@ def _rollback(args: argparse.Namespace) -> None:
             project_dir=project_dir,
             service=args.service,
             dry_run=args.dry_run,
+        )
+        _require_live_image_binding(
+            live_image, args.protected_image, dry_run=args.dry_run
         )
         _validate_snapshot_state(live_image)
         for rollback_ref in (current_image, previous_image, live_image):
@@ -812,6 +854,7 @@ def _rollback(args: argparse.Namespace) -> None:
 
 def _migrate_legacy(args: argparse.Namespace) -> None:
     """Establish an index-only baseline from one explicitly accepted legacy ref."""
+    _require_verified_backup(args.backup_evidence, args.protected_image)
     if not is_immutable_image_ref(args.image_ref):
         raise DeployError(
             f"Image must be immutable digest ref ending with @sha256:<64 lower hex>: {args.image_ref}"
@@ -843,6 +886,9 @@ def _migrate_legacy(args: argparse.Namespace) -> None:
                 project_dir=project_dir,
                 service=args.service,
                 dry_run=False,
+            )
+            _require_live_image_binding(
+                live_image, args.protected_image, dry_run=False
             )
             if live_image != legacy_image:
                 raise DeployError(
@@ -942,6 +988,15 @@ def _build_parser() -> argparse.ArgumentParser:
         "--dry-run",
         action="store_true",
         help="Run validation and planning without Docker mutations.",
+    )
+    parser.add_argument(
+        "--backup-evidence",
+        type=Path,
+        help="Absolute owner-only restore-verified backup evidence JSON.",
+    )
+    parser.add_argument(
+        "--protected-image",
+        help="Current immutable image digest, or no-running-image for first install.",
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)

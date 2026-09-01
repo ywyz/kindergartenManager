@@ -307,7 +307,6 @@ async def test_run_init_redacts_unexpected_bootstrap_failure(
     password = "TestOnlyStrongPass!"
     leaked_hash = "$argon2id$test-only-sensitive-hash"
 
-    monkeypatch.setattr(module, "run_startup_migrations", lambda **_kwargs: None)
     monkeypatch.setattr(module.settings, "BOOTSTRAP_ADMIN_ENABLED", True)
     monkeypatch.setattr(module.settings, "BOOTSTRAP_ADMIN_USERNAME", "sysadmin")
     monkeypatch.setattr(module.settings, "BOOTSTRAP_ADMIN_PASSWORD", password)
@@ -327,30 +326,27 @@ async def test_run_init_redacts_unexpected_bootstrap_failure(
     assert "database failed" not in output
 
 
-async def test_run_init_stops_after_redacted_migration_failure(
+async def test_run_init_never_invokes_alembic(
     monkeypatch,
     capsys,
 ) -> None:
-    """迁移失败必须 fail closed，且不得输出异常正文。"""
+    """Bootstrap 只消费现有 schema，不得隐式运行 Alembic。"""
     from app.jobs import bootstrap_admin as module
-
-    leaked_detail = "mysql://user:secret@example.invalid/database"
-    bootstrap_called = False
-
-    def fail_migration() -> None:
-        raise RuntimeError(leaked_detail)
-
-    async def record_bootstrap_call(**_kwargs) -> str:
-        nonlocal bootstrap_called
-        bootstrap_called = True
-        return "ok: should not run"
+    from alembic import command
 
     monkeypatch.setattr(
-        module,
-        "run_startup_migrations",
-        lambda **_kwargs: fail_migration(),
+        command,
+        "upgrade",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("bootstrap must not migrate")
+        ),
     )
-    monkeypatch.setattr(module, "bootstrap_admin", record_bootstrap_call)
+    monkeypatch.setattr(module, "bootstrap_admin", lambda **_kwargs: None)
+
+    async def succeed(**_kwargs) -> str:
+        return "ok: existing schema"
+
+    monkeypatch.setattr(module, "bootstrap_admin", succeed)
     monkeypatch.setattr(module.settings, "BOOTSTRAP_ADMIN_ENABLED", True)
     monkeypatch.setattr(module.settings, "BOOTSTRAP_ADMIN_USERNAME", "sysadmin")
     monkeypatch.setattr(
@@ -362,10 +358,8 @@ async def test_run_init_stops_after_redacted_migration_failure(
     exit_code = await module._run_init()
 
     output = capsys.readouterr().out
-    assert exit_code == 1
-    assert "迁移失败" in output
-    assert leaked_detail not in output
-    assert bootstrap_called is False
+    assert exit_code == 0
+    assert "迁移" not in output
 
 
 async def test_run_init_maps_ok_and_skip_results_to_success(
@@ -375,7 +369,6 @@ async def test_run_init_maps_ok_and_skip_results_to_success(
     """创建成功与已存在的幂等跳过都应返回成功状态。"""
     from app.jobs import bootstrap_admin as module
 
-    monkeypatch.setattr(module, "run_startup_migrations", lambda **_kwargs: None)
     monkeypatch.setattr(module.settings, "BOOTSTRAP_ADMIN_ENABLED", True)
     monkeypatch.setattr(module.settings, "BOOTSTRAP_ADMIN_USERNAME", "sysadmin")
     monkeypatch.setattr(

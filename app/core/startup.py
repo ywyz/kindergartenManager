@@ -1,4 +1,4 @@
-"""应用启动模块：自动执行 Alembic 数据库迁移。
+"""Alembic 配置工具；迁移只允许由显式迁移任务调用。
 
 支持三种运行模式：
 - 开发模式（python -m app.main）：直接运行，alembic.ini 在项目根目录
@@ -45,8 +45,8 @@ def build_sync_url(database_url: str | None) -> str:
     return database_url
 
 
-def run_startup_migrations(*, log_failure_detail: bool = True) -> None:
-    """在应用启动时自动执行 alembic upgrade head。
+def run_migrations(*, log_failure_detail: bool = True) -> None:
+    """为显式迁移任务执行 alembic upgrade head。
 
     桌面、开发与服务器模式统一 fail-closed：迁移失败时重新抛出，防止应用在未知
     或过期 schema 上继续接受业务操作。默认记录异常；已经提供脱敏错误边界的调用方
@@ -75,5 +75,5 @@ def run_startup_migrations(*, log_failure_detail: bool = True) -> None:
         logger.info("数据库迁移完成")
     except Exception:
         if log_failure_detail:
-            logger.exception("数据库迁移失败，应用启动已中止")
+            logger.exception("数据库迁移失败，显式迁移任务已中止")
         raise
