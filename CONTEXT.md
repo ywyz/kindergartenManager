@@ -226,15 +226,16 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
 
 当前共同下一步是：
 
-1. Issue #54 的 readiness、Compose 与 deploy/rollback 双门已有本地候选；继续完成当前 SHA Review、全量测试、
-   隔离 Compose/真实 MySQL 停止—恢复矩阵。`/api/v1/health` 继续只表示进程/HTTP 存活。
-2. 应用容器启动会执行 fail-closed Alembic upgrade；镜像 rollback 不恢复 schema/data。发布前必须闭合备份恢复
-   与新 schema→旧镜像兼容路径，且不得自动 downgrade 数据库 revision。
+1. Issue #54 readiness 双门与 R5-R backup→restore→evidence 生产端均为 `LOCAL_GREEN`；固定 R5-R code SHA、
+   三轮 Review、全量测试和隔离 MySQL live 证据见 `specs/operations-r5/evidence-ledger.md`。
+   `/api/v1/health` 继续只表示进程/HTTP 存活。
+2. 应用与 Bootstrap 启动均不执行 Alembic；迁移只由已验证备份门后的显式 job 执行。下一步 R5-P 仅处理目标
+   OCI image 的迁移、部署、失败回切和 release 收敛；镜像 rollback 不恢复 schema/data，且不得自动 downgrade。
 3. 当前 OCI index digest 描述资产、Release body/tag/SHA/asset 收敛校验和部署/回滚脚本候选需取得本次
    commit、push、精确 SHA CI 与复审证据；生产管理员登录/最终密码轮换/旧会话失效已于 2026-08-31 验收，
    但目标页语义浏览器自动化超时仍是独立工具问题。
-4. Windows/Word/真实 MySQL 恢复矩阵和其他业务模块人工回归仍是独立工作，不与 Agent、liveness 或部署
-   脚本结果互相替代。
+4. R5-R 的隔离真实 MySQL 与 Linux python-docx 恢复矩阵已通过；Windows Word、生产恢复和其他业务模块人工
+   回归仍是独立工作，不与 Agent、liveness 或部署脚本结果互相替代。
 5. 产品深化按 [`docs/PRODUCT_DIRECTION.md`](docs/PRODUCT_DIRECTION.md) 作为规划基线，优先拆分 Word 模板中心、
    统一教学文档中心、审核/资源复用和成长档案；任何子能力仍须独立 ADR/spec/Issue/稳定 RED，不因方向文档
    获得实现授权，也不扩张 Issue #54 的 readiness 范围。

@@ -36,7 +36,7 @@
 |---|---|---|---|---|---|
 | A | R2 五模块复验 | `5fb4f31dc2a0cd73f786cba4795f5a579f5816ba`（倾听 GREEN candidate） | 待固定 | `IN_PROGRESS` | 倾听冻结 RED、格式 GREEN 与当前 SHA 全量已固定；Review M 和全部人工门仍待闭合 |
 | B | R5-54 readiness + Compose + deploy/rollback 双门 | `0b3f2408984d717b9692cfa003ee2740e4219341` | 待固定 | `LOCAL_GREEN` | stable RED、两轮 Review finding、当前 SHA 全量与隔离 MySQL 故障恢复均通过；生产部署门未执行 |
-| C | R5-R 备份与恢复 | `ddb0d106d0f504d3c62110d886116e1ce3d074fb`（consumer gate） | 待固定 | `BLOCKED` | 启动自动迁移已取消，consumer gate 本地 GREEN；尚无 SQLite/MySQL backup→隔离 restore→evidence 生产与演练，不能称为“已验证备份”闭合 |
+| C | R5-R 备份与恢复 | `b329bf6cf4bbf5518390644b24908ce29bd16894` | 待固定 | `LOCAL_GREEN` | SQLite/MySQL producer→隔离 restore→受控 attestation、deploy 当前库自动绑定与完整破坏恢复演练均通过；无生产、push、Release 或目标镜像部署证据 |
 | D | R5-P release/digest/deploy/rollback 收敛 | 待固定 | 待固定 | `PLANNED` | 只做本地/隔离演练；无 push、Release 或生产操作授权 |
 | E | 最终证据闭合 | 待固定 | 待固定 | `BLOCKED` | 依赖 A-D 各自原始证据；不能吞并它们 |
 
@@ -118,7 +118,7 @@ Python/数据库/migration head、tenant/user/role、模板文件与 SHA-256、�
 - Review M 保持 OPEN：ExportRecord commit 与独立 audit/download 的 generation/session 窄窗口尚无原子契约；
   该 finding 阻止倾听模块和 R2 标记 PASS，需独立 stable RED 后处理。
 
-## R5-R 显式迁移 / 备份 consumer gate
+## R5-R 显式迁移 / 备份 producer 与恢复闭合
 
 - 策略冻结：[ADR-0007](../../docs/ADR/ADR-0007-explicit-migration-and-verified-backup-gate.md)；应用与
   Bootstrap 启动不再运行 Alembic，迁移只能由独立 `app.jobs.migrate_database` 入口发起。
@@ -132,7 +132,24 @@ Python/数据库/migration head、tenant/user/role、模板文件与 SHA-256、�
 - consumer 侧会严格校验证据/备份 artifact 的 owner、`0600`、非 symlink、关闭 JSON schema、24 小时窗口、
   checksum/size、当前镜像、脱敏数据库 identity 与备份 revision；显式迁移复读实际配置库 identity/revision，
   readiness 复读实际 revision 并要求等于当前代码唯一 head。
-- **门禁仍为 BLOCKED**：仓库尚未实现并验收 SQLite/MySQL 一致性备份、隔离恢复、必要 secrets/exports/templates
-  校验和证据生成。当前 JSON consumer 不能证明这些步骤真实发生；不得手写 `passed` 字段后宣称 R5-R、部署或
-  release PASS。deploy 的 database identity 仍由受信运维输入，dry-run 不执行 live-image inspect；这两项在
-  生产 attestation/演练设计前也不得升级为生产证据。
+- producer stable RED 分别固定为：SQLite 连续两次 `11 failed`；MySQL 连续两次
+  `15 failed / 3 passed / 1 skipped`；deploy attestation 连续两次 `8 failed / 4 passed`；完整恢复演练连续两次
+  `1 failed / 1 passed`。所有 RED 均由缺失生产 seam 或旧弱绑定触发，不以人工 `passed` 充数。
+- SQLite 使用 Online Backup API，恢复到全新目录后复验 `integrity_check`、实际 Alembic revision、secrets、exports
+  与五个真实模板 checksum，再由程序生成 owner-only artifact/evidence。MySQL 使用唯一受控 Compose、tmpfs、
+  合成凭据、`--single-transaction`/`--hex-blob` dump，恢复到全新实例后比较全部表、租户、BLOB、revision 与
+  未提交事务排除；清理失败或残留资源会删除 evidence 并失败关闭。
+- deploy 已移除人工 `--database-identity-sha256`，直接校验 producer manifest/evidence，并自动复读当前配置库
+  identity/revision；dry-run 不创建 lock/state/override、不执行 live inspect，并明确输出 `NOT_IMAGE_BOUND`。
+- 完整破坏恢复演练使用真实 Alembic migrations、恢复后的 encryption/JWT secrets、真实登录/readiness、五模块、
+  两类图片、五个恢复模板与五类可由 python-docx 打开的 Word 重导出，并以全表规范化快照证明零数据丢失。
+- 三轮独立只读 Review 的 P0/P1 findings 已全部修复；最终 reviewer 复核无阻断。固定
+  `tested_code_sha=b329bf6cf4bbf5518390644b24908ce29bd16894`：全量
+  `1059 passed / 1 skipped in 69.08s`；显式启用隔离 MySQL live 后
+  `28 passed in 26.68s`，随后精确检查 container/volume/network 均无残留。
+- Graphify 里程碑刷新按固定顺序尝试 OpenAI-compatible、DeepSeek、luna_worker；前两者均因 semantic chunks
+  connection error 失败，agent fallback 也未取得可验证结果。失败产生的 partial cache 已丢弃，本轮明确将
+  Graphify 记为 unavailable，不以旧图或部分图支持 `LOCAL_GREEN`；代码、迁移、测试和 Review 是本门证据。
+- **R5-R 当前为 `LOCAL_GREEN`，不是生产 PASS。** 本轮未连接生产、未读取真实凭据、未 push、未创建 Release、
+  未执行目标镜像迁移/部署/失败回切。下一门固定为 R5-P 的目标 OCI image 迁移、部署、失败回切与 release 元数据收敛；
+  dry-run、Linux python-docx 和本地合成数据均不能代替实际镜像绑定、生产数据恢复或 Windows Word 人工证据。
