@@ -36,7 +36,7 @@
 |---|---|---|---|---|---|
 | A | R2 五模块复验 | `5fb4f31dc2a0cd73f786cba4795f5a579f5816ba`（倾听 GREEN candidate） | 待固定 | `IN_PROGRESS` | 倾听冻结 RED、格式 GREEN 与当前 SHA 全量已固定；Review M 和全部人工门仍待闭合 |
 | B | R5-54 readiness + Compose + deploy/rollback 双门 | `0b3f2408984d717b9692cfa003ee2740e4219341` | 待固定 | `LOCAL_GREEN` | stable RED、两轮 Review finding、当前 SHA 全量与隔离 MySQL 故障恢复均通过；生产部署门未执行 |
-| C | R5-R 备份与恢复 | 待固定 | 待固定 | `BLOCKED` | 尚无实现/演练；应用启动自动迁移使 image rollback 不能恢复 schema/data |
+| C | R5-R 备份与恢复 | `ddb0d106d0f504d3c62110d886116e1ce3d074fb`（consumer gate） | 待固定 | `BLOCKED` | 启动自动迁移已取消，consumer gate 本地 GREEN；尚无 SQLite/MySQL backup→隔离 restore→evidence 生产与演练，不能称为“已验证备份”闭合 |
 | D | R5-P release/digest/deploy/rollback 收敛 | 待固定 | 待固定 | `PLANNED` | 只做本地/隔离演练；无 push、Release 或生产操作授权 |
 | E | 最终证据闭合 | 待固定 | 待固定 | `BLOCKED` | 依赖 A-D 各自原始证据；不能吞并它们 |
 
@@ -117,3 +117,22 @@ Python/数据库/migration head、tenant/user/role、模板文件与 SHA-256、�
   硬分页实现；Windows Word 2010+、浏览器、真实 MySQL/视觉 AI 尚未执行。
 - Review M 保持 OPEN：ExportRecord commit 与独立 audit/download 的 generation/session 窄窗口尚无原子契约；
   该 finding 阻止倾听模块和 R2 标记 PASS，需独立 stable RED 后处理。
+
+## R5-R 显式迁移 / 备份 consumer gate
+
+- 策略冻结：[ADR-0007](../../docs/ADR/ADR-0007-explicit-migration-and-verified-backup-gate.md)；应用与
+  Bootstrap 启动不再运行 Alembic，迁移只能由独立 `app.jobs.migrate_database` 入口发起。
+- 初始 stable RED：`ef632f2`，同一命令连续两次均 `13 failed / 1 error`；初始 GREEN：`592fb72`。
+- 首轮独立 Review 发现数据库错绑、漏迁移仍可能通过 readiness，以及 helper/打包入口回归；finding RED
+  `3a935d9` 连续两次均 `13 failed / 3 passed`，修复为 `a49b0e4`。
+- 第二轮 Review 确认 identity/revision 复读、schema readiness、打包分派和锁内重验已生效；随后补齐迁移
+  探测异常脱敏与 F009 第二调用点，最终 `tested_code_sha=ddb0d106d0f504d3c62110d886116e1ce3d074fb`。
+- 当前 SHA：Python compile 检查通过；`.venv/bin/pytest tests/ -q` 为
+  `1004 passed in 64.60s`，无 skip/xfail。独立 reviewer 对最后两个具体回归复核通过。
+- consumer 侧会严格校验证据/备份 artifact 的 owner、`0600`、非 symlink、关闭 JSON schema、24 小时窗口、
+  checksum/size、当前镜像、脱敏数据库 identity 与备份 revision；显式迁移复读实际配置库 identity/revision，
+  readiness 复读实际 revision 并要求等于当前代码唯一 head。
+- **门禁仍为 BLOCKED**：仓库尚未实现并验收 SQLite/MySQL 一致性备份、隔离恢复、必要 secrets/exports/templates
+  校验和证据生成。当前 JSON consumer 不能证明这些步骤真实发生；不得手写 `passed` 字段后宣称 R5-R、部署或
+  release PASS。deploy 的 database identity 仍由受信运维输入，dry-run 不执行 live-image inspect；这两项在
+  生产 attestation/演练设计前也不得升级为生产证据。
