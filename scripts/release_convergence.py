@@ -533,6 +533,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         values = vars(args)
         publish = values.pop("publish")
+        values["descriptor_path"] = values.pop("descriptor")
         if publish:
             publish_verified_release(token=token, **values)
         else:

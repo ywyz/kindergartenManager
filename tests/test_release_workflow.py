@@ -40,6 +40,50 @@ def _descriptor() -> dict[str, Any]:
     }
 
 
+def test_release_convergence_cli_maps_descriptor_to_public_api(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    descriptor_path = tmp_path / "docker-image.json"
+    descriptor_path.write_text(json.dumps(_descriptor()), encoding="utf-8")
+    captured: dict[str, Any] = {}
+
+    def fake_verify_release(**values: Any) -> None:
+        captured.update(values)
+
+    monkeypatch.setenv("GITHUB_TOKEN", "test-token")
+    monkeypatch.setattr(release_convergence, "verify_release", fake_verify_release)
+    result = release_convergence.main(
+        [
+            "--repo",
+            "ywyz/kindergartenManager",
+            "--release-id",
+            "123",
+            "--descriptor",
+            str(descriptor_path),
+            "--tag",
+            TAG,
+            "--source-sha",
+            SOURCE_SHA,
+            "--repository",
+            REPOSITORY,
+            "--digest",
+            DIGEST,
+            "--ref",
+            IMAGE_REF,
+            "--media-type",
+            MEDIA_TYPE,
+            "--platform",
+            PLATFORMS[0],
+            "--platform",
+            PLATFORMS[1],
+        ]
+    )
+
+    assert result == 0
+    assert captured["descriptor_path"] == descriptor_path
+    assert "descriptor" not in captured
+
+
 def _release_body() -> str:
     return f"""### Docker 不可变引用说明
 
