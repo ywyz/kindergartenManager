@@ -155,7 +155,6 @@ def _run_command(
             result = _normalise_runner(runner)(
                 words,
                 check=check,
-                capture_output=output_path is None,
                 stdin=stream,
                 stdout=stdout,
                 stderr=subprocess.PIPE,

@@ -164,6 +164,27 @@ def test_temporary_credentials_are_owner_only_and_not_argv(tmp_path: Path) -> No
     credentials.unlink()
 
 
+def test_docker_runner_uses_non_conflicting_subprocess_stream_arguments() -> None:
+    module = _module()
+    observed: dict[str, Any] = {}
+
+    def strict_runner(
+        command: list[str], **kwargs: Any
+    ) -> subprocess.CompletedProcess[bytes]:
+        observed.update(kwargs)
+        if kwargs.get("capture_output") and (
+            kwargs.get("stdout") is not None or kwargs.get("stderr") is not None
+        ):
+            raise ValueError("conflicting subprocess stream arguments")
+        return _completed(command, b"ok")
+
+    result = module._run_command(["docker", "version"], runner=strict_runner)
+    assert result.stdout == b"ok"
+    assert "capture_output" not in observed
+    assert observed["stdout"] is subprocess.PIPE
+    assert observed["stderr"] is subprocess.PIPE
+
+
 def test_failure_removes_run_directory_and_never_leaves_evidence(
     tmp_path: Path,
 ) -> None:
