@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import urllib.error
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,57 @@ import pytest
 import yaml
 
 from scripts import release_convergence
+
+
+def test_release_api_read_retries_transient_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    attempts = 0
+    sleeps: list[int] = []
+
+    class Response:
+        def __enter__(self) -> "Response":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self, *_args: object) -> bytes:
+            return b'{"id": 42}'
+
+    def open_request(*_args: object, **_kwargs: object) -> Response:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise urllib.error.URLError("synthetic transient failure")
+        return Response()
+
+    monkeypatch.setattr(release_convergence.urllib.request, "urlopen", open_request)
+    monkeypatch.setattr(release_convergence.time, "sleep", sleeps.append)
+
+    assert release_convergence._api_json("owner/repo", "releases/42", "token") == {
+        "id": 42
+    }
+    assert attempts == 2
+    assert sleeps == [1]
+
+
+def test_release_api_read_does_not_retry_non_transient_http_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    attempts = 0
+
+    def open_request(*_args: object, **_kwargs: object) -> None:
+        nonlocal attempts
+        attempts += 1
+        raise urllib.error.HTTPError("url", 404, "missing", {}, None)
+
+    monkeypatch.setattr(release_convergence.urllib.request, "urlopen", open_request)
+
+    with pytest.raises(release_convergence.ConvergenceError, match="request failed"):
+        release_convergence._api_json("owner/repo", "releases/42", "token")
+    assert attempts == 1
+
 
 ROOT = Path(__file__).parents[1]
 SOURCE_SHA = "e" * 40

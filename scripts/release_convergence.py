@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -27,6 +28,7 @@ DESCRIPTOR_KEYS = {
 }
 OCI_INDEX_MEDIA_TYPE = "application/vnd.oci.image.index.v1+json"
 REQUIRED_PLATFORMS = ("linux/amd64", "linux/arm64")
+API_READ_ATTEMPTS = 3
 DOCKER_FACTS_SECTION_TITLE = "### Docker 不可变引用说明"
 DOCKER_FACTS_HEADER_TO_KEY = {
     "release tag": "release_tag",
@@ -53,13 +55,24 @@ def _request_json(url: str, token: str, *, accept: str) -> dict[str, Any]:
             "X-GitHub-Api-Version": "2022-11-28",
         },
     )
-    try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            payload = json.load(response)
-    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as exc:
-        raise ConvergenceError("GitHub API request failed") from exc
-    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        raise ConvergenceError("GitHub API returned invalid JSON") from exc
+    payload: object | None = None
+    for attempt in range(API_READ_ATTEMPTS):
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                payload = json.load(response)
+            break
+        except urllib.error.HTTPError as exc:
+            if (
+                exc.code not in {429, 500, 502, 503, 504}
+                or attempt == API_READ_ATTEMPTS - 1
+            ):
+                raise ConvergenceError("GitHub API request failed") from exc
+        except (urllib.error.URLError, TimeoutError) as exc:
+            if attempt == API_READ_ATTEMPTS - 1:
+                raise ConvergenceError("GitHub API request failed") from exc
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            raise ConvergenceError("GitHub API returned invalid JSON") from exc
+        time.sleep(2**attempt)
     if not isinstance(payload, dict):
         raise ConvergenceError("GitHub API returned an unexpected payload")
     return payload
