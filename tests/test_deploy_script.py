@@ -24,11 +24,51 @@ VALIDATE_OCI_INDEX_REF = deploy._validate_oci_index_ref
 
 
 @pytest.fixture(autouse=True)
-def _avoid_registry_access(monkeypatch: pytest.MonkeyPatch) -> None:
+def _avoid_registry_access(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(deploy, "_validate_oci_index_ref", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         deploy, "_require_verified_backup", lambda *args, **kwargs: None
     )
+
+    default_runner = tmp_path / "default-acceptance-runner"
+    default_runner.write_text(
+        """#!/bin/sh
+if [ "$R5_ACCEPTANCE_GATE" = "login" ]; then
+  checks='{"login":"passed"}'
+else
+  checks='{"daily_plan":"passed","game_observation":"passed","one_on_one_listening":"passed","homemade_teaching":"passed","course_review":"passed","image_blob":"passed","ai_key_decryption":"passed","word_export":"passed","data_snapshot":"passed"}'
+fi
+printf '{"schema_version":1,"status":"passed","phase":"%s","image_ref":"%s","gate":"%s","checks":%s}\n' "$R5_ACCEPTANCE_PHASE" "$R5_ACCEPTANCE_IMAGE" "$R5_ACCEPTANCE_GATE" "$checks"
+""",
+        encoding="utf-8",
+    )
+    default_runner.chmod(0o700)
+
+    real_main = deploy.main
+
+    def main_with_default_acceptance_runner(
+        argv: list[str] | None = None,
+    ) -> int:
+        if argv is None:
+            return real_main(argv)
+        values = list(argv)
+        if (
+            "--dry-run" not in values
+            and "--acceptance-runner" not in values
+            and any(command in values for command in ("deploy", "rollback"))
+        ):
+            command_index = next(
+                index
+                for index, value in enumerate(values)
+                if value in {"deploy", "rollback"}
+            )
+            values[command_index:command_index] = [
+                "--acceptance-runner",
+                str(default_runner),
+            ]
+        return real_main(values)
+
+    monkeypatch.setattr(deploy, "main", main_with_default_acceptance_runner)
 
 
 def test_deploy_requires_verified_backup_before_docker_or_state(
@@ -62,6 +102,25 @@ def test_deploy_requires_verified_backup_before_docker_or_state(
             ]
         )
     assert calls == ["backup"]
+
+
+@pytest.mark.parametrize("command", ["deploy", "rollback"])
+def test_non_dry_deploy_and_rollback_require_acceptance_runner(
+    tmp_path: Path, command: str
+) -> None:
+    _compose(tmp_path)
+    arguments = [
+        "--project-dir",
+        str(tmp_path),
+        *HEALTH_ARGS,
+        command,
+    ]
+    if command == "deploy":
+        arguments.append(_image("a"))
+    args = deploy._build_parser().parse_args(arguments)
+
+    with pytest.raises(deploy.DeployError, match="acceptance runner"):
+        args.func(args)
 
 
 def _image(character: str) -> str:
@@ -1096,6 +1155,290 @@ def test_explicit_noop_rollback_still_requires_both_gates(
             "previous_image": previous_image,
         }
     }
+
+
+def test_standalone_rollback_acceptance_precedes_state_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _compose(tmp_path)
+    current_image = _image("a")
+    previous_image = _image("b")
+    rollback_target = _image("c")
+    state_path = tmp_path / ".deploy" / "state.json"
+    deploy._ensure_file_permissions(state_path)
+    deploy._update_service_state(
+        state_path,
+        "app",
+        current_image=current_image,
+        previous_image=previous_image,
+    )
+    before = state_path.read_bytes()
+    runner = tmp_path / "acceptance-runner"
+    runner.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    runner.chmod(0o700)
+    monkeypatch.setattr(
+        deploy, "_snapshot_current_state", lambda *args, **kwargs: current_image
+    )
+    events: list[str] = []
+    monkeypatch.setattr(
+        deploy,
+        "_deploy_once",
+        lambda *args, image_ref, **kwargs: (
+            events.append(f"deploy:{image_ref}") or image_ref
+        ),
+    )
+    monkeypatch.setattr(
+        deploy,
+        "_run_acceptance_gate",
+        lambda path, *, phase, image_ref, gate: events.append(
+            f"{phase}_{gate}:{image_ref}"
+        ),
+    )
+    original_update = deploy._update_service_state
+
+    def record_update(*args: object, **kwargs: object) -> None:
+        events.append("state")
+        original_update(*args, **kwargs)
+
+    monkeypatch.setattr(deploy, "_update_service_state", record_update)
+
+    deploy.main(
+        [
+            "--project-dir",
+            str(tmp_path),
+            "--acceptance-runner",
+            str(runner),
+            *HEALTH_ARGS,
+            "rollback",
+            rollback_target,
+        ]
+    )
+
+    assert events == [
+        f"deploy:{rollback_target}",
+        f"rollback_login:{rollback_target}",
+        f"rollback_business:{rollback_target}",
+        "state",
+    ]
+    assert state_path.read_bytes() != before
+
+
+def test_standalone_rollback_acceptance_failure_restores_and_preserves_state_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _compose(tmp_path)
+    current_image = _image("a")
+    previous_image = _image("b")
+    rollback_target = _image("c")
+    state_path = tmp_path / ".deploy" / "state.json"
+    deploy._ensure_file_permissions(state_path)
+    deploy._update_service_state(
+        state_path,
+        "app",
+        current_image=current_image,
+        previous_image=previous_image,
+    )
+    before = state_path.read_bytes()
+    runner = tmp_path / "acceptance-runner"
+    runner.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    runner.chmod(0o700)
+    monkeypatch.setattr(
+        deploy, "_snapshot_current_state", lambda *args, **kwargs: current_image
+    )
+    images: list[str] = []
+    monkeypatch.setattr(
+        deploy,
+        "_deploy_once",
+        lambda *args, image_ref, **kwargs: images.append(image_ref) or image_ref,
+    )
+
+    def acceptance(path: Path, *, phase: str, image_ref: str, gate: str) -> None:
+        if image_ref == rollback_target and gate == "business":
+            raise deploy.DeployError("synthetic rollback business failure")
+
+    monkeypatch.setattr(deploy, "_run_acceptance_gate", acceptance)
+
+    with pytest.raises(SystemExit, match="synthetic rollback business failure"):
+        deploy.main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                "--acceptance-runner",
+                str(runner),
+                *HEALTH_ARGS,
+                "rollback",
+                rollback_target,
+            ]
+        )
+
+    assert images == [rollback_target, current_image]
+    assert state_path.read_bytes() == before
+
+
+def test_standalone_rollback_double_acceptance_failure_preserves_state_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _compose(tmp_path)
+    current_image = _image("a")
+    previous_image = _image("b")
+    rollback_target = _image("c")
+    state_path = tmp_path / ".deploy" / "state.json"
+    deploy._ensure_file_permissions(state_path)
+    deploy._update_service_state(
+        state_path,
+        "app",
+        current_image=current_image,
+        previous_image=previous_image,
+    )
+    before = state_path.read_bytes()
+    runner = tmp_path / "acceptance-runner"
+    runner.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    runner.chmod(0o700)
+    monkeypatch.setattr(
+        deploy, "_snapshot_current_state", lambda *args, **kwargs: current_image
+    )
+    images: list[str] = []
+    monkeypatch.setattr(
+        deploy,
+        "_deploy_once",
+        lambda *args, image_ref, **kwargs: images.append(image_ref) or image_ref,
+    )
+
+    def acceptance(path: Path, *, phase: str, image_ref: str, gate: str) -> None:
+        if gate == "business":
+            if image_ref == rollback_target:
+                raise deploy.DeployError("synthetic rollback business failure")
+            raise deploy.DeployError("synthetic restore acceptance failure")
+
+    monkeypatch.setattr(deploy, "_run_acceptance_gate", acceptance)
+
+    with pytest.raises(
+        SystemExit,
+        match="synthetic rollback business failure.*synthetic restore acceptance failure",
+    ):
+        deploy.main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                "--acceptance-runner",
+                str(runner),
+                *HEALTH_ARGS,
+                "rollback",
+                rollback_target,
+            ]
+        )
+
+    assert images == [rollback_target, current_image]
+    assert state_path.read_bytes() == before
+
+
+def test_regular_deploy_acceptance_failure_restores_without_state_update(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _compose(tmp_path)
+    current_image = _image("a")
+    previous_image = _image("b")
+    target_image = _image("c")
+    state_path = tmp_path / ".deploy" / "state.json"
+    deploy._ensure_file_permissions(state_path)
+    deploy._update_service_state(
+        state_path,
+        "app",
+        current_image=current_image,
+        previous_image=previous_image,
+    )
+    before = state_path.read_bytes()
+    runner = tmp_path / "acceptance-runner"
+    runner.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    runner.chmod(0o700)
+    monkeypatch.setattr(
+        deploy, "_snapshot_current_state", lambda *args, **kwargs: current_image
+    )
+    images: list[str] = []
+    monkeypatch.setattr(
+        deploy,
+        "_deploy_once",
+        lambda *args, image_ref, **kwargs: images.append(image_ref) or image_ref,
+    )
+
+    def acceptance(path: Path, *, phase: str, image_ref: str, gate: str) -> None:
+        if phase == "target" and gate == "business":
+            raise deploy.DeployError("synthetic target business failure")
+
+    monkeypatch.setattr(deploy, "_run_acceptance_gate", acceptance)
+
+    with pytest.raises(SystemExit, match="synthetic target business failure"):
+        deploy.main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                "--acceptance-runner",
+                str(runner),
+                *HEALTH_ARGS,
+                "deploy",
+                target_image,
+            ]
+        )
+
+    assert images == [target_image, current_image]
+    assert state_path.read_bytes() == before
+
+
+def test_regular_deploy_double_acceptance_failure_preserves_state_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _compose(tmp_path)
+    current_image = _image("a")
+    previous_image = _image("b")
+    target_image = _image("c")
+    state_path = tmp_path / ".deploy" / "state.json"
+    deploy._ensure_file_permissions(state_path)
+    deploy._update_service_state(
+        state_path,
+        "app",
+        current_image=current_image,
+        previous_image=previous_image,
+    )
+    before = state_path.read_bytes()
+    runner = tmp_path / "acceptance-runner"
+    runner.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    runner.chmod(0o700)
+    monkeypatch.setattr(
+        deploy, "_snapshot_current_state", lambda *args, **kwargs: current_image
+    )
+    images: list[str] = []
+    monkeypatch.setattr(
+        deploy,
+        "_deploy_once",
+        lambda *args, image_ref, **kwargs: images.append(image_ref) or image_ref,
+    )
+
+    def acceptance(path: Path, *, phase: str, image_ref: str, gate: str) -> None:
+        if gate == "business":
+            if image_ref == target_image:
+                raise deploy.DeployError("synthetic target business failure")
+            raise deploy.DeployError("synthetic restore business failure")
+
+    monkeypatch.setattr(deploy, "_run_acceptance_gate", acceptance)
+
+    with pytest.raises(
+        SystemExit,
+        match="synthetic target business failure.*synthetic restore business failure",
+    ):
+        deploy.main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                "--acceptance-runner",
+                str(runner),
+                *HEALTH_ARGS,
+                "deploy",
+                target_image,
+            ]
+        )
+
+    assert images == [target_image, current_image]
+    assert state_path.read_bytes() == before
 
 
 def test_deployment_gates_check_liveness_then_readiness(

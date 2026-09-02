@@ -388,6 +388,12 @@ def test_backup_evidence_is_rechecked_before_and_inside_deploy_lock(
 
     monkeypatch.setattr(deploy, "_deploy_lock", fake_lock)
     monkeypatch.setattr(deploy, "_require_verified_backup", fake_backup_gate)
+    monkeypatch.setattr(
+        deploy, "_require_acceptance_runner", lambda path: tmp_path / "runner"
+    )
+    monkeypatch.setattr(
+        deploy, "_run_login_and_business_acceptance", lambda *args, **kwargs: None
+    )
     monkeypatch.setattr(deploy, "_validate_oci_index_ref", lambda *a, **k: None)
     monkeypatch.setattr(
         deploy,

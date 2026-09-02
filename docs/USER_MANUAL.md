@@ -52,12 +52,14 @@ docker compose exec -e BOOTSTRAP_ADMIN_ALLOW_REMOTE=true app python -m app.jobs.
 python -m scripts.deploy --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
   --backup-evidence /secure/path/backup-evidence.json \
   --protected-image <当前不可变镜像ref> \
+  --acceptance-runner /secure/path/r5-acceptance-runner \
   --health-url https://manager.ywyz.tech/api/v1/health \
   --readiness-url https://manager.ywyz.tech/api/v1/readiness \
   deploy ghcr.io/ywyz/kindergartenmanager@sha256:<64位digest>
 python -m scripts.deploy --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
   --backup-evidence /secure/path/backup-evidence.json \
   --protected-image <当前不可变镜像ref> \
+  --acceptance-runner /secure/path/r5-acceptance-runner \
   --health-url https://manager.ywyz.tech/api/v1/health \
   --readiness-url https://manager.ywyz.tech/api/v1/readiness rollback
 ```
@@ -69,8 +71,8 @@ revision。producer 从实际配置数据库记录 identity/revision，`deploy.p
 deploy/rollback。R5-P 已有 stable RED 与自动候选，但隔离 MySQL/真实候选 OCI、生产窗口、生产验收和 Release
 closure 仍是独立门；不要把本页通用命令或 dry-run 当成这些门已经通过。
 
-`deploy.py` 要求 liveness 与 database readiness 依次通过后才更新部署状态。它仍不证明迁移兼容、登录、
-五模块业务或数据恢复；真实 MySQL 故障/恢复矩阵见 [Issue #54](https://github.com/ywyz/kindergartenManager/issues/54)。
+`deploy.py` 要求 liveness、database readiness、登录与关键业务门依次通过后才更新部署状态；这些门互不替代。
+它仍不证明数据库 restore 已发生；真实 MySQL 故障/恢复矩阵见 [Issue #54](https://github.com/ywyz/kindergartenManager/issues/54)。
 
 生产管理员密码文件属于运维机密，不是普通用户配置。当前 Aliyun 路径、权限要求、轮换验收与清理规则只在
 [生产部署指南](DEPLOYMENT.md#4-bootstrap-管理员生产凭据)维护；不要在用户手册、Issue 或聊天中记录密码值。

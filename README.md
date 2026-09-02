@@ -133,11 +133,13 @@ docker compose exec -e BOOTSTRAP_ADMIN_ALLOW_REMOTE=true app python -m app.jobs.
 ```bash
 python -m scripts.deploy --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
   --backup-evidence /secure/path/backup-evidence.json --protected-image <当前不可变镜像ref> \
+  --acceptance-runner /secure/path/r5-acceptance-runner \
   --health-url https://manager.ywyz.tech/api/v1/health \
   --readiness-url https://manager.ywyz.tech/api/v1/readiness \
   deploy ghcr.io/ywyz/kindergartenmanager@sha256:<64位digest>
 python -m scripts.deploy --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
   --backup-evidence /secure/path/backup-evidence.json --protected-image <当前不可变镜像ref> \
+  --acceptance-runner /secure/path/r5-acceptance-runner \
   --health-url https://manager.ywyz.tech/api/v1/health \
   --readiness-url https://manager.ywyz.tech/api/v1/readiness rollback
 ```

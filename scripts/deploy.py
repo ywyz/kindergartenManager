@@ -682,12 +682,10 @@ def _require_post_migration_backup(
 
 
 def _require_deploy_evidence(args: argparse.Namespace) -> None:
-    post_migration_values = (
-        args.migration_receipt,
-        args.source_sha,
-        args.acceptance_runner,
-    )
-    if any(post_migration_values) and not all(post_migration_values):
+    post_migration_values = (args.migration_receipt, args.source_sha)
+    if any(post_migration_values) and not all(
+        (args.migration_receipt, args.source_sha, args.acceptance_runner)
+    ):
         raise DeployError(
             "Post-migration deploy requires migration receipt, source SHA, "
             "and acceptance runner together"
@@ -797,6 +795,14 @@ def _run_acceptance_gate(path: Path, *, phase: str, image_ref: str, gate: str) -
     _validate_acceptance_result(payload, phase=phase, image_ref=image_ref, gate=gate)
 
 
+def _run_login_and_business_acceptance(
+    path: Path, *, phase: str, image_ref: str
+) -> None:
+    """Run the independent login and critical-business acceptance gates."""
+    _run_acceptance_gate(path, phase=phase, image_ref=image_ref, gate="login")
+    _run_acceptance_gate(path, phase=phase, image_ref=image_ref, gate="business")
+
+
 def _run_post_migration_deploy(
     args: argparse.Namespace,
     *,
@@ -806,7 +812,9 @@ def _run_post_migration_deploy(
     state_file: Path,
     current_image: str,
 ) -> None:
-    acceptance_runner = _require_acceptance_runner(args.acceptance_runner)
+    acceptance_runner = (
+        None if args.dry_run else _require_acceptance_runner(args.acceptance_runner)
+    )
 
     def start_image(image_ref: str) -> None:
         _start_image(
@@ -991,6 +999,8 @@ def _rollback_or_restore(
     health_url: str,
     readiness_url: str,
     dry_run: bool,
+    acceptance_runner: Path | None = None,
+    acceptance_phase: str = "rollback",
 ) -> None:
     try:
         _deploy_once(
@@ -1003,6 +1013,12 @@ def _rollback_or_restore(
             readiness_url=readiness_url,
             dry_run=dry_run,
         )
+        if acceptance_runner is not None and not dry_run:
+            _run_login_and_business_acceptance(
+                acceptance_runner,
+                phase=acceptance_phase,
+                image_ref=target_image,
+            )
         return
     except DeployError as exc:
         if dry_run:
@@ -1021,6 +1037,12 @@ def _rollback_or_restore(
                 readiness_url=readiness_url,
                 dry_run=False,
             )
+            if acceptance_runner is not None and not dry_run:
+                _run_login_and_business_acceptance(
+                    acceptance_runner,
+                    phase=acceptance_phase,
+                    image_ref=restore_image,
+                )
         except DeployError as restore_error:
             raise DeployError(
                 f"Primary action failed: {exc}; rollback restore to {restore_image} also failed: {restore_error}"
@@ -1068,6 +1090,9 @@ def _deploy(args: argparse.Namespace) -> None:
     _require_service(args.service)
     _require_distinct_probe_urls(args.health_url, args.readiness_url)
     _validate_oci_index_ref(args.image_ref, dry_run=args.dry_run)
+    acceptance_runner = (
+        None if args.dry_run else _require_acceptance_runner(args.acceptance_runner)
+    )
 
     project_dir = args.project_dir
     compose_file = _resolve_within_project(project_dir, args.compose_file)
@@ -1137,6 +1162,12 @@ def _deploy(args: argparse.Namespace) -> None:
                 dry_run=args.dry_run,
             )
             if not args.dry_run:
+                assert acceptance_runner is not None
+                _run_login_and_business_acceptance(
+                    acceptance_runner,
+                    phase="target",
+                    image_ref=args.image_ref,
+                )
                 _update_service_state(
                     state_file,
                     service=args.service,
@@ -1161,34 +1192,51 @@ def _deploy(args: argparse.Namespace) -> None:
             )
             if args.dry_run:
                 return
+            assert acceptance_runner is not None
+            _run_login_and_business_acceptance(
+                acceptance_runner,
+                phase="target",
+                image_ref=deployed_image,
+            )
             _update_service_state(
                 state_file,
                 service=args.service,
                 current_image=deployed_image,
                 previous_image=pre_deploy_image,
             )
-        except DeployError:
+        except DeployError as primary_error:
             if args.dry_run or pre_deploy_image is None:
                 raise
             print(
                 f"Deploy failed; rolling back {args.service} to pre-deploy immutable ref {pre_deploy_image}"
             )
-            _rollback_or_restore(
-                args.service,
-                compose_file=compose_file,
-                project_dir=project_dir,
-                override_file=override_file,
-                target_image=pre_deploy_image,
-                restore_image=pre_deploy_image,
-                health_url=args.health_url,
-                readiness_url=args.readiness_url,
-                dry_run=False,
-            )
+            try:
+                _deploy_once(
+                    compose_file=compose_file,
+                    project_dir=project_dir,
+                    override_file=override_file,
+                    service=args.service,
+                    image_ref=pre_deploy_image,
+                    health_url=args.health_url,
+                    readiness_url=args.readiness_url,
+                    dry_run=False,
+                )
+                assert acceptance_runner is not None
+                _run_login_and_business_acceptance(
+                    acceptance_runner,
+                    phase="rollback",
+                    image_ref=pre_deploy_image,
+                )
+            except DeployError as restore_error:
+                raise DeployError(
+                    f"Primary action failed: {primary_error}; rollback restore to "
+                    f"{pre_deploy_image} also failed: {restore_error}"
+                ) from restore_error
             raise
 
 
 def _rollback(args: argparse.Namespace) -> None:
-    if any((args.migration_receipt, args.source_sha, args.acceptance_runner)):
+    if any((args.migration_receipt, args.source_sha)):
         raise DeployError(
             "Post-migration deploy options are valid only for the immediate "
             "post-migration deploy; rollback requires fresh current-database evidence"
@@ -1208,6 +1256,9 @@ def _rollback(args: argparse.Namespace) -> None:
     project_dir = args.project_dir
     compose_file = _resolve_within_project(project_dir, args.compose_file)
     _require_compose_inputs(compose_file)
+    acceptance_runner = (
+        None if args.dry_run else _require_acceptance_runner(args.acceptance_runner)
+    )
 
     state_dir = _with_state_dir(project_dir, args.state_dir)
     state_file = state_dir / STATE_FILE_NAME
@@ -1266,6 +1317,13 @@ def _rollback(args: argparse.Namespace) -> None:
                 timeout_seconds=DEFAULT_HEALTH_TIMEOUT_SECONDS,
                 dry_run=args.dry_run,
             )
+            if not args.dry_run:
+                assert acceptance_runner is not None
+                _run_login_and_business_acceptance(
+                    acceptance_runner,
+                    phase="rollback",
+                    image_ref=target_image,
+                )
             print(f"{args.service} already at {target_image}, no change.")
             return
 
@@ -1284,6 +1342,7 @@ def _rollback(args: argparse.Namespace) -> None:
             health_url=args.health_url,
             readiness_url=args.readiness_url,
             dry_run=args.dry_run,
+            acceptance_runner=acceptance_runner,
         )
         restored = target_image
 
@@ -1475,7 +1534,7 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         help=(
             "Absolute owner-only executable which checks login and critical business "
-            "gates for post-migration target and rollback phases."
+            "gates for deploy target and rollback phases."
         ),
     )
     subparsers = parser.add_subparsers(dest="command", required=True)

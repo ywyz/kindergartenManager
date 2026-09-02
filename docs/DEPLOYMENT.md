@@ -40,7 +40,7 @@ R5-P 的平台集合必须恰好为 `linux/amd64` 与 `linux/arm64`；缺少任�
 
 仓库新增 `scripts/deploy.py`：
 
-- `deploy` 子命令：仅接收 digest 形式的 image ref（`...@sha256:...`）
+- `deploy` 子命令：仅接收 digest 形式的 image ref（`...@sha256:...`），并要求受控 acceptance runner
 - 三个镜像变更命令均须先验证 `--backup-evidence`，并以 `--protected-image` 绑定当前运行镜像
 - 部署前通过 `docker buildx imagetools inspect --raw` 确认它是恰好含 `linux/amd64`、`linux/arm64` 的 OCI index
 - 使用文件锁串行化操作
@@ -48,13 +48,17 @@ R5-P 的平台集合必须恰好为 `linux/amd64` 与 `linux/arm64`；缺少任�
 - 执行 `docker compose pull` + `up --no-build`
 - 校验 `.Config.Image` 与请求 image ref 完全一致
 - 依次等待 liveness（`/api/v1/health`）与 database readiness（`/api/v1/readiness`）通过
-- 部署失败自动尝试回退到部署前实际运行的 immutable image
-- `rollback` 子命令：显式回退到历史 immutable ref（或可指定目标）
+- 部署失败或登录/业务门失败时，自动尝试回退到部署前实际运行的 immutable image
+- `rollback` 子命令：显式回退到历史 immutable ref（或可指定目标），回切后重新执行登录与关键业务门
 - `--dry-run`：仅展示计划，不执行 Docker 变更
 
 `scripts/deploy.py` 只切换镜像并执行它声明的门禁；它不运行 migration、不修改 secrets、不删除卷、不执行
 Alembic downgrade 或数据库 restore。dry-run 始终是 `NOT_IMAGE_BOUND`，不能作为镜像绑定、迁移、部署、回切、
 登录、业务验收或 Release 证据。
+
+除仅建立历史 index 基线的 `migrate-legacy` 外，`deploy` 与 `rollback` 都必须提供 `--acceptance-runner`。
+helper 只有在 liveness、readiness、登录和关键业务四类独立门全部通过后才原子写 deployment state；目标动作
+或恢复动作任一门失败（包括双重失败）时，原 state 保持不变。
 
 R5-R 的 database identity 与 Alembic revision 不是命令行参数。备份 producer 从实际配置数据库读取并写入
 `backup-evidence.json`；`deploy.py` consumer 使用 `--backup-evidence` 消费该 producer evidence，并在任何
@@ -109,6 +113,7 @@ python -m scripts.deploy \
   --state-dir /var/lib/kindergarten-manager/deploy-state \
   --backup-evidence /secure/path/backup-evidence.json \
   --protected-image ghcr.io/ywyz/kindergartenmanager@sha256:<当前digest> \
+  --acceptance-runner /secure/path/r5-acceptance-runner \
   --health-url https://manager.ywyz.tech/api/v1/health \
   --readiness-url https://manager.ywyz.tech/api/v1/readiness rollback
 ```
@@ -154,7 +159,8 @@ index 写成唯一基线（`previous_image=null`），不把单平台历史写�
 > 重新通过 readiness、登录和关键业务，必须进入明确的 database restore 方案，不能继续依赖单纯镜像回切。
 > migration receipt 只授权紧接迁移的那一次目标部署及其同一受控动作内的自动镜像回切。若该动作结束后再手工
 > 执行 `rollback`，必须先对“当前运行镜像 + 当前已迁移数据库 revision”重新生成新鲜 producer backup evidence；
-> 不得复用迁移前 evidence 或 receipt。手工回切后的登录与业务验收属于独立生产门，完成前不得宣称 closure。
+> 不得复用迁移前 evidence 或 receipt。显式回切必须带 acceptance runner，登录与业务门通过前 helper 不更新
+> deployment state，也不得宣称 closure。
 
 ## 3. 健康/就绪边界
 
