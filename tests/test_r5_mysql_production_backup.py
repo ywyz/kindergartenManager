@@ -134,6 +134,38 @@ def test_database_identity_strips_credentials_and_query_values() -> None:
         )
 
 
+def test_snapshot_mismatch_reports_only_table_and_category() -> None:
+    module = _module()
+    source = {
+        "tables": {
+            "users": {
+                "type": "BASE TABLE",
+                "engine": "InnoDB",
+                "columns": [{"name": "secret", "data_type": "varchar"}],
+                "rows": [["V73656E736974697665"]],
+            }
+        },
+        "tenant_ids": [],
+        "blob_sha256": [],
+    }
+    restored = {
+        **source,
+        "tables": {
+            "users": {
+                **source["tables"]["users"],
+                "rows": [["V646966666572656E74"]],
+            }
+        },
+    }
+    with pytest.raises(
+        module.ProductionMySQLBackupError,
+        match=r"^Restored row contents do not match source table users$",
+    ) as raised:
+        module._compare_snapshots(source, restored)
+    assert "73656E736974697665" not in str(raised.value)
+    assert "646966666572656E74" not in str(raised.value)
+
+
 def test_rejects_mutable_or_unsafe_inputs() -> None:
     module = _module()
     with pytest.raises(module.ProductionMySQLBackupError):

@@ -1059,7 +1059,30 @@ def _capture_snapshot(
 
 
 def _compare_snapshots(source: Mapping[str, Any], restored: Mapping[str, Any]) -> None:
-    if source.get("tables") != restored.get("tables"):
+    source_tables = source.get("tables")
+    restored_tables = restored.get("tables")
+    if source_tables != restored_tables:
+        if isinstance(source_tables, Mapping) and isinstance(restored_tables, Mapping):
+            if set(source_tables) != set(restored_tables):
+                raise _error("Restored table inventory does not match source")
+            for table_name in sorted(source_tables):
+                source_table = source_tables[table_name]
+                restored_table = restored_tables[table_name]
+                if not isinstance(source_table, Mapping) or not isinstance(
+                    restored_table, Mapping
+                ):
+                    break
+                if any(
+                    source_table.get(field) != restored_table.get(field)
+                    for field in ("type", "engine", "columns")
+                ):
+                    raise _error(
+                        f"Restored schema metadata does not match source table {table_name}"
+                    )
+                if source_table.get("rows") != restored_table.get("rows"):
+                    raise _error(
+                        f"Restored row contents do not match source table {table_name}"
+                    )
         raise _error("Restored table or row contents do not match source")
     if source.get("tenant_ids") != restored.get("tenant_ids"):
         raise _error("Restored tenant boundary does not match source")
