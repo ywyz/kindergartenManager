@@ -366,6 +366,14 @@ def test_complete_chain_uses_a_new_network_and_writes_consumer_shape(
     assert all("source-secret" not in word for command in calls for word in command)
     assert not list(evidence.parent.glob(".*.tmp"))
     assert sum(command[:2] == ["docker", "inspect"] for command in calls) == 3
+    snapshot_queries = [
+        command[command.index("--execute") + 1]
+        for command in calls
+        if "--execute" in command
+        and "CONCAT_WS" in command[command.index("--execute") + 1]
+    ]
+    assert snapshot_queries
+    assert all("HEX(CAST(" in query for query in snapshot_queries)
     from app.jobs.backup_restore import validate_generated_attestation
 
     validated = validate_generated_attestation(

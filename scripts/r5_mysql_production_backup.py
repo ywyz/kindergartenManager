@@ -999,9 +999,8 @@ def _capture_snapshot(
         columns = [row[0] for row in column_rows]
         data_types = [row[1] for row in column_rows]
         expressions = ",".join(
-            "CASE WHEN {column} IS NULL THEN 'N' ELSE CONCAT('V',HEX({column})) END".format(
-                column=_quote_identifier(column)
-            )
+            f"CASE WHEN {_quote_identifier(column)} IS NULL THEN 'N' "
+            f"ELSE CONCAT('V',HEX(CAST({_quote_identifier(column)} AS BINARY))) END"
             for column in columns
         )
         row_output = _mysql_query(
