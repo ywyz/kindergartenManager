@@ -381,6 +381,38 @@ def test_production_compose_commands_use_explicit_reachable_liveness_url() -> No
         assert "--health-url https://manager.ywyz.tech/api/v1/health" in contents
 
 
+def test_release_workflow_keeps_strict_docker_facts_section_and_direct_api() -> None:
+    workflow_path = ROOT / ".github/workflows/release.yml"
+    workflow = workflow_path.read_text(encoding="utf-8")
+    platforms = "| Platforms | `linux/amd64`, `linux/arm64` |"
+    separator = "\n            ---"
+    explanation = "`docker-image.json` 已随 release 资产发布"
+    assert (
+        workflow.index(platforms)
+        < workflow.index(separator)
+        < workflow.index(explanation)
+    )
+    for proxy_name in (
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "all_proxy",
+    ):
+        assert f'{proxy_name}: ""' in workflow
+    parsed_workflow = yaml.safe_load(workflow)
+    release_step = next(
+        step
+        for step in parsed_workflow["jobs"]["create-release"]["steps"]
+        if "body" in step.get("with", {})
+    )
+    parsed_facts = release_convergence._parse_release_body_facts(
+        release_step["with"]["body"]
+    )
+    assert set(parsed_facts) == release_convergence.EXPECTED_DOCKER_FACTS_KEYS
+
+
 def test_release_convergence_accepts_exactly_matching_facts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

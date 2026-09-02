@@ -330,9 +330,9 @@ jobs:
             | Media type | `${{ needs.build-docker.outputs.image_media_type }}` |
             | Platforms | `linux/amd64`, `linux/arm64` |
 
-            `docker-image.json` 已随 release 资产发布，需与 Release body 和 tag/SHA 逐项一致；若不一致则视为发布不收敛。
-
             ---
+
+            `docker-image.json` 已随 release 资产发布，需与 Release body 和 tag/SHA 逐项一致；若不一致则视为发布不收敛。
 
             ### 🪟 Windows 安装版（推荐）
 
@@ -470,6 +470,12 @@ jobs:
           EXPECTED_IMAGE_REF: ${{ needs.build-docker.outputs.image_ref }}
           EXPECTED_MEDIA_TYPE: ${{ needs.build-docker.outputs.image_media_type }}
           RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
+          HTTP_PROXY: ""
+          HTTPS_PROXY: ""
+          ALL_PROXY: ""
+          http_proxy: ""
+          https_proxy: ""
+          all_proxy: ""
         run: |
           python scripts/release_convergence.py \
             --repo "$GITHUB_REPO" \
