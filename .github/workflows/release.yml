@@ -392,6 +392,7 @@ jobs:
             # 部署示例（推荐）：python -m scripts.deploy --service app \
             #   --backup-evidence /secure/path/backup-evidence.json \
             #   --protected-image <当前不可变镜像ref> \
+            #   --acceptance-runner /secure/path/r5-acceptance-runner \
             #   --health-url https://manager.example.com/api/v1/health \
             #   --readiness-url https://manager.example.com/api/v1/readiness \
             #   deploy ${{ needs.build-docker.outputs.image_ref }}
@@ -449,7 +450,9 @@ jobs:
     needs: [build-docker, create-release]
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      # Draft Releases are visible only to tokens with push-level repository access.
+      # The convergence script remains read-only unless --publish is explicit.
+      contents: write
     steps:
       - uses: actions/checkout@v4
 

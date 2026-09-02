@@ -274,11 +274,13 @@ def test_release_workflow_uploads_descriptor_as_artifact_and_release_asset() -> 
         assert value in body
     assert "scripts/deploy.py --service app" not in body
     assert body.index("--service app") < body.index("deploy ${{")
+    assert "--acceptance-runner /secure/path/r5-acceptance-runner" in body
 
 
 def test_release_workflow_runs_testable_post_release_convergence() -> None:
     verify = _workflow()["jobs"]["verify-release"]
     assert verify["needs"] == ["build-docker", "create-release"]
+    assert verify["permissions"]["contents"] == "write"
     steps = verify["steps"]
     assert any(step.get("uses") == "actions/checkout@v4" for step in steps)
     download = next(
