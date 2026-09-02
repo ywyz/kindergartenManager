@@ -72,6 +72,7 @@ def test_migration_receipt_is_closed_owner_only_and_self_validating(
         expected_source_sha=SOURCE_SHA,
         expected_database_identity_sha256=IDENTITY,
         expected_after_revision=AFTER_REVISION,
+        now=datetime(2026, 9, 1, 0, 0, tzinfo=UTC),
     )
     assert receipt.before_revision == BEFORE_REVISION
     assert receipt.after_revision == AFTER_REVISION
