@@ -164,6 +164,43 @@ def test_temporary_credentials_are_owner_only_and_not_argv(tmp_path: Path) -> No
     credentials.unlink()
 
 
+def test_restore_cleanup_continues_after_credentials_unlink_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _module()
+    dump = tmp_path / "database.sql"
+    dump.write_bytes(b"-- isolated restore test\n")
+    calls: list[list[str]] = []
+    original_unlink = Path.unlink
+
+    def fail_server_credentials_unlink(path: Path, *, missing_ok: bool = False) -> None:
+        if path.name == ".restore-mysql-server.env.tmp":
+            raise OSError("injected unlink failure")
+        original_unlink(path, missing_ok=missing_ok)
+
+    def runner(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[bytes]:
+        calls.append(command)
+        if "mysqladmin" in command:
+            return _completed(command)
+        if "--execute" in command:
+            return _completed(command, b"already_present\n")
+        return _completed(command, b"resource-id")
+
+    monkeypatch.setattr(Path, "unlink", fail_server_credentials_unlink)
+    with pytest.raises(module.ProductionMySQLBackupError, match="cleanup failed"):
+        module._restore_mysql(
+            dump=dump,
+            source_snapshot={},
+            source_revision="2b7f3d5e9c8a",
+            production_network="kindergarten_prod",
+            mysql_image=MYSQL_IMAGE,
+            run_dir=tmp_path,
+            runner=runner,
+        )
+    assert any(command[:3] == ["docker", "rm", "--force"] for command in calls)
+    assert any(command[:3] == ["docker", "network", "rm"] for command in calls)
+
+
 def test_docker_runner_uses_non_conflicting_subprocess_stream_arguments() -> None:
     module = _module()
     observed: dict[str, Any] = {}

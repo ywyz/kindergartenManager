@@ -1260,11 +1260,14 @@ def _restore_mysql(
             raise _error("Restored Alembic revision does not match source")
         return restored_snapshot
     finally:
-        restore_server_env.unlink(missing_ok=True)
-        restore_client_env.unlink(missing_ok=True)
         # Only the random, label-scoped container and network are cleaned up;
         # no volume, production network, or broad Docker prune is attempted.
         cleanup_error = False
+        for credentials_path in (restore_server_env, restore_client_env):
+            try:
+                credentials_path.unlink(missing_ok=True)
+            except OSError:
+                cleanup_error = True
         if created_container:
             try:
                 _run_command(
