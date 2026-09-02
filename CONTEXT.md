@@ -1,9 +1,9 @@
 # KindergartenManager 项目上下文
 
-> 状态快照：2026-08-31；合入基线：`main@ec592def`；
-> PR #53 已合并，Issue #52 已关闭，`v3.4.0-beta2` 已从该 merge SHA 发布；当前检出仍为
-> `feat/agent-write` 包含 merge 后的 digest 发布/部署收敛与图谱更新，
-> 不得把这些后续提交误写成已纳入 `main` 或已发布。
+> 状态快照：2026-09-02；发布源码基线：`main@f4687f05e8fdca5d22f5921922ec5c77a4d28bea`。
+> `v3.4.0-beta9` 已从该 SHA 发布为 prerelease；Release、OCI 和生产闭环的精确事实只见
+> `specs/operations-r5/evidence-ledger.md`。evidence closure commit 的 SHA 必须在提交后回读并由自身
+> exact-SHA Quality 固定，不能预填或沿用 release source SHA。
 > Agent 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
 > Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。精确 lineage 与测试证据仅以
 > `specs/agent-write/tests/README.md` 为准；本文不复制逐轮事实。
@@ -214,11 +214,10 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
 3. **投影边界需持续守卫**：API 列表显式使用 tenant 投影，UI 详情和子表使用 tenant + user 投影并已有跨 tenant/user 负向测试；新增查询仍必须选择并测试正确投影。
 4. **类型债务**：Ruff 已清零，但当前 Pyright 仍报告既有第三方类型与结构问题，尚未建立可执行的类型门禁。
 5. **发布证据漂移**：Linux 本地结果不能代替 Windows 安装、浏览器打开、模板 Word 保真和真实 AI/MySQL 验收。
-6. **发布元数据与迁移后恢复已完成隔离验收、仍待生产**：R5-P 候选已把唯一元组固定为 tag、source SHA、repository、
-   双平台 OCI index digest、`docker-image.json` 与 Release body，并改为 draft 验证后 publish；migration receipt
-   解决迁移前 evidence 与迁移后 revision 的证据连续性；`340d23d…` 已用真实双平台 loopback OCI、MySQL 8.4.11、
-   临时凭据完成迁移后目标失败和旧镜像回切，旧镜像在新 schema 上通过完整验收。生产门与 Release closure 仍须独立证明；
-   `/api/v1/health` 仍是存活检查，不作为数据库 readiness 替代；Issue #54 保留 readiness 范围。
+6. **R5-P 生产门已闭合，evidence commit CI 仍是最后独立门**：`v3.4.0-beta9` 的 tag/source/repository、
+   双平台 OCI index、`docker-image.json` 与 Release body 已收敛；`340d23d…` 的隔离 migration→failure→rollback
+   与 2026-09-02 的生产新鲜备份、beta9 故障注入→beta5 回切、最终 beta9 双探针/登录/业务验收分别 PASS。
+   `/api/v1/health` 仍只表示存活；Issue #54 保持 OPEN，R5-P 不能外推关闭它。完整证据见 evidence ledger。
 7. **远端质量证据需按 SHA 回读**：F005-F009 的既有 push Quality 均已按各自 `headSha` 回读；最终
   `evidence_closure_sha` 仍必须使用自身 Review/CI/远端证据，不能沿用 `tested_code_sha` 的旧 CI。
 8. **会话与 WRITE 门禁**：可信页面入口与敏感 callback 必须保持 exact-jti 绑定；W007 不能从局部
@@ -229,19 +228,18 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
 
 当前共同下一步是：
 
-1. Issue #54 readiness 双门与 R5-R backup→restore→evidence 生产端均为 `LOCAL_GREEN`；固定 R5-R code SHA、
-   三轮 Review、全量测试和隔离 MySQL live 证据见 `specs/operations-r5/evidence-ledger.md`。
-   `/api/v1/health` 继续只表示进程/HTTP 存活。
+1. R5-P 生产闭环已经完成；下一道门是聚焦 evidence closure commit、独立 reviewer 和该 commit 自身的 exact-SHA
+   Quality success。Issue #54 仍保持 OPEN，`/api/v1/health` 继续只表示进程/HTTP 存活。
 2. 应用与 Bootstrap 启动均不执行 Alembic；迁移只由已验证备份门后的显式 job 执行。R5-P 候选新增关闭的
    migration receipt 与迁移后失败回切协调 seam；镜像 rollback 不恢复 schema/data，且不得自动 downgrade。
-3. 当前 OCI index digest 描述资产、Release body/tag/SHA/asset 收敛校验和部署/回滚脚本候选已取得隔离全链
-   GREEN，精确事实见 evidence ledger；仍需本次 push、精确 SHA CI、生产窗口验收与 Release closure。生产管理员登录/最终密码轮换/旧会话失效已于 2026-08-31 验收，
-   但目标页语义浏览器自动化超时仍是独立工具问题。
+3. 当前生产固定 `v3.4.0-beta9` immutable OCI index；故障回切后最终 beta9 的 liveness、readiness、登录和
+   九项业务矩阵已经通过。source Quality、Release Build、生产验收与 closure Quality 互不替代；closure SHA
+   只在提交后形成。生产管理员密码轮换与旧会话失效是 2026-08-31 的另一条独立证据。
 4. R5-R 的隔离真实 MySQL 与 Linux python-docx 恢复矩阵已通过；Windows Word、生产恢复和其他业务模块人工
    回归仍是独立工作，不与 Agent、liveness 或部署脚本结果互相替代。
-5. 产品深化按 [`docs/PRODUCT_DIRECTION.md`](docs/PRODUCT_DIRECTION.md) 作为规划基线，优先拆分 Word 模板中心、
-   统一教学文档中心、审核/资源复用和成长档案；任何子能力仍须独立 ADR/spec/Issue/稳定 RED，不因方向文档
-   获得实现授权，也不扩张 Issue #54 的 readiness 范围。
+5. R5-P closure Quality 成功后，先在 Issue #55 冻结角色权限矩阵与 Word 模板权威/验收决策，再进入新的
+   ADR/spec/稳定 RED。每日计划周视角、月视角以及每周活动计划/月主题活动计划 Word 文档必须先作为独立业务
+   契约切片，明确数据模型、模板类型、权限和导出验收，不与模板中心第一期的存储/版本能力混成一个 GREEN。
 
 ## 11. 更新规则
 

@@ -1,21 +1,22 @@
 # R2 / R5 复验证据账本
 
-> 本账本建立于 2026-09-01。它记录门禁状态，不是完成声明。历史 GREEN、方向文档、图谱结果、
-> 其他模块或其他 SHA 的结果均不得代替本轮证据。
+> 本账本建立于 2026-09-01，最近一次 R5-P 生产核验为 2026-09-02。每条完成声明只覆盖其明确
+> gate；历史 GREEN、方向文档、图谱结果、其他模块或其他 SHA 的结果均不得代替本轮证据。
 
 ## 当前事实基线
 
 | 项目 | 当前事实 |
 |---|---|
-| branch / HEAD | `main` / `c7ab7e079598737ba7e23ccf82e3092b0489692a` |
-| worktree | 建账前 clean；后续证据必须同时记录 HEAD 与未提交 diff/commit |
+| branch / release source | `main` / `f4687f05e8fdca5d22f5921922ec5c77a4d28bea` |
+| release tag | `v3.4.0-beta9`，annotated tag peeled commit、`main` 与 `origin/main` 均为 release source |
+| worktree | 生产验收前 clean；evidence closure 只允许文档与稳定契约测试 diff |
 | Python | `3.14.7` |
 | Alembic head | `2b7f3d5e9c8a` |
 | Docker / Compose | Engine `29.7.2` / Compose `5.5.0`，Linux x86_64 |
-| MySQL client | 当前主机未安装；真实 MySQL 只通过隔离 Compose 验收 |
-| CodeGraph | 308 files / 6,084 nodes / 18,404 edges，up-to-date |
-| codebase-memory | project `kindergartenManager`，full generation `2026-08-31T14:58:29Z`，HEAD 匹配；源码无 parse/skipped，范围缺口仅 `__pycache__` 排除 |
-| Graphify | 仅作辅助；现有图 5,094 nodes，本轮不作为当前实现或通过证明 |
+| MySQL client | 本地开发主机未安装；隔离 MySQL 8.4.11 与生产 MySQL 分别通过各自验收，不互相替代 |
+| CodeGraph | `.codegraph/` 存在；本轮以当前源码直读和可复现命令补足文档/脚本证据 |
+| codebase-memory | project `kindergartenManager`；generation `2026-08-31T14:58:29Z` 早于本 release source，仅作定位并对相关路径执行 source fallback |
+| Graphify | `unavailable`；OpenAI-compatible 与 DeepSeek 均 3/3 semantic chunks connection error，`luna_worker` fallback 无嵌套 agent 接口；旧图 `built_at_commit=c06e225...` 且 manifest 覆盖不足，不作为本轮证据 |
 
 ### 固定 Word 模板 SHA-256
 
@@ -35,10 +36,10 @@
 | ID | gate/module | tested_code_sha | evidence_closure_sha | 当前状态 | 当前证据 / 下一门 |
 |---|---|---|---|---|---|
 | A | R2 五模块复验 | `5fb4f31dc2a0cd73f786cba4795f5a579f5816ba`（倾听 GREEN candidate） | 待固定 | `IN_PROGRESS` | 倾听冻结 RED、格式 GREEN 与当前 SHA 全量已固定；Review M 和全部人工门仍待闭合 |
-| B | R5-54 readiness + Compose + deploy/rollback 双门 | `0b3f2408984d717b9692cfa003ee2740e4219341` | 待固定 | `LOCAL_GREEN` | stable RED、两轮 Review finding、当前 SHA 全量与隔离 MySQL 故障恢复均通过；生产部署门未执行 |
+| B | R5-54 readiness + Compose + deploy/rollback 双门 | `0b3f2408984d717b9692cfa003ee2740e4219341` | 待固定 | `LOCAL_GREEN + PROD_PROBE_PASS` | stable RED、Review、隔离 MySQL 故障恢复均通过；2026-09-02 生产 liveness/readiness 通过，但 Issue #54 仍 OPEN，不能由 R5-P 外推关闭 |
 | C | R5-R 备份与恢复 | `b329bf6cf4bbf5518390644b24908ce29bd16894` | `8b06f89bf8a7533788bec8e4d19c2be4ae289541` | `LOCAL_GREEN` | SQLite/MySQL producer→隔离 restore→受控 attestation、deploy 当前库自动绑定与完整破坏恢复演练均通过；无生产、push、Release 或目标镜像部署证据 |
-| D | R5-P release/digest/deploy/rollback 收敛 | `340d23d1581038056ce3eed27517fb1d5a953175` | 待固定 | `ISOLATION_GREEN` | Cernet 直连双平台候选、pre-head MySQL backup/restore、migration receipt、目标验收故障注入与旧镜像回切均通过；精确 SHA CI、生产和 Release closure 待独立闭合 |
-| E | 最终证据闭合 | 待固定 | 待固定 | `BLOCKED` | 依赖 A-D 各自原始证据；不能吞并它们 |
+| D | R5-P release/digest/deploy/rollback 收敛 | `release_source_sha=f4687f05e8fdca5d22f5921922ec5c77a4d28bea`；`isolated_tested_code_sha=340d23d1581038056ce3eed27517fb1d5a953175` | 由本次 evidence closure commit 形成，提交后回读 | `PRODUCTION_CLOSED / CLOSURE_CI_PENDING` | 发布、exact-source CI 与生产证据绑定 release source；隔离 migration/failure/rollback 绑定独立 tested SHA。六条独立证据均 PASS；只剩 closure commit 自身 exact-SHA Quality 回读 |
+| E | R2 / R5 全局总账闭合 | 待固定 | 待固定 | `BLOCKED` | R5-P 的生产闭环不吞并仍未完成的 R2 人工门；全局状态继续依赖 A-D 各自原始证据 |
 
 ## 每次证据记录的必填字段
 
@@ -49,8 +50,10 @@ Python/数据库/migration head、tenant/user/role、模板文件与 SHA-256、�
 
 ## 授权边界
 
-本轮允许本地与隔离环境的 SQLite/MySQL、真实 AI、节假日和恢复演练；只使用合成数据并走应用安全配置链。
-未经另行授权不执行 push、merge、Issue 关闭、新 Release、生产部署/回滚或生产凭据操作。
+2026-09-02 已取得一次窄生产维护授权，仅覆盖 beta5 基线、beta9 target-business 故障注入回切、最终 beta9
+恢复部署与相应验收；未授权也未执行数据库迁移、secret 修改、卷删除、密码轮换、tag/Release 元组改写或 Issue
+关闭。evidence closure commit、push、精确 SHA CI 和窄范围 Issue 证据回写按本交付授权执行；merge 与 Issue 关闭
+仍不在范围内。
 
 ## R5-54 stable RED 记录
 
@@ -154,7 +157,7 @@ Python/数据库/migration head、tenant/user/role、模板文件与 SHA-256、�
   未执行目标镜像迁移/部署/失败回切。下一门固定为 R5-P 的目标 OCI image 迁移、部署、失败回切与 release 元数据收敛；
   dry-run、Linux python-docx 和本地合成数据均不能代替实际镜像绑定、生产数据恢复或 Windows Word 人工证据。
 
-## R5-P 迁移后失败回切与发布元数据候选
+## R5-P 迁移后失败回切与发布元数据
 
 - R5-R 的 `tested_code_sha=b329bf6...` 保持不变；本节是独立 R5-P 候选，不回写或冒充 R5-R 证据。
 - 迁移后回切 stable RED：`tests/test_r5_post_migration_rollback.py` 连续两次均 `8 failed`，collection clean；
@@ -191,5 +194,61 @@ Python/数据库/migration head、tenant/user/role、模板文件与 SHA-256、�
   脱敏证据位于 owner-only `/tmp/kg-r5p-live.6yywcuho/`；随机 env 文件已删除，容器已清理。
 - 演练发现镜像切换瞬间的 `ConnectionResetError` 曾被错误归类为双重 gate 失败；新增 stable RED 后修复为等待器
   重试瞬时连接重置，部署/回切专项 `56 passed`，随后才取得上述全链 GREEN。
-- 当前为 `ISOLATION_GREEN`，仍不是生产或 Release PASS：未 push/tag、未创建/发布 Release、未连接生产，精确 SHA
-  CI、生产新鲜备份/部署/失败回切和 Release 元数据收敛必须分别留证。
+- 上述 `340d23d...` 仍只代表隔离 migration → target failure → old-image rollback，不因后续生产验收而改写。
+
+## R5-P 生产与 Release evidence closure（2026-09-02）
+
+### 固定 Release 元组
+
+| 字段 | 固定值 |
+|---|---|
+| release tag | `v3.4.0-beta9` |
+| source SHA | `f4687f05e8fdca5d22f5921922ec5c77a4d28bea` |
+| repository | `ghcr.io/ywyz/kindergartenmanager` |
+| OCI index digest | `sha256:bfa93aebe5ea617a62c98e095e5cd18c5573dbd10a3fca936aeb753e66545bfe` |
+| immutable ref | `ghcr.io/ywyz/kindergartenmanager@sha256:bfa93aebe5ea617a62c98e095e5cd18c5573dbd10a3fca936aeb753e66545bfe` |
+| media type / platforms | `application/vnd.oci.image.index.v1+json`；仅 `linux/amd64`、`linux/arm64` |
+
+`main`、`origin/main` 与 tag peeled commit 均为 source SHA。Release 已发布、`draft=false`、
+`prerelease=true`，发布时间为 `2026-09-02T08:43:21Z`。Release body、Release asset
+`docker-image.json` 与固定元组逐字段一致；两个 platform manifest 的
+`org.opencontainers.image.revision` 均为 source SHA，version 均为 `3.4.0-beta9`。beta7/beta8 失败
+草稿本轮未删除，清理需要独立授权。
+
+### 六类互相独立的证据
+
+| 类别 | 状态 | 固定证据 |
+|---|---|---|
+| 1. exact-SHA CI | `PASS` | [Quality run 33607674505](https://github.com/ywyz/kindergartenManager/actions/runs/33607674505) 为 completed/success，`headSha` 精确等于 source SHA |
+| 2. OCI / Release 元数据收敛 | `PASS` | [Release Build 33607924279](https://github.com/ywyz/kindergartenManager/actions/runs/33607924279) 五个 job success；[v3.4.0-beta9](https://github.com/ywyz/kindergartenManager/releases/tag/v3.4.0-beta9) body、asset、tag、SHA、repository、index digest、media type 与双平台集合一致 |
+| 3. 隔离 migration → target failure → old-image rollback | `PASS` | `tested_code_sha=340d23d1581038056ce3eed27517fb1d5a953175` 的隔离 MySQL 8.4.11/loopback OCI run；receipt、目标故障、旧镜像在新 schema 的完整验收及 state 不变均通过 |
+| 4. 生产新鲜备份 | `PASS` | beta9 绑定 attestation 创建于 `2026-09-02T08:31:27Z`，beta5 绑定 attestation 创建于 `2026-09-02T08:39:18Z`；均为 owner-only `0600`、`verified`、三项 checks passed、revision `2b7f3d5e9c8a`，消费时未过期 |
+| 5. 生产故障注入与 beta5 回切 | `PASS` | beta5 基线先通过双探针、登录和业务矩阵；临时无凭据 `0700/root` wrapper 只拒绝 beta9 `target/business`，deploy 非零后自动恢复 beta5；rollback 双探针、登录与业务矩阵通过，state 原始字节不变，wrapper 随后删除且原 runner 保留 |
+| 6. 最终 beta9 部署与验收 | `PASS` | `2026-09-02T11:21:02Z` live image/state current 均为 immutable ref，previous 为 beta5；app/MySQL running、healthy、未暂停；liveness `200/ok`、readiness `200/ready`；登录及每日计划、游戏观察、一对一倾听、自制教玩具、课程审议、图片 BLOB、AI key 解密、Word 导出和数据快照均 passed |
+
+生产维护使用 release source 的 `scripts/deploy.py`，通过一次性 `--rm` helper 复用 beta9 镜像内已发布的 Python
+依赖和宿主 Docker CLI；source、备份与配置只读挂载，仅 deploy-state 可写。宿主系统 Python 缺应用依赖的首次
+dry-run 在 Docker 变更前失败关闭；随后 helper dry-run 明确报告 `NOT_IMAGE_BOUND`，均未计入生产证据。全程未
+迁移数据库、未修改 secrets、未删除卷、未轮换密码、未移动 tag、未改 Release 固定元组，也未记录备份内容、
+database identity、密码、`DATABASE_URL`、AI key 或 token。
+
+### evidence closure SHA 形成规则
+
+本节生产证据绑定 release source SHA；`evidence_closure_sha` 是在上述事实、稳定文档契约测试和独立 reviewer
+finding 收敛后创建的单一聚焦 commit。commit 产生前不得预填或猜测 SHA；提交后用 `git rev-parse HEAD` 回读，
+push 后只接受 `headSha` 精确等于该 commit 且 conclusion 为 success 的 Quality run。closure SHA 与 CI URL
+回写对应 Issue/最终交付汇总，不通过第二个文档 commit 自引用。若 closure commit 修改产品、部署 helper 或
+验收 runner，而非仅文档/契约测试，则上述生产验收失效，必须重跑。
+
+dry-run、本地测试、source exact-SHA CI、生产验收和 Release closure 是五个互不替代的独立门；任一 PASS
+都不能替代另一门。R5-R 的 `tested_code_sha=b329bf6cf4bbf5518390644b24908ce29bd16894` 与 closure SHA
+`8b06f89bf8a7533788bec8e4d19c2be4ae289541` 保持历史原值，不得改成 R5-P source 或 closure 证据。
+
+GitHub 未发现专用 R5-P Issue。Issue #54 仍为 OPEN，且 digest 部署/回滚自动化是其明确非目标；本轮只能回写
+生产 readiness 的窄证据，不能推断或操作 Issue 关闭。
+
+Graphify 按固定 OpenAI-compatible → DeepSeek → `luna_worker` 顺序执行。前两者均为 3/3 semantic chunks
+connection error，34/34 变更文档没有节点；每次 partial cache 都在进入下一步前丢弃。fallback 子代理确认当前
+环境没有可调用的嵌套 agent 接口，未生成有效增量图；现有旧图的 `built_at_commit=c06e225...` 且 manifest 漏记
+本轮文件。本轮因此明确记为 `unavailable`，`graphify-out` 零提交变化，旧图、旧 diagnostics 和 partial 输出均不
+支持 `PRODUCTION_CLOSED` 或最终 closure 声明。

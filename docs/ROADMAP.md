@@ -270,12 +270,12 @@ H0/M0/L0，Quality、CodeQL 与 Dependency Graph 精确 SHA 成功，Issue #52 �
 
 ## 10. R5：发布与运维复核
 
-状态：`实现中（digest 发布/部署候选与生产管理员轮换已完成本地验收，精确 SHA CI 和 readiness 待闭合）`。
+状态：`R5-P 生产闭环完成；evidence closure commit 的独立 Review 与 exact-SHA Quality 待固定`。
 
-当前历史基线：`v3.4.0-beta2` workflow run `33312637621` 在
-`ec592def` 成功；现网 `manager.ywyz.tech` 固定 linux/amd64 manifest
-`sha256:be4ee7e841621f6c9ec7142ec15271a37573a5587658e61c7329a7059f7a4b2c`。新 digest 自动化已形成待提交候选并
-通过本地专项测试；其 commit/push、精确 SHA CI 和新 release 实跑闭合前不得写成已发布能力。
+当前发布基线为 `v3.4.0-beta9@f4687f05e8fdca5d22f5921922ec5c77a4d28bea`，Quality run
+`33607674505` 与 Release Build `33607924279` 均为精确 source SHA success。生产使用 immutable OCI index
+`sha256:bfa93aebe5ea617a62c98e095e5cd18c5573dbd10a3fca936aeb753e66545bfe`，仅含
+`linux/amd64`、`linux/arm64`；Release 已发布且保持 prerelease。
 
 2026-08-31 已在 `manager.ywyz.tech` 完成 Bootstrap 管理员密码文件漂移恢复、标准轮换、旧凭据拒绝、旧会话
 失效和最终凭据重登 `/home`。受保护密码文件路径与操作边界记录于 `docs/DEPLOYMENT.md`；密码值不进入仓库。
@@ -291,12 +291,12 @@ H0/M0/L0，Quality、CodeQL 与 Dependency Graph 精确 SHA 成功，Issue #52 �
 - Release SHA、资产、校验值、变更日志和回滚说明。
 - `docker-image.json` 与 Release Notes 的收敛校验与自动化验证。
 - `scripts/deploy.py` 的不可变部署与回滚操作（dry-run、串行锁、rollback）。
-- 独立 Issue #54 的 `/api/v1/readiness` 双门与 R5-R backup→restore→evidence 已固定 `LOCAL_GREEN`；R5-R 已完成
-  三轮 Review、当前 SHA 全量回归、隔离 Compose/真实 MySQL live 和完整破坏恢复演练。R5-P 的目标镜像迁移、
-  deployment state 延迟收敛、失败回切的隔离 OCI/MySQL 全链已在 `340d23d…` 进入 `ISOLATION_GREEN`：目标镜像
-  完整门后故障注入、旧镜像在新 schema 上回切及五模块/图片/AI/Word/快照均通过且状态未更新。生产证据与
-  release closure 仍待独立闭合；migration receipt、回切 stable RED/GREEN 与 draft→verify→publish 元数据门
-  不能代替精确 SHA CI、生产维护窗口或最终 Release 验收。
+- 独立 Issue #54 的 `/api/v1/readiness` 双门与 R5-R backup→restore→evidence 保持各自历史结论；R5-R
+  `tested_code_sha=b329bf6cf4bbf5518390644b24908ce29bd16894` 不因 R5-P 改写。R5-P 的隔离
+  migration→target failure→old-image rollback 继续绑定 `340d23d…`。2026-09-02 生产另行完成 fresh backup、
+  beta9 target-business 故障注入后 beta5 回切、回切完整验收和最终 beta9 部署；最终 app/MySQL healthy、未暂停，
+  liveness/readiness、登录、五模块、图片、AI key、Word 与数据快照均 PASS。六类证据及互不替代规则只见
+  `specs/operations-r5/evidence-ledger.md`；closure commit SHA 只能在提交后回读并由自身 Quality 固定。
 
 ## 11. R6：产品深化（模板、文档、审核与复用）
 
@@ -309,12 +309,14 @@ Agent WRITE 的精确本地交付状态、Review 轮次、SHA 与测试证据仅
 
 建议顺序：
 
-1. 在 R2 业务复验和 R5 readiness/恢复门禁推进的同时，冻结三类角色的跨教师读取、审核、导出和删除矩阵。
+1. R5-P closure Quality 成功后，冻结三类角色的跨教师读取、审核、导出和删除矩阵；未冻结前不进入模板管理 GREEN。
 2. 为 Word 模板中心新增 ADR，只取代或细化 ADR-0004 的“固定模板权威来源”子决策，固定模板文件权威、版本、
    受控占位符、权限、安全存储和回滚；ADR-0004 的 AI/教师采用边界继续有效。
-3. 以独立 spec/Issue 和稳定 RED 实现 Word 模板中心第一期，并逐一接入现有五类 exporter。
-4. 在模板版本可追溯后建设统一教学文档中心；审核流和资源复用继续拆成独立 Issue。
-5. 仅在幼儿身份、隐私、保留/删除和跨教师权限冻结后规划成长档案和管理视图。
+3. 同期为每日计划周视角、月视角及每周活动计划/月主题活动计划 Word 文档建立独立业务 spec/Issue/稳定 RED；
+   先冻结周/月数据模型与导出契约，再由模板中心提供版本化模板能力，不能把两者合并为一个无限范围 Issue。
+4. 以独立 spec/Issue 和稳定 RED 实现 Word 模板中心第一期，并逐一接入现有五类 exporter，再接入经批准的周/月文档类型。
+5. 在模板版本可追溯后建设统一教学文档中心；审核流和资源复用继续拆成独立 Issue。
+6. 仅在幼儿身份、隐私、保留/删除和跨教师权限冻结后规划成长档案和管理视图。
 
 明确不做：把产品方向混入 Issue #54；开放 Agent Provider WRITE；在同一 Issue 中同时实现模板中心、复杂审批、
 成长档案、家长端和多园 SaaS；没有真实需求时提前拆分微服务。
