@@ -1064,7 +1064,12 @@ def _compare_snapshots(source: Mapping[str, Any], restored: Mapping[str, Any]) -
     if source_tables != restored_tables:
         if isinstance(source_tables, Mapping) and isinstance(restored_tables, Mapping):
             if set(source_tables) != set(restored_tables):
-                raise _error("Restored table inventory does not match source")
+                missing = ",".join(sorted(set(source_tables) - set(restored_tables)))
+                unexpected = ",".join(sorted(set(restored_tables) - set(source_tables)))
+                raise _error(
+                    "Restored table inventory does not match source "
+                    f"(missing={missing or '-'} unexpected={unexpected or '-'})"
+                )
             for table_name in sorted(source_tables):
                 source_table = source_tables[table_name]
                 restored_table = restored_tables[table_name]

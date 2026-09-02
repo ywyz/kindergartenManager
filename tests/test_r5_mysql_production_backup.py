@@ -166,6 +166,21 @@ def test_snapshot_mismatch_reports_only_table_and_category() -> None:
     assert "646966666572656E74" not in str(raised.value)
 
 
+def test_snapshot_inventory_mismatch_reports_only_table_names() -> None:
+    module = _module()
+    source = {"tables": {"expected_table": {}}, "tenant_ids": [], "blob_sha256": []}
+    restored = {
+        "tables": {"unexpected_table": {}},
+        "tenant_ids": [],
+        "blob_sha256": [],
+    }
+    with pytest.raises(
+        module.ProductionMySQLBackupError,
+        match=(r"missing=expected_table unexpected=unexpected_table"),
+    ):
+        module._compare_snapshots(source, restored)
+
+
 def test_rejects_mutable_or_unsafe_inputs() -> None:
     module = _module()
     with pytest.raises(module.ProductionMySQLBackupError):
