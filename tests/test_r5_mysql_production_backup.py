@@ -275,6 +275,7 @@ def test_complete_chain_uses_a_new_network_and_writes_consumer_shape(
     module = _module()
     root, secrets, exports, templates = _assets(tmp_path)
     calls: list[list[str]] = []
+    restore_server_payloads: list[bytes] = []
     revision = "2b7f3d5e9c8a"
     table_inventory = (
         b"alembic_version\tBASE TABLE\tInnoDB\nusers\tBASE TABLE\tInnoDB\n"
@@ -290,6 +291,9 @@ def test_complete_chain_uses_a_new_network_and_writes_consumer_shape(
         if "network" in command and "create" in command:
             return _completed(command, b"network-id")
         if "--detach" in command:
+            restore_server_payloads.append(
+                Path(command[command.index("--env-file") + 1]).read_bytes()
+            )
             return _completed(command, b"container-id")
         if "mysqladmin" in command:
             return _completed(command)
@@ -366,6 +370,18 @@ def test_complete_chain_uses_a_new_network_and_writes_consumer_shape(
     assert all("source-secret" not in word for command in calls for word in command)
     assert not list(evidence.parent.glob(".*.tmp"))
     assert sum(command[:2] == ["docker", "inspect"] for command in calls) == 3
+    detached = next(command for command in calls if "--detach" in command)
+    server_env = detached[detached.index("--env-file") + 1]
+    client_envs = {
+        command[command.index("--env-file") + 1]
+        for command in calls
+        if "--env-file" in command
+        and "restore-mysql-client" in command[command.index("--env-file") + 1]
+    }
+    assert client_envs == {server_env.replace("server", "client")}
+    assert server_env not in client_envs
+    assert restore_server_payloads
+    assert all(b"MYSQL_PWD=" not in payload for payload in restore_server_payloads)
     snapshot_queries = [
         command[command.index("--execute") + 1]
         for command in calls

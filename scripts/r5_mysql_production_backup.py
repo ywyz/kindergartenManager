@@ -1120,22 +1120,21 @@ def _restore_mysql(
     # a Docker argv element and are removed in the caller's finally block.
     restore_network = _build_restore_network_name()
     restore_container = _build_restore_container_name()
-    restore_env = run_dir / ".restore-mysql.env.tmp"
+    restore_server_env = run_dir / ".restore-mysql-server.env.tmp"
+    restore_client_env = run_dir / ".restore-mysql-client.env.tmp"
     database = f"r5_restore_{uuid.uuid4().hex[:16]}"
     user = "r5_restore"
     root_password = _secrets.token_urlsafe(32)
     _write_mysql_env(
-        restore_env,
+        restore_server_env,
         {
             "MYSQL_ROOT_PASSWORD": root_password,
             "MYSQL_DATABASE": database,
             "MYSQL_USER": user,
             "MYSQL_PASSWORD": _secrets.token_urlsafe(32),
-            # The server's healthcheck and all client commands consume
-            # MYSQL_PWD; MYSQL_ROOT_PASSWORD is an entrypoint setting only.
-            "MYSQL_PWD": root_password,
         },
     )
+    _write_mysql_env(restore_client_env, {"MYSQL_PWD": root_password})
     created_network = False
     created_container = False
     try:
@@ -1169,7 +1168,7 @@ def _restore_mysql(
                 "--tmpfs",
                 "/run/mysqld:rw,noexec,nosuid,nodev",
                 "--env-file",
-                str(restore_env),
+                str(restore_server_env),
                 mysql_image,
                 "--log-bin-trust-function-creators=1",
             ],
@@ -1193,7 +1192,7 @@ def _restore_mysql(
                     "--network",
                     restore_network,
                     "--env-file",
-                    str(restore_env),
+                    str(restore_client_env),
                     mysql_image,
                     "mysqladmin",
                     "ping",
@@ -1216,7 +1215,7 @@ def _restore_mysql(
             target=restore_target,
             network=restore_network,
             mysql_image=mysql_image,
-            credentials_file=restore_env,
+            credentials_file=restore_client_env,
             query="SHOW TABLES",
             runner=runner,
         )
@@ -1230,7 +1229,7 @@ def _restore_mysql(
                 "--network",
                 restore_network,
                 "--env-file",
-                str(restore_env),
+                str(restore_client_env),
                 mysql_image,
                 "mysql",
                 "--protocol=tcp",
@@ -1246,7 +1245,7 @@ def _restore_mysql(
             target=restore_target,
             network=restore_network,
             mysql_image=mysql_image,
-            credentials_file=restore_env,
+            credentials_file=restore_client_env,
             runner=runner,
         )
         _compare_snapshots(source_snapshot, restored_snapshot)
@@ -1254,14 +1253,15 @@ def _restore_mysql(
             target=restore_target,
             network=restore_network,
             mysql_image=mysql_image,
-            credentials_file=restore_env,
+            credentials_file=restore_client_env,
             runner=runner,
         )
         if restored_revision != source_revision:
             raise _error("Restored Alembic revision does not match source")
         return restored_snapshot
     finally:
-        restore_env.unlink(missing_ok=True)
+        restore_server_env.unlink(missing_ok=True)
+        restore_client_env.unlink(missing_ok=True)
         # Only the random, label-scoped container and network are cleaned up;
         # no volume, production network, or broad Docker prune is attempted.
         cleanup_error = False
