@@ -1253,6 +1253,7 @@ def _restore_mysql(
             [
                 "docker",
                 "run",
+                "--interactive",
                 "--rm",
                 "--network",
                 restore_network,

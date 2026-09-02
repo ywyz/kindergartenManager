@@ -466,6 +466,14 @@ def test_complete_chain_uses_a_new_network_and_writes_consumer_shape(
     assert server_env not in client_envs
     assert restore_server_payloads
     assert all(b"MYSQL_PWD=" not in payload for payload in restore_server_payloads)
+    import_commands = [
+        command
+        for command in calls
+        if "mysql" in command
+        and "--binary-mode" in command
+        and "--interactive" in command
+    ]
+    assert len(import_commands) == 1
     snapshot_queries = [
         command[command.index("--execute") + 1]
         for command in calls
