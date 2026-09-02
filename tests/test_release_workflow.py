@@ -392,15 +392,10 @@ def test_release_workflow_keeps_strict_docker_facts_section_and_direct_api() -> 
         < workflow.index(separator)
         < workflow.index(explanation)
     )
-    for proxy_name in (
-        "HTTP_PROXY",
-        "HTTPS_PROXY",
-        "ALL_PROXY",
-        "http_proxy",
-        "https_proxy",
-        "all_proxy",
-    ):
-        assert f'{proxy_name}: ""' in workflow
+    assert (
+        "unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy"
+        in workflow
+    )
     parsed_workflow = yaml.safe_load(workflow)
     release_step = next(
         step

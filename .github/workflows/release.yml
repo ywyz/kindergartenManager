@@ -470,13 +470,8 @@ jobs:
           EXPECTED_IMAGE_REF: ${{ needs.build-docker.outputs.image_ref }}
           EXPECTED_MEDIA_TYPE: ${{ needs.build-docker.outputs.image_media_type }}
           RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
-          HTTP_PROXY: ""
-          HTTPS_PROXY: ""
-          ALL_PROXY: ""
-          http_proxy: ""
-          https_proxy: ""
-          all_proxy: ""
         run: |
+          unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy
           python scripts/release_convergence.py \
             --repo "$GITHUB_REPO" \
             --release-id "$RELEASE_ID" \
