@@ -5,7 +5,7 @@
 """
 
 from dataclasses import FrozenInstanceError, fields, is_dataclass
-from datetime import date
+from datetime import date, timedelta
 from importlib import import_module
 from inspect import iscoroutinefunction, signature
 
@@ -43,7 +43,7 @@ def _days(c):
     labels = ("周一", "周二", "周三", "周四", "周五")
     return tuple(
         c.WeeklyDay(
-            day_date=date(2026, 9, 28 + offset),
+            day_date=date(2026, 9, 28) + timedelta(days=offset),
             weekday=offset,
             weekday_cn=label,
             morning_talk=f"晨谈 {offset}",
@@ -204,7 +204,7 @@ def test_weekly_day_slots_are_exactly_monday_to_friday_and_ordered():
     assert len(days) == 5
     assert tuple(day.weekday for day in days) == (0, 1, 2, 3, 4)
     assert tuple(day.day_date for day in days) == tuple(
-        date(2026, 9, 28 + offset) for offset in range(5)
+        date(2026, 9, 28) + timedelta(days=offset) for offset in range(5)
     )
 
 
