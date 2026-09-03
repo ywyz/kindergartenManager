@@ -199,18 +199,13 @@ def _read_members(content: bytes) -> tuple[dict[str, bytes], list[dict[str, obje
                     if actual_size > info.file_size or actual_size > MAX_PART_BYTES:
                         _reject()
                     digest.update(chunk)
-                    if (
-                        name.casefold().endswith((".xml", ".rels"))
-                        or name == _CONTENT_TYPES
-                    ):
-                        chunks.append(chunk)
+                    chunks.append(chunk)
             if actual_size != info.file_size:
                 _reject()
             summaries.append(
                 {"name": name, "size": actual_size, "sha256": digest.hexdigest()}
             )
-            if chunks:
-                retained[name] = b"".join(chunks)
+            retained[name] = b"".join(chunks)
     if {_CONTENT_TYPES, _ROOT_RELS, _MAIN_PART} - normalized_names:
         _reject()
     return retained, summaries
@@ -331,33 +326,35 @@ def _validate_header_footer_parts(
     document_relationships = relationships.get(_MAIN_PART, {})
     document = roots[_MAIN_PART]
     part_contracts = (
-        (
-            re.compile(r"word/header[1-9][0-9]*\.xml", re.IGNORECASE),
-            "hdr",
-            _HEADER_CONTENT_TYPE,
-            _HEADER_REL,
-            "headerReference",
-        ),
-        (
-            re.compile(r"word/footer[1-9][0-9]*\.xml", re.IGNORECASE),
-            "ftr",
-            _FOOTER_CONTENT_TYPE,
-            _FOOTER_REL,
-            "footerReference",
-        ),
+        ("hdr", _HEADER_CONTENT_TYPE, _HEADER_REL, "headerReference"),
+        ("ftr", _FOOTER_CONTENT_TYPE, _FOOTER_REL, "footerReference"),
     )
     for (
-        pattern,
         root_name,
         content_type,
         relationship_type,
         reference_name,
     ) in part_contracts:
-        for part_name, root in roots.items():
-            if pattern.fullmatch(part_name) is None:
-                continue
+        candidate_parts = {
+            part_name
+            for part_name, root in roots.items()
+            if root.tag == f"{{{_WORD_NS}}}{root_name}"
+        }
+        candidate_parts.update(
+            part_name
+            for part_name, declared_content_type in overrides.items()
+            if declared_content_type == content_type
+        )
+        candidate_parts.update(
+            target
+            for found_type, target in document_relationships.values()
+            if found_type == relationship_type
+        )
+        for part_name in candidate_parts:
+            root = roots.get(part_name)
             if (
                 part_name not in allowed_parts
+                or root is None
                 or root.tag != f"{{{_WORD_NS}}}{root_name}"
                 or overrides.get(part_name) != content_type
             ):
@@ -385,11 +382,7 @@ def _validate_ooxml(
     member_names: set[str],
     allowed_parts: tuple[str, ...],
 ) -> dict[str, etree._Element]:
-    roots: dict[str, etree._Element] = {}
-    for name, value in parts.items():
-        roots[name] = _parse_xml(value)
-
-    content_types = roots[_CONTENT_TYPES]
+    content_types = _parse_xml(parts[_CONTENT_TYPES])
     if content_types.tag != f"{{{_CONTENT_TYPE_NS}}}Types":
         _reject()
     overrides = _content_type_overrides(content_types, member_names)
@@ -401,6 +394,22 @@ def _validate_ooxml(
         for marker in ("macroenabled", "activex", "oleobject")
     ):
         _reject()
+
+    xml_content_types = {
+        "application/xml",
+        "application/vnd.openxmlformats-package.relationships+xml",
+    }
+    roots: dict[str, etree._Element] = {_CONTENT_TYPES: content_types}
+    for name, value in parts.items():
+        if name == _CONTENT_TYPES:
+            continue
+        declared_content_type = overrides.get(name, "").casefold()
+        if (
+            name.casefold().endswith((".xml", ".rels"))
+            or declared_content_type in xml_content_types
+            or declared_content_type.endswith("+xml")
+        ):
+            roots[name] = _parse_xml(value)
 
     root_office_targets: list[str] = []
     relationships: dict[str | None, dict[str, tuple[str, str]]] = {}
@@ -449,7 +458,6 @@ def _validate_ooxml(
     for part_name, root in roots.items():
         if (
             part_name.casefold().startswith("word/")
-            and part_name.casefold().endswith(".xml")
             and part_name not in allowed_parts
             and any(
                 type(element.tag) is str
