@@ -404,6 +404,54 @@ def test_t004_rejects_duplicate_relationship_ids():
     _assert_rejected(_docx(document, document_relationships=relationships))
 
 
+def test_t004_rejects_internal_ole_relationship_without_banned_member_name():
+    relationships = _relationships(
+        ("rIdOle", f"{R_NS}/oleObject", "../customXml/payload.xml"),
+    )
+    document = _document_xml(
+        '<w:p><w:r><w:object><o:OLEObject xmlns:o="urn:schemas-microsoft-com:office:office" '
+        'r:id="rIdOle"/></w:object></w:r></w:p>'
+    )
+    _assert_rejected(
+        _docx(
+            document,
+            document_relationships=relationships,
+            extra=(("customXml/payload.xml", b"<payload/>"),),
+        )
+    )
+
+
+def test_t004_rejects_orphan_relationship_part():
+    orphan_relationships = _relationships(
+        ("rIdOrphan", f"{R_NS}/hyperlink", "document.xml"),
+    )
+    _assert_rejected(
+        _docx(extra=(("word/_rels/orphan.xml.rels", orphan_relationships),))
+    )
+
+
+def test_t004_rejects_non_opc_target_mode():
+    relationships = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        f'<Relationship Id="rIdBogus" Type="{R_NS}/hyperlink" '
+        'Target="document.xml" TargetMode="Bogus"/></Relationships>'
+    ).encode("utf-8")
+    _assert_rejected(_docx(document_relationships=relationships))
+
+
+def test_t004_rejects_noncanonical_content_type_override_part_name():
+    override = (
+        '<Override PartName="/word/../document.xml" ContentType="application/xml"/>'
+    )
+    _assert_rejected(_docx(content_types=_content_types(extra_overrides=(override,))))
+
+
+def test_t004_rejects_undeclared_wordprocessingml_part_without_text():
+    unapproved = f'<w:settings xmlns:w="{W_NS}"/>'.encode("utf-8")
+    _assert_rejected(_docx(extra=(("word/unapproved.xml", unapproved),)))
+
+
 @pytest.mark.parametrize(
     "target",
     [
