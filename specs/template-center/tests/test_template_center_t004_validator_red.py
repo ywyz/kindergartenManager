@@ -83,7 +83,9 @@ def _document_xml(*body: str) -> bytes:
     ).encode("utf-8")
 
 
-def _content_types(*, macro_enabled: bool = False) -> bytes:
+def _content_types(
+    *, macro_enabled: bool = False, extra_overrides: tuple[str, ...] = ()
+) -> bytes:
     main_type = (
         "application/vnd.ms-word.document.macroEnabled.main+xml"
         if macro_enabled
@@ -95,7 +97,8 @@ def _content_types(*, macro_enabled: bool = False) -> bytes:
         '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
         '<Default Extension="xml" ContentType="application/xml"/>'
         f'<Override PartName="/word/document.xml" ContentType="{main_type}"/>'
-        "</Types>"
+        + "".join(extra_overrides)
+        + "</Types>"
     ).encode("utf-8")
 
 
@@ -125,13 +128,17 @@ def _docx(
     extra: tuple[tuple[str | ZipInfo, bytes], ...] = (),
     content_types: bytes | None = None,
     root_relationships: bytes | None = None,
+    document_relationships: bytes | None = None,
     compression: int = ZIP_DEFLATED,
 ) -> bytes:
     members: tuple[tuple[str | ZipInfo, bytes], ...] = (
         ("[Content_Types].xml", content_types or _content_types()),
         ("_rels/.rels", root_relationships or _root_relationships()),
         ("word/document.xml", document or _document_xml(_paragraph("safe"))),
-        ("word/_rels/document.xml.rels", _empty_relationships()),
+        (
+            "word/_rels/document.xml.rels",
+            document_relationships or _empty_relationships(),
+        ),
     ) + extra
     output = BytesIO()
     with ZipFile(output, "w", compression=compression) as archive:
@@ -220,6 +227,7 @@ def test_t004_valid_receipt_is_frozen_sanitized_and_content_bound():
         (".~lock.candidate.docx#", DOCX_MIME),
         ("candidate\x00.docx", DOCX_MIME),
         ("candidate\n.docx", DOCX_MIME),
+        ("candidate:payload.docx", DOCX_MIME),
         (unicodedata.normalize("NFD", "café.docx"), DOCX_MIME),
         ("candidate.docx", "application/zip"),
         ("candidate.docx", DOCX_MIME.upper()),
@@ -296,6 +304,7 @@ def test_t004_rejects_missing_or_invalid_mandatory_ooxml_parts():
         ("word/../escape.xml", b"<escape/>"),
         (r"word\\escape.xml", b"<escape/>"),
         ("/absolute.xml", b"<escape/>"),
+        ("word/payload:alt.xml", b"<escape/>"),
     ],
 )
 def test_t004_rejects_active_or_unsafe_zip_members(member_name, member_bytes):
@@ -342,6 +351,25 @@ def test_t004_rejects_part_over_compression_ratio_limit():
 )
 def test_t004_rejects_unsafe_or_malformed_xml(xml):
     _assert_rejected(_docx(document=xml))
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        (
+            '<w:p><w:fldSimple w:instr="INCLUDETEXT &quot;https://example.invalid/remote.docx&quot;">'
+            "<w:r><w:t>remote</w:t></w:r></w:fldSimple></w:p>"
+        ),
+        (
+            "<w:p><w:r><w:instrText>"
+            "DDEAUTO c:\\\\windows\\\\system32\\\\cmd.exe"
+            "</w:instrText></w:r></w:p>"
+        ),
+    ],
+    ids=["include-text-attribute", "dde-auto-instr-text"],
+)
+def test_t004_rejects_active_word_field_instructions(field):
+    _assert_rejected(_docx(_document_xml(field)))
 
 
 @pytest.mark.parametrize(
@@ -456,6 +484,43 @@ def test_t004_rejects_token_in_part_not_allowed_by_its_descriptor():
     _assert_rejected(
         _docx(_document_xml(_paragraph("{{kg.daily_plan.title}}"))),
         contract=contract,
+    )
+
+
+def test_t004_rejects_undeclared_text_bearing_word_part():
+    header = (
+        f'<w:hdr xmlns:w="{W_NS}">'
+        + _paragraph("{{kg.daily_plan.unknown}}")
+        + "</w:hdr>"
+    ).encode("utf-8")
+    header_override = (
+        '<Override PartName="/word/header1.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>'
+    )
+    document_relationships = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rIdHeader" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" '
+        'Target="header1.xml"/></Relationships>'
+    ).encode("utf-8")
+    content = _docx(
+        content_types=_content_types(extra_overrides=(header_override,)),
+        document_relationships=document_relationships,
+        extra=(("word/header1.xml", header),),
+    )
+    _assert_rejected(content)
+
+
+def test_t004_rejects_token_inside_unsupported_text_box_boundary():
+    text_box = (
+        "<w:p><w:r><w:drawing><w:txbxContent>"
+        + _paragraph("{{kg.daily_plan.title}}")
+        + "</w:txbxContent></w:drawing></w:r></w:p>"
+    )
+    _assert_rejected(
+        _docx(_document_xml(text_box)),
+        contract=_contract(tokens=(_token(occurrence="repeatable"),)),
     )
 
 
