@@ -84,6 +84,7 @@ class ContentAddressedTemplateBlobStore:
             if (
                 not stat.S_ISREG(metadata.st_mode)
                 or stat.S_ISLNK(metadata.st_mode)
+                or metadata.st_nlink != 1
                 or stat.S_IMODE(metadata.st_mode) != 0o600
             ):
                 raise _storage_failed()
