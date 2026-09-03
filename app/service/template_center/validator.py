@@ -81,6 +81,25 @@ _ACTIVE_XML_TAGS = {
     f"{{{_WORD_NS}}}txbxContent",
     "{http://www.w3.org/2001/XInclude}include",
 }
+_TEXT_BOUNDARY_TAGS = {
+    f"{{{_WORD_NS}}}br",
+    f"{{{_WORD_NS}}}cr",
+    f"{{{_WORD_NS}}}drawing",
+    f"{{{_WORD_NS}}}noBreakHyphen",
+    f"{{{_WORD_NS}}}object",
+    f"{{{_WORD_NS}}}pict",
+    f"{{{_WORD_NS}}}softHyphen",
+    f"{{{_WORD_NS}}}tab",
+}
+_SAFE_IMAGE_MEDIA_TYPES = {
+    "bmp": "image/bmp",
+    "gif": "image/gif",
+    "jpeg": "image/jpeg",
+    "jpg": "image/jpeg",
+    "png": "image/png",
+    "tif": "image/tiff",
+    "tiff": "image/tiff",
+}
 
 
 class _Rejected(Exception):
@@ -333,6 +352,22 @@ def _is_xml_media_type(content_type: str) -> bool:
     return base in {"application/xml", "text/xml"} or base.endswith("+xml")
 
 
+def _validate_non_xml_parts(part_content_types: dict[str, str]) -> None:
+    for part_name, content_type in part_content_types.items():
+        basename = posixpath.basename(part_name)
+        extension = basename.rsplit(".", 1)[1].casefold() if "." in basename else ""
+        base_media_type = _base_media_type(content_type)
+        if base_media_type.startswith("image/"):
+            if (
+                not part_name.casefold().startswith("word/media/")
+                or _SAFE_IMAGE_MEDIA_TYPES.get(extension) != base_media_type
+            ):
+                _reject()
+            continue
+        if not _is_xml_media_type(content_type):
+            _reject()
+
+
 def _validate_relationship_references(
     roots: dict[str, etree._Element],
     relationships: dict[str | None, dict[str, tuple[str, str]]],
@@ -423,6 +458,7 @@ def _validate_ooxml(
     overrides, part_content_types = _content_type_declarations(
         content_types, member_names
     )
+    _validate_non_xml_parts(part_content_types)
     if overrides.get(_MAIN_PART) != _MAIN_CONTENT_TYPE:
         _reject()
     if any(
@@ -492,11 +528,7 @@ def _validate_ooxml(
         if (
             part_name.casefold().startswith("word/")
             and part_name not in allowed_parts
-            and any(
-                type(element.tag) is str
-                and etree.QName(element.tag).namespace == _WORD_NS
-                for element in root.iter()
-            )
+            and not part_name.casefold().endswith(".rels")
         ):
             _reject()
     return roots
@@ -558,34 +590,38 @@ def _token_occurrences(
         if root is None:
             continue
         for paragraph_index, paragraph in enumerate(root.iter(f"{{{_WORD_NS}}}p")):
-            text = "".join(
-                node.text or "" for node in paragraph.iter(f"{{{_WORD_NS}}}t")
-            )
-            matches = list(_TOKEN.finditer(text))
-            remainder = _TOKEN.sub("", text)
-            if (
-                "{{" in remainder
-                or "}}" in remainder
-                or "{%" in remainder
-                or "%}" in remainder
-            ):
-                _reject()
-            for match in matches:
-                token_id = match.group(1)
-                if _TOKEN_ID.fullmatch(token_id) is None:
+            segments = [""]
+            for element in paragraph.iter():
+                if element.tag == f"{{{_WORD_NS}}}t":
+                    segments[-1] += element.text or ""
+                elif element.tag in _TEXT_BOUNDARY_TAGS:
+                    segments.append("")
+            for text in segments:
+                matches = list(_TOKEN.finditer(text))
+                remainder = _TOKEN.sub("", text)
+                if (
+                    "{{" in remainder
+                    or "}}" in remainder
+                    or "{%" in remainder
+                    or "%}" in remainder
+                ):
                     _reject()
-                descriptor = descriptors.get(token_id)
-                if descriptor is None or part_name not in descriptor.allowed_parts:
-                    _reject()
-                counts[token_id] += 1
-                occurrences.append(
-                    TemplateTokenOccurrence(
-                        token_id=token_id,
-                        value_kind=descriptor.value_kind,
-                        part_name=part_name,
-                        location=f"paragraph:{paragraph_index}",
+                for match in matches:
+                    token_id = match.group(1)
+                    if _TOKEN_ID.fullmatch(token_id) is None:
+                        _reject()
+                    descriptor = descriptors.get(token_id)
+                    if descriptor is None or part_name not in descriptor.allowed_parts:
+                        _reject()
+                    counts[token_id] += 1
+                    occurrences.append(
+                        TemplateTokenOccurrence(
+                            token_id=token_id,
+                            value_kind=descriptor.value_kind,
+                            part_name=part_name,
+                            location=f"paragraph:{paragraph_index}",
+                        )
                     )
-                )
     for descriptor in contract.tokens:
         count = counts[descriptor.token_id]
         if descriptor.required and count == 0:
