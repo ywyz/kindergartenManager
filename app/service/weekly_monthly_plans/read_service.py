@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
 from dataclasses import dataclass
 from dataclasses import replace as replace_dataclass
 from datetime import date, timedelta
@@ -10,12 +9,16 @@ from typing import Protocol, TypeAlias
 
 from .contracts import (
     AuthorizationDecision,
+    MonthPeriod,
     MonthlyThemeActivityPlan,
     PlanAction,
     PlanAuthorizationPort,
     PlanAuthorizationRequest,
     PlanKind,
+    PlanScope,
+    WeekPeriod,
     WeeklyActivityPlan,
+    WeeklyDay,
 )
 
 
@@ -147,6 +150,132 @@ def _aggregate_matches_request(
     )
 
 
+def _detach_scope(value: object) -> PlanScope:
+    if type(value) is not PlanScope:
+        _deny()
+    return PlanScope(
+        tenant_id=value.tenant_id,
+        teacher_id=value.teacher_id,
+        class_id=value.class_id,
+        grade=value.grade,
+        class_name=value.class_name,
+        teacher_names=value.teacher_names,
+        caregiver_name=value.caregiver_name,
+    )
+
+
+def _detach_week_period(value: object) -> WeekPeriod:
+    if type(value) is not WeekPeriod:
+        _deny()
+    return WeekPeriod(
+        week_start=value.week_start,
+        week_end=value.week_end,
+        week_number=value.week_number,
+        semester_id=value.semester_id,
+    )
+
+
+def _detach_month_period(value: object) -> MonthPeriod:
+    if type(value) is not MonthPeriod:
+        _deny()
+    return MonthPeriod(
+        year=value.year,
+        month=value.month,
+        month_start=value.month_start,
+        month_end=value.month_end,
+    )
+
+
+def _detach_weekly_day(value: object) -> WeeklyDay:
+    if type(value) is not WeeklyDay:
+        _deny()
+    return WeeklyDay(
+        day_date=value.day_date,
+        weekday=value.weekday,
+        weekday_cn=value.weekday_cn,
+        morning_talk=value.morning_talk,
+        collective_activity=value.collective_activity,
+        area_game=value.area_game,
+        outdoor_game=value.outdoor_game,
+    )
+
+
+def _detach_aggregate(value: object) -> PlanAggregate:
+    if type(value) is WeeklyActivityPlan:
+        if type(value.days) is not tuple:
+            _deny()
+        return WeeklyActivityPlan(
+            plan_id=value.plan_id,
+            scope=_detach_scope(value.scope),
+            period=_detach_week_period(value.period),
+            theme_name=value.theme_name,
+            days=tuple(_detach_weekly_day(day) for day in value.days),
+            weekly_focus=value.weekly_focus,
+            environment_creation=value.environment_creation,
+            life_habits=value.life_habits,
+            home_school_cooperation=value.home_school_cooperation,
+            version=value.version,
+            status=value.status,
+            source_daily_plan_ids=value.source_daily_plan_ids,
+        )
+    if type(value) is MonthlyThemeActivityPlan:
+        return MonthlyThemeActivityPlan(
+            plan_id=value.plan_id,
+            scope=_detach_scope(value.scope),
+            period=_detach_month_period(value.period),
+            theme_name=value.theme_name,
+            previous_month_analysis=value.previous_month_analysis,
+            monthly_focus=value.monthly_focus,
+            theme_goals=value.theme_goals,
+            life_habits=value.life_habits,
+            play_activities=value.play_activities,
+            environment_creation=value.environment_creation,
+            home_school_cooperation=value.home_school_cooperation,
+            other=value.other,
+            activity_contents=value.activity_contents,
+            version=value.version,
+            status=value.status,
+            source_daily_plan_ids=value.source_daily_plan_ids,
+            source_weekly_plan_ids=value.source_weekly_plan_ids,
+        )
+    _deny()
+
+
+def _detach_daily_sources(value: object) -> tuple[DailyPlanSourceRef, ...]:
+    if type(value) is not tuple or not all(
+        type(source) is DailyPlanSourceRef for source in value
+    ):
+        _deny()
+    return tuple(
+        DailyPlanSourceRef(
+            source_id=source.source_id,
+            tenant_id=source.tenant_id,
+            teacher_id=source.teacher_id,
+            class_id=source.class_id,
+            plan_date=source.plan_date,
+        )
+        for source in value
+    )
+
+
+def _detach_weekly_sources(value: object) -> tuple[WeeklyPlanSourceRef, ...]:
+    if type(value) is not tuple or not all(
+        type(source) is WeeklyPlanSourceRef for source in value
+    ):
+        _deny()
+    return tuple(
+        WeeklyPlanSourceRef(
+            source_id=source.source_id,
+            tenant_id=source.tenant_id,
+            teacher_id=source.teacher_id,
+            class_id=source.class_id,
+            week_start=source.week_start,
+            week_end=source.week_end,
+        )
+        for source in value
+    )
+
+
 def _source_scope_matches(
     source: DailyPlanSourceRef | WeeklyPlanSourceRef,
     request: PlanAuthorizationRequest,
@@ -256,7 +385,7 @@ class PlanReadService:
             repository_aggregate = await self._repository.read_exact(aggregate_request)
             if aggregate_request != trusted_request:
                 _deny()
-            aggregate = deepcopy(repository_aggregate)
+            aggregate = _detach_aggregate(repository_aggregate)
             if not _aggregate_matches_request(aggregate, trusted_request):
                 _deny()
             daily_request = replace_dataclass(trusted_request)
@@ -265,7 +394,7 @@ class PlanReadService:
             )
             if daily_request != trusted_request:
                 _deny()
-            daily_sources = deepcopy(repository_daily_sources)
+            daily_sources = _detach_daily_sources(repository_daily_sources)
             if type(aggregate) is WeeklyActivityPlan:
                 if not _weekly_daily_sources_match(
                     aggregate, trusted_request, daily_sources
@@ -282,7 +411,7 @@ class PlanReadService:
                 )
                 if weekly_request != trusted_request:
                     _deny()
-                weekly_sources = deepcopy(repository_weekly_sources)
+                weekly_sources = _detach_weekly_sources(repository_weekly_sources)
                 if not _monthly_weekly_sources_match(
                     aggregate, trusted_request, weekly_sources
                 ):
