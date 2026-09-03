@@ -36,13 +36,13 @@ def _evidence(api, *, sha: str = "a" * 64):
     )
 
 
-def _version(api, evidence, allocation):
+def _version(api, evidence, allocation, *, content_sha256: str | None = None):
     return api.TemplateVersionRef(
         template_version_id=allocation.template_version_id,
         tenant_id=allocation.tenant_id,
         document_type=allocation.document_type,
         version=allocation.version,
-        content_sha256=evidence.content_sha256,
+        content_sha256=content_sha256 or evidence.content_sha256,
         size_bytes=evidence.size_bytes,
         mime_type=evidence.mime_type,
         extension=evidence.extension,
@@ -126,7 +126,7 @@ def test_version_is_fixed_to_the_exact_validation_evidence():
 
     mismatched = _evidence(api, sha="c" * 64)
     with pytest.raises((TypeError, ValueError)):
-        _version(api, mismatched, allocation)
+        _version(api, mismatched, allocation, content_sha256="a" * 64)
 
 
 def test_version_allocation_is_closed_frozen_and_strictly_scoped():
