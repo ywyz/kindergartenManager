@@ -458,3 +458,12 @@ Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。不得增加 Pro
 设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。当前 W007 的精确本地交付状态、
 Review 轮次、SHA 与测试证据仅以 `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后
 作为外部证据；本文不复制逐轮事实。merge、Issue 关闭与 release 仍须单独授权。
+
+## 16. R6 Word 模板与周/月计划设计基线（2026-09-02）
+
+Issue #55 冻结三角色的同租户权限边界；[ADR-0008](../docs/ADR/ADR-0008-word-template-authority-versioning-and-secure-storage.md)
+接受租户级不可变模板版本、安全存储、active 指针、回滚、占位符/profile、备份恢复和 Office 证据契约。
+[模板中心第一期](../specs/template-center/spec.md) 与
+[周/月计划领域及导出契约](../specs/weekly-monthly-plans/spec.md) 是两个独立稳定 RED 边界，最终双轴 Review
+均为 Standards 0 / Spec 0。模板中心正式导出只提供 active-only opaque binding + render/parse；周/月候选
+先经不可交付的 T011 synthetic qualification，再启用文档类型。该设计基线不授权 GREEN、迁移、合并或发布。
