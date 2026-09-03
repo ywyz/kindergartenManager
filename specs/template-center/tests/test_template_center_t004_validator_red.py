@@ -609,6 +609,18 @@ def test_t004_rejects_token_split_across_non_text_run_boundary():
     )
 
 
+def test_t004_rejects_token_split_across_symbol_run_boundary():
+    paragraph = (
+        "<w:p><w:r><w:t>{{kg.daily_</w:t>"
+        '<w:sym w:font="Wingdings" w:char="F0B7"/>'
+        "<w:t>plan.title}}</w:t></w:r></w:p>"
+    )
+    _assert_rejected(
+        _docx(_document_xml(paragraph)),
+        contract=_contract(tokens=(_token(),)),
+    )
+
+
 @pytest.mark.parametrize(
     "body",
     [
