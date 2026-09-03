@@ -783,7 +783,14 @@ def test_week_period_rejects_an_unrepresentable_natural_week_as_a_value_error():
 
 @pytest.mark.parametrize(
     "field_name",
-    ("actor_id", "tenant_id", "owner_teacher_id", "class_id", "plan_id", "plan_version"),
+    (
+        "actor_id",
+        "tenant_id",
+        "owner_teacher_id",
+        "class_id",
+        "plan_id",
+        "plan_version",
+    ),
 )
 @pytest.mark.parametrize("invalid", (True, 0, "1"))
 def test_authorization_request_rejects_invalid_ids_and_version(field_name, invalid):
