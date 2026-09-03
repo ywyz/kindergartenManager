@@ -299,6 +299,7 @@ def validate_generated_attestation(
     evidence_path: Path,
     *,
     expected_protected_image: str,
+    now: datetime | None = None,
 ) -> VerifiedBackupEvidence:
     """Validate evidence against the producer-owned archive manifest.
 
@@ -312,6 +313,7 @@ def validate_generated_attestation(
     verified = validate_backup_evidence(
         evidence_path,
         expected_protected_image=expected_protected_image,
+        now=now,
     )
     manifest = _validated_attestation_manifest(verified.artifact_path)
     database = manifest["database"]
