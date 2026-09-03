@@ -621,6 +621,15 @@ def test_t004_rejects_token_split_across_symbol_run_boundary():
     )
 
 
+def test_t004_rejects_unknown_token_inside_deleted_revision_text():
+    paragraph = (
+        "<w:p><w:del><w:r><w:delText>"
+        "{{kg.daily_plan.unknown}}"
+        "</w:delText></w:r></w:del></w:p>"
+    )
+    _assert_rejected(_docx(_document_xml(paragraph)))
+
+
 @pytest.mark.parametrize(
     "body",
     [
