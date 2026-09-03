@@ -130,6 +130,13 @@ class AllowAuthorization:
         )
 
 
+class MutatingAuthorization(AllowAuthorization):
+    async def authorize(self, request):
+        self.calls.append(request)
+        object.__setattr__(request, "tenant_id", 2)
+        return self.api.AuthorizationDecision(allowed=True, reason_code="allowed")
+
+
 class MemoryAggregateRepository:
     def __init__(
         self,
@@ -158,6 +165,12 @@ class MemoryAggregateRepository:
     async def read_weekly_sources(self, request, source_ids):
         self.calls.append(("weekly", request, source_ids))
         return self.weekly_sources
+
+
+class MutatingAggregateRepository(MemoryAggregateRepository):
+    async def read_daily_sources(self, request, source_ids):
+        object.__setattr__(self.aggregate, "status", _api().ReviewStatus.ARCHIVED)
+        return await super().read_daily_sources(request, source_ids)
 
 
 def _daily_ref(api, source_id, *, plan_date, **changes):
@@ -257,6 +270,26 @@ async def test_wmp4_denial_happens_before_any_repository_await():
         await service.read(request)
 
     assert authorization.calls == [request]
+    assert repository.calls == []
+
+
+@pytest.mark.asyncio
+async def test_wmp4_authorization_cannot_mutate_the_frozen_repository_query():
+    api = _api()
+    request = _request(api)
+    repository = MemoryAggregateRepository(
+        aggregate=_weekly(api, scope=_scope(api, tenant_id=2)),
+        daily_sources=tuple(
+            replace(source, tenant_id=2) for source in _weekly_sources(api)
+        ),
+    )
+    authorization = MutatingAuthorization(api)
+    service, _ = _service(api, repository, authorization)
+
+    with pytest.raises(api.PlanReadDenied):
+        await service.read(request)
+
+    assert request.tenant_id == 1
     assert repository.calls == []
 
 
@@ -374,7 +407,8 @@ async def test_wmp4_cross_month_week_remains_one_aggregate_and_is_not_split():
 
     snapshot = await service.read(request)
 
-    assert snapshot.aggregate is aggregate
+    assert snapshot.aggregate == aggregate
+    assert snapshot.aggregate is not aggregate
     assert snapshot.aggregate.period.week_start == date(2026, 9, 28)
     assert snapshot.aggregate.period.week_end == date(2026, 10, 4)
     assert [call[0] for call in repository.calls].count("aggregate") == 1
@@ -424,10 +458,28 @@ async def test_wmp4_monthly_snapshot_keeps_readonly_status_and_valid_sources():
 
     snapshot = await service.read(_request(api, monthly=True))
 
-    assert snapshot.aggregate is aggregate
+    assert snapshot.aggregate == aggregate
+    assert snapshot.aggregate is not aggregate
     assert snapshot.aggregate.status is api.ReviewStatus.APPROVED
     with pytest.raises(FrozenInstanceError):
         snapshot.aggregate.status = api.ReviewStatus.ARCHIVED
+
+
+@pytest.mark.asyncio
+async def test_wmp4_repository_cannot_mutate_aggregate_between_awaits():
+    api = _api()
+    aggregate = _weekly(api)
+    repository = MutatingAggregateRepository(
+        aggregate=aggregate,
+        daily_sources=_weekly_sources(api),
+    )
+    service, _ = _service(api, repository)
+
+    snapshot = await service.read(_request(api))
+
+    assert aggregate.status is api.ReviewStatus.ARCHIVED
+    assert snapshot.aggregate.status is api.ReviewStatus.SUBMITTED
+    assert snapshot.aggregate is not aggregate
 
 
 @pytest.mark.asyncio
