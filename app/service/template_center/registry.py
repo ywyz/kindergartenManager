@@ -107,7 +107,7 @@ class InitialDocumentRegistry:
         for descriptor in INITIAL_DOCUMENT_DESCRIPTORS:
             if descriptor.key.value == key:
                 return descriptor
-        raise TemplateCenterError(TemplateErrorCode.DOCUMENT_TYPE_DISABLED)
+        raise TemplateCenterError(TemplateErrorCode.DOCUMENT_TYPE_RESERVED_UNTIL_GATE)
 
 
 class InitialContractRegistry:

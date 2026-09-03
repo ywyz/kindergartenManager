@@ -43,7 +43,7 @@ class TemplateCapability(str, Enum):
 
 class TemplateErrorCode(str, Enum):
     UNKNOWN_DOCUMENT_TYPE = "unknown_document_type"
-    DOCUMENT_TYPE_DISABLED = "document_type_disabled"
+    DOCUMENT_TYPE_RESERVED_UNTIL_GATE = "document_type_reserved_until_gate"
     CONTRACT_INVALID = "contract_invalid"
     INPUT_INVALID = "input_invalid"
     PERMISSION_DENIED = "permission_denied"
@@ -101,12 +101,14 @@ def _sha256(value: object, code: str) -> None:
 
 
 def _utc(value: object, code: str) -> None:
-    if (
-        type(value) is not datetime
-        or value.tzinfo is None
-        or value.utcoffset() != timezone.utc.utcoffset(value)
-    ):
+    if type(value) is not datetime or value.tzinfo is not timezone.utc:
         raise ValueError(code)
+
+
+def _deeply_immutable(value: object) -> bool:
+    if value is None or type(value) in {bool, int, float, str, bytes, UUID, datetime}:
+        return type(value) is not datetime or value.tzinfo is timezone.utc
+    return type(value) is tuple and all(_deeply_immutable(item) for item in value)
 
 
 def _document_type(value: object, code: str) -> None:
@@ -127,8 +129,10 @@ class TemplateTokenDescriptor:
             type(self.token_id) is not str
             or re.fullmatch(r"kg\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_.]*", self.token_id)
             is None
+            or type(self.value_kind) is not str
             or self.value_kind not in {"text", "rich_text", "image"}
             or type(self.required) is not bool
+            or type(self.occurrence) is not str
             or self.occurrence not in {"single", "repeatable"}
             or type(self.allowed_parts) is not tuple
             or not self.allowed_parts
@@ -167,11 +171,19 @@ class TemplateContractManifest:
         if (
             type(self.allowed_parts) is not tuple
             or not self.allowed_parts
+            or not all(type(part) is str and part for part in self.allowed_parts)
             or type(self.required_anchors) is not tuple
             or not self.required_anchors
+            or not all(
+                type(anchor) is str and anchor for anchor in self.required_anchors
+            )
             or type(self.tokens) is not tuple
             or not all(type(token) is TemplateTokenDescriptor for token in self.tokens)
             or len({token.token_id for token in self.tokens}) != len(self.tokens)
+            or any(
+                not set(token.allowed_parts).issubset(self.allowed_parts)
+                for token in self.tokens
+            )
         ):
             raise ValueError("template_contract_manifest_invalid")
 
@@ -301,6 +313,33 @@ class TemplateRegistryState:
 
 
 @dataclass(frozen=True, slots=True)
+class TemplateVersionSummary:
+    """Pathless immutable version metadata safe for permission projections."""
+
+    template_version_id: UUID
+    tenant_id: int
+    document_type: DocumentType
+    version: int
+    content_sha256: str
+    contract_id: str
+    contract_version: int
+    validated_at_utc: datetime
+    created_at_utc: datetime
+
+    def __post_init__(self) -> None:
+        if type(self.template_version_id) is not UUID:
+            raise ValueError("template_version_summary_invalid")
+        _positive_int(self.tenant_id, "template_version_summary_invalid")
+        _document_type(self.document_type, "template_version_summary_invalid")
+        _positive_int(self.version, "template_version_summary_invalid")
+        _sha256(self.content_sha256, "template_version_summary_invalid")
+        _nonempty_text(self.contract_id, "template_version_summary_invalid")
+        _positive_int(self.contract_version, "template_version_summary_invalid")
+        _utc(self.validated_at_utc, "template_version_summary_invalid")
+        _utc(self.created_at_utc, "template_version_summary_invalid")
+
+
+@dataclass(frozen=True, slots=True)
 class PermissionDecision:
     allowed: bool
     policy_version: str
@@ -318,8 +357,8 @@ class TemplatePermissionProjection:
     tenant_id: int
     document_type: DocumentType | None
     allowed_actions: tuple[TemplateCapability, ...]
-    versions: tuple[TemplateVersionRef, ...]
-    active_version: TemplateVersionRef | None
+    versions: tuple[TemplateVersionSummary, ...]
+    active_version: TemplateVersionSummary | None
 
     def __post_init__(self) -> None:
         _positive_int(self.tenant_id, "template_permission_projection_invalid")
@@ -332,13 +371,24 @@ class TemplatePermissionProjection:
             )
             or len(set(self.allowed_actions)) != len(self.allowed_actions)
             or type(self.versions) is not tuple
-            or not all(type(item) is TemplateVersionRef for item in self.versions)
-            or any(item.tenant_id != self.tenant_id for item in self.versions)
+            or not all(type(item) is TemplateVersionSummary for item in self.versions)
+            or any(
+                item.tenant_id != self.tenant_id
+                or (
+                    self.document_type is not None
+                    and item.document_type is not self.document_type
+                )
+                for item in self.versions
+            )
             or (
                 self.active_version is not None
                 and (
-                    type(self.active_version) is not TemplateVersionRef
+                    type(self.active_version) is not TemplateVersionSummary
                     or self.active_version.tenant_id != self.tenant_id
+                    or (
+                        self.document_type is not None
+                        and self.active_version.document_type is not self.document_type
+                    )
                 )
             )
         ):
@@ -397,6 +447,11 @@ class TemplateAuditEvent:
     user_id: int
     session_hash: str
     document_type: DocumentType
+    template_version_id: UUID | None
+    content_sha256: str | None
+    contract_id: str | None
+    contract_version: int | None
+    registry_revision: int | None
     occurred_at_utc: datetime
     schema_version: int = 1
 
@@ -411,6 +466,19 @@ class TemplateAuditEvent:
         _positive_int(self.user_id, "template_audit_event_invalid")
         _sha256(self.session_hash, "template_audit_event_invalid")
         _document_type(self.document_type, "template_audit_event_invalid")
+        if (
+            self.template_version_id is not None
+            and type(self.template_version_id) is not UUID
+        ):
+            raise ValueError("template_audit_event_invalid")
+        if self.content_sha256 is not None:
+            _sha256(self.content_sha256, "template_audit_event_invalid")
+        if self.contract_id is not None:
+            _nonempty_text(self.contract_id, "template_audit_event_invalid")
+        if self.contract_version is not None:
+            _positive_int(self.contract_version, "template_audit_event_invalid")
+        if self.registry_revision is not None:
+            _positive_int(self.registry_revision, "template_audit_event_invalid")
         _utc(self.occurred_at_utc, "template_audit_event_invalid")
         _positive_int(self.schema_version, "template_audit_event_invalid")
 
@@ -499,6 +567,7 @@ class SyntheticPreviewCase:
                 and len(item) == 2
                 and type(item[0]) is str
                 and bool(item[0])
+                and _deeply_immutable(item[1])
                 for item in self.payload
             )
         ):

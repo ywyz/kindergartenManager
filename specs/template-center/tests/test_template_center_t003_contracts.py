@@ -208,6 +208,25 @@ def test_t003_audit_event_has_complete_version_contract_and_revision_evidence():
     } <= names
 
 
+def test_t003_audit_version_contract_and_revision_evidence_is_atomic():
+    with pytest.raises(ValueError):
+        api.TemplateAuditEvent(
+            event_id=uuid4(),
+            action=api.TemplateCapability.ACTIVATE,
+            outcome=api.AuditOutcome.ACCEPTED,
+            tenant_id=7,
+            user_id=11,
+            session_hash="e" * 64,
+            document_type=api.DocumentType.DAILY_PLAN,
+            template_version_id=uuid4(),
+            content_sha256=None,
+            contract_id="contract.v1",
+            contract_version=None,
+            registry_revision=None,
+            occurred_at_utc=datetime(2026, 9, 3, tzinfo=timezone.utc),
+        )
+
+
 def test_t003_contracts_reject_nested_mutability_and_string_subclasses():
     class TextSubclass(str):
         pass
