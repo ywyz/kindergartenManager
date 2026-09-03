@@ -642,16 +642,24 @@ class TemplateAuditEvent:
         _positive_int(self.user_id, "template_audit_event_invalid")
         _sha256(self.session_hash, "template_audit_event_invalid")
         _document_type(self.document_type, "template_audit_event_invalid")
-        evidence = (
+        version_evidence = (
             self.template_version_id,
             self.content_sha256,
             self.contract_id,
             self.contract_version,
-            self.registry_revision,
         )
         if not (
-            all(item is None for item in evidence)
-            or all(item is not None for item in evidence)
+            all(item is None for item in version_evidence)
+            or all(item is not None for item in version_evidence)
+        ):
+            raise ValueError("template_audit_event_invalid")
+        if (
+            self.action is TemplateCapability.UPLOAD
+            and self.registry_revision is not None
+        ) or (
+            self.action is not TemplateCapability.UPLOAD
+            and any(item is not None for item in version_evidence)
+            and self.registry_revision is None
         ):
             raise ValueError("template_audit_event_invalid")
         if (

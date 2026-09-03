@@ -43,6 +43,7 @@ from app.service.template_center.contracts import (
     VersionAllocation,
 )
 from app.service.template_center.validator import validate_upload
+from app.service.template_center.blob_store import ContentAddressedTemplateBlobStore
 from app.service.template_center.registry import (
     GLOBAL_KNOWN_DOCUMENT_TYPES,
     INITIAL_DOCUMENT_DESCRIPTORS,
@@ -53,12 +54,14 @@ from app.service.template_center.registry import (
     build_initial_contract_registry,
     build_initial_document_registry,
 )
+from app.service.template_center.service import TemplateCenter
 
 __all__ = (
     "AuditOutcome",
     "BackupAttestation",
     "BlobRef",
     "CommitReceipt",
+    "ContentAddressedTemplateBlobStore",
     "DOCX_MIME_TYPE",
     "DocumentType",
     "DocumentTypeDescriptor",
@@ -77,6 +80,7 @@ __all__ = (
     "TemplateBackupPort",
     "TemplateBlobStorePort",
     "TemplateCapability",
+    "TemplateCenter",
     "TemplateCenterError",
     "TemplateClockPort",
     "TemplateContractManifest",

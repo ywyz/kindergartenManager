@@ -202,8 +202,7 @@ def test_t003_ports_expose_only_closed_entrypoints():
                 assert iscoroutinefunction(getattr(port, name))
 
 
-def test_t003_contract_surface_has_no_service_or_dynamic_discovery():
-    assert not hasattr(api, "TemplateCenter")
+def test_t003_contract_surface_has_no_dynamic_discovery_or_future_jobs():
     assert not hasattr(api, "TemplateCandidateQualificationJob")
     assert not hasattr(api, "resolve_for_export")
     assert not hasattr(api, "get_template_path")

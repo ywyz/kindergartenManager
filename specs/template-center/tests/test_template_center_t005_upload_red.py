@@ -403,3 +403,17 @@ async def test_content_addressed_store_rejects_unsafe_root_and_existing_blob_col
     with pytest.raises(api.TemplateCenterError) as caught:
         await store.put_if_absent(digest, content)
     assert caught.value.code is api.TemplateErrorCode.STORAGE_FAILED
+
+
+@pytest.mark.asyncio
+async def test_missing_blob_lookup_is_read_only_and_does_not_create_a_shard(
+    tmp_path: Path,
+):
+    api = _api()
+    root = tmp_path / "trusted-template-blobs"
+    store = api.ContentAddressedTemplateBlobStore(root)
+    digest = "1" * 64
+    reference = api.BlobRef(value=f"sha256/{digest}", content_sha256=digest)
+
+    assert await store.exists(reference, digest) is False
+    assert tuple(root.iterdir()) == ()
