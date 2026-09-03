@@ -28,7 +28,12 @@ def _api():
     return import_module("app.service.template_center")
 
 
-def _contract(*, tokens=(), anchors=("part:word/document.xml",)):
+def _contract(
+    *,
+    tokens=(),
+    anchors=("part:word/document.xml",),
+    allowed_parts=("word/document.xml",),
+):
     api = _api()
     return api.TemplateContractManifest(
         contract_id="kg.template.daily_plan.synthetic",
@@ -38,7 +43,7 @@ def _contract(*, tokens=(), anchors=("part:word/document.xml",)):
         structural_profile_version=1,
         renderer_id="kg.renderer.daily_plan.synthetic.v1",
         parser_id="kg.parser.daily_plan.synthetic.v1",
-        allowed_parts=("word/document.xml",),
+        allowed_parts=allowed_parts,
         required_anchors=anchors,
         tokens=tokens,
     )
@@ -882,4 +887,27 @@ def test_t004_rejects_office_web_extension_part():
             content_types=_content_types(extra_overrides=(override,)),
             extra=(("webextensions/webextension1.xml", web_extension),),
         )
+    )
+
+
+def test_t004_contract_cannot_allow_office_web_extension_part():
+    override = (
+        '<Override PartName="/webextensions/webextension1.xml" '
+        'ContentType="application/vnd.ms-office.webextension+xml"/>'
+    )
+    web_extension = (
+        b'<we:webextension xmlns:we="http://schemas.microsoft.com/'
+        b'office/webextensions/webextension/2010/11"/>'
+    )
+    contract = _contract(
+        allowed_parts=("word/document.xml", "webextensions/webextension1.xml"),
+        anchors=("part:word/document.xml",),
+        tokens=(),
+    )
+    _assert_rejected(
+        _docx(
+            content_types=_content_types(extra_overrides=(override,)),
+            extra=(("webextensions/webextension1.xml", web_extension),),
+        ),
+        contract=contract,
     )
