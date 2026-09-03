@@ -80,17 +80,55 @@ class MemoryUnitOfWork:
         version_store: MemoryVersionStore,
         audit_sink: MemoryAuditSink,
         owner: "MemoryTransactionPort",
+        tenant_id: int,
+        document_type: object,
     ) -> None:
         self.version_store = version_store
         self.audit_sink = audit_sink
         self.owner = owner
+        self.tenant_id = tenant_id
+        self.document_type = document_type
         self.staged_versions: list[object] = []
         self.staged_transitions: list[object] = []
         self.staged_audits: list[object] = []
         self.stage_calls: list[str] = []
         self.committed = False
+        self.allocations: dict[UUID, object] = {}
+        self.consumed_allocations: set[UUID] = set()
 
-    async def stage_version(self, version: object) -> None:
+    async def allocate_version(self) -> object:
+        from app.service import template_center as api
+
+        key = (
+            self.tenant_id,
+            getattr(self.document_type, "value", self.document_type),
+        )
+        version = self.owner.version_sequences.get(key, 0) + 1
+        self.owner.version_sequences[key] = version
+        allocation = api.VersionAllocation(
+            template_version_id=uuid4(),
+            tenant_id=self.tenant_id,
+            document_type=api.DocumentType(key[1]),
+            version=version,
+        )
+        self.allocations[allocation.template_version_id] = allocation
+        return allocation
+
+    async def stage_version(self, allocation: object, version: object) -> None:
+        from app.service import template_center as api
+
+        if (
+            type(allocation) is not api.VersionAllocation
+            or self.allocations.get(allocation.template_version_id) is not allocation
+            or allocation.template_version_id in self.consumed_allocations
+            or type(version) is not api.TemplateVersionRef
+            or version.template_version_id != allocation.template_version_id
+            or version.tenant_id != allocation.tenant_id
+            or version.document_type is not allocation.document_type
+            or version.version != allocation.version
+        ):
+            raise api.TemplateCenterError(api.TemplateErrorCode.STORAGE_FAILED)
+        self.consumed_allocations.add(allocation.template_version_id)
         self.stage_calls.append("version")
         self.staged_versions.append(version)
 
@@ -132,11 +170,36 @@ class MemoryTransactionPort:
         self.begin_calls = 0
         self.commit_attempts = 0
         self.commit_calls = 0
+        self.version_sequences: dict[tuple[int, str], int] = {}
         self.units: list[MemoryUnitOfWork] = []
 
     async def begin(self, tenant_id: int, document_type: str) -> MemoryUnitOfWork:
+        from app.service import template_center as api
+
+        if type(tenant_id) is not int or tenant_id <= 0:
+            raise api.TemplateCenterError(api.TemplateErrorCode.INPUT_INVALID)
+        try:
+            normalized = (
+                document_type
+                if type(document_type) is api.DocumentType
+                else api.DocumentType(document_type)
+            )
+        except (TypeError, ValueError) as error:
+            raise api.TemplateCenterError(
+                api.TemplateErrorCode.UNKNOWN_DOCUMENT_TYPE
+            ) from error
+        if not api.build_initial_document_registry().is_enabled(normalized):
+            raise api.TemplateCenterError(
+                api.TemplateErrorCode.DOCUMENT_TYPE_RESERVED_UNTIL_GATE
+            )
         self.begin_calls += 1
-        unit = MemoryUnitOfWork(self.version_store, self.audit_sink, self)
+        unit = MemoryUnitOfWork(
+            self.version_store,
+            self.audit_sink,
+            self,
+            tenant_id,
+            normalized,
+        )
         self.units.append(unit)
         return unit
 

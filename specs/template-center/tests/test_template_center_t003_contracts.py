@@ -66,6 +66,22 @@ def test_t003_descriptors_are_frozen_legacy_structural_manifests():
 
 def test_t003_version_reference_is_closed_frozen_and_content_addressed():
     sha = "a" * 64
+    evidence = api.TemplateValidationEvidence(
+        validation_receipt_id=uuid4(),
+        content_sha256=sha,
+        size_bytes=123,
+        mime_type=api.DOCX_MIME_TYPE,
+        extension=".docx",
+        contract_id="kg.template.daily_plan.legacy_structural",
+        contract_version=1,
+        structural_profile_id="legacy_structural_v1.daily_plan",
+        structural_profile_version=1,
+        structure_summary_sha256="b" * 64,
+        validator_version="validator.v1",
+        validated_at_utc=datetime(2026, 9, 3, tzinfo=timezone.utc),
+        validation_status=api.ValidationStatus.VALIDATED,
+        token_occurrences=(),
+    )
     version = api.TemplateVersionRef(
         template_version_id=uuid4(),
         tenant_id=7,
@@ -78,13 +94,14 @@ def test_t003_version_reference_is_closed_frozen_and_content_addressed():
         blob_ref=f"sha256/{sha}",
         contract_id="kg.template.daily_plan.legacy_structural",
         contract_version=1,
-        validation_receipt_id=uuid4(),
+        validation_receipt_id=evidence.validation_receipt_id,
         validation_status=api.ValidationStatus.VALIDATED,
         validated_at_utc=datetime(2026, 9, 3, tzinfo=timezone.utc),
         validator_version="validator.v1",
         source=api.TemplateSource.UPLOAD,
         created_by_user_id=11,
         created_at_utc=datetime(2026, 9, 3, tzinfo=timezone.utc),
+        validation_evidence=evidence,
     )
     assert {item.name for item in fields(version)} == {
         "template_version_id",
@@ -105,6 +122,7 @@ def test_t003_version_reference_is_closed_frozen_and_content_addressed():
         "source",
         "created_by_user_id",
         "created_at_utc",
+        "validation_evidence",
     }
     assert not hasattr(version, "content")
     assert not hasattr(version, "absolute_path")
@@ -116,6 +134,22 @@ def test_t003_version_reference_is_closed_frozen_and_content_addressed():
 @pytest.mark.parametrize("bad", (True, 0, -1, "7"))
 def test_t003_version_reference_rejects_invalid_tenant_id(bad):
     sha = "b" * 64
+    evidence = api.TemplateValidationEvidence(
+        validation_receipt_id=uuid4(),
+        content_sha256=sha,
+        size_bytes=1,
+        mime_type=api.DOCX_MIME_TYPE,
+        extension=".docx",
+        contract_id="contract.v1",
+        contract_version=1,
+        structural_profile_id="profile.v1",
+        structural_profile_version=1,
+        structure_summary_sha256="c" * 64,
+        validator_version="validator.v1",
+        validated_at_utc=datetime(2026, 9, 3, tzinfo=timezone.utc),
+        validation_status=api.ValidationStatus.VALIDATED,
+        token_occurrences=(),
+    )
     with pytest.raises((TypeError, ValueError)):
         api.TemplateVersionRef(
             template_version_id=uuid4(),
@@ -129,13 +163,14 @@ def test_t003_version_reference_rejects_invalid_tenant_id(bad):
             blob_ref=f"sha256/{sha}",
             contract_id="contract.v1",
             contract_version=1,
-            validation_receipt_id=uuid4(),
+            validation_receipt_id=evidence.validation_receipt_id,
             validation_status=api.ValidationStatus.VALIDATED,
             validated_at_utc=datetime(2026, 9, 3, tzinfo=timezone.utc),
             validator_version="validator.v1",
             source=api.TemplateSource.UPLOAD,
             created_by_user_id=11,
             created_at_utc=datetime(2026, 9, 3, tzinfo=timezone.utc),
+            validation_evidence=evidence,
         )
 
 
@@ -144,6 +179,7 @@ def test_t003_ports_expose_only_closed_entrypoints():
         api.TemplateBlobStorePort: {"put_if_absent", "read", "exists"},
         api.TemplateVersionStorePort: {"get_version", "snapshot"},
         api.TemplateUnitOfWork: {
+            "allocate_version",
             "stage_version",
             "stage_transition",
             "stage_audit",

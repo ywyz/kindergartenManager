@@ -252,6 +252,85 @@ class TemplateValidationReceipt:
 
 
 @dataclass(frozen=True, slots=True)
+class TemplateValidationEvidence:
+    """Persistable, content-bound evidence derived from one T004 receipt."""
+
+    validation_receipt_id: UUID
+    content_sha256: str
+    size_bytes: int
+    mime_type: str
+    extension: str
+    contract_id: str
+    contract_version: int
+    structural_profile_id: str
+    structural_profile_version: int
+    structure_summary_sha256: str
+    validator_version: str
+    validated_at_utc: datetime
+    validation_status: ValidationStatus
+    token_occurrences: tuple[TemplateTokenOccurrence, ...]
+
+    def __post_init__(self) -> None:
+        if type(self.validation_receipt_id) is not UUID:
+            raise ValueError("template_validation_evidence_invalid")
+        _sha256(self.content_sha256, "template_validation_evidence_invalid")
+        _positive_int(self.size_bytes, "template_validation_evidence_invalid")
+        if (
+            self.size_bytes > MAX_TEMPLATE_BYTES
+            or self.mime_type != DOCX_MIME_TYPE
+            or self.extension != ".docx"
+        ):
+            raise ValueError("template_validation_evidence_invalid")
+        _nonempty_text(self.contract_id, "template_validation_evidence_invalid")
+        _positive_int(self.contract_version, "template_validation_evidence_invalid")
+        _nonempty_text(
+            self.structural_profile_id, "template_validation_evidence_invalid"
+        )
+        _positive_int(
+            self.structural_profile_version, "template_validation_evidence_invalid"
+        )
+        _sha256(self.structure_summary_sha256, "template_validation_evidence_invalid")
+        _nonempty_text(self.validator_version, "template_validation_evidence_invalid")
+        _utc(self.validated_at_utc, "template_validation_evidence_invalid")
+        if (
+            type(self.validation_status) is not ValidationStatus
+            or self.validation_status is not ValidationStatus.VALIDATED
+            or type(self.token_occurrences) is not tuple
+            or not all(
+                type(item) is TemplateTokenOccurrence for item in self.token_occurrences
+            )
+        ):
+            raise ValueError("template_validation_evidence_invalid")
+
+    @classmethod
+    def from_receipt(
+        cls,
+        validation_receipt_id: UUID,
+        receipt: TemplateValidationReceipt,
+        *,
+        validated_at_utc: datetime,
+    ) -> "TemplateValidationEvidence":
+        if type(receipt) is not TemplateValidationReceipt:
+            raise ValueError("template_validation_evidence_invalid")
+        return cls(
+            validation_receipt_id=validation_receipt_id,
+            content_sha256=receipt.content_sha256,
+            size_bytes=receipt.size_bytes,
+            mime_type=receipt.mime_type,
+            extension=receipt.extension,
+            contract_id=receipt.contract_id,
+            contract_version=receipt.contract_version,
+            structural_profile_id=receipt.structural_profile_id,
+            structural_profile_version=receipt.structural_profile_version,
+            structure_summary_sha256=receipt.structure_summary_sha256,
+            validator_version=receipt.validator_version,
+            validated_at_utc=validated_at_utc,
+            validation_status=ValidationStatus.VALIDATED,
+            token_occurrences=receipt.token_occurrences,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class DocumentTypeDescriptor:
     key: DocumentType
     display_name: str
@@ -296,6 +375,23 @@ class BlobRef:
 
 
 @dataclass(frozen=True, slots=True)
+class VersionAllocation:
+    """Opaque reservation from one tenant/type-bound unit of work."""
+
+    template_version_id: UUID
+    tenant_id: int
+    document_type: DocumentType
+    version: int
+
+    def __post_init__(self) -> None:
+        if type(self.template_version_id) is not UUID:
+            raise ValueError("version_allocation_invalid")
+        _positive_int(self.tenant_id, "version_allocation_invalid")
+        _document_type(self.document_type, "version_allocation_invalid")
+        _positive_int(self.version, "version_allocation_invalid")
+
+
+@dataclass(frozen=True, slots=True)
 class TemplateVersionRef:
     template_version_id: UUID
     tenant_id: int
@@ -315,6 +411,7 @@ class TemplateVersionRef:
     source: TemplateSource
     created_by_user_id: int | None
     created_at_utc: datetime
+    validation_evidence: TemplateValidationEvidence
 
     def __post_init__(self) -> None:
         if type(self.template_version_id) is not UUID:
@@ -350,6 +447,22 @@ class TemplateVersionRef:
         else:
             _positive_int(self.created_by_user_id, "template_version_ref_invalid")
         _utc(self.created_at_utc, "template_version_ref_invalid")
+        if type(self.validation_evidence) is not TemplateValidationEvidence:
+            raise ValueError("template_version_ref_invalid")
+        evidence = self.validation_evidence
+        if (
+            evidence.validation_receipt_id != self.validation_receipt_id
+            or evidence.content_sha256 != self.content_sha256
+            or evidence.size_bytes != self.size_bytes
+            or evidence.mime_type != self.mime_type
+            or evidence.extension != self.extension
+            or evidence.contract_id != self.contract_id
+            or evidence.contract_version != self.contract_version
+            or evidence.validation_status is not self.validation_status
+            or evidence.validated_at_utc != self.validated_at_utc
+            or evidence.validator_version != self.validator_version
+        ):
+            raise ValueError("template_version_ref_invalid")
 
 
 @dataclass(frozen=True, slots=True)
@@ -714,7 +827,12 @@ class TemplateVersionStorePort(Protocol):
 
 
 class TemplateUnitOfWork(Protocol):
-    async def stage_version(self, version_ref: TemplateVersionRef) -> None: ...
+    async def allocate_version(self) -> VersionAllocation: ...
+    async def stage_version(
+        self,
+        allocation: VersionAllocation,
+        version_ref: TemplateVersionRef,
+    ) -> None: ...
     async def stage_transition(
         self, transition_event: TemplateTransitionEvent
     ) -> None: ...

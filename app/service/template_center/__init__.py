@@ -37,8 +37,10 @@ from app.service.template_center.contracts import (
     TemplateVersionSummary,
     TemplateVersionStorePort,
     TemplateValidationReceipt,
+    TemplateValidationEvidence,
     TransitionReceipt,
     ValidationStatus,
+    VersionAllocation,
 )
 from app.service.template_center.validator import validate_upload
 from app.service.template_center.registry import (
@@ -95,8 +97,10 @@ __all__ = (
     "TemplateVersionSummary",
     "TemplateVersionStorePort",
     "TemplateValidationReceipt",
+    "TemplateValidationEvidence",
     "TransitionReceipt",
     "ValidationStatus",
+    "VersionAllocation",
     "build_initial_contract_registry",
     "build_initial_document_registry",
     "validate_upload",
