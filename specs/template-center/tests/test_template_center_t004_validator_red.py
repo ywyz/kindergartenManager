@@ -473,6 +473,31 @@ def test_t004_rejects_case_variant_unallowed_header_part():
     _assert_rejected(content)
 
 
+def test_t004_rejects_unallowed_header_part_with_non_xml_extension():
+    part_name = "word/header_payload.part"
+    header = (
+        f'<w:hdr xmlns:w="{W_NS}">' + _paragraph("{{kg.daily_plan.title}}") + "</w:hdr>"
+    ).encode("utf-8")
+    override = (
+        '<Override PartName="/'
+        + part_name
+        + '" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>',
+    )
+    relationships = _relationships(
+        ("rIdHeader", f"{R_NS}/header", "header_payload.part")
+    )
+    content = _docx(
+        _document_xml(
+            _paragraph("safe"),
+            section='<w:headerReference w:type="default" r:id="rIdHeader"/>',
+        ),
+        content_types=_content_types(extra_overrides=override),
+        document_relationships=relationships,
+        extra=((part_name, header),),
+    )
+    _assert_rejected(content)
+
+
 @pytest.mark.parametrize(
     "target",
     [
