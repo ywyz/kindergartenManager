@@ -43,6 +43,15 @@ _MAIN_CONTENT_TYPE = (
 _OFFICE_DOCUMENT_REL = (
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
 )
+_OFFICE_REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+_HEADER_REL = f"{_OFFICE_REL_NS}/header"
+_FOOTER_REL = f"{_OFFICE_REL_NS}/footer"
+_HEADER_CONTENT_TYPE = (
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"
+)
+_FOOTER_CONTENT_TYPE = (
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"
+)
 _TOKEN = re.compile(r"\{\{(.*?)\}\}")
 _TOKEN_ID = re.compile(r"kg\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_.]*")
 _TABLE_ANCHOR = re.compile(
@@ -235,6 +244,115 @@ def _resolved_relationship_target(rels_name: str, target: str) -> str:
     return resolved
 
 
+def _relationship_owner(rels_name: str) -> str | None:
+    if rels_name == _ROOT_RELS:
+        return None
+    directory, filename = posixpath.split(rels_name)
+    if posixpath.basename(directory) != "_rels" or not filename.endswith(".rels"):
+        _reject()
+    owner_directory = posixpath.dirname(directory)
+    owner_name = filename.removesuffix(".rels")
+    owner = posixpath.join(owner_directory, owner_name)
+    if not owner:
+        _reject()
+    return owner
+
+
+def _content_type_overrides(content_types: etree._Element) -> dict[str, str]:
+    overrides: dict[str, str] = {}
+    for element in content_types:
+        if element.tag != f"{{{_CONTENT_TYPE_NS}}}Override":
+            continue
+        part_name = element.get("PartName") or ""
+        content_type = element.get("ContentType") or ""
+        if (
+            not part_name.startswith("/")
+            or part_name == "/"
+            or part_name[1:] in overrides
+            or not content_type
+        ):
+            _reject()
+        overrides[part_name[1:]] = content_type
+    return overrides
+
+
+def _validate_relationship_references(
+    roots: dict[str, etree._Element],
+    relationships: dict[str | None, dict[str, tuple[str, str]]],
+) -> None:
+    for part_name, root in roots.items():
+        if part_name.endswith(".rels") or part_name == _CONTENT_TYPES:
+            continue
+        available = relationships.get(part_name, {})
+        for element in root.iter():
+            for attribute_name, relationship_id in element.attrib.items():
+                attribute = etree.QName(attribute_name)
+                if attribute.namespace != _OFFICE_REL_NS:
+                    continue
+                if attribute.localname not in {"id", "embed", "link"}:
+                    continue
+                if not relationship_id or relationship_id not in available:
+                    _reject()
+
+
+def _validate_header_footer_parts(
+    roots: dict[str, etree._Element],
+    allowed_parts: tuple[str, ...],
+    overrides: dict[str, str],
+    relationships: dict[str | None, dict[str, tuple[str, str]]],
+) -> None:
+    document_relationships = relationships.get(_MAIN_PART, {})
+    document = roots[_MAIN_PART]
+    part_contracts = (
+        (
+            re.compile(r"word/header[1-9][0-9]*\.xml"),
+            "hdr",
+            _HEADER_CONTENT_TYPE,
+            _HEADER_REL,
+            "headerReference",
+        ),
+        (
+            re.compile(r"word/footer[1-9][0-9]*\.xml"),
+            "ftr",
+            _FOOTER_CONTENT_TYPE,
+            _FOOTER_REL,
+            "footerReference",
+        ),
+    )
+    for (
+        pattern,
+        root_name,
+        content_type,
+        relationship_type,
+        reference_name,
+    ) in part_contracts:
+        for part_name, root in roots.items():
+            if pattern.fullmatch(part_name) is None:
+                continue
+            if (
+                part_name not in allowed_parts
+                or root.tag != f"{{{_WORD_NS}}}{root_name}"
+                or overrides.get(part_name) != content_type
+            ):
+                _reject()
+            matching_relationship_ids = {
+                relationship_id
+                for relationship_id, (
+                    found_type,
+                    target,
+                ) in document_relationships.items()
+                if found_type == relationship_type and target == part_name
+            }
+            referenced_ids = {
+                element.get(f"{{{_OFFICE_REL_NS}}}id")
+                for element in document.iter(f"{{{_WORD_NS}}}{reference_name}")
+            }
+            if not matching_relationship_ids or not (
+                matching_relationship_ids & referenced_ids
+            ):
+                _reject()
+
+
 def _validate_ooxml(
     parts: dict[str, bytes],
     member_names: set[str],
@@ -247,16 +365,8 @@ def _validate_ooxml(
     content_types = roots[_CONTENT_TYPES]
     if content_types.tag != f"{{{_CONTENT_TYPE_NS}}}Types":
         _reject()
-    main_overrides = [
-        element
-        for element in content_types
-        if element.tag == f"{{{_CONTENT_TYPE_NS}}}Override"
-        and element.get("PartName") == f"/{_MAIN_PART}"
-    ]
-    if (
-        len(main_overrides) != 1
-        or main_overrides[0].get("ContentType") != _MAIN_CONTENT_TYPE
-    ):
+    overrides = _content_type_overrides(content_types)
+    if overrides.get(_MAIN_PART) != _MAIN_CONTENT_TYPE:
         _reject()
     if any(
         marker in (element.get("ContentType") or "").casefold()
@@ -266,22 +376,33 @@ def _validate_ooxml(
         _reject()
 
     root_office_targets: list[str] = []
+    relationships: dict[str | None, dict[str, tuple[str, str]]] = {}
     for name, root in roots.items():
         if not name.endswith(".rels"):
             continue
         if root.tag != f"{{{_REL_NS}}}Relationships":
             _reject()
+        owner = _relationship_owner(name)
+        owner_relationships = relationships.setdefault(owner, {})
         for relationship in root:
             if relationship.tag != f"{{{_REL_NS}}}Relationship":
                 _reject()
-            if (relationship.get("TargetMode") or "").casefold() == "external":
+            relationship_id = relationship.get("Id") or ""
+            relationship_type = relationship.get("Type") or ""
+            if (
+                not relationship_id
+                or not relationship_type
+                or relationship_id in owner_relationships
+                or (relationship.get("TargetMode") or "").casefold() == "external"
+            ):
                 _reject()
             resolved = _resolved_relationship_target(
                 name, relationship.get("Target") or ""
             )
             if resolved not in member_names:
                 _reject()
-            if name == _ROOT_RELS and relationship.get("Type") == _OFFICE_DOCUMENT_REL:
+            owner_relationships[relationship_id] = (relationship_type, resolved)
+            if name == _ROOT_RELS and relationship_type == _OFFICE_DOCUMENT_REL:
                 root_office_targets.append(resolved)
     if root_office_targets != [_MAIN_PART]:
         _reject()
@@ -292,6 +413,8 @@ def _validate_ooxml(
     bodies = document.findall(f"{{{_WORD_NS}}}body")
     if len(bodies) != 1:
         _reject()
+    _validate_relationship_references(roots, relationships)
+    _validate_header_footer_parts(roots, allowed_parts, overrides, relationships)
     for part_name, root in roots.items():
         if (
             part_name.startswith("word/")
