@@ -181,6 +181,7 @@ def _safe_member_name(info: ZipInfo, normalized_names: set[str]) -> str:
         or any(unicodedata.category(character).startswith("C") for character in name)
         or info.is_dir()
         or name.endswith("/")
+        or bool(info.external_attr & 0x10)
     ):
         _reject()
     components = name.split("/")
