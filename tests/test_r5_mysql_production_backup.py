@@ -12,7 +12,7 @@ import inspect
 import json
 import subprocess
 import zipfile
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -361,6 +361,7 @@ def test_complete_chain_uses_a_new_network_and_writes_consumer_shape(
     calls: list[list[str]] = []
     restore_server_payloads: list[bytes] = []
     revision = "2b7f3d5e9c8a"
+    controlled_now = datetime(2026, 9, 2, tzinfo=UTC)
     table_inventory = (
         b"alembic_version\tBASE TABLE\tInnoDB\nusers\tBASE TABLE\tInnoDB\n"
     )
@@ -421,7 +422,7 @@ def test_complete_chain_uses_a_new_network_and_writes_consumer_shape(
         exports_source=exports,
         templates_source=templates,
         protected_image=IMAGE,
-        now=datetime(2026, 9, 2, tzinfo=UTC),
+        now=controlled_now,
         runner=runner,
     )
     assert evidence.is_file()
@@ -487,5 +488,14 @@ def test_complete_chain_uses_a_new_network_and_writes_consumer_shape(
     validated = validate_generated_attestation(
         evidence,
         expected_protected_image=IMAGE,
+        now=controlled_now + timedelta(minutes=1),
     )
     assert validated.database_revision == revision
+    from app.core.backup_evidence import BackupEvidenceError
+
+    with pytest.raises(BackupEvidenceError, match="expired"):
+        validate_generated_attestation(
+            evidence,
+            expected_protected_image=IMAGE,
+            now=controlled_now + timedelta(hours=25),
+        )
