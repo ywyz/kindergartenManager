@@ -57,6 +57,10 @@ _ACTIVE_PARTS = (
 )
 _ACTIVE_XML_TAGS = {
     f"{{{_WORD_NS}}}altChunk",
+    f"{{{_WORD_NS}}}fldChar",
+    f"{{{_WORD_NS}}}fldSimple",
+    f"{{{_WORD_NS}}}instrText",
+    f"{{{_WORD_NS}}}txbxContent",
     "{http://www.w3.org/2001/XInclude}include",
 }
 
@@ -93,6 +97,7 @@ def _validate_public_inputs(
         or filename in {"", ".", ".."}
         or "/" in filename
         or "\\" in filename
+        or ":" in filename
         or _DRIVE_PATH.match(filename) is not None
         or filename.startswith(".~lock.")
         or filename.endswith("#")
@@ -114,6 +119,7 @@ def _safe_member_name(info: ZipInfo, normalized_names: set[str]) -> str:
         or name != normalized
         or name.startswith("/")
         or "\\" in name
+        or ":" in name
         or _DRIVE_PATH.match(name) is not None
         or any(unicodedata.category(character).startswith("C") for character in name)
         or info.is_dir()
@@ -230,7 +236,9 @@ def _resolved_relationship_target(rels_name: str, target: str) -> str:
 
 
 def _validate_ooxml(
-    parts: dict[str, bytes], member_names: set[str]
+    parts: dict[str, bytes],
+    member_names: set[str],
+    allowed_parts: tuple[str, ...],
 ) -> dict[str, etree._Element]:
     roots: dict[str, etree._Element] = {}
     for name, value in parts.items():
@@ -284,6 +292,14 @@ def _validate_ooxml(
     bodies = document.findall(f"{{{_WORD_NS}}}body")
     if len(bodies) != 1:
         _reject()
+    for part_name, root in roots.items():
+        if (
+            part_name.startswith("word/")
+            and part_name.endswith(".xml")
+            and part_name not in allowed_parts
+            and next(root.iter(f"{{{_WORD_NS}}}t"), None) is not None
+        ):
+            _reject()
     return roots
 
 
@@ -392,7 +408,7 @@ def validate_upload(
     try:
         retained, member_summaries = _read_members(content)
         member_names = {item["name"] for item in member_summaries}
-        roots = _validate_ooxml(retained, member_names)
+        roots = _validate_ooxml(retained, member_names, contract.allowed_parts)
         shapes = _validate_anchors(contract, roots)
         occurrences = _token_occurrences(contract, roots)
         structure_summary = sha256(
