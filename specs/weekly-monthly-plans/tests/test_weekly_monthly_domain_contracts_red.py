@@ -752,3 +752,67 @@ def test_authorization_request_contains_actor_tenant_teacher_class_target_and_st
         "plan_version",
         "status",
     }
+
+
+def _authorization_request(c, **overrides):
+    values = {
+        "action": c.PlanAction.READ,
+        "actor_id": 31,
+        "actor_role": "teacher",
+        "tenant_id": 7,
+        "owner_teacher_id": 11,
+        "class_id": 23,
+        "plan_kind": c.PlanKind.WEEKLY_ACTIVITY,
+        "plan_id": 101,
+        "plan_version": 2,
+        "status": c.ReviewStatus.DRAFT,
+    }
+    values.update(overrides)
+    return c.PlanAuthorizationRequest(**values)
+
+
+def test_week_period_rejects_an_unrepresentable_natural_week_as_a_value_error():
+    c = _contracts()
+    with pytest.raises(ValueError):
+        c.WeekPeriod(
+            week_start=date(9999, 12, 27),
+            week_end=date(9999, 12, 31),
+            week_number=1,
+        )
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    ("actor_id", "tenant_id", "owner_teacher_id", "class_id", "plan_id", "plan_version"),
+)
+@pytest.mark.parametrize("invalid", (True, 0, "1"))
+def test_authorization_request_rejects_invalid_ids_and_version(field_name, invalid):
+    c = _contracts()
+    with pytest.raises((TypeError, ValueError)):
+        _authorization_request(c, **{field_name: invalid})
+
+
+@pytest.mark.parametrize(
+    ("field_name", "invalid"),
+    (
+        ("action", "read"),
+        ("plan_kind", "weekly_activity_plan"),
+        ("status", "draft"),
+    ),
+)
+def test_authorization_request_rejects_raw_string_enums(field_name, invalid):
+    c = _contracts()
+    with pytest.raises((TypeError, ValueError)):
+        _authorization_request(c, **{field_name: invalid})
+
+
+def test_authorization_contracts_are_immutable_and_decision_bool_is_strict():
+    c = _contracts()
+    request = _authorization_request(c)
+    decision = c.AuthorizationDecision(allowed=False, reason_code="policy_denied")
+    with pytest.raises(FrozenInstanceError):
+        request.plan_version = 3
+    with pytest.raises(FrozenInstanceError):
+        decision.allowed = True
+    with pytest.raises((TypeError, ValueError)):
+        c.AuthorizationDecision(allowed=1, reason_code="policy_denied")
