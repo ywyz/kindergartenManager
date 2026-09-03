@@ -417,3 +417,22 @@ async def test_missing_blob_lookup_is_read_only_and_does_not_create_a_shard(
 
     assert await store.exists(reference, digest) is False
     assert tuple(root.iterdir()) == ()
+
+
+@pytest.mark.asyncio
+async def test_blob_with_an_external_hard_link_is_rejected_as_mutable_alias(
+    tmp_path: Path,
+):
+    api = _api()
+    root = tmp_path / "trusted-template-blobs"
+    store = api.ContentAddressedTemplateBlobStore(root)
+    content = docx_with_text("synthetic hard-link candidate")
+    digest = sha256(content).hexdigest()
+    reference = await store.put_if_absent(digest, content)
+    blob_path = root / digest[:2] / digest
+    outside_alias = tmp_path / "outside-alias"
+    outside_alias.hardlink_to(blob_path)
+
+    with pytest.raises(api.TemplateCenterError) as caught:
+        await store.read(reference, digest)
+    assert caught.value.code is api.TemplateErrorCode.STORAGE_FAILED
