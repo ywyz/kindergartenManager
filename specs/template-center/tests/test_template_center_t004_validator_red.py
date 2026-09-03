@@ -452,6 +452,27 @@ def test_t004_rejects_undeclared_wordprocessingml_part_without_text():
     _assert_rejected(_docx(extra=(("word/unapproved.xml", unapproved),)))
 
 
+def test_t004_rejects_case_variant_unallowed_header_part():
+    header = (
+        f'<w:hdr xmlns:w="{W_NS}">' + _paragraph("{{kg.daily_plan.title}}") + "</w:hdr>"
+    ).encode("utf-8")
+    override = (
+        '<Override PartName="/word/header1.XML" '
+        'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>',
+    )
+    relationships = _relationships(("rIdHeader", f"{R_NS}/header", "header1.XML"))
+    content = _docx(
+        _document_xml(
+            _paragraph("safe"),
+            section='<w:headerReference w:type="default" r:id="rIdHeader"/>',
+        ),
+        content_types=_content_types(extra_overrides=override),
+        document_relationships=relationships,
+        extra=(("word/header1.XML", header),),
+    )
+    _assert_rejected(content)
+
+
 @pytest.mark.parametrize(
     "target",
     [
