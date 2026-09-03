@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
+from dataclasses import replace as replace_dataclass
 from datetime import date, timedelta
 from typing import Protocol, TypeAlias
 
@@ -235,31 +237,54 @@ class PlanReadService:
         ):
             _deny()
 
+        trusted_request = replace_dataclass(request)
+        authorization_request = replace_dataclass(trusted_request)
+
         try:
-            decision = await self._authorization.authorize(request)
+            decision = await self._authorization.authorize(authorization_request)
         except Exception as error:
             _deny(error)
-        if type(decision) is not AuthorizationDecision or not decision.allowed:
+        if (
+            authorization_request != trusted_request
+            or type(decision) is not AuthorizationDecision
+            or not decision.allowed
+        ):
             _deny()
 
         try:
-            aggregate = await self._repository.read_exact(request)
-            if not _aggregate_matches_request(aggregate, request):
+            aggregate_request = replace_dataclass(trusted_request)
+            repository_aggregate = await self._repository.read_exact(aggregate_request)
+            if aggregate_request != trusted_request:
                 _deny()
-            daily_sources = await self._repository.read_daily_sources(
-                request, aggregate.source_daily_plan_ids
+            aggregate = deepcopy(repository_aggregate)
+            if not _aggregate_matches_request(aggregate, trusted_request):
+                _deny()
+            daily_request = replace_dataclass(trusted_request)
+            repository_daily_sources = await self._repository.read_daily_sources(
+                daily_request, aggregate.source_daily_plan_ids
             )
+            if daily_request != trusted_request:
+                _deny()
+            daily_sources = deepcopy(repository_daily_sources)
             if type(aggregate) is WeeklyActivityPlan:
-                if not _weekly_daily_sources_match(aggregate, request, daily_sources):
+                if not _weekly_daily_sources_match(
+                    aggregate, trusted_request, daily_sources
+                ):
                     _deny()
             else:
-                if not _monthly_daily_sources_match(aggregate, request, daily_sources):
+                if not _monthly_daily_sources_match(
+                    aggregate, trusted_request, daily_sources
+                ):
                     _deny()
-                weekly_sources = await self._repository.read_weekly_sources(
-                    request, aggregate.source_weekly_plan_ids
+                weekly_request = replace_dataclass(trusted_request)
+                repository_weekly_sources = await self._repository.read_weekly_sources(
+                    weekly_request, aggregate.source_weekly_plan_ids
                 )
+                if weekly_request != trusted_request:
+                    _deny()
+                weekly_sources = deepcopy(repository_weekly_sources)
                 if not _monthly_weekly_sources_match(
-                    aggregate, request, weekly_sources
+                    aggregate, trusted_request, weekly_sources
                 ):
                     _deny()
         except PlanReadDenied:
@@ -268,7 +293,7 @@ class PlanReadService:
             _deny(error)
 
         return PlanAggregateSnapshot(
-            plan_kind=request.plan_kind,
+            plan_kind=trusted_request.plan_kind,
             aggregate=aggregate,
         )
 
