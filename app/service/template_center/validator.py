@@ -75,9 +75,18 @@ _ACTIVE_RELATIONSHIP_SUFFIXES = (
 )
 _ACTIVE_XML_TAGS = {
     f"{{{_WORD_NS}}}altChunk",
+    f"{{{_WORD_NS}}}del",
+    f"{{{_WORD_NS}}}delText",
     f"{{{_WORD_NS}}}fldChar",
     f"{{{_WORD_NS}}}fldSimple",
+    f"{{{_WORD_NS}}}ins",
     f"{{{_WORD_NS}}}instrText",
+    f"{{{_WORD_NS}}}moveFrom",
+    f"{{{_WORD_NS}}}moveFromRangeEnd",
+    f"{{{_WORD_NS}}}moveFromRangeStart",
+    f"{{{_WORD_NS}}}moveTo",
+    f"{{{_WORD_NS}}}moveToRangeEnd",
+    f"{{{_WORD_NS}}}moveToRangeStart",
     f"{{{_WORD_NS}}}txbxContent",
     "{http://www.w3.org/2001/XInclude}include",
 }
