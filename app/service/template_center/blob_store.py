@@ -42,7 +42,11 @@ def _safe_directory(path: Path, *, create: bool) -> None:
         metadata = path.lstat()
     except (FileNotFoundError, OSError) as error:
         raise _storage_failed(error) from error
-    if not stat.S_ISDIR(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or stat.S_ISLNK(metadata.st_mode)
+        or metadata.st_uid != os.geteuid()
+    ):
         raise _storage_failed()
     if stat.S_IMODE(metadata.st_mode) != 0o700:
         raise _storage_failed()
@@ -85,6 +89,7 @@ class ContentAddressedTemplateBlobStore:
                 not stat.S_ISREG(metadata.st_mode)
                 or stat.S_ISLNK(metadata.st_mode)
                 or metadata.st_nlink != 1
+                or metadata.st_uid != os.geteuid()
                 or stat.S_IMODE(metadata.st_mode) != 0o600
             ):
                 raise _storage_failed()
