@@ -546,6 +546,7 @@ def make_upload_center(
     audit = MemoryAuditSink()
     transactions = MemoryTransactionPort(versions, audit, events=events)
     permissions = policy or AllowPolicy(events=events)
+    permissions.events = events
     center = api.TemplateCenter(
         blob_store=blobs,
         transaction_port=transactions,

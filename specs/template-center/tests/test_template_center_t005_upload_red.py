@@ -5,7 +5,7 @@ does not exercise active pointers, lifecycle operations, exporters, previews,
 backups, database models, or repository template files.
 """
 
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 from hashlib import sha256
 from importlib import import_module
 from inspect import signature
@@ -194,6 +194,45 @@ async def test_forged_or_mismatched_validator_receipt_fails_closed(monkeypatch):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("content_sha256", "0" * 64),
+        ("size_bytes", 1),
+        ("contract_id", "kg.template.other.v1"),
+        ("structural_profile_id", "other.profile.v1"),
+    ],
+)
+async def test_well_formed_but_content_or_contract_mismatched_receipt_is_rejected(
+    monkeypatch, field, value
+):
+    api = _api()
+    center, effects = make_upload_center(api)
+    service_module = import_module("app.service.template_center.service")
+    content = docx_with_text("receipt mismatch synthetic candidate")
+    receipt = api.validate_upload(
+        content,
+        "synthetic.docx",
+        api.DOCX_MIME_TYPE,
+        api.build_initial_contract_registry().resolve("daily_plan"),
+    )
+    monkeypatch.setattr(
+        service_module,
+        "validate_upload",
+        lambda *_args, **_kwargs: replace(receipt, **{field: value}),
+    )
+
+    with pytest.raises(api.TemplateCenterError) as caught:
+        await _upload(center, content=content)
+
+    assert caught.value.code is api.TemplateErrorCode.VALIDATION_FAILED
+    assert effects["blobs"].calls == []
+    assert effects["versions"].versions == []
+    assert len(effects["audit"].events) == 1
+    assert effects["audit"].events[0].outcome is api.AuditOutcome.REJECTED
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
     ("document_type", "error_code"),
     [
         ("weekly_activity_plan", "document_type_reserved_until_gate"),
@@ -256,6 +295,21 @@ async def test_every_storage_stage_failure_leaves_no_visible_version_audit_or_po
     assert effects["audit"].events == []
     if failure == "blob":
         assert effects["blobs"].blobs == {}
+
+
+@pytest.mark.asyncio
+async def test_failed_upload_allocation_is_never_reused():
+    api = _api()
+    center, effects = make_upload_center(api)
+    effects["transactions"].fail_commit = True
+
+    with pytest.raises(api.TemplateCenterError):
+        await _upload(center)
+
+    effects["transactions"].fail_commit = False
+    version = await _upload(center)
+    assert version.version == 2
+    assert len(effects["versions"].versions) == 1
 
 
 @pytest.mark.asyncio
@@ -322,4 +376,30 @@ async def test_content_addressed_store_deduplicates_synthetic_bytes_and_rejects_
     assert root.stat().st_mode & 0o777 == 0o700
     with pytest.raises(api.TemplateCenterError) as caught:
         await store.put_if_absent("0" * 64, content)
+    assert caught.value.code is api.TemplateErrorCode.STORAGE_FAILED
+
+
+@pytest.mark.asyncio
+async def test_content_addressed_store_rejects_unsafe_root_and_existing_blob_collision(
+    tmp_path: Path,
+):
+    api = _api()
+    real_root = tmp_path / "real-root"
+    real_root.mkdir(mode=0o700)
+    linked_root = tmp_path / "linked-root"
+    linked_root.symlink_to(real_root, target_is_directory=True)
+
+    with pytest.raises(api.TemplateCenterError):
+        api.ContentAddressedTemplateBlobStore(linked_root)
+
+    store = api.ContentAddressedTemplateBlobStore(real_root)
+    content = docx_with_text("synthetic collision candidate")
+    digest = sha256(content).hexdigest()
+    blob_path = real_root / digest[:2] / digest
+    blob_path.parent.mkdir(mode=0o700)
+    blob_path.write_bytes(b"different bytes under claimed digest")
+    blob_path.chmod(0o600)
+
+    with pytest.raises(api.TemplateCenterError) as caught:
+        await store.put_if_absent(digest, content)
     assert caught.value.code is api.TemplateErrorCode.STORAGE_FAILED
