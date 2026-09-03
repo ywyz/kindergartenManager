@@ -102,9 +102,7 @@ _SAFE_IMAGE_MEDIA_TYPES = {
     "tif": "image/tiff",
     "tiff": "image/tiff",
 }
-_RELATIONSHIPS_CONTENT_TYPE = (
-    "application/vnd.openxmlformats-package.relationships+xml"
-)
+_RELATIONSHIPS_CONTENT_TYPE = "application/vnd.openxmlformats-package.relationships+xml"
 _CUSTOM_XML_PROPERTIES_CONTENT_TYPE = (
     "application/vnd.openxmlformats-officedocument.customxmlproperties+xml"
 )
