@@ -64,6 +64,14 @@ _ACTIVE_PARTS = (
     "embeddings/",
     "customui/",
 )
+_ACTIVE_RELATIONSHIP_SUFFIXES = (
+    "/attachedtemplate",
+    "/control",
+    "/externallinkpath",
+    "/oleobject",
+    "/package",
+    "/vbaproject",
+)
 _ACTIVE_XML_TAGS = {
     f"{{{_WORD_NS}}}altChunk",
     f"{{{_WORD_NS}}}fldChar",
@@ -258,21 +266,35 @@ def _relationship_owner(rels_name: str) -> str | None:
     return owner
 
 
-def _content_type_overrides(content_types: etree._Element) -> dict[str, str]:
+def _content_type_overrides(
+    content_types: etree._Element, member_names: set[str]
+) -> dict[str, str]:
     overrides: dict[str, str] = {}
     for element in content_types:
         if element.tag != f"{{{_CONTENT_TYPE_NS}}}Override":
             continue
         part_name = element.get("PartName") or ""
         content_type = element.get("ContentType") or ""
+        normalized_part_name = part_name.removeprefix("/")
         if (
             not part_name.startswith("/")
             or part_name == "/"
-            or part_name[1:] in overrides
+            or part_name.count("/") < 1
+            or normalized_part_name
+            != unicodedata.normalize("NFC", normalized_part_name)
+            or "\\" in normalized_part_name
+            or ":" in normalized_part_name
+            or any(
+                component in {"", ".", ".."}
+                for component in normalized_part_name.split("/")
+            )
+            or posixpath.normpath(normalized_part_name) != normalized_part_name
+            or normalized_part_name not in member_names
+            or normalized_part_name in overrides
             or not content_type
         ):
             _reject()
-        overrides[part_name[1:]] = content_type
+        overrides[normalized_part_name] = content_type
     return overrides
 
 
@@ -365,7 +387,7 @@ def _validate_ooxml(
     content_types = roots[_CONTENT_TYPES]
     if content_types.tag != f"{{{_CONTENT_TYPE_NS}}}Types":
         _reject()
-    overrides = _content_type_overrides(content_types)
+    overrides = _content_type_overrides(content_types, member_names)
     if overrides.get(_MAIN_PART) != _MAIN_CONTENT_TYPE:
         _reject()
     if any(
@@ -383,17 +405,21 @@ def _validate_ooxml(
         if root.tag != f"{{{_REL_NS}}}Relationships":
             _reject()
         owner = _relationship_owner(name)
+        if owner is not None and owner not in member_names:
+            _reject()
         owner_relationships = relationships.setdefault(owner, {})
         for relationship in root:
             if relationship.tag != f"{{{_REL_NS}}}Relationship":
                 _reject()
             relationship_id = relationship.get("Id") or ""
             relationship_type = relationship.get("Type") or ""
+            target_mode = relationship.get("TargetMode") or ""
             if (
                 not relationship_id
                 or not relationship_type
                 or relationship_id in owner_relationships
-                or (relationship.get("TargetMode") or "").casefold() == "external"
+                or target_mode not in {"", "Internal"}
+                or relationship_type.casefold().endswith(_ACTIVE_RELATIONSHIP_SUFFIXES)
             ):
                 _reject()
             resolved = _resolved_relationship_target(
@@ -420,7 +446,11 @@ def _validate_ooxml(
             part_name.startswith("word/")
             and part_name.endswith(".xml")
             and part_name not in allowed_parts
-            and next(root.iter(f"{{{_WORD_NS}}}t"), None) is not None
+            and any(
+                type(element.tag) is str
+                and etree.QName(element.tag).namespace == _WORD_NS
+                for element in root.iter()
+            )
         ):
             _reject()
     return roots
