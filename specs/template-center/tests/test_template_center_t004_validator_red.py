@@ -21,6 +21,7 @@ import pytest
 
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 
 
 def _api():
@@ -74,12 +75,12 @@ def _table(rows: int = 2, columns: int = 2) -> str:
     )
 
 
-def _document_xml(*body: str) -> bytes:
+def _document_xml(*body: str, section: str = "") -> bytes:
     return (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-        f'<w:document xmlns:w="{W_NS}"><w:body>'
+        f'<w:document xmlns:w="{W_NS}" xmlns:r="{R_NS}"><w:body>'
         + "".join(body)
-        + "<w:sectPr/></w:body></w:document>"
+        + f"<w:sectPr>{section}</w:sectPr></w:body></w:document>"
     ).encode("utf-8")
 
 
@@ -119,6 +120,18 @@ def _empty_relationships() -> bytes:
     return (
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>'
+    ).encode("utf-8")
+
+
+def _relationships(*relationships: tuple[str, str, str]) -> bytes:
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        + "".join(
+            f'<Relationship Id="{relationship_id}" Type="{relationship_type}" Target="{target}"/>'
+            for relationship_id, relationship_type, target in relationships
+        )
+        + "</Relationships>"
     ).encode("utf-8")
 
 
@@ -372,6 +385,25 @@ def test_t004_rejects_active_word_field_instructions(field):
     _assert_rejected(_docx(_document_xml(field)))
 
 
+def test_t004_rejects_dangling_document_relationship_id():
+    document = _document_xml(
+        '<w:p><w:hyperlink r:id="rIdMissing"><w:r><w:t>link</w:t></w:r></w:hyperlink></w:p>'
+    )
+    _assert_rejected(_docx(document))
+
+
+def test_t004_rejects_duplicate_relationship_ids():
+    relationship_type = f"{R_NS}/hyperlink"
+    relationships = _relationships(
+        ("rIdDuplicate", relationship_type, "document.xml"),
+        ("rIdDuplicate", relationship_type, "document.xml"),
+    )
+    document = _document_xml(
+        '<w:p><w:hyperlink r:id="rIdDuplicate"><w:r><w:t>link</w:t></w:r></w:hyperlink></w:p>'
+    )
+    _assert_rejected(_docx(document, document_relationships=relationships))
+
+
 @pytest.mark.parametrize(
     "target",
     [
@@ -510,6 +542,122 @@ def test_t004_rejects_undeclared_text_bearing_word_part():
         extra=(("word/header1.xml", header),),
     )
     _assert_rejected(content)
+
+
+def _declared_header_case(
+    *,
+    root_name: str = "hdr",
+    content_type: str
+    | None = "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml",
+    include_document_relationship: bool = True,
+    header_relationships: bytes | None = None,
+    header_body: str = "{{kg.daily_plan.title}}",
+) -> tuple[bytes, object]:
+    api = _api()
+    header_xml = (
+        header_body if header_body.startswith("<w:") else _paragraph(header_body)
+    )
+    header = (
+        f'<w:{root_name} xmlns:w="{W_NS}" xmlns:r="{R_NS}">'
+        + header_xml
+        + f"</w:{root_name}>"
+    ).encode("utf-8")
+    if content_type is None:
+        overrides = ()
+    else:
+        overrides = (
+            f'<Override PartName="/word/header1.xml" ContentType="{content_type}"/>',
+        )
+    document_relationships = (
+        _relationships(("rIdHeader", f"{R_NS}/header", "header1.xml"))
+        if include_document_relationship
+        else _empty_relationships()
+    )
+    extras: list[tuple[str, bytes]] = [("word/header1.xml", header)]
+    if header_relationships is not None:
+        extras.append(("word/_rels/header1.xml.rels", header_relationships))
+    content = _docx(
+        _document_xml(
+            _paragraph("body"),
+            section='<w:headerReference w:type="default" r:id="rIdHeader"/>',
+        ),
+        content_types=_content_types(extra_overrides=overrides),
+        document_relationships=document_relationships,
+        extra=tuple(extras),
+    )
+    token = api.TemplateTokenDescriptor(
+        token_id="kg.daily_plan.title",
+        value_kind="text",
+        required=True,
+        occurrence="single",
+        allowed_parts=("word/header1.xml",),
+    )
+    contract = api.TemplateContractManifest(
+        contract_id="kg.template.daily_plan.synthetic",
+        contract_version=1,
+        placeholder_contract_version=1,
+        structural_profile_id="synthetic.daily_plan.header.v1",
+        structural_profile_version=1,
+        renderer_id="kg.renderer.daily_plan.synthetic.v1",
+        parser_id="kg.parser.daily_plan.synthetic.v1",
+        allowed_parts=("word/document.xml", "word/header1.xml"),
+        required_anchors=("part:word/document.xml", "part:word/header1.xml"),
+        tokens=(token,),
+    )
+    return content, contract
+
+
+def test_t004_accepts_properly_declared_and_referenced_header():
+    content, contract = _declared_header_case()
+    receipt = _validate(content, contract=contract)
+    assert tuple(item.part_name for item in receipt.token_occurrences) == (
+        "word/header1.xml",
+    )
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        {"include_document_relationship": False},
+        {"root_name": "document"},
+        {"content_type": None},
+        {
+            "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"
+        },
+    ],
+    ids=["detached", "wrong-root", "missing-content-type", "wrong-content-type"],
+)
+def test_t004_rejects_misbound_declared_header_part(case):
+    content, contract = _declared_header_case(**case)
+    _assert_rejected(content, contract=contract)
+
+
+def test_t004_rejects_dangling_relationship_id_inside_declared_header():
+    content, contract = _declared_header_case(
+        header_body=(
+            '<w:p><w:hyperlink r:id="rIdMissing"><w:r><w:t>'
+            "{{kg.daily_plan.title}}"
+            "</w:t></w:r></w:hyperlink></w:p>"
+        ),
+        header_relationships=_empty_relationships(),
+    )
+    _assert_rejected(content, contract=contract)
+
+
+def test_t004_rejects_duplicate_relationship_ids_inside_declared_header():
+    relationship_type = f"{R_NS}/hyperlink"
+    content, contract = _declared_header_case(
+        header_body=(
+            '<w:p><w:hyperlink r:id="rIdDuplicate"><w:r><w:t>'
+            "{{kg.daily_plan.title}}"
+            "</w:t></w:r></w:hyperlink></w:p>"
+        ),
+        header_relationships=_relationships(
+            ("rIdDuplicate", relationship_type, "header1.xml"),
+            ("rIdDuplicate", relationship_type, "header1.xml"),
+        ),
+    )
+    _assert_rejected(content, contract=contract)
 
 
 def test_t004_rejects_token_inside_unsupported_text_box_boundary():
