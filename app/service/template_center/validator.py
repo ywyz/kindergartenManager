@@ -199,7 +199,10 @@ def _read_members(content: bytes) -> tuple[dict[str, bytes], list[dict[str, obje
                     if actual_size > info.file_size or actual_size > MAX_PART_BYTES:
                         _reject()
                     digest.update(chunk)
-                    if name.endswith((".xml", ".rels")) or name == _CONTENT_TYPES:
+                    if (
+                        name.casefold().endswith((".xml", ".rels"))
+                        or name == _CONTENT_TYPES
+                    ):
                         chunks.append(chunk)
             if actual_size != info.file_size:
                 _reject()
@@ -256,10 +259,12 @@ def _relationship_owner(rels_name: str) -> str | None:
     if rels_name == _ROOT_RELS:
         return None
     directory, filename = posixpath.split(rels_name)
-    if posixpath.basename(directory) != "_rels" or not filename.endswith(".rels"):
+    if posixpath.basename(directory) != "_rels" or not filename.casefold().endswith(
+        ".rels"
+    ):
         _reject()
     owner_directory = posixpath.dirname(directory)
-    owner_name = filename.removesuffix(".rels")
+    owner_name = filename[:-5]
     owner = posixpath.join(owner_directory, owner_name)
     if not owner:
         _reject()
@@ -303,7 +308,7 @@ def _validate_relationship_references(
     relationships: dict[str | None, dict[str, tuple[str, str]]],
 ) -> None:
     for part_name, root in roots.items():
-        if part_name.endswith(".rels") or part_name == _CONTENT_TYPES:
+        if part_name.casefold().endswith(".rels") or part_name == _CONTENT_TYPES:
             continue
         available = relationships.get(part_name, {})
         for element in root.iter():
@@ -327,14 +332,14 @@ def _validate_header_footer_parts(
     document = roots[_MAIN_PART]
     part_contracts = (
         (
-            re.compile(r"word/header[1-9][0-9]*\.xml"),
+            re.compile(r"word/header[1-9][0-9]*\.xml", re.IGNORECASE),
             "hdr",
             _HEADER_CONTENT_TYPE,
             _HEADER_REL,
             "headerReference",
         ),
         (
-            re.compile(r"word/footer[1-9][0-9]*\.xml"),
+            re.compile(r"word/footer[1-9][0-9]*\.xml", re.IGNORECASE),
             "ftr",
             _FOOTER_CONTENT_TYPE,
             _FOOTER_REL,
@@ -400,7 +405,7 @@ def _validate_ooxml(
     root_office_targets: list[str] = []
     relationships: dict[str | None, dict[str, tuple[str, str]]] = {}
     for name, root in roots.items():
-        if not name.endswith(".rels"):
+        if not name.casefold().endswith(".rels"):
             continue
         if root.tag != f"{{{_REL_NS}}}Relationships":
             _reject()
@@ -443,8 +448,8 @@ def _validate_ooxml(
     _validate_header_footer_parts(roots, allowed_parts, overrides, relationships)
     for part_name, root in roots.items():
         if (
-            part_name.startswith("word/")
-            and part_name.endswith(".xml")
+            part_name.casefold().startswith("word/")
+            and part_name.casefold().endswith(".xml")
             and part_name not in allowed_parts
             and any(
                 type(element.tag) is str
