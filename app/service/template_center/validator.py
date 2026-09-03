@@ -81,16 +81,6 @@ _ACTIVE_XML_TAGS = {
     f"{{{_WORD_NS}}}txbxContent",
     "{http://www.w3.org/2001/XInclude}include",
 }
-_TEXT_BOUNDARY_TAGS = {
-    f"{{{_WORD_NS}}}br",
-    f"{{{_WORD_NS}}}cr",
-    f"{{{_WORD_NS}}}drawing",
-    f"{{{_WORD_NS}}}noBreakHyphen",
-    f"{{{_WORD_NS}}}object",
-    f"{{{_WORD_NS}}}pict",
-    f"{{{_WORD_NS}}}softHyphen",
-    f"{{{_WORD_NS}}}tab",
-}
 _SAFE_IMAGE_MEDIA_TYPES = {
     "bmp": "image/bmp",
     "gif": "image/gif",
@@ -579,6 +569,42 @@ def _validate_anchors(
     return shapes
 
 
+def _contains_token_syntax(text: str) -> bool:
+    return any(marker in text for marker in ("{{", "}}", "{%", "%}"))
+
+
+def _paragraph_text_segments(paragraph: etree._Element) -> tuple[str, ...]:
+    """Rebuild only direct run text; every other semantic node is a boundary."""
+
+    paragraph_properties = f"{{{_WORD_NS}}}pPr"
+    run_tag = f"{{{_WORD_NS}}}r"
+    run_properties = f"{{{_WORD_NS}}}rPr"
+    text_tag = f"{{{_WORD_NS}}}t"
+    segments = [""]
+    for child in paragraph:
+        if child.tag == paragraph_properties:
+            continue
+        if child.tag != run_tag:
+            unsupported_text = "".join(node.text or "" for node in child.iter(text_tag))
+            if _contains_token_syntax(unsupported_text):
+                _reject()
+            segments.append("")
+            continue
+        for run_child in child:
+            if run_child.tag == run_properties:
+                continue
+            if run_child.tag == text_tag:
+                segments[-1] += run_child.text or ""
+                continue
+            unsupported_text = "".join(
+                node.text or "" for node in run_child.iter(text_tag)
+            )
+            if _contains_token_syntax(unsupported_text):
+                _reject()
+            segments.append("")
+    return tuple(segments)
+
+
 def _token_occurrences(
     contract: TemplateContractManifest, roots: dict[str, etree._Element]
 ) -> tuple[TemplateTokenOccurrence, ...]:
@@ -590,21 +616,10 @@ def _token_occurrences(
         if root is None:
             continue
         for paragraph_index, paragraph in enumerate(root.iter(f"{{{_WORD_NS}}}p")):
-            segments = [""]
-            for element in paragraph.iter():
-                if element.tag == f"{{{_WORD_NS}}}t":
-                    segments[-1] += element.text or ""
-                elif element.tag in _TEXT_BOUNDARY_TAGS:
-                    segments.append("")
-            for text in segments:
+            for text in _paragraph_text_segments(paragraph):
                 matches = list(_TOKEN.finditer(text))
                 remainder = _TOKEN.sub("", text)
-                if (
-                    "{{" in remainder
-                    or "}}" in remainder
-                    or "{%" in remainder
-                    or "%}" in remainder
-                ):
+                if _contains_token_syntax(remainder):
                     _reject()
                 for match in matches:
                     token_id = match.group(1)
