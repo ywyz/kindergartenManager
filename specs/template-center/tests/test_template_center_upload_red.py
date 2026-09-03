@@ -11,7 +11,7 @@ from _support import (
     docx_with_symlink_member,
     docx_with_text,
     docx_with_zipbomb,
-    make_center,
+    make_upload_center,
 )
 
 
@@ -22,7 +22,7 @@ def _api():
 @pytest.mark.asyncio
 async def test_same_content_deduplicates_blob_but_each_authorized_upload_gets_a_new_version():
     api = _api()
-    center, effects = make_center(api)
+    center, effects = make_upload_center(api)
     content = docx_with_text("same bytes")
 
     first = await center.upload(
@@ -62,7 +62,7 @@ async def test_same_content_deduplicates_blob_but_each_authorized_upload_gets_a_
 )
 async def test_upload_rejects_unsafe_or_non_docx_filenames_before_persistence(filename):
     api = _api()
-    center, effects = make_center(api)
+    center, effects = make_upload_center(api)
 
     with pytest.raises(api.TemplateCenterError):
         await center.upload(
@@ -97,7 +97,7 @@ async def test_upload_rejects_malformed_or_active_content_before_version_commit(
     content,
 ):
     api = _api()
-    center, effects = make_center(api)
+    center, effects = make_upload_center(api)
 
     with pytest.raises(api.TemplateCenterError):
         await center.upload(
@@ -119,7 +119,7 @@ async def test_upload_rejects_malformed_or_active_content_before_version_commit(
 @pytest.mark.asyncio
 async def test_unknown_placeholder_is_rejected_without_leaking_placeholder_value():
     api = _api()
-    center, effects = make_center(api)
+    center, effects = make_upload_center(api)
     value = "{{kg.daily_plan.not_declared}}"
 
     with pytest.raises(api.TemplateCenterError) as caught:
@@ -143,7 +143,7 @@ async def test_unknown_placeholder_is_rejected_without_leaking_placeholder_value
 @pytest.mark.asyncio
 async def test_audit_failure_does_not_publish_a_version_or_active_pointer():
     api = _api()
-    center, effects = make_center(api)
+    center, effects = make_upload_center(api)
     effects["audit"].fail = True
 
     with pytest.raises(api.TemplateCenterError):
