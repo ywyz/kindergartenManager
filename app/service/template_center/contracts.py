@@ -466,6 +466,18 @@ class TemplateAuditEvent:
         _positive_int(self.user_id, "template_audit_event_invalid")
         _sha256(self.session_hash, "template_audit_event_invalid")
         _document_type(self.document_type, "template_audit_event_invalid")
+        evidence = (
+            self.template_version_id,
+            self.content_sha256,
+            self.contract_id,
+            self.contract_version,
+            self.registry_revision,
+        )
+        if not (
+            all(item is None for item in evidence)
+            or all(item is not None for item in evidence)
+        ):
+            raise ValueError("template_audit_event_invalid")
         if (
             self.template_version_id is not None
             and type(self.template_version_id) is not UUID
