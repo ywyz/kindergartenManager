@@ -866,3 +866,20 @@ def test_t004_allows_safe_internal_custom_xml_but_never_scans_it_for_tokens():
     content = _docx(extra=(("customXml/item1.xml", custom_xml),))
     receipt = _validate(content)
     assert receipt.token_occurrences == ()
+
+
+def test_t004_rejects_office_web_extension_part():
+    override = (
+        '<Override PartName="/webextensions/webextension1.xml" '
+        'ContentType="application/vnd.ms-office.webextension+xml"/>'
+    )
+    web_extension = (
+        b'<we:webextension xmlns:we="http://schemas.microsoft.com/'
+        b'office/webextensions/webextension/2010/11"/>'
+    )
+    _assert_rejected(
+        _docx(
+            content_types=_content_types(extra_overrides=(override,)),
+            extra=(("webextensions/webextension1.xml", web_extension),),
+        )
+    )
