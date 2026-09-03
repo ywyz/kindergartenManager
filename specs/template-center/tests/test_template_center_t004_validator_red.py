@@ -519,6 +519,26 @@ def test_t004_rejects_default_typed_unallowed_wordprocessingml_part():
     )
 
 
+def test_t004_rejects_text_xml_typed_unallowed_wordprocessingml_part():
+    content_types = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Default Extension="part" ContentType="text/xml"/>'
+        '<Override PartName="/word/document.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+        "</Types>"
+    ).encode("utf-8")
+    unapproved = f'<w:settings xmlns:w="{W_NS}"/>'.encode("utf-8")
+    _assert_rejected(
+        _docx(
+            content_types=content_types,
+            extra=(("word/unapproved.part", unapproved),),
+        )
+    )
+
+
 @pytest.mark.parametrize(
     "target",
     [
