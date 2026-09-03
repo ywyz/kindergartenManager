@@ -99,6 +99,22 @@ _SAFE_IMAGE_MEDIA_TYPES = {
     "tif": "image/tiff",
     "tiff": "image/tiff",
 }
+_RELATIONSHIPS_CONTENT_TYPE = (
+    "application/vnd.openxmlformats-package.relationships+xml"
+)
+_CUSTOM_XML_PROPERTIES_CONTENT_TYPE = (
+    "application/vnd.openxmlformats-officedocument.customxmlproperties+xml"
+)
+_DOC_PROPERTIES_CONTENT_TYPES = {
+    "docProps/app.xml": (
+        "application/vnd.openxmlformats-officedocument.extended-properties+xml"
+    ),
+    "docProps/core.xml": "application/vnd.openxmlformats-package.core-properties+xml",
+    "docProps/custom.xml": (
+        "application/vnd.openxmlformats-officedocument.custom-properties+xml"
+    ),
+}
+_CUSTOM_XML_PART = re.compile(r"customXml/(?:item|itemProps)[1-9][0-9]*\.xml")
 
 
 class _Rejected(Exception):
@@ -367,6 +383,44 @@ def _validate_non_xml_parts(part_content_types: dict[str, str]) -> None:
             _reject()
 
 
+def _validate_closed_package_parts(
+    part_content_types: dict[str, str], allowed_parts: tuple[str, ...]
+) -> None:
+    allowed_contract_parts = set(allowed_parts)
+    for part_name, content_type in part_content_types.items():
+        base_media_type = _base_media_type(content_type)
+        if part_name in allowed_contract_parts:
+            continue
+        if part_name.casefold().endswith(".rels"):
+            if base_media_type != _RELATIONSHIPS_CONTENT_TYPE:
+                _reject()
+            continue
+        if part_name.casefold().startswith("word/media/"):
+            continue
+        if _CUSTOM_XML_PART.fullmatch(part_name) is not None:
+            if not (
+                _is_xml_media_type(content_type)
+                and base_media_type
+                in {
+                    "application/xml",
+                    "text/xml",
+                    _CUSTOM_XML_PROPERTIES_CONTENT_TYPE,
+                }
+            ):
+                _reject()
+            continue
+        expected_doc_properties_type = _DOC_PROPERTIES_CONTENT_TYPES.get(part_name)
+        if expected_doc_properties_type is not None:
+            if base_media_type != expected_doc_properties_type:
+                _reject()
+            continue
+        if part_name == "docProps/thumbnail.jpeg":
+            if base_media_type != "image/jpeg":
+                _reject()
+            continue
+        _reject()
+
+
 def _validate_relationship_references(
     roots: dict[str, etree._Element],
     relationships: dict[str | None, dict[str, tuple[str, str]]],
@@ -458,6 +512,7 @@ def _validate_ooxml(
         content_types, member_names
     )
     _validate_non_xml_parts(part_content_types)
+    _validate_closed_package_parts(part_content_types, allowed_parts)
     if overrides.get(_MAIN_PART) != _MAIN_CONTENT_TYPE:
         _reject()
     if any(
