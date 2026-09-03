@@ -189,6 +189,69 @@ class TemplateContractManifest:
 
 
 @dataclass(frozen=True, slots=True)
+class TemplateTokenOccurrence:
+    """Sanitized token metadata emitted by the pure upload validator."""
+
+    token_id: str
+    value_kind: str
+    part_name: str
+    location: str
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.token_id) is not str
+            or re.fullmatch(r"kg\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_.]*", self.token_id)
+            is None
+            or type(self.value_kind) is not str
+            or self.value_kind not in {"text", "rich_text", "image"}
+            or type(self.part_name) is not str
+            or not self.part_name
+            or type(self.location) is not str
+            or re.fullmatch(r"paragraph:[0-9]+", self.location) is None
+        ):
+            raise ValueError("template_token_occurrence_invalid")
+
+
+@dataclass(frozen=True, slots=True)
+class TemplateValidationReceipt:
+    """Content-bound, pathless result of side-effect-free T004 validation."""
+
+    content_sha256: str
+    size_bytes: int
+    mime_type: str
+    extension: str
+    contract_id: str
+    contract_version: int
+    structural_profile_id: str
+    structural_profile_version: int
+    structure_summary_sha256: str
+    token_occurrences: tuple[TemplateTokenOccurrence, ...]
+    validator_version: str
+
+    def __post_init__(self) -> None:
+        _sha256(self.content_sha256, "template_validation_receipt_invalid")
+        _positive_int(self.size_bytes, "template_validation_receipt_invalid")
+        if self.size_bytes > MAX_TEMPLATE_BYTES:
+            raise ValueError("template_validation_receipt_invalid")
+        if self.mime_type != DOCX_MIME_TYPE or self.extension != ".docx":
+            raise ValueError("template_validation_receipt_invalid")
+        _nonempty_text(self.contract_id, "template_validation_receipt_invalid")
+        _positive_int(self.contract_version, "template_validation_receipt_invalid")
+        _nonempty_text(
+            self.structural_profile_id, "template_validation_receipt_invalid"
+        )
+        _positive_int(
+            self.structural_profile_version, "template_validation_receipt_invalid"
+        )
+        _sha256(self.structure_summary_sha256, "template_validation_receipt_invalid")
+        if type(self.token_occurrences) is not tuple or not all(
+            type(item) is TemplateTokenOccurrence for item in self.token_occurrences
+        ):
+            raise ValueError("template_validation_receipt_invalid")
+        _nonempty_text(self.validator_version, "template_validation_receipt_invalid")
+
+
+@dataclass(frozen=True, slots=True)
 class DocumentTypeDescriptor:
     key: DocumentType
     display_name: str
