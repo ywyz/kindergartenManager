@@ -104,7 +104,11 @@ class WeekPeriod:
             _require_positive_int(self.semester_id, "semester_id")
         if self.week_start.weekday() != 0:
             raise ValueError("week_start must be Monday")
-        if self.week_end != self.week_start + timedelta(days=6):
+        try:
+            expected_end = self.week_start + timedelta(days=6)
+        except OverflowError:
+            raise ValueError("week_start must permit a complete natural week") from None
+        if self.week_end != expected_end:
             raise ValueError("week_end must be six days after week_start")
 
 
