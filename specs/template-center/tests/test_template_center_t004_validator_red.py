@@ -143,6 +143,7 @@ def _relationships(*relationships: tuple[str, str, str]) -> bytes:
 def _docx(
     document: bytes | None = None,
     *,
+    document_info: str | ZipInfo = "word/document.xml",
     extra: tuple[tuple[str | ZipInfo, bytes], ...] = (),
     content_types: bytes | None = None,
     root_relationships: bytes | None = None,
@@ -152,7 +153,7 @@ def _docx(
     members: tuple[tuple[str | ZipInfo, bytes], ...] = (
         ("[Content_Types].xml", content_types or _content_types()),
         ("_rels/.rels", root_relationships or _root_relationships()),
-        ("word/document.xml", document or _document_xml(_paragraph("safe"))),
+        (document_info, document or _document_xml(_paragraph("safe"))),
         (
             "word/_rels/document.xml.rels",
             document_relationships or _empty_relationships(),
@@ -346,6 +347,13 @@ def test_t004_rejects_duplicate_directory_symlink_and_too_many_members():
 
     extras = tuple((f"customXml/item{index}.xml", b"<root/>") for index in range(253))
     _assert_rejected(_docx(extra=extras))
+
+
+def test_t004_rejects_msdos_directory_bit_disguised_as_document_file():
+    disguised_directory = ZipInfo("word/document.xml")
+    disguised_directory.create_system = 0
+    disguised_directory.external_attr = 0x10
+    _assert_rejected(_docx(document_info=disguised_directory))
 
 
 def test_t004_rejects_part_over_compression_ratio_limit():
