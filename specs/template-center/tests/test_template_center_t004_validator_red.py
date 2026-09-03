@@ -539,6 +539,25 @@ def test_t004_rejects_text_xml_typed_unallowed_wordprocessingml_part():
     )
 
 
+def test_t004_rejects_unknown_active_html_part():
+    content_types = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Default Extension="html" ContentType="text/html"/>'
+        '<Override PartName="/word/document.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+        "</Types>"
+    ).encode("utf-8")
+    _assert_rejected(
+        _docx(
+            content_types=content_types,
+            extra=(("word/payload.html", b"<script>alert(1)</script>"),),
+        )
+    )
+
+
 @pytest.mark.parametrize(
     "target",
     [
@@ -575,6 +594,18 @@ def test_t004_accepts_declared_tokens_split_across_runs_in_one_paragraph():
     receipt = _validate(content, contract=contract)
     assert tuple(item.token_id for item in receipt.token_occurrences) == (
         "kg.daily_plan.title",
+    )
+
+
+def test_t004_rejects_token_split_across_non_text_run_boundary():
+    paragraph = (
+        "<w:p><w:r><w:t>{{kg.daily_</w:t></w:r>"
+        "<w:r><w:tab/></w:r>"
+        "<w:r><w:t>plan.title}}</w:t></w:r></w:p>"
+    )
+    _assert_rejected(
+        _docx(_document_xml(paragraph)),
+        contract=_contract(tokens=(_token(),)),
     )
 
 
