@@ -173,6 +173,14 @@ class MutatingAggregateRepository(MemoryAggregateRepository):
         return await super().read_daily_sources(request, source_ids)
 
 
+class CloneTrojan:
+    def __init__(self, replacement):
+        self.replacement = replacement
+
+    def __deepcopy__(self, memo):
+        return self.replacement
+
+
 def _daily_ref(api, source_id, *, plan_date, **changes):
     values = {
         "source_id": source_id,
@@ -480,6 +488,61 @@ async def test_wmp4_repository_cannot_mutate_aggregate_between_awaits():
     assert aggregate.status is api.ReviewStatus.ARCHIVED
     assert snapshot.aggregate.status is api.ReviewStatus.SUBMITTED
     assert snapshot.aggregate is not aggregate
+
+
+@pytest.mark.asyncio
+async def test_wmp4_rejects_aggregate_that_only_becomes_valid_during_deepcopy():
+    api = _api()
+    repository = MemoryAggregateRepository(
+        aggregate=CloneTrojan(_weekly(api)),
+        daily_sources=_weekly_sources(api),
+    )
+    service, _ = _service(api, repository)
+
+    with pytest.raises(api.PlanReadDenied):
+        await service.read(_request(api))
+
+
+@pytest.mark.asyncio
+async def test_wmp4_rejects_daily_source_that_only_becomes_valid_during_deepcopy():
+    api = _api()
+    repository = MemoryAggregateRepository(
+        aggregate=_weekly(api),
+        daily_sources=tuple(CloneTrojan(source) for source in _weekly_sources(api)),
+    )
+    service, _ = _service(api, repository)
+
+    with pytest.raises(api.PlanReadDenied):
+        await service.read(_request(api))
+
+
+@pytest.mark.asyncio
+async def test_wmp4_rejects_weekly_source_that_only_becomes_valid_during_deepcopy():
+    api = _api()
+    repository = MemoryAggregateRepository(
+        aggregate=_monthly(api),
+        daily_sources=(_daily_ref(api, 201, plan_date=date(2026, 10, 8)),),
+        weekly_sources=(CloneTrojan(_weekly_ref(api)),),
+    )
+    service, _ = _service(api, repository)
+
+    with pytest.raises(api.PlanReadDenied):
+        await service.read(_request(api, monthly=True))
+
+
+@pytest.mark.asyncio
+async def test_wmp4_rejects_exact_aggregate_with_corrupted_nested_invariants():
+    api = _api()
+    aggregate = _weekly(api)
+    object.__setattr__(aggregate, "days", [])
+    repository = MemoryAggregateRepository(
+        aggregate=aggregate,
+        daily_sources=_weekly_sources(api),
+    )
+    service, _ = _service(api, repository)
+
+    with pytest.raises(api.PlanReadDenied):
+        await service.read(_request(api))
 
 
 @pytest.mark.asyncio
