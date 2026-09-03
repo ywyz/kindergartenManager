@@ -463,6 +463,7 @@ def _validate_header_footer_parts(
         relationship_type,
         reference_name,
     ) in part_contracts:
+        part_prefix = "word/header" if root_name == "hdr" else "word/footer"
         candidate_parts = {
             part_name
             for part_name, root in roots.items()
@@ -477,6 +478,11 @@ def _validate_header_footer_parts(
             target
             for found_type, target in document_relationships.values()
             if found_type == relationship_type
+        )
+        candidate_parts.update(
+            part_name
+            for part_name in allowed_parts
+            if part_name.startswith(part_prefix) and part_name in part_content_types
         )
         for part_name in candidate_parts:
             root = roots.get(part_name)

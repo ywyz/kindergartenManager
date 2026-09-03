@@ -914,9 +914,7 @@ def test_t004_contract_cannot_allow_office_web_extension_part():
 
 
 def test_t004_contract_part_name_cannot_disguise_non_header_xml():
-    override = (
-        '<Override PartName="/word/header1.xml" ContentType="application/xml"/>'
-    )
+    override = '<Override PartName="/word/header1.xml" ContentType="application/xml"/>'
     disguised_settings = f'<w:settings xmlns:w="{W_NS}"/>'.encode()
     contract = _contract(
         allowed_parts=("word/document.xml", "word/header1.xml"),
