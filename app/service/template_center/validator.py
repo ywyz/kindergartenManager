@@ -266,13 +266,25 @@ def _relationship_owner(rels_name: str) -> str | None:
     return owner
 
 
-def _content_type_overrides(
+def _content_type_declarations(
     content_types: etree._Element, member_names: set[str]
-) -> dict[str, str]:
+) -> tuple[dict[str, str], dict[str, str]]:
+    defaults: dict[str, str] = {}
     overrides: dict[str, str] = {}
     for element in content_types:
-        if element.tag != f"{{{_CONTENT_TYPE_NS}}}Override":
+        if element.tag == f"{{{_CONTENT_TYPE_NS}}}Default":
+            extension = (element.get("Extension") or "").casefold()
+            content_type = element.get("ContentType") or ""
+            if (
+                re.fullmatch(r"[a-z0-9][a-z0-9_-]*", extension) is None
+                or extension in defaults
+                or not content_type
+            ):
+                _reject()
+            defaults[extension] = content_type
             continue
+        if element.tag != f"{{{_CONTENT_TYPE_NS}}}Override":
+            _reject()
         part_name = element.get("PartName") or ""
         content_type = element.get("ContentType") or ""
         normalized_part_name = part_name.removeprefix("/")
@@ -295,7 +307,15 @@ def _content_type_overrides(
         ):
             _reject()
         overrides[normalized_part_name] = content_type
-    return overrides
+    effective: dict[str, str] = {}
+    for member_name in member_names - {_CONTENT_TYPES}:
+        basename = posixpath.basename(member_name)
+        extension = basename.rsplit(".", 1)[1].casefold() if "." in basename else ""
+        content_type = overrides.get(member_name) or defaults.get(extension)
+        if content_type is None:
+            _reject()
+        effective[member_name] = content_type
+    return overrides, effective
 
 
 def _validate_relationship_references(
@@ -320,7 +340,7 @@ def _validate_relationship_references(
 def _validate_header_footer_parts(
     roots: dict[str, etree._Element],
     allowed_parts: tuple[str, ...],
-    overrides: dict[str, str],
+    part_content_types: dict[str, str],
     relationships: dict[str | None, dict[str, tuple[str, str]]],
 ) -> None:
     document_relationships = relationships.get(_MAIN_PART, {})
@@ -342,7 +362,7 @@ def _validate_header_footer_parts(
         }
         candidate_parts.update(
             part_name
-            for part_name, declared_content_type in overrides.items()
+            for part_name, declared_content_type in part_content_types.items()
             if declared_content_type == content_type
         )
         candidate_parts.update(
@@ -356,7 +376,7 @@ def _validate_header_footer_parts(
                 part_name not in allowed_parts
                 or root is None
                 or root.tag != f"{{{_WORD_NS}}}{root_name}"
-                or overrides.get(part_name) != content_type
+                or part_content_types.get(part_name) != content_type
             ):
                 _reject()
             matching_relationship_ids = {
@@ -385,7 +405,9 @@ def _validate_ooxml(
     content_types = _parse_xml(parts[_CONTENT_TYPES])
     if content_types.tag != f"{{{_CONTENT_TYPE_NS}}}Types":
         _reject()
-    overrides = _content_type_overrides(content_types, member_names)
+    overrides, part_content_types = _content_type_declarations(
+        content_types, member_names
+    )
     if overrides.get(_MAIN_PART) != _MAIN_CONTENT_TYPE:
         _reject()
     if any(
@@ -403,7 +425,7 @@ def _validate_ooxml(
     for name, value in parts.items():
         if name == _CONTENT_TYPES:
             continue
-        declared_content_type = overrides.get(name, "").casefold()
+        declared_content_type = part_content_types.get(name, "").casefold()
         if (
             name.casefold().endswith((".xml", ".rels"))
             or declared_content_type in xml_content_types
@@ -454,7 +476,9 @@ def _validate_ooxml(
     if len(bodies) != 1:
         _reject()
     _validate_relationship_references(roots, relationships)
-    _validate_header_footer_parts(roots, allowed_parts, overrides, relationships)
+    _validate_header_footer_parts(
+        roots, allowed_parts, part_content_types, relationships
+    )
     for part_name, root in roots.items():
         if (
             part_name.casefold().startswith("word/")
