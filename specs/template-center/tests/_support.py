@@ -99,6 +99,7 @@ class MemoryUnitOfWork:
     async def allocate_version(self) -> object:
         from app.service import template_center as api
 
+        self.owner.events.append("allocate_version")
         key = (
             self.tenant_id,
             getattr(self.document_type, "value", self.document_type),
@@ -117,6 +118,9 @@ class MemoryUnitOfWork:
     async def stage_version(self, allocation: object, version: object) -> None:
         from app.service import template_center as api
 
+        self.owner.events.append("stage_version")
+        if self.owner.fail_stage_version:
+            raise RuntimeError("synthetic version staging failure")
         if (
             type(allocation) is not api.VersionAllocation
             or self.allocations.get(allocation.template_version_id) is not allocation
@@ -133,18 +137,25 @@ class MemoryUnitOfWork:
         self.staged_versions.append(version)
 
     async def stage_transition(self, event: object) -> None:
+        self.owner.events.append("stage_transition")
         self.stage_calls.append("transition")
         self.staged_transitions.append(event)
 
     async def stage_audit(self, event: object) -> None:
+        self.owner.events.append("stage_audit")
+        if self.owner.fail_stage_audit:
+            raise RuntimeError("synthetic audit staging failure")
         self.stage_calls.append("audit")
         self.staged_audits.append(event)
 
     async def commit(self) -> object:
+        from app.service import template_center as api
+
+        self.owner.events.append("commit")
         if self.committed:
             raise RuntimeError("synthetic unit of work committed twice")
         self.owner.commit_attempts += 1
-        if self.audit_sink.fail:
+        if self.audit_sink.fail or self.owner.fail_commit:
             raise RuntimeError("synthetic audit failure")
         # No operation below can fail in this deterministic fake.  The real
         # implementation must provide the same all-or-nothing visibility.
@@ -156,14 +167,18 @@ class MemoryUnitOfWork:
         self.audit_sink.events.extend(self.staged_audits)
         self.committed = True
         self.owner.commit_calls += 1
-        return SimpleNamespace(committed=True)
+        return api.CommitReceipt(committed=True)
 
 
 class MemoryTransactionPort:
     """Begin-only write port; uncommitted stages never enter read-side lists."""
 
     def __init__(
-        self, version_store: MemoryVersionStore, audit_sink: MemoryAuditSink
+        self,
+        version_store: MemoryVersionStore,
+        audit_sink: MemoryAuditSink,
+        *,
+        events: list[str] | None = None,
     ) -> None:
         self.version_store = version_store
         self.audit_sink = audit_sink
@@ -172,10 +187,15 @@ class MemoryTransactionPort:
         self.commit_calls = 0
         self.version_sequences: dict[tuple[int, str], int] = {}
         self.units: list[MemoryUnitOfWork] = []
+        self.events = events if events is not None else []
+        self.fail_stage_version = False
+        self.fail_stage_audit = False
+        self.fail_commit = False
 
     async def begin(self, tenant_id: int, document_type: str) -> MemoryUnitOfWork:
         from app.service import template_center as api
 
+        self.events.append("begin")
         if type(tenant_id) is not int or tenant_id <= 0:
             raise api.TemplateCenterError(api.TemplateErrorCode.INPUT_INVALID)
         try:
@@ -228,14 +248,23 @@ def actor(
 
 
 class MemoryBlobStore:
-    def __init__(self) -> None:
+    def __init__(self, *, events: list[str] | None = None) -> None:
         self.blobs: dict[str, bytes] = {}
         self.calls: list[tuple[str, str]] = []
+        self.events = events if events is not None else []
+        self.fail_put = False
 
-    async def put_if_absent(self, content_sha256: str, content: bytes) -> str:
+    async def put_if_absent(self, content_sha256: str, content: bytes) -> object:
+        from app.service import template_center as api
+
+        self.events.append("put_blob")
         self.calls.append(("put", content_sha256))
+        if self.fail_put:
+            raise RuntimeError("synthetic blob failure")
         self.blobs.setdefault(content_sha256, bytes(content))
-        return f"sha256/{content_sha256}"
+        return api.BlobRef(
+            value=f"sha256/{content_sha256}", content_sha256=content_sha256
+        )
 
     async def read(self, blob_ref: str, expected_sha256: str) -> bytes:
         self.calls.append(("read", expected_sha256))
@@ -248,7 +277,13 @@ class MemoryBlobStore:
 
 
 class AllowPolicy:
-    def __init__(self, *, allowed: set[str] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        allowed: set[str] | None = None,
+        events: list[str] | None = None,
+        force_invalid_decision: bool = False,
+    ) -> None:
         self.allowed = allowed or {
             "list",
             "read",
@@ -263,6 +298,8 @@ class AllowPolicy:
             "parse",
         }
         self.calls: list[tuple[str, int, int, str]] = []
+        self.events = events if events is not None else []
+        self.force_invalid_decision = force_invalid_decision
 
     async def project(
         self, session: object, document_type: str | None = None
@@ -281,7 +318,10 @@ class AllowPolicy:
         action: str,
         document_type: str,
         tenant_id: int,
-    ) -> bool:
+    ) -> object:
+        from app.service import template_center as api
+
+        self.events.append("authorize")
         self.calls.append(
             (
                 action,
@@ -290,7 +330,16 @@ class AllowPolicy:
                 document_type,
             )
         )
-        return action in self.allowed and tenant_id == getattr(session, "tenant_id")
+        if self.force_invalid_decision:
+            return SimpleNamespace(allowed=True)
+        allowed = getattr(
+            action, "value", action
+        ) in self.allowed and tenant_id == getattr(session, "tenant_id")
+        return api.PermissionDecision(
+            allowed=allowed,
+            policy_version="issue-55.v1",
+            reason_code="allowed" if allowed else "default_deny",
+        )
 
 
 class MemoryExportPort:
@@ -483,6 +532,34 @@ def make_center(
         "permissions": permissions,
         "exports": exports,
         "backups": backups,
+    }
+
+
+def make_upload_center(
+    api: object, *, policy: AllowPolicy | None = None
+) -> tuple[object, dict[str, object]]:
+    """Construct only the T005 upload slice; no exporter or backup wiring."""
+
+    events: list[str] = []
+    blobs = MemoryBlobStore(events=events)
+    versions = MemoryVersionStore()
+    audit = MemoryAuditSink()
+    transactions = MemoryTransactionPort(versions, audit, events=events)
+    permissions = policy or AllowPolicy(events=events)
+    center = api.TemplateCenter(
+        blob_store=blobs,
+        transaction_port=transactions,
+        permission_policy=permissions,
+        contract_registry=api.build_initial_contract_registry(),
+        clock=FixedClock(),
+    )
+    return center, {
+        "blobs": blobs,
+        "versions": versions,
+        "audit": audit,
+        "transactions": transactions,
+        "permissions": permissions,
+        "events": events,
     }
 
 
