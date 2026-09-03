@@ -438,7 +438,9 @@ async def test_blob_with_an_external_hard_link_is_rejected_as_mutable_alias(
     assert caught.value.code is api.TemplateErrorCode.STORAGE_FAILED
 
 
-def test_blob_root_owned_by_another_effective_user_is_rejected(tmp_path: Path, monkeypatch):
+def test_blob_root_owned_by_another_effective_user_is_rejected(
+    tmp_path: Path, monkeypatch
+):
     api = _api()
     blob_store_module = import_module("app.service.template_center.blob_store")
     root = tmp_path / "foreign-owner-root"
