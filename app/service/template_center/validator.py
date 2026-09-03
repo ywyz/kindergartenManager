@@ -54,6 +54,9 @@ _FOOTER_CONTENT_TYPE = (
 )
 _TOKEN = re.compile(r"\{\{(.*?)\}\}")
 _TOKEN_ID = re.compile(r"kg\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_.]*")
+_CONTRACT_WORD_PART = re.compile(
+    r"word/(?:document|header[1-9][0-9]*|footer[1-9][0-9]*)\.xml"
+)
 _TABLE_ANCHOR = re.compile(
     r"table:(?P<part>[^:]+):(?P<rows>[1-9][0-9]*)x(?P<columns>[1-9][0-9]*)"
 )
@@ -158,6 +161,10 @@ def _validate_public_inputs(
         )
         or not filename.casefold().endswith(".docx")
         or content_type != DOCX_MIME_TYPE
+        or any(
+            _CONTRACT_WORD_PART.fullmatch(part) is None
+            for part in contract.allowed_parts
+        )
     ):
         raise TemplateCenterError(TemplateErrorCode.INPUT_INVALID)
 
