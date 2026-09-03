@@ -58,6 +58,7 @@ _TABLE_ANCHOR = re.compile(
     r"table:(?P<part>[^:]+):(?P<rows>[1-9][0-9]*)x(?P<columns>[1-9][0-9]*)"
 )
 _DRIVE_PATH = re.compile(r"^[A-Za-z]:")
+_MEDIA_TYPE = re.compile(r"[A-Za-z0-9!#$%&'*+.^_`|~-]+/[A-Za-z0-9!#$%&'*+.^_`|~-]+")
 _ACTIVE_PARTS = (
     "vbaproject",
     "activex/",
@@ -281,6 +282,7 @@ def _content_type_declarations(
                 or not content_type
             ):
                 _reject()
+            _base_media_type(content_type)
             defaults[extension] = content_type
             continue
         if element.tag != f"{{{_CONTENT_TYPE_NS}}}Override":
@@ -306,6 +308,7 @@ def _content_type_declarations(
             or not content_type
         ):
             _reject()
+        _base_media_type(content_type)
         overrides[normalized_part_name] = content_type
     effective: dict[str, str] = {}
     for member_name in member_names - {_CONTENT_TYPES}:
@@ -316,6 +319,18 @@ def _content_type_declarations(
             _reject()
         effective[member_name] = content_type
     return overrides, effective
+
+
+def _base_media_type(content_type: str) -> str:
+    base = content_type.partition(";")[0].strip()
+    if _MEDIA_TYPE.fullmatch(base) is None:
+        _reject()
+    return base.casefold()
+
+
+def _is_xml_media_type(content_type: str) -> bool:
+    base = _base_media_type(content_type)
+    return base in {"application/xml", "text/xml"} or base.endswith("+xml")
 
 
 def _validate_relationship_references(
@@ -417,19 +432,13 @@ def _validate_ooxml(
     ):
         _reject()
 
-    xml_content_types = {
-        "application/xml",
-        "application/vnd.openxmlformats-package.relationships+xml",
-    }
     roots: dict[str, etree._Element] = {_CONTENT_TYPES: content_types}
     for name, value in parts.items():
         if name == _CONTENT_TYPES:
             continue
-        declared_content_type = part_content_types.get(name, "").casefold()
-        if (
-            name.casefold().endswith((".xml", ".rels"))
-            or declared_content_type in xml_content_types
-            or declared_content_type.endswith("+xml")
+        declared_content_type = part_content_types.get(name, "")
+        if name.casefold().endswith((".xml", ".rels")) or _is_xml_media_type(
+            declared_content_type
         ):
             roots[name] = _parse_xml(value)
 
