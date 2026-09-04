@@ -42,51 +42,56 @@ ALLOW_SCRATCH_FALLBACK = False
 ALLOW_DIRECT_TEMPLATE_PATH = False
 
 
-_WEEKLY_PLACEHOLDERS = {
-    "weekly_activity_plan.title": "document_title",
-    "weekly_activity_plan.theme_name": "theme_name",
-    "weekly_activity_plan.grade": "scope.grade",
-    "weekly_activity_plan.class_name": "scope.class_name",
-    "weekly_activity_plan.week_number": "period.week_number",
-    "weekly_activity_plan.week_start": "period.week_start",
-    "weekly_activity_plan.week_end": "period.week_end",
-    "weekly_activity_plan.teacher_names": "scope.teacher_names",
-    "weekly_activity_plan.caregiver_name": "scope.caregiver_name",
-    "weekly_activity_plan.days": "days",
-    "weekly_activity_plan.days.date": "days[].day_date",
-    "weekly_activity_plan.days.weekday": "days[].weekday",
-    "weekly_activity_plan.days.weekday_cn": "days[].weekday_cn",
-    "weekly_activity_plan.days.morning_talk": "days[].morning_talk",
-    "weekly_activity_plan.days.collective_activity": ("days[].collective_activity"),
-    "weekly_activity_plan.days.area_game": "days[].area_game",
-    "weekly_activity_plan.days.outdoor_game": "days[].outdoor_game",
-    "weekly_activity_plan.weekly_focus": "weekly_focus",
-    "weekly_activity_plan.environment_creation": "environment_creation",
-    "weekly_activity_plan.life_habits": "life_habits",
-    "weekly_activity_plan.home_school_cooperation": "home_school_cooperation",
-}
+WEEKLY_PLACEHOLDER_MAPPING: Mapping[str, str] = MappingProxyType(
+    {
+        "weekly_activity_plan.title": "document_title",
+        "weekly_activity_plan.theme_name": "theme_name",
+        "weekly_activity_plan.grade": "scope.grade",
+        "weekly_activity_plan.class_name": "scope.class_name",
+        "weekly_activity_plan.week_number": "period.week_number",
+        "weekly_activity_plan.week_start": "period.week_start",
+        "weekly_activity_plan.week_end": "period.week_end",
+        "weekly_activity_plan.teacher_names": "scope.teacher_names",
+        "weekly_activity_plan.caregiver_name": "scope.caregiver_name",
+        "weekly_activity_plan.days": "days",
+        "weekly_activity_plan.days.date": "days[].day_date",
+        "weekly_activity_plan.days.weekday": "days[].weekday",
+        "weekly_activity_plan.days.weekday_cn": "days[].weekday_cn",
+        "weekly_activity_plan.days.morning_talk": "days[].morning_talk",
+        "weekly_activity_plan.days.collective_activity": ("days[].collective_activity"),
+        "weekly_activity_plan.days.area_game": "days[].area_game",
+        "weekly_activity_plan.days.outdoor_game": "days[].outdoor_game",
+        "weekly_activity_plan.weekly_focus": "weekly_focus",
+        "weekly_activity_plan.environment_creation": "environment_creation",
+        "weekly_activity_plan.life_habits": "life_habits",
+        "weekly_activity_plan.home_school_cooperation": "home_school_cooperation",
+    }
+)
 
-_MONTHLY_PLACEHOLDERS = {
-    "monthly_theme_activity_plan.title": "document_title",
-    "monthly_theme_activity_plan.year_month": "period.year/month",
-    "monthly_theme_activity_plan.grade": "scope.grade",
-    "monthly_theme_activity_plan.class_name": "scope.class_name",
-    "monthly_theme_activity_plan.teacher_names": "scope.teacher_names",
-    "monthly_theme_activity_plan.caregiver_name": "scope.caregiver_name",
-    "monthly_theme_activity_plan.theme_name": "theme_name",
-    "monthly_theme_activity_plan.previous_month_analysis": ("previous_month_analysis"),
-    "monthly_theme_activity_plan.monthly_focus": "monthly_focus",
-    "monthly_theme_activity_plan.theme_goals": "theme_goals",
-    "monthly_theme_activity_plan.life_habits": "life_habits",
-    "monthly_theme_activity_plan.play_activities": "play_activities",
-    "monthly_theme_activity_plan.environment_creation": "environment_creation",
-    "monthly_theme_activity_plan.home_school_cooperation": ("home_school_cooperation"),
-    "monthly_theme_activity_plan.other": "other",
-    "monthly_theme_activity_plan.activity_contents": "activity_contents",
-}
-
-WEEKLY_PLACEHOLDER_MAPPING: Mapping[str, str] = MappingProxyType(_WEEKLY_PLACEHOLDERS)
-MONTHLY_PLACEHOLDER_MAPPING: Mapping[str, str] = MappingProxyType(_MONTHLY_PLACEHOLDERS)
+MONTHLY_PLACEHOLDER_MAPPING: Mapping[str, str] = MappingProxyType(
+    {
+        "monthly_theme_activity_plan.title": "document_title",
+        "monthly_theme_activity_plan.year_month": "period.year/month",
+        "monthly_theme_activity_plan.grade": "scope.grade",
+        "monthly_theme_activity_plan.class_name": "scope.class_name",
+        "monthly_theme_activity_plan.teacher_names": "scope.teacher_names",
+        "monthly_theme_activity_plan.caregiver_name": "scope.caregiver_name",
+        "monthly_theme_activity_plan.theme_name": "theme_name",
+        "monthly_theme_activity_plan.previous_month_analysis": (
+            "previous_month_analysis"
+        ),
+        "monthly_theme_activity_plan.monthly_focus": "monthly_focus",
+        "monthly_theme_activity_plan.theme_goals": "theme_goals",
+        "monthly_theme_activity_plan.life_habits": "life_habits",
+        "monthly_theme_activity_plan.play_activities": "play_activities",
+        "monthly_theme_activity_plan.environment_creation": "environment_creation",
+        "monthly_theme_activity_plan.home_school_cooperation": (
+            "home_school_cooperation"
+        ),
+        "monthly_theme_activity_plan.other": "other",
+        "monthly_theme_activity_plan.activity_contents": "activity_contents",
+    }
+)
 WEEKLY_REPEATABLE_REGION_MAPPING: Mapping[str, tuple[str, ...]] = MappingProxyType(
     {
         "weekly_activity_plan.days": (
@@ -134,6 +139,8 @@ def _safe_filename(value: object) -> bool:
         and len(value.encode("utf-8")) <= 240
         and not any(character in value for character in "/\\")
         and not any(ord(character) < 32 or ord(character) == 127 for character in value)
+        and _FORBIDDEN_FILENAME.search(value) is None
+        and value[:-5].casefold().split(".", 1)[0] not in _WINDOWS_RESERVED
         and value == value.rstrip(". ")
     )
 
@@ -282,7 +289,9 @@ class TemplateExportPort(Protocol):
     ) -> RenderedTemplate: ...
 
     async def parse(
-        self, binding: TemplateExportBinding, rendered_bytes: object
+        self,
+        binding: TemplateExportBinding,
+        rendered_bytes: RenderedTemplate | bytes,
     ) -> ExportParseReport: ...
 
 
