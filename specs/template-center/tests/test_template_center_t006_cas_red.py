@@ -266,3 +266,77 @@ async def test_accepted_transition_audit_is_complete_and_redacted() -> None:
     assert event.schema_version == 1
     assert not hasattr(event, "blob_ref")
     assert not hasattr(event, "content")
+
+
+@pytest.mark.asyncio
+async def test_invalid_target_blob_is_rejected_with_one_traceable_audit() -> None:
+    api = _api()
+    center, effects = make_lifecycle_center(api)
+    version = await _upload(center)
+    effects["blobs"].blobs.pop(version.content_sha256)
+    before_audits = len(effects["audit"].events)
+
+    with pytest.raises(api.TemplateCenterError) as caught:
+        await center.activate(
+            actor(),
+            document_type="daily_plan",
+            version_id=version.template_version_id,
+            expected_registry_revision=0,
+            expected_active_version_id=None,
+        )
+
+    assert caught.value.code is api.TemplateErrorCode.VALIDATION_FAILED
+    snapshot = await effects["versions"].snapshot(7, "daily_plan")
+    assert (snapshot.registry_revision, snapshot.active_version_id) == (0, None)
+    assert effects["versions"].transitions == []
+    assert len(effects["audit"].events) == before_audits + 1
+    event = effects["audit"].events[-1]
+    assert (event.action, event.outcome) == ("activate", "rejected")
+    assert event.template_version_id == version.template_version_id
+    assert event.content_sha256 == version.content_sha256
+    assert event.contract_id == version.contract_id
+    assert event.contract_version == version.contract_version
+    assert event.registry_revision == 0
+    assert not hasattr(event, "blob_ref")
+    assert not hasattr(event, "content")
+
+
+@pytest.mark.asyncio
+async def test_invalid_current_active_blob_blocks_deactivate_with_one_audit() -> None:
+    api = _api()
+    center, effects = make_lifecycle_center(api)
+    version = await _upload(center)
+    session = actor()
+    await center.activate(
+        session,
+        document_type="daily_plan",
+        version_id=version.template_version_id,
+        expected_registry_revision=0,
+        expected_active_version_id=None,
+    )
+    effects["blobs"].blobs.pop(version.content_sha256)
+    before_audits = len(effects["audit"].events)
+
+    with pytest.raises(api.TemplateCenterError) as caught:
+        await center.deactivate(
+            session,
+            document_type="daily_plan",
+            expected_registry_revision=1,
+            expected_active_version_id=version.template_version_id,
+        )
+
+    assert caught.value.code is api.TemplateErrorCode.VALIDATION_FAILED
+    snapshot = await effects["versions"].snapshot(7, "daily_plan")
+    assert (snapshot.registry_revision, snapshot.active_version_id) == (
+        1,
+        version.template_version_id,
+    )
+    assert len(effects["versions"].transitions) == 1
+    assert len(effects["audit"].events) == before_audits + 1
+    event = effects["audit"].events[-1]
+    assert (event.action, event.outcome) == ("deactivate", "rejected")
+    assert event.template_version_id == version.template_version_id
+    assert event.content_sha256 == version.content_sha256
+    assert event.contract_id == version.contract_id
+    assert event.contract_version == version.contract_version
+    assert event.registry_revision == 1
