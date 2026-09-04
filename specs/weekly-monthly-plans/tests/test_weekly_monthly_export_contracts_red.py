@@ -1,7 +1,7 @@
 """周/月计划 Word 导出契约的稳定 RED。"""
 
 import re
-from dataclasses import FrozenInstanceError, fields, is_dataclass
+from dataclasses import FrozenInstanceError, fields, is_dataclass, replace
 from datetime import date, datetime, timezone
 from importlib import import_module
 from inspect import iscoroutinefunction, signature
@@ -494,3 +494,166 @@ def test_formal_week_month_export_does_not_allow_scratch_fallback_or_direct_path
     e = _exports()
     assert e.ALLOW_SCRATCH_FALLBACK is False
     assert e.ALLOW_DIRECT_TEMPLATE_PATH is False
+
+
+def test_mapping_profiles_are_immutable_and_have_no_dynamic_extension_seam():
+    e = _exports()
+    mappings = (
+        e.WEEKLY_PLACEHOLDER_MAPPING,
+        e.MONTHLY_PLACEHOLDER_MAPPING,
+        e.WEEKLY_REPEATABLE_REGION_MAPPING,
+        e.MONTHLY_ORDERED_LIST_MAPPING,
+    )
+    for mapping in mappings:
+        with pytest.raises(TypeError):
+            mapping["unknown.dynamic.token"] = "payload.anything"
+        assert mapping.get("unknown.dynamic.token") is None
+    for forbidden in (
+        "register_mapping",
+        "extend_mapping",
+        "resolve_payload_path",
+        "mapping_from_payload",
+    ):
+        assert not hasattr(e, forbidden)
+
+
+def test_export_snapshot_exactly_freezes_wmp4_authorized_identity_and_status():
+    e = _exports()
+    d = _domain()
+    plan = _weekly_plan(d)
+    snapshot = e.ExportSnapshot(
+        plan=plan,
+        document_type=e.PlanDocumentType.WEEKLY_ACTIVITY_PLAN,
+        captured_at_utc=datetime(2026, 9, 28, tzinfo=timezone.utc),
+    )
+
+    assert snapshot.plan is plan
+    assert snapshot.plan.scope.tenant_id == 7
+    assert snapshot.plan.scope.teacher_id == 11
+    assert snapshot.plan.scope.class_id == 23
+    assert snapshot.plan.plan_id == 101
+    assert snapshot.plan.version == 2
+    assert snapshot.plan.status is d.ReviewStatus.DRAFT
+    assert snapshot.document_type.value == d.PlanKind.WEEKLY_ACTIVITY.value
+
+
+def test_export_snapshot_rejects_kind_mismatch_noncanonical_time_and_subclasses():
+    e = _exports()
+    d = _domain()
+
+    with pytest.raises(e.ExportContractError):
+        e.ExportSnapshot(
+            plan=_weekly_plan(d),
+            document_type=e.PlanDocumentType.MONTHLY_THEME_ACTIVITY_PLAN,
+            captured_at_utc=datetime(2026, 9, 28, tzinfo=timezone.utc),
+        )
+    with pytest.raises(e.ExportContractError):
+        e.ExportSnapshot(
+            plan=_weekly_plan(d),
+            document_type=e.PlanDocumentType.WEEKLY_ACTIVITY_PLAN,
+            captured_at_utc=datetime(2026, 9, 28),
+        )
+
+    class WeeklySubclass(d.WeeklyActivityPlan):
+        pass
+
+    with pytest.raises(e.ExportContractError):
+        e.ExportSnapshot(
+            plan=WeeklySubclass(
+                **{
+                    field.name: getattr(_weekly_plan(d), field.name)
+                    for field in fields(_weekly_plan(d))
+                }
+            ),
+            document_type=e.PlanDocumentType.WEEKLY_ACTIVITY_PLAN,
+            captured_at_utc=datetime(2026, 9, 28, tzinfo=timezone.utc),
+        )
+
+
+@pytest.mark.parametrize(
+    ("actor_id", "actor_role"),
+    [(True, "teacher"), (0, "teacher"), (11, ""), (11, " teacher ")],
+)
+def test_export_request_rejects_noncanonical_actor_facts(actor_id, actor_role):
+    e = _exports()
+    d = _domain()
+    snapshot = e.ExportSnapshot(
+        plan=_weekly_plan(d),
+        document_type=e.PlanDocumentType.WEEKLY_ACTIVITY_PLAN,
+        captured_at_utc=datetime(2026, 9, 28, tzinfo=timezone.utc),
+    )
+    with pytest.raises(e.ExportContractError):
+        e.PlanExportRequest(
+            actor_id=actor_id,
+            actor_role=actor_role,
+            snapshot=snapshot,
+        )
+
+
+def test_binding_and_result_reject_cross_tenant_type_or_evidence_mismatch():
+    e = _exports()
+    binding = _binding(e)
+    rendered = _rendered(e, binding)
+    report = _report(e, binding)
+
+    with pytest.raises(e.DocumentTypeMismatchError):
+        e.ExportResult(
+            document_type=e.PlanDocumentType.MONTHLY_THEME_ACTIVITY_PLAN,
+            plan_id=101,
+            plan_version=2,
+            binding=binding,
+            rendered=rendered,
+            parse_report=report,
+            filename="safe.docx",
+        )
+    with pytest.raises(e.TemplateBindingError):
+        e.ExportResult(
+            document_type=e.PlanDocumentType.WEEKLY_ACTIVITY_PLAN,
+            plan_id=101,
+            plan_version=2,
+            binding=binding,
+            rendered=e.RenderedTemplate(
+                binding=replace(binding, tenant_id=8), opaque_result=object()
+            ),
+            parse_report=report,
+            filename="safe.docx",
+        )
+
+
+def test_filename_builder_rejects_binding_mismatch_and_normalizes_unsafe_class_name():
+    e = _exports()
+    d = _domain()
+    plan = _weekly_plan(d)
+    unsafe_scope = replace(plan.scope, class_name=" CON/彩虹\\班\x00. ")
+    snapshot = e.ExportSnapshot(
+        plan=replace(plan, scope=unsafe_scope),
+        document_type=e.PlanDocumentType.WEEKLY_ACTIVITY_PLAN,
+        captured_at_utc=datetime(2026, 9, 28, tzinfo=timezone.utc),
+    )
+    binding = _binding(e)
+    first = e.build_export_filename(snapshot, binding)
+    second = e.build_export_filename(snapshot, binding)
+
+    assert first == second
+    assert first.endswith(".docx")
+    assert not any(marker in first for marker in ("/", "\\", "\x00"))
+    assert len(first) <= 180
+    with pytest.raises(e.TemplateBindingError):
+        e.build_export_filename(snapshot, replace(binding, tenant_id=8))
+
+
+def test_filename_builder_bounds_very_long_normalized_segments():
+    e = _exports()
+    d = _domain()
+    plan = _monthly_plan(d)
+    snapshot = e.ExportSnapshot(
+        plan=replace(plan, scope=replace(plan.scope, class_name="班" * 500)),
+        document_type=e.PlanDocumentType.MONTHLY_THEME_ACTIVITY_PLAN,
+        captured_at_utc=datetime(2026, 9, 1, tzinfo=timezone.utc),
+    )
+    filename = e.build_export_filename(
+        snapshot,
+        _binding(e, e.PlanDocumentType.MONTHLY_THEME_ACTIVITY_PLAN),
+    )
+    assert filename.endswith(".docx")
+    assert len(filename.encode("utf-8")) <= 240
