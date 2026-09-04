@@ -7,6 +7,7 @@ stays clean while the formal implementation is absent.
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from html import escape
@@ -163,6 +164,7 @@ class MemoryUnitOfWork:
         self.transition_cas.append(
             (expected_registry_revision, expected_active_version_id)
         )
+        await self.owner.wait_at_transition_barrier()
 
     async def stage_audit(self, event: object) -> None:
         self.owner.events.append("stage_audit")
@@ -237,6 +239,24 @@ class MemoryTransactionPort:
         self.fail_stage_transition = False
         self.fail_stage_audit = False
         self.fail_commit = False
+        self.transition_barrier_parties = 0
+        self.transition_barrier_arrivals = 0
+        self.transition_barrier = asyncio.Event()
+
+    def arm_transition_barrier(self, parties: int) -> None:
+        if type(parties) is not int or parties < 2:
+            raise ValueError("transition_barrier_parties_invalid")
+        self.transition_barrier_parties = parties
+        self.transition_barrier_arrivals = 0
+        self.transition_barrier = asyncio.Event()
+
+    async def wait_at_transition_barrier(self) -> None:
+        if self.transition_barrier_parties == 0:
+            return
+        self.transition_barrier_arrivals += 1
+        if self.transition_barrier_arrivals == self.transition_barrier_parties:
+            self.transition_barrier.set()
+        await self.transition_barrier.wait()
 
     async def begin(self, tenant_id: int, document_type: str) -> MemoryUnitOfWork:
         from app.service import template_center as api

@@ -78,6 +78,7 @@ async def test_same_cas_concurrent_activations_have_exactly_one_winner() -> None
     first = await _upload(center, label="first")
     second = await _upload(center, label="second")
     session = actor()
+    effects["transactions"].arm_transition_barrier(2)
 
     results = await asyncio.gather(
         center.activate(
@@ -103,8 +104,16 @@ async def test_same_cas_concurrent_activations_have_exactly_one_winner() -> None
     assert len(failures) == 1
     assert failures[0].code is api.TemplateErrorCode.REGISTRY_STALE
     assert len(effects["versions"].transitions) == 1
-    assert effects["audit"].events[-2].outcome is api.AuditOutcome.ACCEPTED
-    assert effects["audit"].events[-1].outcome is api.AuditOutcome.STALE
+    accepted, stale = effects["audit"].events[-2:]
+    assert accepted.outcome is api.AuditOutcome.ACCEPTED
+    assert stale.outcome is api.AuditOutcome.STALE
+    winner_id = receipts[0].active_version_id
+    loser = second if winner_id == first.template_version_id else first
+    assert stale.template_version_id == loser.template_version_id
+    assert stale.content_sha256 == loser.content_sha256
+    assert stale.contract_id == loser.contract_id
+    assert stale.contract_version == loser.contract_version
+    assert stale.registry_revision == 1
 
 
 @pytest.mark.asyncio
