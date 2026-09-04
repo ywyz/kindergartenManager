@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from hashlib import sha256
 from html import escape
 from io import BytesIO
 from types import SimpleNamespace
@@ -411,8 +412,16 @@ class AllowPolicy:
 
 
 class MemoryExportPort:
-    def __init__(self, version_store: MemoryVersionStore | None = None) -> None:
+    def __init__(
+        self,
+        version_store: MemoryVersionStore | None = None,
+        *,
+        render_mode: str = "valid",
+        parse_mode: str = "valid",
+    ) -> None:
         self.version_store = version_store
+        self.render_mode = render_mode
+        self.parse_mode = parse_mode
         self.render_calls: list[tuple[object, object]] = []
         self.parse_calls: list[tuple[object, bytes]] = []
         self.resolve_calls: list[tuple[int, str]] = []
@@ -447,20 +456,65 @@ class MemoryExportPort:
         )
 
     async def render(self, binding: object, payload: object) -> object:
+        from app.service import template_center as api
+
         self.render_calls.append((binding, payload))
-        return SimpleNamespace(
-            content=_docx_with_text("合成预览"),
-            binding=binding,
+        if self.render_mode == "raises":
+            raise RuntimeError("synthetic render failure with private body")
+        rendered_bytes = _docx_with_text("合成预览")
+        rendered_binding = (
+            api.TemplateExportBinding.candidate(
+                document_type=binding.document_type,
+                content_sha256=binding.content_sha256,
+                contract_id=binding.contract_id,
+                contract_version=binding.contract_version,
+                candidate_binding_id=uuid4(),
+                profile_id=binding.profile_id,
+                profile_version=binding.profile_version,
+            )
+            if self.render_mode == "binding-mismatch"
+            else binding
+        )
+        return api.RenderedTemplate(
+            rendered_bytes=rendered_bytes,
+            rendered_sha256=(
+                "0" * 64
+                if self.render_mode == "hash-mismatch"
+                else sha256(rendered_bytes).hexdigest()
+            ),
+            binding=rendered_binding,
         )
 
     async def parse(self, binding: object, rendered_bytes: bytes) -> object:
+        from app.service import template_center as api
+
         self.parse_calls.append((binding, rendered_bytes))
-        return SimpleNamespace(
-            valid=True,
-            content_sha256="c" * 64,
-            unresolved_tokens=(),
-            external_relationships=(),
-            macros=(),
+        if self.parse_mode == "raises":
+            raise RuntimeError("synthetic parse failure with private body")
+        parse_binding = (
+            api.TemplateExportBinding.candidate(
+                document_type=binding.document_type,
+                content_sha256=binding.content_sha256,
+                contract_id=binding.contract_id,
+                contract_version=binding.contract_version,
+                candidate_binding_id=uuid4(),
+                profile_id=binding.profile_id,
+                profile_version=binding.profile_version,
+            )
+            if self.parse_mode == "binding-mismatch"
+            else binding
+        )
+        return api.ExportParseReport(
+            binding=parse_binding,
+            valid=self.parse_mode != "invalid",
+            structure_summary_sha256="c" * 64,
+            unresolved_token_ids=(
+                ("kg.synthetic.unresolved",)
+                if self.parse_mode == "unresolved"
+                else ()
+            ),
+            has_macros=self.parse_mode == "macro",
+            has_external_relationships=self.parse_mode == "external",
         )
 
 
@@ -499,17 +553,23 @@ class MemoryOfficeQualificationPort:
         status: str = "passed",
         evidence_id: str | None = "office-qualification-v1",
         client_versions: tuple[str, ...] = OFFICE_CLIENT_VERSIONS,
+        raises: bool = False,
     ) -> None:
         self.calls: list[tuple[object, object, str]] = []
         self.status = status
         self.evidence_id = evidence_id
         self.client_versions = client_versions
+        self.raises = raises
 
     async def qualify(
         self, binding: object, parse_report: object, profile_id: str
     ) -> object:
+        from app.service import template_center as api
+
         self.calls.append((binding, parse_report, profile_id))
-        return SimpleNamespace(
+        if self.raises:
+            raise RuntimeError("synthetic office failure with raw output")
+        return api.OfficeQualificationResult(
             evidence_id=self.evidence_id,
             status=self.status,
             client_versions=self.client_versions,
@@ -517,10 +577,13 @@ class MemoryOfficeQualificationPort:
 
 
 class MemoryQualificationEvidenceStore:
-    def __init__(self) -> None:
+    def __init__(self, *, fail: bool = False) -> None:
         self.items: list[object] = []
+        self.fail = fail
 
     async def append(self, evidence: object) -> object:
+        if self.fail:
+            raise RuntimeError("synthetic evidence store failure")
         self.items.append(evidence)
         return evidence
 

@@ -3,7 +3,11 @@
 候选资格是受控 seed/fixture 的内部校验 job，不是 TemplateCenter 的正式 Preview 或 CRUD。
 """
 
+from dataclasses import FrozenInstanceError, fields
+from hashlib import sha256
 from importlib import import_module
+from inspect import signature
+from uuid import UUID
 
 import pytest
 
@@ -24,11 +28,11 @@ def _api():
     return import_module("app.service.template_center")
 
 
-def _job(api, *, seeds=None, office=None):
+def _job(api, *, seeds=None, export=None, office=None, evidence=None):
     seeds = seeds or MemoryControlledSeedStore()
-    export = MemoryExportPort()
+    export = export or MemoryExportPort()
     office = office or MemoryOfficeQualificationPort()
-    evidence = MemoryQualificationEvidenceStore()
+    evidence = evidence or MemoryQualificationEvidenceStore()
     job = api.TemplateCandidateQualificationJob(
         controlled_seed_store=seeds,
         export_port=export,
@@ -47,8 +51,52 @@ def _fixture(api, *, provenance="synthetic"):
     return api.SyntheticQualificationFixture(
         fixture_id="weekly-monthly-fixture-v1",
         provenance=provenance,
-        values={"title": "仅用于候选资格的合成值"},
+        values=(("title", "仅用于候选资格的合成值"),),
     )
+
+
+def test_candidate_job_and_contracts_are_closed_immutable_and_internal_only():
+    api = _api()
+    job, _ = _job(api)
+
+    assert tuple(signature(type(job)).parameters) == (
+        "controlled_seed_store",
+        "export_port",
+        "office_qualification_port",
+        "qualification_evidence_store",
+    )
+    assert tuple(signature(job.qualify).parameters) == (
+        "document_type",
+        "seed_handle",
+        "fixture",
+        "profile_id",
+    )
+    assert {
+        item.name for item in fields(api.CandidateQualificationEvidence)
+    } == {
+        "qualification_id",
+        "document_type",
+        "seed_sha256",
+        "profile_id",
+        "profile_version",
+        "rendered_sha256",
+        "parse_report_sha256",
+        "office_evidence_id",
+        "office_client_versions",
+        "fixture_id",
+        "checker_version",
+        "qualified_at_utc",
+        "qualification_status",
+    }
+    fixture = _fixture(api)
+    with pytest.raises(FrozenInstanceError):
+        fixture.fixture_id = "changed"
+    with pytest.raises(ValueError):
+        api.SyntheticQualificationFixture(
+            fixture_id="weekly-monthly-fixture-v1",
+            provenance="synthetic",
+            values=(("title", {"mutable": "value"}),),
+        )
 
 
 @pytest.mark.asyncio
@@ -82,6 +130,9 @@ async def test_reserved_candidate_qualification_uses_controlled_seed_and_same_op
     assert evidence.office_evidence_id == "office-qualification-v1"
     assert evidence.office_client_versions
     assert evidence.fixture_id == "weekly-monthly-fixture-v1"
+    assert type(evidence.qualification_id) is UUID
+    assert evidence.checker_version == "template-candidate-qualification.v1"
+    assert evidence.qualified_at_utc.utcoffset().total_seconds() == 0
     assert not hasattr(evidence, "rendered_bytes")
     assert not hasattr(evidence, "seed_bytes")
     assert not hasattr(evidence, "absolute_path")
@@ -90,9 +141,76 @@ async def test_reserved_candidate_qualification_uses_controlled_seed_and_same_op
     assert effects["seeds"].read_calls == [(seed_handle, document_type)]
     assert len(effects["export"].render_calls) == 1
     assert len(effects["export"].parse_calls) == 1
+    binding, payload = effects["export"].render_calls[0]
+    assert type(binding) is api.TemplateExportBinding
+    assert binding.kind.value == "candidate"
+    assert binding.document_type.value == document_type
+    assert binding.content_sha256 == evidence.seed_sha256
+    assert binding.profile_id == evidence.profile_id
+    assert binding.profile_version == evidence.profile_version
+    assert binding.tenant_id is None
+    assert binding.template_version_id is None
+    assert binding.version is None
+    assert payload == _fixture(api).values
+    parse_binding, rendered_bytes = effects["export"].parse_calls[0]
+    assert parse_binding is binding
+    assert sha256(rendered_bytes).hexdigest() == evidence.rendered_sha256
+    office_binding, parse_report, office_profile = effects["office"].calls[0]
+    assert office_binding is binding
+    assert parse_report.binding is binding
+    assert office_profile == evidence.profile_id
     assert effects["export"].resolve_calls == []
     assert len(effects["office"].calls) == 1
     assert effects["evidence"].items == [evidence]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("document_type", "seed_handle", "profile_id"),
+    [
+        (
+            "weekly_activity_plan",
+            "controlled-monthplan-seed-v1",
+            "weekly_activity_plan-profile-v1",
+        ),
+        (
+            "monthly_theme_activity_plan",
+            "controlled-weekplan-seed-v1",
+            "monthly_theme_activity_plan-profile-v1",
+        ),
+        (
+            "weekly_activity_plan",
+            "controlled-weekplan-seed-v1",
+            "monthly_theme_activity_plan-profile-v1",
+        ),
+        (
+            "weekly_activity_plan",
+            "controlled-weekplan-seed-v1",
+            "candidate-profile-v999",
+        ),
+    ],
+    ids=["cross-seed-weekly", "cross-seed-monthly", "cross-profile", "unknown-profile"],
+)
+async def test_candidate_preflight_closes_seed_and_profile_to_document_type(
+    document_type, seed_handle, profile_id
+):
+    api = _api()
+    job, effects = _job(api)
+
+    with pytest.raises(api.TemplateCenterError) as caught:
+        await job.qualify(
+            document_type=document_type,
+            seed_handle=seed_handle,
+            fixture=_fixture(api),
+            profile_id=profile_id,
+        )
+
+    assert caught.value.code is api.TemplateErrorCode.INPUT_INVALID
+    assert seed_handle not in repr(caught.value)
+    assert effects["seeds"].read_calls == []
+    assert effects["export"].render_calls == []
+    assert effects["office"].calls == []
+    assert effects["evidence"].items == []
 
 
 @pytest.mark.asyncio
@@ -111,7 +229,7 @@ async def test_registered_candidate_seed_reuses_security_validator_and_fails_bef
 ):
     """A registered handle is not a trust bypass: security/profile failures stop the pipeline."""
     api = _api()
-    seed_handle = f"controlled-weekplan-{case_id}-v1"
+    seed_handle = "controlled-weekplan-seed-v1"
     seeds = MemoryControlledSeedStore()
     seeds.register_controlled_seed(seed_handle, seed_content)
     job, effects = _job(api, seeds=seeds)
@@ -206,6 +324,76 @@ async def test_incomplete_office_qualification_fails_after_render_without_passed
         api.build_initial_document_registry().is_enabled("weekly_activity_plan")
         is False
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("render_mode", "parse_mode", "office_raises", "expected_parse", "expected_office"),
+    [
+        ("raises", "valid", False, 0, 0),
+        ("binding-mismatch", "valid", False, 0, 0),
+        ("hash-mismatch", "valid", False, 0, 0),
+        ("valid", "raises", False, 1, 0),
+        ("valid", "binding-mismatch", False, 1, 0),
+        ("valid", "invalid", False, 1, 0),
+        ("valid", "unresolved", False, 1, 0),
+        ("valid", "macro", False, 1, 0),
+        ("valid", "external", False, 1, 0),
+        ("valid", "valid", True, 1, 1),
+    ],
+    ids=[
+        "render-error",
+        "render-binding",
+        "render-hash",
+        "parse-error",
+        "parse-binding",
+        "parse-invalid",
+        "parse-unresolved",
+        "parse-macro",
+        "parse-external",
+        "office-error",
+    ],
+)
+async def test_candidate_pipeline_failures_short_circuit_without_evidence(
+    render_mode, parse_mode, office_raises, expected_parse, expected_office
+):
+    api = _api()
+    export = MemoryExportPort(render_mode=render_mode, parse_mode=parse_mode)
+    office = MemoryOfficeQualificationPort(raises=office_raises)
+    job, effects = _job(api, export=export, office=office)
+
+    with pytest.raises(api.TemplateCenterError) as caught:
+        await job.qualify(
+            document_type="weekly_activity_plan",
+            seed_handle="controlled-weekplan-seed-v1",
+            fixture=_fixture(api),
+            profile_id="weekly_activity_plan-profile-v1",
+        )
+
+    assert caught.value.code is api.TemplateErrorCode.EXPORT_FAILED
+    assert len(effects["export"].parse_calls) == expected_parse
+    assert len(effects["office"].calls) == expected_office
+    assert effects["evidence"].items == []
+    assert effects["export"].resolve_calls == []
+
+
+@pytest.mark.asyncio
+async def test_candidate_evidence_append_failure_is_sanitized_and_not_visible():
+    api = _api()
+    evidence_store = MemoryQualificationEvidenceStore(fail=True)
+    job, effects = _job(api, evidence=evidence_store)
+
+    with pytest.raises(api.TemplateCenterError) as caught:
+        await job.qualify(
+            document_type="weekly_activity_plan",
+            seed_handle="controlled-weekplan-seed-v1",
+            fixture=_fixture(api),
+            profile_id="weekly_activity_plan-profile-v1",
+        )
+
+    assert caught.value.code is api.TemplateErrorCode.STORAGE_FAILED
+    assert effects["evidence"].items == []
+    assert "synthetic" not in repr(caught.value)
 
 
 @pytest.mark.asyncio
