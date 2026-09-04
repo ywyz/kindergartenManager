@@ -50,17 +50,26 @@ class MemoryVersionStore:
         )
 
     async def snapshot(self, tenant_id: int, document_type: str) -> object:
-        key = (tenant_id, document_type)
+        normalized = getattr(document_type, "value", document_type)
+        key = (tenant_id, normalized)
+        scoped = [
+            event
+            for event in self.transitions
+            if getattr(event, "tenant_id", None) == tenant_id
+            and getattr(getattr(event, "document_type", None), "value", None)
+            == normalized
+        ]
         return SimpleNamespace(
             tenant_id=tenant_id,
             document_type=document_type,
-            registry_revision=sum(
-                1
-                for event in self.transitions
-                if getattr(event, "tenant_id", None) == tenant_id
-                and getattr(event, "document_type", None) == document_type
-            ),
+            registry_revision=len(scoped),
             active_version_id=self.active.get(key),
+            active_content_sha256=(
+                getattr(scoped[-1], "active_content_sha256", None) if scoped else None
+            ),
+            last_transition_event_id=(
+                getattr(scoped[-1], "event_id", None) if scoped else None
+            ),
         )
 
 
@@ -90,6 +99,7 @@ class MemoryUnitOfWork:
         self.document_type = document_type
         self.staged_versions: list[object] = []
         self.staged_transitions: list[object] = []
+        self.transition_cas: list[tuple[int, object | None]] = []
         self.staged_audits: list[object] = []
         self.stage_calls: list[str] = []
         self.committed = False
@@ -136,10 +146,21 @@ class MemoryUnitOfWork:
         self.stage_calls.append("version")
         self.staged_versions.append(version)
 
-    async def stage_transition(self, event: object) -> None:
+    async def stage_transition(
+        self,
+        event: object,
+        *,
+        expected_registry_revision: int,
+        expected_active_version_id: object | None,
+    ) -> None:
         self.owner.events.append("stage_transition")
+        if self.owner.fail_stage_transition:
+            raise RuntimeError("synthetic transition staging failure")
         self.stage_calls.append("transition")
         self.staged_transitions.append(event)
+        self.transition_cas.append(
+            (expected_registry_revision, expected_active_version_id)
+        )
 
     async def stage_audit(self, event: object) -> None:
         self.owner.events.append("stage_audit")
@@ -157,12 +178,34 @@ class MemoryUnitOfWork:
         self.owner.commit_attempts += 1
         if self.audit_sink.fail or self.owner.fail_commit:
             raise RuntimeError("synthetic audit failure")
+        if len(self.staged_transitions) != len(self.transition_cas):
+            raise RuntimeError("transition CAS evidence missing")
+        for event, (expected_revision, expected_active) in zip(
+            self.staged_transitions, self.transition_cas, strict=True
+        ):
+            normalized = getattr(event.document_type, "value", event.document_type)
+            key = (event.tenant_id, normalized)
+            actual_revision = sum(
+                1
+                for existing in self.version_store.transitions
+                if getattr(existing, "tenant_id", None) == event.tenant_id
+                and getattr(existing.document_type, "value", existing.document_type)
+                == normalized
+            )
+            if (
+                actual_revision != expected_revision
+                or self.version_store.active.get(key) != expected_active
+            ):
+                raise api.TemplateCenterError(api.TemplateErrorCode.REGISTRY_STALE)
         # No operation below can fail in this deterministic fake.  The real
         # implementation must provide the same all-or-nothing visibility.
         self.version_store.versions.extend(self.staged_versions)
         self.version_store.transitions.extend(self.staged_transitions)
         for event in self.staged_transitions:
-            key = (getattr(event, "tenant_id"), getattr(event, "document_type"))
+            key = (
+                getattr(event, "tenant_id"),
+                getattr(getattr(event, "document_type"), "value"),
+            )
             self.version_store.active[key] = getattr(event, "active_version_id", None)
         self.audit_sink.events.extend(self.staged_audits)
         self.committed = True
@@ -189,6 +232,7 @@ class MemoryTransactionPort:
         self.units: list[MemoryUnitOfWork] = []
         self.events = events if events is not None else []
         self.fail_stage_version = False
+        self.fail_stage_transition = False
         self.fail_stage_audit = False
         self.fail_commit = False
 
@@ -532,6 +576,33 @@ def make_center(
         "permissions": permissions,
         "exports": exports,
         "backups": backups,
+    }
+
+
+def make_lifecycle_center(
+    api: object, *, policy: AllowPolicy | None = None
+) -> tuple[object, dict[str, object]]:
+    """Construct exactly the T006 slice without preview/backup dependencies."""
+
+    blobs = MemoryBlobStore()
+    versions = MemoryVersionStore()
+    audit = MemoryAuditSink()
+    transactions = MemoryTransactionPort(versions, audit)
+    permissions = policy or AllowPolicy()
+    center = api.TemplateCenter(
+        blob_store=blobs,
+        version_store=versions,
+        transaction_port=transactions,
+        permission_policy=permissions,
+        contract_registry=api.build_initial_contract_registry(),
+        clock=FixedClock(),
+    )
+    return center, {
+        "blobs": blobs,
+        "versions": versions,
+        "audit": audit,
+        "transactions": transactions,
+        "permissions": permissions,
     }
 
 

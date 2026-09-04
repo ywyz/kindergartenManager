@@ -4,7 +4,7 @@ from importlib import import_module
 
 import pytest
 
-from _support import actor, docx_with_text, make_center
+from _support import actor, docx_with_text, make_lifecycle_center
 
 
 def _api():
@@ -32,7 +32,7 @@ async def _upload_two_versions(center):
 @pytest.mark.asyncio
 async def test_activation_uses_exact_registry_revision_and_emits_a_traceable_transition():
     api = _api()
-    center, effects = make_center(api)
+    center, effects = make_lifecycle_center(api)
     version, _other = await _upload_two_versions(center)
 
     receipt = await center.activate(
@@ -57,7 +57,7 @@ async def test_activation_uses_exact_registry_revision_and_emits_a_traceable_tra
 @pytest.mark.asyncio
 async def test_stale_activation_fails_without_changing_the_existing_active_pointer():
     api = _api()
-    center, effects = make_center(api)
+    center, effects = make_lifecycle_center(api)
     first, second = await _upload_two_versions(center)
     session = actor()
 
@@ -78,9 +78,9 @@ async def test_stale_activation_fails_without_changing_the_existing_active_point
             expected_active_version_id=None,
         )
 
-    binding = await center.resolve_active(session, document_type="daily_plan")
-    assert binding.template_version_id == first.template_version_id
-    assert binding.content_sha256 == first.content_sha256
+    snapshot = await effects["versions"].snapshot(7, "daily_plan")
+    assert snapshot.active_version_id == first.template_version_id
+    assert snapshot.active_content_sha256 == first.content_sha256
     assert len(effects["versions"].transitions) == 1
     assert [getattr(event, "action", None) for event in effects["audit"].events].count(
         "activate"
@@ -91,7 +91,7 @@ async def test_stale_activation_fails_without_changing_the_existing_active_point
 @pytest.mark.asyncio
 async def test_deactivation_blocks_export_but_keeps_validated_version_reactivatable():
     api = _api()
-    center, effects = make_center(api)
+    center, effects = make_lifecycle_center(api)
     version, _other = await _upload_two_versions(center)
     session = actor()
 
@@ -109,8 +109,8 @@ async def test_deactivation_blocks_export_but_keeps_validated_version_reactivata
         expected_active_version_id=version.template_version_id,
     )
 
-    with pytest.raises(api.TemplateCenterError):
-        await center.resolve_active(session, document_type="daily_plan")
+    snapshot = await effects["versions"].snapshot(7, "daily_plan")
+    assert snapshot.active_version_id is None
 
     assert len(effects["versions"].versions) == 2
     assert version.content_sha256 in effects["blobs"].blobs
@@ -125,9 +125,9 @@ async def test_deactivation_blocks_export_but_keeps_validated_version_reactivata
     )
     assert reactivated.active_version_id == version.template_version_id
     assert reactivated.registry_revision == 3
-    binding = await center.resolve_active(session, document_type="daily_plan")
-    assert binding.template_version_id == version.template_version_id
-    assert binding.content_sha256 == version.content_sha256
+    snapshot = await effects["versions"].snapshot(7, "daily_plan")
+    assert snapshot.active_version_id == version.template_version_id
+    assert snapshot.active_content_sha256 == version.content_sha256
     assert len(effects["versions"].versions) == 2
     assert len(effects["versions"].transitions) == 3
     assert effects["audit"].events[-2].action == "deactivate"
@@ -137,7 +137,7 @@ async def test_deactivation_blocks_export_but_keeps_validated_version_reactivata
 @pytest.mark.asyncio
 async def test_transition_and_audit_are_not_visible_when_staging_audit_fails():
     api = _api()
-    center, effects = make_center(api)
+    center, effects = make_lifecycle_center(api)
     version, _other = await _upload_two_versions(center)
     session = actor()
     effects["audit"].fail = True
@@ -163,7 +163,7 @@ async def test_transition_and_audit_are_not_visible_when_staging_audit_fails():
 @pytest.mark.asyncio
 async def test_rollback_moves_only_the_active_pointer_and_preserves_each_immutable_version():
     api = _api()
-    center, effects = make_center(api)
+    center, effects = make_lifecycle_center(api)
     first, second = await _upload_two_versions(center)
     session = actor()
 
@@ -204,7 +204,7 @@ async def test_rollback_moves_only_the_active_pointer_and_preserves_each_immutab
 @pytest.mark.asyncio
 async def test_cross_tenant_lifecycle_reference_is_rejected_before_transition_and_is_audited_safely():
     api = _api()
-    center, effects = make_center(api)
+    center, effects = make_lifecycle_center(api)
     foreign = await center.upload(
         actor(tenant_id=99, user_id=3),
         document_type="daily_plan",
