@@ -77,6 +77,16 @@ class ValidationStatus(str, Enum):
     VALIDATED = "validated"
 
 
+class TemplateExportBindingKind(str, Enum):
+    ACTIVE = "active"
+    CANDIDATE = "candidate"
+
+
+class QualificationStatus(str, Enum):
+    PASSED = "passed"
+    FAILED = "failed"
+
+
 class AuditOutcome(str, Enum):
     ACCEPTED = "accepted"
     DENIED = "denied"
@@ -698,23 +708,74 @@ class CommitReceipt:
 
 @dataclass(frozen=True, slots=True)
 class TemplateExportBinding:
-    tenant_id: int
     document_type: DocumentType
-    template_version_id: UUID
-    version: int
     content_sha256: str
     contract_id: str
     contract_version: int
+    tenant_id: int | None = None
+    template_version_id: UUID | None = None
+    version: int | None = None
+    kind: TemplateExportBindingKind = TemplateExportBindingKind.ACTIVE
+    candidate_binding_id: UUID | None = None
+    profile_id: str | None = None
+    profile_version: int | None = None
 
     def __post_init__(self) -> None:
-        _positive_int(self.tenant_id, "template_export_binding_invalid")
         _document_type(self.document_type, "template_export_binding_invalid")
-        if type(self.template_version_id) is not UUID:
-            raise ValueError("template_export_binding_invalid")
-        _positive_int(self.version, "template_export_binding_invalid")
         _sha256(self.content_sha256, "template_export_binding_invalid")
         _nonempty_text(self.contract_id, "template_export_binding_invalid")
         _positive_int(self.contract_version, "template_export_binding_invalid")
+        active_values = (self.tenant_id, self.template_version_id, self.version)
+        candidate_values = (
+            self.candidate_binding_id,
+            self.profile_id,
+            self.profile_version,
+        )
+        if self.kind is TemplateExportBindingKind.ACTIVE:
+            if (
+                type(self.tenant_id) is not int
+                or self.tenant_id <= 0
+                or type(self.template_version_id) is not UUID
+                or type(self.version) is not int
+                or self.version <= 0
+                or any(item is not None for item in candidate_values)
+            ):
+                raise ValueError("template_export_binding_invalid")
+        elif self.kind is TemplateExportBindingKind.CANDIDATE:
+            if (
+                any(item is not None for item in active_values)
+                or type(self.candidate_binding_id) is not UUID
+                or type(self.profile_id) is not str
+                or not self.profile_id
+                or type(self.profile_version) is not int
+                or self.profile_version <= 0
+            ):
+                raise ValueError("template_export_binding_invalid")
+        else:
+            raise ValueError("template_export_binding_invalid")
+
+    @classmethod
+    def candidate(
+        cls,
+        *,
+        document_type: DocumentType,
+        content_sha256: str,
+        contract_id: str,
+        contract_version: int,
+        candidate_binding_id: UUID,
+        profile_id: str,
+        profile_version: int,
+    ) -> "TemplateExportBinding":
+        return cls(
+            document_type=document_type,
+            content_sha256=content_sha256,
+            contract_id=contract_id,
+            contract_version=contract_version,
+            kind=TemplateExportBindingKind.CANDIDATE,
+            candidate_binding_id=candidate_binding_id,
+            profile_id=profile_id,
+            profile_version=profile_version,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -776,6 +837,91 @@ class SyntheticPreviewCase:
             )
         ):
             raise ValueError("synthetic_preview_case_invalid")
+
+
+@dataclass(frozen=True, slots=True)
+class SyntheticQualificationFixture:
+    fixture_id: str
+    provenance: str
+    values: tuple[tuple[str, object], ...]
+
+    def __post_init__(self) -> None:
+        if (
+            self.fixture_id != "weekly-monthly-fixture-v1"
+            or type(self.provenance) is not str
+            or not self.provenance
+            or type(self.values) is not tuple
+            or not self.values
+            or not all(
+                type(item) is tuple
+                and len(item) == 2
+                and type(item[0]) is str
+                and bool(item[0])
+                and _deeply_immutable(item[1])
+                for item in self.values
+            )
+            or len({item[0] for item in self.values}) != len(self.values)
+        ):
+            raise ValueError("synthetic_qualification_fixture_invalid")
+
+
+@dataclass(frozen=True, slots=True)
+class OfficeQualificationResult:
+    evidence_id: str | None
+    status: str
+    client_versions: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if (
+            (
+                self.evidence_id is not None
+                and (type(self.evidence_id) is not str or not self.evidence_id.strip())
+            )
+            or type(self.status) is not str
+            or type(self.client_versions) is not tuple
+        ):
+            raise ValueError("office_qualification_result_invalid")
+        if not all(type(item) is str and item for item in self.client_versions):
+            raise ValueError("office_qualification_result_invalid")
+
+
+@dataclass(frozen=True, slots=True)
+class CandidateQualificationEvidence:
+    qualification_id: UUID
+    document_type: DocumentType
+    seed_sha256: str
+    profile_id: str
+    profile_version: int
+    rendered_sha256: str
+    parse_report_sha256: str
+    office_evidence_id: str
+    office_client_versions: tuple[str, ...]
+    fixture_id: str
+    checker_version: str
+    qualified_at_utc: datetime
+    qualification_status: QualificationStatus
+
+    def __post_init__(self) -> None:
+        if type(self.qualification_id) is not UUID:
+            raise ValueError("candidate_qualification_evidence_invalid")
+        _document_type(self.document_type, "candidate_qualification_evidence_invalid")
+        _sha256(self.seed_sha256, "candidate_qualification_evidence_invalid")
+        _nonempty_text(self.profile_id, "candidate_qualification_evidence_invalid")
+        _positive_int(self.profile_version, "candidate_qualification_evidence_invalid")
+        _sha256(self.rendered_sha256, "candidate_qualification_evidence_invalid")
+        _sha256(self.parse_report_sha256, "candidate_qualification_evidence_invalid")
+        _nonempty_text(
+            self.office_evidence_id, "candidate_qualification_evidence_invalid"
+        )
+        if type(self.office_client_versions) is not tuple or not all(
+            type(item) is str and item for item in self.office_client_versions
+        ):
+            raise ValueError("candidate_qualification_evidence_invalid")
+        _nonempty_text(self.fixture_id, "candidate_qualification_evidence_invalid")
+        _nonempty_text(self.checker_version, "candidate_qualification_evidence_invalid")
+        _utc(self.qualified_at_utc, "candidate_qualification_evidence_invalid")
+        if self.qualification_status is not QualificationStatus.PASSED:
+            raise ValueError("candidate_qualification_evidence_invalid")
 
 
 @dataclass(frozen=True, slots=True)

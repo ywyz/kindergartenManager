@@ -71,9 +71,7 @@ def test_candidate_job_and_contracts_are_closed_immutable_and_internal_only():
         "fixture",
         "profile_id",
     )
-    assert {
-        item.name for item in fields(api.CandidateQualificationEvidence)
-    } == {
+    assert {item.name for item in fields(api.CandidateQualificationEvidence)} == {
         "qualification_id",
         "document_type",
         "seed_sha256",

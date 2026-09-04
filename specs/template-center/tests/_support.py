@@ -509,9 +509,7 @@ class MemoryExportPort:
             valid=self.parse_mode != "invalid",
             structure_summary_sha256="c" * 64,
             unresolved_token_ids=(
-                ("kg.synthetic.unresolved",)
-                if self.parse_mode == "unresolved"
-                else ()
+                ("kg.synthetic.unresolved",) if self.parse_mode == "unresolved" else ()
             ),
             has_macros=self.parse_mode == "macro",
             has_external_relationships=self.parse_mode == "external",

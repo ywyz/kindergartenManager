@@ -14,6 +14,19 @@ GLOBAL_KNOWN_DOCUMENT_TYPES = tuple(item.value for item in DocumentType)
 PHASE1_ENABLED_DOCUMENT_TYPES = GLOBAL_KNOWN_DOCUMENT_TYPES[:5]
 PHASE1_RESERVED_DOCUMENT_TYPES = GLOBAL_KNOWN_DOCUMENT_TYPES[5:]
 
+_CANDIDATE_PROFILE_ROWS = (
+    (
+        DocumentType.WEEKLY_ACTIVITY_PLAN,
+        "controlled-weekplan-seed-v1",
+        "weekly_activity_plan-profile-v1",
+    ),
+    (
+        DocumentType.MONTHLY_THEME_ACTIVITY_PLAN,
+        "controlled-monthplan-seed-v1",
+        "monthly_theme_activity_plan-profile-v1",
+    ),
+)
+
 _CAPABILITIES = tuple(TemplateCapability)
 _SEEDS = (
     (
@@ -61,6 +74,35 @@ def _manifest(key: str) -> TemplateContractManifest:
         allowed_parts=("word/document.xml",),
         required_anchors=(f"legacy:{key}:root",),
     )
+
+
+def candidate_profile(
+    document_type: object, seed_handle: object, profile_id: object
+) -> tuple[DocumentType, str, str, int, TemplateContractManifest]:
+    """Resolve the two closed synthetic qualification profiles only."""
+    for (
+        registered_type,
+        registered_handle,
+        registered_profile,
+    ) in _CANDIDATE_PROFILE_ROWS:
+        if (
+            document_type == registered_type.value
+            and seed_handle == registered_handle
+            and profile_id == registered_profile
+        ):
+            manifest = TemplateContractManifest(
+                contract_id=f"kg.template.{registered_type.value}.candidate",
+                contract_version=1,
+                placeholder_contract_version=1,
+                structural_profile_id=registered_profile,
+                structural_profile_version=1,
+                renderer_id=f"kg.renderer.{registered_type.value}.candidate.v1",
+                parser_id=f"kg.parser.{registered_type.value}.candidate.v1",
+                allowed_parts=("word/document.xml",),
+                required_anchors=("table:word/document.xml:19x2",),
+            )
+            return registered_type, registered_handle, registered_profile, 1, manifest
+    raise TemplateCenterError(TemplateErrorCode.INPUT_INVALID)
 
 
 INITIAL_DOCUMENT_DESCRIPTORS = tuple(
