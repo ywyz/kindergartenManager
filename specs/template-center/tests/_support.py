@@ -533,9 +533,13 @@ class MemoryControlledSeedStore:
     def register_controlled_seed(self, seed_handle: str, content: bytes) -> None:
         self.seeds[seed_handle] = bytes(content)
 
-    async def read_controlled_seed(self, seed_handle: str, document_type: str) -> bytes:
-        self.read_calls.append((seed_handle, document_type))
-        return self.seeds[seed_handle]
+    async def read_controlled_seed(
+        self, seed_handle: object, document_type: object
+    ) -> bytes:
+        handle_id = getattr(seed_handle, "handle_id", seed_handle)
+        type_id = getattr(document_type, "value", document_type)
+        self.read_calls.append((handle_id, type_id))
+        return self.seeds[handle_id]
 
 
 OFFICE_CLIENT_VERSIONS = (
@@ -773,7 +777,9 @@ def _docx_with_text(
     out = BytesIO()
     with ZipFile(out, "w", ZIP_DEFLATED) as archive:
         for name, content in files.items():
-            archive.writestr(name, content)
+            info = ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))
+            info.compress_type = ZIP_DEFLATED
+            archive.writestr(info, content)
     return out.getvalue()
 
 
@@ -848,3 +854,48 @@ def docx_with_table_shapes(*shapes: tuple[int, int]) -> bytes:
         members={"word/document.xml": document},
         table_rows=1,
     )
+
+
+def docx_with_safe_office_support_parts(*, include_directories: bool) -> bytes:
+    """Synthetic package shaped like normal Word output, without document content."""
+    support = {
+        "word/styles.xml": (
+            '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>'
+        ).encode(),
+        "word/numbering.xml": (
+            '<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>'
+        ).encode(),
+        "word/settings.xml": (
+            '<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>'
+        ).encode(),
+        "word/fontTable.xml": (
+            '<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>'
+        ).encode(),
+        "word/theme/theme1.xml": (
+            '<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="synthetic"/>'
+        ).encode(),
+    }
+    overrides = (
+        ("/word/styles.xml", "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"),
+        ("/word/numbering.xml", "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"),
+        ("/word/settings.xml", "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"),
+        ("/word/fontTable.xml", "application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"),
+        ("/word/theme/theme1.xml", "application/vnd.openxmlformats-officedocument.theme+xml"),
+    )
+    content_types = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Override PartName="/word/document.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+        + "".join(
+            f'<Override PartName="{part}" ContentType="{content_type}"/>'
+            for part, content_type in overrides
+        )
+        + "</Types>"
+    ).encode()
+    members = {"[Content_Types].xml": content_types, **support}
+    if include_directories:
+        members.update({"word/": b"", "word/theme/": b""})
+    return _docx_with_text("synthetic Office package", members=members)

@@ -3,7 +3,7 @@
 候选资格是受控 seed/fixture 的内部校验 job，不是 TemplateCenter 的正式 Preview 或 CRUD。
 """
 
-from dataclasses import FrozenInstanceError, fields
+from dataclasses import FrozenInstanceError, fields, replace
 from hashlib import sha256
 from importlib import import_module
 from inspect import signature
@@ -19,6 +19,7 @@ from _support import (
     RESERVED_TYPES,
     docx_with_external_relationship,
     docx_with_macro_member,
+    docx_with_safe_office_support_parts,
     docx_with_structure_profile_mismatch,
     docx_with_table_shapes,
     docx_with_text,
@@ -86,6 +87,34 @@ def test_unique_validator_enforces_exact_candidate_table_count_rows_and_grid():
         assert caught.value.code is api.TemplateErrorCode.VALIDATION_FAILED
 
 
+@pytest.mark.parametrize("include_directories", [False, True], ids=["parts", "dirs"])
+def test_unique_validator_accepts_closed_safe_office_support_parts(
+    include_directories,
+):
+    api = _api()
+    contract = replace(
+        api.CANDIDATE_QUALIFICATION_PROFILES[0].contract,
+        allowed_parts=(
+            "word/document.xml",
+            "word/styles.xml",
+            "word/numbering.xml",
+            "word/settings.xml",
+            "word/fontTable.xml",
+            "word/theme/theme1.xml",
+        ),
+        required_anchors=("table:word/document.xml:19x2",),
+    )
+
+    api.validate_upload(
+        docx_with_safe_office_support_parts(
+            include_directories=include_directories
+        ),
+        "synthetic-office.docx",
+        api.DOCX_MIME_TYPE,
+        contract,
+    )
+
+
 @pytest.mark.asyncio
 async def test_registered_seed_handle_cannot_be_rebound_to_different_valid_bytes():
     api = _api()
@@ -111,6 +140,32 @@ async def test_registered_seed_handle_cannot_be_rebound_to_different_valid_bytes
 
 def _api():
     return import_module("app.service.template_center")
+
+
+@pytest.fixture(autouse=True)
+def _use_closed_synthetic_profiles_for_unit_job_tests(monkeypatch):
+    """Keep unit GREEN independent of the untracked released Office templates."""
+    api = _api()
+    module = import_module("app.service.template_center.candidate_qualification")
+    production_resolver = module.candidate_profile
+    seed_bytes = MemoryControlledSeedStore().seeds
+
+    def resolve(document_type, seed_handle, profile_id):
+        profile = production_resolver(document_type, seed_handle, profile_id)
+        expected = sha256(seed_bytes[profile.seed_handle.handle_id]).hexdigest()
+        return replace(
+            profile,
+            seed_handle=replace(
+                profile.seed_handle,
+                expected_sha256=expected,
+            ),
+            contract=replace(
+                profile.contract,
+                required_anchors=("table:word/document.xml:19x2",),
+            ),
+        )
+
+    monkeypatch.setattr(module, "candidate_profile", resolve)
 
 
 def _job(api, *, seeds=None, export=None, office=None, evidence=None):
