@@ -117,6 +117,52 @@ async def test_same_cas_concurrent_activations_have_exactly_one_winner() -> None
 
 
 @pytest.mark.asyncio
+async def test_same_cas_concurrent_deactivations_audit_the_previous_active() -> None:
+    api = _api()
+    center, effects = make_lifecycle_center(api)
+    version = await _upload(center)
+    session = actor()
+    await center.activate(
+        session,
+        document_type="daily_plan",
+        version_id=version.template_version_id,
+        expected_registry_revision=0,
+        expected_active_version_id=None,
+    )
+    effects["transactions"].arm_transition_barrier(2)
+
+    results = await asyncio.gather(
+        *(
+            center.deactivate(
+                session,
+                document_type="daily_plan",
+                expected_registry_revision=1,
+                expected_active_version_id=version.template_version_id,
+            )
+            for _ in range(2)
+        ),
+        return_exceptions=True,
+    )
+
+    assert sum(type(result) is api.TransitionReceipt for result in results) == 1
+    failures = [result for result in results if type(result) is api.TemplateCenterError]
+    assert len(failures) == 1
+    assert failures[0].code is api.TemplateErrorCode.REGISTRY_STALE
+    snapshot = await effects["versions"].snapshot(7, "daily_plan")
+    assert (snapshot.registry_revision, snapshot.active_version_id) == (2, None)
+    assert len(effects["versions"].transitions) == 2
+    accepted, stale = effects["audit"].events[-2:]
+    assert accepted.outcome is api.AuditOutcome.ACCEPTED
+    assert stale.outcome is api.AuditOutcome.STALE
+    assert stale.template_version_id is not None
+    assert stale.template_version_id == version.template_version_id
+    assert stale.content_sha256 == version.content_sha256
+    assert stale.contract_id == version.contract_id
+    assert stale.contract_version == version.contract_version
+    assert stale.registry_revision == 2
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "failure", ("fail_stage_transition", "fail_stage_audit", "fail_commit")
 )
