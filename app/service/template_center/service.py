@@ -35,6 +35,14 @@ from app.service.template_center.contracts import (
 from app.service.template_center.validator import VALIDATOR_VERSION, validate_upload
 
 
+class _InvalidVersionEvidence(Exception):
+    """Internal marker retaining only safe immutable metadata for rejection audit."""
+
+    def __init__(self, version: TemplateVersionRef | None) -> None:
+        self.version = version
+        super().__init__(TemplateErrorCode.VALIDATION_FAILED.value)
+
+
 class TemplateCenter:
     """Upload and CAS lifecycle service; UI/exporter operations remain absent."""
 
@@ -396,6 +404,10 @@ class TemplateCenter:
             raise TemplateCenterError(TemplateErrorCode.STORAGE_FAILED) from error
         if version is None:
             return None
+        if type(version) is not TemplateVersionRef:
+            raise _InvalidVersionEvidence(None)
+        if version.tenant_id != tenant_id or version.document_type is not document_type:
+            raise _InvalidVersionEvidence(None)
         try:
             contract = self._contract_registry.resolve(document_type)
             evidence = version.validation_evidence
@@ -406,10 +418,7 @@ class TemplateCenter:
         except Exception as error:
             raise TemplateCenterError(TemplateErrorCode.STORAGE_FAILED) from error
         if (
-            type(version) is not TemplateVersionRef
-            or version.tenant_id != tenant_id
-            or version.document_type is not document_type
-            or version.validation_status is not ValidationStatus.VALIDATED
+            version.validation_status is not ValidationStatus.VALIDATED
             or version.contract_id != contract.contract_id
             or version.contract_version != contract.contract_version
             or evidence.content_sha256 != version.content_sha256
@@ -418,7 +427,7 @@ class TemplateCenter:
             != contract.structural_profile_version
             or exists is not True
         ):
-            raise TemplateCenterError(TemplateErrorCode.VALIDATION_FAILED)
+            raise _InvalidVersionEvidence(version)
         return version
 
     async def _stale(
@@ -484,11 +493,26 @@ class TemplateCenter:
         snapshot = await self._snapshot(tenant_id, normalized_type)
         current_version = None
         if snapshot.active_version_id is not None:
-            current_version = await self._validated_target(
-                tenant_id=tenant_id,
-                document_type=normalized_type,
-                version_id=snapshot.active_version_id,
-            )
+            try:
+                current_version = await self._validated_target(
+                    tenant_id=tenant_id,
+                    document_type=normalized_type,
+                    version_id=snapshot.active_version_id,
+                )
+            except _InvalidVersionEvidence as invalid:
+                await self._commit_rejection(
+                    outcome=AuditOutcome.REJECTED,
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    session_id=session_id,
+                    document_type=normalized_type,
+                    action=action,
+                    version=invalid.version,
+                    registry_revision=snapshot.registry_revision,
+                )
+                raise TemplateCenterError(
+                    TemplateErrorCode.VALIDATION_FAILED
+                ) from invalid
         if (
             snapshot.registry_revision != expected_revision
             or snapshot.active_version_id != expected_active
@@ -505,11 +529,26 @@ class TemplateCenter:
         if target_version_id is None:
             target = None
         else:
-            target = await self._validated_target(
-                tenant_id=tenant_id,
-                document_type=normalized_type,
-                version_id=target_version_id,
-            )
+            try:
+                target = await self._validated_target(
+                    tenant_id=tenant_id,
+                    document_type=normalized_type,
+                    version_id=target_version_id,
+                )
+            except _InvalidVersionEvidence as invalid:
+                await self._commit_rejection(
+                    outcome=AuditOutcome.REJECTED,
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    session_id=session_id,
+                    document_type=normalized_type,
+                    action=action,
+                    version=invalid.version,
+                    registry_revision=snapshot.registry_revision,
+                )
+                raise TemplateCenterError(
+                    TemplateErrorCode.VALIDATION_FAILED
+                ) from invalid
             if target is None:
                 await self._commit_rejection(
                     outcome=AuditOutcome.DENIED,
