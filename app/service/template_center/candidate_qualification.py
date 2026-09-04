@@ -92,7 +92,10 @@ class TemplateCandidateQualificationJob:
         profile_id: str,
     ) -> CandidateQualificationEvidence:
         if (
-            type(fixture) is not SyntheticQualificationFixture
+            type(document_type) is not str
+            or type(seed_handle) is not str
+            or type(profile_id) is not str
+            or type(fixture) is not SyntheticQualificationFixture
             or fixture.provenance != "synthetic"
         ):
             raise TemplateCenterError(TemplateErrorCode.INPUT_INVALID)

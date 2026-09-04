@@ -148,6 +148,12 @@ def candidate_profile(
     document_type: object, seed_handle: object, profile_id: object
 ) -> CandidateQualificationProfile:
     """Resolve the two closed released candidate profiles only."""
+    if not (
+        type(document_type) is str
+        and type(seed_handle) is str
+        and type(profile_id) is str
+    ):
+        raise TemplateCenterError(TemplateErrorCode.INPUT_INVALID)
     for profile in CANDIDATE_QUALIFICATION_PROFILES:
         if (
             document_type == profile.document_type.value
