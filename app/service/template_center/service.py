@@ -588,6 +588,7 @@ class TemplateCenter:
                     document_type=normalized_type,
                     action=action,
                     registry_revision=latest.registry_revision,
+                    version=target,
                 )
             raise
         except Exception as error:
