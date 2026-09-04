@@ -52,6 +52,23 @@ def _safe_directory(path: Path, *, create: bool) -> None:
         raise _storage_failed()
 
 
+def _validate_ancestor_chain(path: Path) -> None:
+    """Reject traversal through symlinked or untrusted writable ancestors."""
+
+    for ancestor in path.parents:
+        try:
+            metadata = ancestor.lstat()
+        except OSError as error:
+            raise _storage_failed(error) from error
+        mode = metadata.st_mode
+        if not stat.S_ISDIR(mode) or stat.S_ISLNK(mode):
+            raise _storage_failed()
+        writable_by_others = bool(stat.S_IMODE(mode) & 0o022)
+        sticky_directory = bool(mode & stat.S_ISVTX)
+        if writable_by_others and not sticky_directory:
+            raise _storage_failed()
+
+
 class ContentAddressedTemplateBlobStore:
     """Store immutable blobs beneath one trusted, owner-only root."""
 
@@ -61,6 +78,7 @@ class ContentAddressedTemplateBlobStore:
         if not isinstance(trusted_root, Path) or not trusted_root.is_absolute():
             raise _storage_failed()
         try:
+            _validate_ancestor_chain(trusted_root)
             if trusted_root.exists() or trusted_root.is_symlink():
                 _safe_directory(trusted_root, create=False)
             else:
@@ -73,6 +91,7 @@ class ContentAddressedTemplateBlobStore:
 
     def _blob_path(self, content_sha256: str, *, create_shard: bool) -> Path:
         digest = _validate_digest(content_sha256)
+        _validate_ancestor_chain(self._root)
         _safe_directory(self._root, create=False)
         shard = self._root / digest[:2]
         if shard.exists() or shard.is_symlink():
@@ -146,8 +165,8 @@ class ContentAddressedTemplateBlobStore:
                     os.unlink(temporary_name)
                 except FileNotFoundError:
                     pass
-                except OSError:
-                    pass
+                except OSError as error:
+                    raise _storage_failed(error) from error
         return BlobRef(value=f"sha256/{digest}", content_sha256=digest)
 
     async def read(self, blob_ref: BlobRef, expected_sha256: str) -> bytes:
