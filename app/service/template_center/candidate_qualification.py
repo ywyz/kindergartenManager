@@ -96,13 +96,13 @@ class TemplateCandidateQualificationJob:
             or fixture.provenance != "synthetic"
         ):
             raise TemplateCenterError(TemplateErrorCode.INPUT_INVALID)
-        document, _, _, profile_version, contract = candidate_profile(
-            document_type, seed_handle, profile_id
-        )
+        profile = candidate_profile(document_type, seed_handle, profile_id)
+        if fixture.fixture_id != profile.fixture_id:
+            raise TemplateCenterError(TemplateErrorCode.INPUT_INVALID)
 
         try:
             seed_bytes = await self._controlled_seed_store.read_controlled_seed(
-                seed_handle, document_type
+                profile.seed_handle, profile.document_type
             )
         except Exception as error:
             raise TemplateCenterError(TemplateErrorCode.STORAGE_FAILED) from error
@@ -114,16 +114,18 @@ class TemplateCandidateQualificationJob:
                 "application/vnd.openxmlformats-officedocument."
                 "wordprocessingml.document"
             ),
-            contract=contract,
+            contract=profile.contract,
         )
+        if validation.content_sha256 != profile.seed_handle.expected_sha256:
+            raise TemplateCenterError(TemplateErrorCode.VALIDATION_FAILED)
         binding = TemplateExportBinding.candidate(
-            document_type=document,
+            document_type=profile.document_type,
             content_sha256=validation.content_sha256,
             contract_id=validation.contract_id,
             contract_version=validation.contract_version,
             candidate_binding_id=uuid4(),
             profile_id=profile_id,
-            profile_version=profile_version,
+            profile_version=profile.profile_version,
         )
 
         try:
@@ -159,10 +161,10 @@ class TemplateCandidateQualificationJob:
 
         evidence = CandidateQualificationEvidence(
             qualification_id=uuid4(),
-            document_type=document,
+            document_type=profile.document_type,
             seed_sha256=validation.content_sha256,
             profile_id=profile_id,
-            profile_version=profile_version,
+            profile_version=profile.profile_version,
             rendered_sha256=rendered.rendered_sha256,
             parse_report_sha256=_parse_report_sha256(report),
             office_evidence_id=office.evidence_id,

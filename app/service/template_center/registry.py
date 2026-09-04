@@ -1,6 +1,8 @@
 """Versioned, immutable phase-1 document and contract registries."""
 
 from app.service.template_center.contracts import (
+    CandidateQualificationProfile,
+    ControlledSeedHandle,
     DocumentType,
     DocumentTypeDescriptor,
     TemplateCapability,
@@ -19,12 +21,36 @@ _CANDIDATE_PROFILE_ROWS = (
         DocumentType.WEEKLY_ACTIVITY_PLAN,
         "controlled-weekplan-seed-v1",
         "weekly_activity_plan-profile-v1",
+        "226c8208659bb6334533499b417aaf5f7ccad1e82d3a7cd6b8955d91a2b6417a",
+        "tables:word/document.xml:2x9x7",
     ),
     (
         DocumentType.MONTHLY_THEME_ACTIVITY_PLAN,
         "controlled-monthplan-seed-v1",
         "monthly_theme_activity_plan-profile-v1",
+        "787f1a9be8aaebd27cf87c25747a3f8e70e584ac5bfd1c068ffedc2df54a4ac6",
+        "tables:word/document.xml:1x8x4",
     ),
+)
+
+_WEEKLY_CANDIDATE_PARTS = (
+    "word/document.xml",
+    "word/footnotes.xml",
+    "word/endnotes.xml",
+    "word/theme/theme1.xml",
+    "word/settings.xml",
+    "word/numbering.xml",
+    "word/styles.xml",
+    "word/webSettings.xml",
+    "word/fontTable.xml",
+)
+_MONTHLY_CANDIDATE_PARTS = (
+    "word/document.xml",
+    "word/theme/theme1.xml",
+    "word/settings.xml",
+    "word/numbering.xml",
+    "word/styles.xml",
+    "word/fontTable.xml",
 )
 
 _CAPABILITIES = tuple(TemplateCapability)
@@ -76,32 +102,59 @@ def _manifest(key: str) -> TemplateContractManifest:
     )
 
 
+def _candidate_profile(
+    document_type: DocumentType,
+    handle_id: str,
+    profile_id: str,
+    seed_sha256: str,
+    table_anchor: str,
+) -> CandidateQualificationProfile:
+    allowed_parts = (
+        _WEEKLY_CANDIDATE_PARTS
+        if document_type is DocumentType.WEEKLY_ACTIVITY_PLAN
+        else _MONTHLY_CANDIDATE_PARTS
+    )
+    contract = TemplateContractManifest(
+        contract_id=f"kg.template.{document_type.value}.candidate",
+        contract_version=1,
+        placeholder_contract_version=1,
+        structural_profile_id=profile_id,
+        structural_profile_version=1,
+        renderer_id=f"kg.renderer.{document_type.value}.candidate.v1",
+        parser_id=f"kg.parser.{document_type.value}.candidate.v1",
+        allowed_parts=allowed_parts,
+        required_anchors=(table_anchor,),
+    )
+    return CandidateQualificationProfile(
+        document_type=document_type,
+        seed_handle=ControlledSeedHandle(
+            handle_id=handle_id,
+            document_type=document_type,
+            expected_sha256=seed_sha256,
+        ),
+        profile_id=profile_id,
+        profile_version=1,
+        fixture_id="weekly-monthly-fixture-v1",
+        contract=contract,
+    )
+
+
+CANDIDATE_QUALIFICATION_PROFILES = tuple(
+    _candidate_profile(*row) for row in _CANDIDATE_PROFILE_ROWS
+)
+
+
 def candidate_profile(
     document_type: object, seed_handle: object, profile_id: object
-) -> tuple[DocumentType, str, str, int, TemplateContractManifest]:
-    """Resolve the two closed synthetic qualification profiles only."""
-    for (
-        registered_type,
-        registered_handle,
-        registered_profile,
-    ) in _CANDIDATE_PROFILE_ROWS:
+) -> CandidateQualificationProfile:
+    """Resolve the two closed released candidate profiles only."""
+    for profile in CANDIDATE_QUALIFICATION_PROFILES:
         if (
-            document_type == registered_type.value
-            and seed_handle == registered_handle
-            and profile_id == registered_profile
+            document_type == profile.document_type.value
+            and seed_handle == profile.seed_handle.handle_id
+            and profile_id == profile.profile_id
         ):
-            manifest = TemplateContractManifest(
-                contract_id=f"kg.template.{registered_type.value}.candidate",
-                contract_version=1,
-                placeholder_contract_version=1,
-                structural_profile_id=registered_profile,
-                structural_profile_version=1,
-                renderer_id=f"kg.renderer.{registered_type.value}.candidate.v1",
-                parser_id=f"kg.parser.{registered_type.value}.candidate.v1",
-                allowed_parts=("word/document.xml",),
-                required_anchors=("table:word/document.xml:19x2",),
-            )
-            return registered_type, registered_handle, registered_profile, 1, manifest
+            return profile
     raise TemplateCenterError(TemplateErrorCode.INPUT_INVALID)
 
 

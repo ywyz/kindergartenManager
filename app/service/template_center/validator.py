@@ -55,10 +55,16 @@ _FOOTER_CONTENT_TYPE = (
 _TOKEN = re.compile(r"\{\{(.*?)\}\}")
 _TOKEN_ID = re.compile(r"kg\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_.]*")
 _CONTRACT_WORD_PART = re.compile(
-    r"word/(?:document|header[1-9][0-9]*|footer[1-9][0-9]*)\.xml"
+    r"word/(?:document|header[1-9][0-9]*|footer[1-9][0-9]*|"
+    r"styles|numbering|settings|fontTable|webSettings|footnotes|endnotes)\.xml|"
+    r"word/theme/theme[1-9][0-9]*\.xml"
 )
 _TABLE_ANCHOR = re.compile(
     r"table:(?P<part>[^:]+):(?P<rows>[1-9][0-9]*)x(?P<columns>[1-9][0-9]*)"
+)
+_TABLE_SET_ANCHOR = re.compile(
+    r"tables:(?P<part>[^:]+):(?P<count>[1-9][0-9]*)x"
+    r"(?P<rows>[1-9][0-9]*)x(?P<columns>[1-9][0-9]*)"
 )
 _DRIVE_PATH = re.compile(r"^[A-Za-z]:")
 _MEDIA_TYPE = re.compile(r"[A-Za-z0-9!#$%&'*+.^_`|~-]+/[A-Za-z0-9!#$%&'*+.^_`|~-]+")
@@ -212,18 +218,50 @@ def _safe_member_name(info: ZipInfo, normalized_names: set[str]) -> str:
     return canonical
 
 
+def _safe_directory_name(info: ZipInfo, normalized_names: set[str]) -> None:
+    name = info.filename
+    normalized = unicodedata.normalize("NFC", name)
+    components = name.removesuffix("/").split("/")
+    mode = (info.external_attr >> 16) & 0xFFFF
+    file_type = stat.S_IFMT(mode)
+    if (
+        type(name) is not str
+        or not name.endswith("/")
+        or name != normalized
+        or name.startswith("/")
+        or "\\" in name
+        or ":" in name
+        or _DRIVE_PATH.match(name) is not None
+        or any(unicodedata.category(character).startswith("C") for character in name)
+        or any(component in {"", ".", ".."} for component in components)
+        or posixpath.normpath(name.removesuffix("/")) + "/" != name
+        or name in normalized_names
+        or info.file_size != 0
+        or info.flag_bits & 0x1
+        or info.compress_type not in {ZIP_STORED, ZIP_DEFLATED}
+        or file_type not in {0, stat.S_IFDIR}
+    ):
+        _reject()
+    normalized_names.add(name)
+
+
 def _read_members(content: bytes) -> tuple[dict[str, bytes], list[dict[str, object]]]:
     if not content.startswith(b"PK\x03\x04"):
         _reject()
     retained: dict[str, bytes] = {}
     summaries: list[dict[str, object]] = []
     normalized_names: set[str] = set()
+    directory_names: set[str] = set()
     total = 0
     with ZipFile(BytesIO(content), "r") as archive:
         infos = archive.infolist()
         if not infos or len(infos) > MAX_ZIP_MEMBERS:
             _reject()
         for info in infos:
+            if info.is_dir():
+                _safe_directory_name(info, normalized_names)
+                directory_names.add(info.filename)
+                continue
             name = _safe_member_name(info, normalized_names)
             total += info.file_size
             if total > MAX_TOTAL_UNCOMPRESSED_BYTES:
@@ -247,6 +285,11 @@ def _read_members(content: bytes) -> tuple[dict[str, bytes], list[dict[str, obje
                 {"name": name, "size": actual_size, "sha256": digest.hexdigest()}
             )
             retained[name] = b"".join(chunks)
+    if any(
+        not any(name.startswith(directory) for name in retained)
+        for directory in directory_names
+    ):
+        _reject()
     if {_CONTENT_TYPES, _ROOT_RELS, _MAIN_PART} - normalized_names:
         _reject()
     return retained, summaries
@@ -613,6 +656,16 @@ def _table_shapes(root: etree._Element) -> tuple[tuple[int, tuple[int, ...]], ..
     return tuple(shapes)
 
 
+def _table_grid_shapes(root: etree._Element) -> tuple[tuple[int, int], ...]:
+    shapes = []
+    for table in root.iter(f"{{{_WORD_NS}}}tbl"):
+        rows = table.findall(f"{{{_WORD_NS}}}tr")
+        grid = table.find(f"{{{_WORD_NS}}}tblGrid")
+        columns = 0 if grid is None else len(grid.findall(f"{{{_WORD_NS}}}gridCol"))
+        shapes.append((len(rows), columns))
+    return tuple(shapes)
+
+
 def _validate_anchors(
     contract: TemplateContractManifest, roots: dict[str, etree._Element]
 ) -> dict[str, tuple[tuple[int, tuple[int, ...]], ...]]:
@@ -635,6 +688,16 @@ def _validate_anchors(
                 row_count == rows and column_counts == (columns,) * rows
                 for row_count, column_counts in shapes.get(part, ())
             ):
+                _reject()
+            continue
+        table_set_match = _TABLE_SET_ANCHOR.fullmatch(anchor)
+        if table_set_match is not None:
+            part = table_set_match.group("part")
+            count = int(table_set_match.group("count"))
+            rows = int(table_set_match.group("rows"))
+            columns = int(table_set_match.group("columns"))
+            root = roots.get(part)
+            if root is None or _table_grid_shapes(root) != ((rows, columns),) * count:
                 _reject()
             continue
         if re.fullmatch(r"legacy:[a-z][a-z0-9_]*:root", anchor) is not None:

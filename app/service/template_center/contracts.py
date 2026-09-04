@@ -204,6 +204,44 @@ class TemplateContractManifest:
 
 
 @dataclass(frozen=True, slots=True)
+class ControlledSeedHandle:
+    """Opaque identity and immutable digest for one released candidate seed."""
+
+    handle_id: str
+    document_type: DocumentType
+    expected_sha256: str
+
+    def __post_init__(self) -> None:
+        _nonempty_text(self.handle_id, "controlled_seed_handle_invalid")
+        _document_type(self.document_type, "controlled_seed_handle_invalid")
+        _sha256(self.expected_sha256, "controlled_seed_handle_invalid")
+
+
+@dataclass(frozen=True, slots=True)
+class CandidateQualificationProfile:
+    document_type: DocumentType
+    seed_handle: ControlledSeedHandle
+    profile_id: str
+    profile_version: int
+    fixture_id: str
+    contract: TemplateContractManifest
+
+    def __post_init__(self) -> None:
+        _document_type(self.document_type, "candidate_qualification_profile_invalid")
+        if (
+            type(self.seed_handle) is not ControlledSeedHandle
+            or self.seed_handle.document_type is not self.document_type
+            or type(self.contract) is not TemplateContractManifest
+            or self.contract.structural_profile_id != self.profile_id
+            or self.contract.structural_profile_version != self.profile_version
+        ):
+            raise ValueError("candidate_qualification_profile_invalid")
+        _nonempty_text(self.profile_id, "candidate_qualification_profile_invalid")
+        _positive_int(self.profile_version, "candidate_qualification_profile_invalid")
+        _nonempty_text(self.fixture_id, "candidate_qualification_profile_invalid")
+
+
+@dataclass(frozen=True, slots=True)
 class TemplateTokenOccurrence:
     """Sanitized token metadata emitted by the pure upload validator."""
 

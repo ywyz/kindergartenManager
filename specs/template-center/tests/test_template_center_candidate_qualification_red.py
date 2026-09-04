@@ -106,9 +106,7 @@ def test_unique_validator_accepts_closed_safe_office_support_parts(
     )
 
     api.validate_upload(
-        docx_with_safe_office_support_parts(
-            include_directories=include_directories
-        ),
+        docx_with_safe_office_support_parts(include_directories=include_directories),
         "synthetic-office.docx",
         api.DOCX_MIME_TYPE,
         contract,
@@ -145,7 +143,6 @@ def _api():
 @pytest.fixture(autouse=True)
 def _use_closed_synthetic_profiles_for_unit_job_tests(monkeypatch):
     """Keep unit GREEN independent of the untracked released Office templates."""
-    api = _api()
     module = import_module("app.service.template_center.candidate_qualification")
     production_resolver = module.candidate_profile
     seed_bytes = MemoryControlledSeedStore().seeds

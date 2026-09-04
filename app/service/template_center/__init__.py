@@ -5,7 +5,9 @@ from app.service.template_center.contracts import (
     BackupAttestation,
     BlobRef,
     CandidateQualificationEvidence,
+    CandidateQualificationProfile,
     CommitReceipt,
+    ControlledSeedHandle,
     DOCX_MIME_TYPE,
     DocumentType,
     DocumentTypeDescriptor,
@@ -50,6 +52,7 @@ from app.service.template_center.contracts import (
 from app.service.template_center.validator import validate_upload
 from app.service.template_center.blob_store import ContentAddressedTemplateBlobStore
 from app.service.template_center.registry import (
+    CANDIDATE_QUALIFICATION_PROFILES,
     GLOBAL_KNOWN_DOCUMENT_TYPES,
     INITIAL_DOCUMENT_DESCRIPTORS,
     PHASE1_ENABLED_DOCUMENT_TYPES,
@@ -69,7 +72,10 @@ __all__ = (
     "BackupAttestation",
     "BlobRef",
     "CandidateQualificationEvidence",
+    "CandidateQualificationProfile",
+    "CANDIDATE_QUALIFICATION_PROFILES",
     "CommitReceipt",
+    "ControlledSeedHandle",
     "ContentAddressedTemplateBlobStore",
     "DOCX_MIME_TYPE",
     "DocumentType",
