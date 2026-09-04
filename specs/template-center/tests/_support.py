@@ -461,7 +461,11 @@ class MemoryExportPort:
         self.render_calls.append((binding, payload))
         if self.render_mode == "raises":
             raise RuntimeError("synthetic render failure with private body")
-        rendered_bytes = _docx_with_text("合成预览")
+        rendered_bytes = (
+            b"not a DOCX rendered payload"
+            if self.render_mode == "unsafe-bytes"
+            else _docx_with_text("合成预览")
+        )
         rendered_binding = (
             api.TemplateExportBinding.candidate(
                 document_type=binding.document_type,
@@ -507,7 +511,9 @@ class MemoryExportPort:
         return api.ExportParseReport(
             binding=parse_binding,
             valid=self.parse_mode != "invalid",
-            structure_summary_sha256="c" * 64,
+            structure_summary_sha256=(
+                "d" * 64 if self.parse_mode == "structure-mismatch" else "c" * 64
+            ),
             unresolved_token_ids=(
                 ("kg.synthetic.unresolved",) if self.parse_mode == "unresolved" else ()
             ),

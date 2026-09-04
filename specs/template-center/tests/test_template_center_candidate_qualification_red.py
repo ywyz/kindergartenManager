@@ -513,6 +513,36 @@ async def test_candidate_pipeline_failures_short_circuit_without_evidence(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("render_mode", "parse_mode", "expected_parse"),
+    [
+        ("unsafe-bytes", "valid", 0),
+        ("valid", "structure-mismatch", 1),
+    ],
+    ids=["rendered-not-docx", "parse-structure-not-bound"],
+)
+async def test_render_and_parse_cannot_self_attest_unbound_content(
+    render_mode, parse_mode, expected_parse
+):
+    api = _api()
+    export = MemoryExportPort(render_mode=render_mode, parse_mode=parse_mode)
+    job, effects = _job(api, export=export)
+
+    with pytest.raises(api.TemplateCenterError) as caught:
+        await job.qualify(
+            document_type="weekly_activity_plan",
+            seed_handle="controlled-weekplan-seed-v1",
+            fixture=_fixture(api),
+            profile_id="weekly_activity_plan-profile-v1",
+        )
+
+    assert caught.value.code is api.TemplateErrorCode.EXPORT_FAILED
+    assert len(effects["export"].parse_calls) == expected_parse
+    assert effects["office"].calls == []
+    assert effects["evidence"].items == []
+
+
+@pytest.mark.asyncio
 async def test_candidate_evidence_append_failure_is_sanitized_and_not_visible():
     api = _api()
     evidence_store = MemoryQualificationEvidenceStore(fail=True)
