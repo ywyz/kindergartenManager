@@ -451,3 +451,38 @@ def test_blob_root_owned_by_another_effective_user_is_rejected(
     with pytest.raises(api.TemplateCenterError) as caught:
         api.ContentAddressedTemplateBlobStore(root)
     assert caught.value.code is api.TemplateErrorCode.STORAGE_FAILED
+
+
+def test_blob_root_rejects_a_symlink_in_an_intermediate_ancestor(tmp_path: Path):
+    api = _api()
+    real_parent = tmp_path / "real-parent"
+    real_parent.mkdir(mode=0o700)
+    linked_parent = tmp_path / "linked-parent"
+    linked_parent.symlink_to(real_parent, target_is_directory=True)
+
+    with pytest.raises(api.TemplateCenterError) as caught:
+        api.ContentAddressedTemplateBlobStore(linked_parent / "blob-root")
+    assert caught.value.code is api.TemplateErrorCode.STORAGE_FAILED
+
+
+@pytest.mark.asyncio
+async def test_blob_put_fails_closed_when_plaintext_temporary_cleanup_fails(
+    tmp_path: Path, monkeypatch
+):
+    api = _api()
+    blob_store_module = import_module("app.service.template_center.blob_store")
+    root = tmp_path / "trusted-template-blobs"
+    store = api.ContentAddressedTemplateBlobStore(root)
+    content = docx_with_text("synthetic cleanup failure candidate")
+    digest = sha256(content).hexdigest()
+    real_unlink = blob_store_module.os.unlink
+
+    def fail_temporary_unlink(path, *args, **kwargs):
+        if Path(path).name.startswith(".template-blob-"):
+            raise OSError("synthetic temporary cleanup failure")
+        return real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(blob_store_module.os, "unlink", fail_temporary_unlink)
+    with pytest.raises(api.TemplateCenterError) as caught:
+        await store.put_if_absent(digest, content)
+    assert caught.value.code is api.TemplateErrorCode.STORAGE_FAILED
