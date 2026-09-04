@@ -818,3 +818,33 @@ def docx_with_text(text: str, *, table_rows: int = 19) -> bytes:
 def docx_with_structure_profile_mismatch() -> bytes:
     """Safe OOXML whose table shape cannot satisfy the registered candidate profile."""
     return _docx_with_text("candidate structure mismatch", table_rows=1)
+
+
+def docx_with_table_shapes(*shapes: tuple[int, int]) -> bytes:
+    """Build deterministic synthetic OOXML with explicit table-grid shapes."""
+    tables = []
+    for row_count, column_count in shapes:
+        grid = "".join('<w:gridCol w:w="1000"/>' for _ in range(column_count))
+        rows = "".join(
+            "<w:tr>"
+            + "".join(
+                "<w:tc><w:p><w:r><w:t>synthetic</w:t></w:r></w:p></w:tc>"
+                for _ in range(column_count)
+            )
+            + "</w:tr>"
+            for _ in range(row_count)
+        )
+        tables.append(f"<w:tbl><w:tblGrid>{grid}</w:tblGrid>{rows}</w:tbl>")
+    document = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        "<w:body>"
+        + "".join(tables)
+        + '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr>'
+        "</w:body></w:document>"
+    ).encode()
+    return _docx_with_text(
+        "synthetic",
+        members={"word/document.xml": document},
+        table_rows=1,
+    )

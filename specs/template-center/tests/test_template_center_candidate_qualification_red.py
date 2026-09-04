@@ -20,8 +20,93 @@ from _support import (
     docx_with_external_relationship,
     docx_with_macro_member,
     docx_with_structure_profile_mismatch,
+    docx_with_table_shapes,
+    docx_with_text,
     OFFICE_CLIENT_VERSIONS,
 )
+
+
+def test_candidate_registry_pins_released_seed_hashes_and_exact_table_profiles():
+    api = _api()
+
+    assert tuple(
+        (
+            profile.document_type.value,
+            profile.seed_handle.handle_id,
+            profile.seed_handle.expected_sha256,
+            profile.contract.required_anchors,
+        )
+        for profile in api.CANDIDATE_QUALIFICATION_PROFILES
+    ) == (
+        (
+            "weekly_activity_plan",
+            "controlled-weekplan-seed-v1",
+            "226c8208659bb6334533499b417aaf5f7ccad1e82d3a7cd6b8955d91a2b6417a",
+            ("tables:word/document.xml:2x9x7",),
+        ),
+        (
+            "monthly_theme_activity_plan",
+            "controlled-monthplan-seed-v1",
+            "787f1a9be8aaebd27cf87c25747a3f8e70e584ac5bfd1c068ffedc2df54a4ac6",
+            ("tables:word/document.xml:1x8x4",),
+        ),
+    )
+
+
+def test_unique_validator_enforces_exact_candidate_table_count_rows_and_grid():
+    api = _api()
+    weekly = api.CANDIDATE_QUALIFICATION_PROFILES[0]
+    monthly = api.CANDIDATE_QUALIFICATION_PROFILES[1]
+
+    api.validate_upload(
+        docx_with_table_shapes((9, 7), (9, 7)),
+        "synthetic-weekly.docx",
+        api.DOCX_MIME_TYPE,
+        weekly.contract,
+    )
+    api.validate_upload(
+        docx_with_table_shapes((8, 4)),
+        "synthetic-monthly.docx",
+        api.DOCX_MIME_TYPE,
+        monthly.contract,
+    )
+    for content, contract in (
+        (docx_with_table_shapes((9, 7)), weekly.contract),
+        (docx_with_table_shapes((9, 7), (9, 6)), weekly.contract),
+        (docx_with_table_shapes((8, 4), (8, 4)), monthly.contract),
+        (docx_with_table_shapes((8, 3)), monthly.contract),
+    ):
+        with pytest.raises(api.TemplateCenterError) as caught:
+            api.validate_upload(
+                content,
+                "synthetic-candidate.docx",
+                api.DOCX_MIME_TYPE,
+                contract,
+            )
+        assert caught.value.code is api.TemplateErrorCode.VALIDATION_FAILED
+
+
+@pytest.mark.asyncio
+async def test_registered_seed_handle_cannot_be_rebound_to_different_valid_bytes():
+    api = _api()
+    seeds = MemoryControlledSeedStore()
+    seeds.register_controlled_seed(
+        "controlled-weekplan-seed-v1", docx_with_text("rebound candidate seed")
+    )
+    job, effects = _job(api, seeds=seeds)
+
+    with pytest.raises(api.TemplateCenterError) as caught:
+        await job.qualify(
+            document_type="weekly_activity_plan",
+            seed_handle="controlled-weekplan-seed-v1",
+            fixture=_fixture(api),
+            profile_id="weekly_activity_plan-profile-v1",
+        )
+
+    assert caught.value.code is api.TemplateErrorCode.VALIDATION_FAILED
+    assert effects["export"].render_calls == []
+    assert effects["office"].calls == []
+    assert effects["evidence"].items == []
 
 
 def _api():
