@@ -192,6 +192,50 @@ def _fixture(api, *, provenance="synthetic"):
     )
 
 
+class _EqualityBypass:
+    def __eq__(self, other):
+        return True
+
+
+class _StringSubclass(str):
+    pass
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("document_type", "seed_handle", "profile_id"),
+    [
+        (_EqualityBypass(), _EqualityBypass(), _EqualityBypass()),
+        (
+            _StringSubclass("weekly_activity_plan"),
+            _StringSubclass("controlled-weekplan-seed-v1"),
+            _StringSubclass("weekly_activity_plan-profile-v1"),
+        ),
+    ],
+    ids=["custom-equality", "str-subclass"],
+)
+async def test_candidate_preflight_rejects_equality_bypass_before_all_ports(
+    document_type, seed_handle, profile_id
+):
+    api = _api()
+    job, effects = _job(api)
+
+    with pytest.raises(api.TemplateCenterError) as caught:
+        await job.qualify(
+            document_type=document_type,
+            seed_handle=seed_handle,
+            fixture=_fixture(api),
+            profile_id=profile_id,
+        )
+
+    assert caught.value.code is api.TemplateErrorCode.INPUT_INVALID
+    assert effects["seeds"].read_calls == []
+    assert effects["export"].render_calls == []
+    assert effects["export"].parse_calls == []
+    assert effects["office"].calls == []
+    assert effects["evidence"].items == []
+
+
 def test_candidate_job_and_contracts_are_closed_immutable_and_internal_only():
     api = _api()
     job, _ = _job(api)
