@@ -5,6 +5,7 @@ from dataclasses import FrozenInstanceError, fields, is_dataclass, replace
 from datetime import date, datetime, timedelta, timezone
 from importlib import import_module
 from inspect import iscoroutinefunction, signature
+from typing import get_args, get_type_hints
 from uuid import UUID
 
 import pytest
@@ -657,3 +658,31 @@ def test_filename_builder_bounds_very_long_normalized_segments():
     )
     assert filename.endswith(".docx")
     assert len(filename.encode("utf-8")) <= 240
+
+
+def test_template_export_parse_accepts_only_closed_rendered_or_bytes_shape():
+    e = _exports()
+    annotation = get_type_hints(e.TemplateExportPort.parse)["rendered_bytes"]
+    assert set(get_args(annotation)) == {e.RenderedTemplate, bytes}
+
+
+def test_exported_mapping_profiles_have_no_mutable_module_backing_store():
+    e = _exports()
+    for name in ("_WEEKLY_PLACEHOLDERS", "_MONTHLY_PLACEHOLDERS"):
+        assert not hasattr(e, name)
+
+
+@pytest.mark.parametrize("filename", ["CON.docx", "con.docx", "bad?.docx"])
+def test_export_result_rejects_noncanonical_windows_filenames(filename):
+    e = _exports()
+    binding = _binding(e)
+    with pytest.raises(e.ExportContractError):
+        e.ExportResult(
+            document_type=e.PlanDocumentType.WEEKLY_ACTIVITY_PLAN,
+            plan_id=101,
+            plan_version=2,
+            binding=binding,
+            rendered=_rendered(e, binding),
+            parse_report=_report(e, binding),
+            filename=filename,
+        )
