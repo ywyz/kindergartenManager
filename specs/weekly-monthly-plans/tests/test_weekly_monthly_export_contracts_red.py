@@ -2,7 +2,7 @@
 
 import re
 from dataclasses import FrozenInstanceError, fields, is_dataclass, replace
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from importlib import import_module
 from inspect import iscoroutinefunction, signature
 from uuid import UUID
@@ -38,7 +38,7 @@ def _weekly_plan(c):
     labels = ("周一", "周二", "周三", "周四", "周五")
     days = tuple(
         c.WeeklyDay(
-            day_date=date(2026, 9, 28 + offset),
+            day_date=date(2026, 9, 28) + timedelta(days=offset),
             weekday=offset,
             weekday_cn=label,
             morning_talk=f"晨谈 {offset}",
