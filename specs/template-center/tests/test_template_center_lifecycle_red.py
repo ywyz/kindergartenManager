@@ -82,10 +82,14 @@ async def test_stale_activation_fails_without_changing_the_existing_active_point
     assert snapshot.active_version_id == first.template_version_id
     assert snapshot.active_content_sha256 == first.content_sha256
     assert len(effects["versions"].transitions) == 1
-    assert [getattr(event, "action", None) for event in effects["audit"].events].count(
-        "activate"
-    ) == 1
-    assert effects["audit"].events[-1].outcome == "stale"
+    assert [event.action for event in effects["audit"].events[-2:]] == [
+        "activate",
+        "activate",
+    ]
+    assert [event.outcome for event in effects["audit"].events[-2:]] == [
+        "accepted",
+        "stale",
+    ]
 
 
 @pytest.mark.asyncio

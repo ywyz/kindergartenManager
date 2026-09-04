@@ -50,6 +50,8 @@ class MemoryVersionStore:
         )
 
     async def snapshot(self, tenant_id: int, document_type: str) -> object:
+        from app.service import template_center as api
+
         normalized = getattr(document_type, "value", document_type)
         key = (tenant_id, normalized)
         scoped = [
@@ -59,9 +61,9 @@ class MemoryVersionStore:
             and getattr(getattr(event, "document_type", None), "value", None)
             == normalized
         ]
-        return SimpleNamespace(
+        return api.TemplateRegistryState(
             tenant_id=tenant_id,
-            document_type=document_type,
+            document_type=api.DocumentType(normalized),
             registry_revision=len(scoped),
             active_version_id=self.active.get(key),
             active_content_sha256=(
@@ -312,12 +314,14 @@ class MemoryBlobStore:
 
     async def read(self, blob_ref: str, expected_sha256: str) -> bytes:
         self.calls.append(("read", expected_sha256))
-        assert blob_ref == f"sha256/{expected_sha256}"
+        value = getattr(blob_ref, "value", blob_ref)
+        assert value == f"sha256/{expected_sha256}"
         return self.blobs[expected_sha256]
 
     async def exists(self, blob_ref: str, expected_sha256: str) -> bool:
         self.calls.append(("exists", expected_sha256))
-        return blob_ref == f"sha256/{expected_sha256}" and expected_sha256 in self.blobs
+        value = getattr(blob_ref, "value", blob_ref)
+        return value == f"sha256/{expected_sha256}" and expected_sha256 in self.blobs
 
 
 class AllowPolicy:

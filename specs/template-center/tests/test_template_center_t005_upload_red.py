@@ -32,13 +32,15 @@ async def _upload(center, *, session=None, content=None, document_type="daily_pl
     )
 
 
-def test_t005_public_service_is_upload_only_and_has_no_caller_tenant_override():
+def test_t006_public_service_is_closed_and_has_no_caller_tenant_override():
     api = _api()
     public = {name for name in vars(api.TemplateCenter) if not name.startswith("_")}
-    assert public == {"upload"}
-    parameters = signature(api.TemplateCenter.upload).parameters
-    assert "tenant_id" not in parameters
-    assert not hasattr(api.TemplateCenter, "activate")
+    assert public == {"upload", "activate", "deactivate", "rollback"}
+    for method_name in public:
+        assert (
+            "tenant_id"
+            not in signature(getattr(api.TemplateCenter, method_name)).parameters
+        )
     assert not hasattr(api.TemplateCenter, "resolve_active")
     assert not hasattr(api.TemplateCenter, "project")
 

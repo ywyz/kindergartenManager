@@ -90,6 +90,11 @@ def _positive_int(value: object, code: str) -> None:
         raise ValueError(code)
 
 
+def _nonnegative_int(value: object, code: str) -> None:
+    if type(value) is not int or value < 0:
+        raise ValueError(code)
+
+
 def _nonempty_text(value: object, code: str) -> None:
     if type(value) is not str or not value.strip():
         raise ValueError(code)
@@ -472,13 +477,16 @@ class TemplateRegistryState:
     registry_revision: int
     active_version_id: UUID | None
     active_content_sha256: str | None
-    last_transition_event_id: UUID
+    last_transition_event_id: UUID | None
 
     def __post_init__(self) -> None:
         _positive_int(self.tenant_id, "template_registry_state_invalid")
         _document_type(self.document_type, "template_registry_state_invalid")
-        _positive_int(self.registry_revision, "template_registry_state_invalid")
-        if type(self.last_transition_event_id) is not UUID:
+        _nonnegative_int(self.registry_revision, "template_registry_state_invalid")
+        if self.registry_revision == 0:
+            if self.last_transition_event_id is not None:
+                raise ValueError("template_registry_state_invalid")
+        elif type(self.last_transition_event_id) is not UUID:
             raise ValueError("template_registry_state_invalid")
         if (self.active_version_id is None) != (self.active_content_sha256 is None):
             raise ValueError("template_registry_state_invalid")
@@ -674,7 +682,7 @@ class TemplateAuditEvent:
         if self.contract_version is not None:
             _positive_int(self.contract_version, "template_audit_event_invalid")
         if self.registry_revision is not None:
-            _positive_int(self.registry_revision, "template_audit_event_invalid")
+            _nonnegative_int(self.registry_revision, "template_audit_event_invalid")
         _utc(self.occurred_at_utc, "template_audit_event_invalid")
         _positive_int(self.schema_version, "template_audit_event_invalid")
 
@@ -842,7 +850,11 @@ class TemplateUnitOfWork(Protocol):
         version_ref: TemplateVersionRef,
     ) -> None: ...
     async def stage_transition(
-        self, transition_event: TemplateTransitionEvent
+        self,
+        transition_event: TemplateTransitionEvent,
+        *,
+        expected_registry_revision: int,
+        expected_active_version_id: UUID | None,
     ) -> None: ...
     async def stage_audit(self, audit_event: TemplateAuditEvent) -> None: ...
     async def commit(self) -> CommitReceipt: ...

@@ -1,4 +1,4 @@
-"""Narrow T005 upload orchestration for validated immutable versions."""
+"""Narrow T005/T006 orchestration for immutable versions and active pointers."""
 
 from __future__ import annotations
 
@@ -20,11 +20,15 @@ from app.service.template_center.contracts import (
     TemplateContractManifest,
     TemplateErrorCode,
     TemplatePermissionPolicyPort,
+    TemplateRegistryState,
     TemplateSource,
+    TemplateTransitionEvent,
     TemplateUnitOfWorkPort,
     TemplateValidationEvidence,
     TemplateValidationReceipt,
     TemplateVersionRef,
+    TemplateVersionStorePort,
+    TransitionReceipt,
     ValidationStatus,
     VersionAllocation,
 )
@@ -32,10 +36,11 @@ from app.service.template_center.validator import VALIDATOR_VERSION, validate_up
 
 
 class TemplateCenter:
-    """T005-only service; lifecycle and exporter operations are intentionally absent."""
+    """Upload and CAS lifecycle service; UI/exporter operations remain absent."""
 
     __slots__ = (
         "_blob_store",
+        "_version_store",
         "_transaction_port",
         "_permission_policy",
         "_contract_registry",
@@ -46,12 +51,14 @@ class TemplateCenter:
         self,
         *,
         blob_store: TemplateBlobStorePort,
+        version_store: TemplateVersionStorePort | None = None,
         transaction_port: TemplateUnitOfWorkPort,
         permission_policy: TemplatePermissionPolicyPort,
         contract_registry: object,
         clock: TemplateClockPort,
     ) -> None:
         self._blob_store = blob_store
+        self._version_store = version_store
         self._transaction_port = transaction_port
         self._permission_policy = permission_policy
         self._contract_registry = contract_registry
@@ -91,20 +98,25 @@ class TemplateCenter:
         session_id: UUID,
         document_type: DocumentType,
         occurred_at_utc: datetime,
+        action: TemplateCapability = TemplateCapability.UPLOAD,
+        version: TemplateVersionRef | None = None,
+        registry_revision: int | None = None,
     ) -> TemplateAuditEvent:
         return TemplateAuditEvent(
             event_id=uuid4(),
-            action=TemplateCapability.UPLOAD,
+            action=action,
             outcome=outcome,
             tenant_id=tenant_id,
             user_id=user_id,
             session_hash=TemplateCenter._session_hash(session_id),
             document_type=document_type,
-            template_version_id=None,
-            content_sha256=None,
-            contract_id=None,
-            contract_version=None,
-            registry_revision=None,
+            template_version_id=(
+                version.template_version_id if version is not None else None
+            ),
+            content_sha256=version.content_sha256 if version is not None else None,
+            contract_id=version.contract_id if version is not None else None,
+            contract_version=version.contract_version if version is not None else None,
+            registry_revision=registry_revision,
             occurred_at_utc=occurred_at_utc,
         )
 
@@ -116,6 +128,9 @@ class TemplateCenter:
         user_id: int,
         session_id: UUID,
         document_type: DocumentType,
+        action: TemplateCapability = TemplateCapability.UPLOAD,
+        version: TemplateVersionRef | None = None,
+        registry_revision: int | None = None,
     ) -> None:
         try:
             unit = await self._transaction_port.begin(tenant_id, document_type)
@@ -127,6 +142,9 @@ class TemplateCenter:
                     session_id=session_id,
                     document_type=document_type,
                     occurred_at_utc=self._now(),
+                    action=action,
+                    version=version,
+                    registry_revision=registry_revision,
                 )
             )
             receipt = await unit.commit()
@@ -293,3 +311,343 @@ class TemplateCenter:
         except Exception as error:
             raise TemplateCenterError(TemplateErrorCode.STORAGE_FAILED) from error
         return version
+
+    @staticmethod
+    def _expected_pointer(
+        expected_registry_revision: object,
+        expected_active_version_id: object,
+    ) -> tuple[int, UUID | None]:
+        if (
+            type(expected_registry_revision) is not int
+            or expected_registry_revision < 0
+            or (
+                expected_active_version_id is not None
+                and type(expected_active_version_id) is not UUID
+            )
+        ):
+            raise TemplateCenterError(TemplateErrorCode.INPUT_INVALID)
+        return expected_registry_revision, expected_active_version_id
+
+    async def _authorize_lifecycle(
+        self,
+        actor: object,
+        *,
+        action: TemplateCapability,
+        document_type: DocumentType,
+        tenant_id: int,
+        user_id: int,
+        session_id: UUID,
+    ) -> None:
+        try:
+            decision = await self._permission_policy.authorize(
+                actor, action, document_type, tenant_id
+            )
+        except Exception as error:
+            decision = None
+            authorization_error = error
+        else:
+            authorization_error = None
+        if type(decision) is PermissionDecision and decision.allowed is True:
+            return
+        await self._commit_rejection(
+            outcome=AuditOutcome.DENIED,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            session_id=session_id,
+            document_type=document_type,
+            action=action,
+        )
+        denial = TemplateCenterError(TemplateErrorCode.PERMISSION_DENIED)
+        if authorization_error is not None:
+            denial.__cause__ = authorization_error
+        raise denial
+
+    async def _snapshot(
+        self, tenant_id: int, document_type: DocumentType
+    ) -> TemplateRegistryState:
+        if self._version_store is None:
+            raise TemplateCenterError(TemplateErrorCode.STORAGE_FAILED)
+        try:
+            snapshot = await self._version_store.snapshot(tenant_id, document_type)
+        except TemplateCenterError:
+            raise
+        except Exception as error:
+            raise TemplateCenterError(TemplateErrorCode.STORAGE_FAILED) from error
+        if (
+            type(snapshot) is not TemplateRegistryState
+            or snapshot.tenant_id != tenant_id
+            or snapshot.document_type is not document_type
+        ):
+            raise TemplateCenterError(TemplateErrorCode.STORAGE_FAILED)
+        return snapshot
+
+    async def _validated_target(
+        self,
+        *,
+        tenant_id: int,
+        document_type: DocumentType,
+        version_id: UUID,
+    ) -> TemplateVersionRef | None:
+        if self._version_store is None:
+            raise TemplateCenterError(TemplateErrorCode.STORAGE_FAILED)
+        try:
+            version = await self._version_store.get_version(tenant_id, version_id)
+        except Exception as error:
+            raise TemplateCenterError(TemplateErrorCode.STORAGE_FAILED) from error
+        if version is None:
+            return None
+        try:
+            contract = self._contract_registry.resolve(document_type)
+            evidence = version.validation_evidence
+            blob_ref = BlobRef(
+                value=version.blob_ref, content_sha256=version.content_sha256
+            )
+            exists = await self._blob_store.exists(blob_ref, version.content_sha256)
+        except Exception as error:
+            raise TemplateCenterError(TemplateErrorCode.STORAGE_FAILED) from error
+        if (
+            type(version) is not TemplateVersionRef
+            or version.tenant_id != tenant_id
+            or version.document_type is not document_type
+            or version.validation_status is not ValidationStatus.VALIDATED
+            or version.contract_id != contract.contract_id
+            or version.contract_version != contract.contract_version
+            or evidence.content_sha256 != version.content_sha256
+            or evidence.structural_profile_id != contract.structural_profile_id
+            or evidence.structural_profile_version
+            != contract.structural_profile_version
+            or exists is not True
+        ):
+            raise TemplateCenterError(TemplateErrorCode.VALIDATION_FAILED)
+        return version
+
+    async def _stale(
+        self,
+        *,
+        tenant_id: int,
+        user_id: int,
+        session_id: UUID,
+        document_type: DocumentType,
+        action: TemplateCapability,
+        registry_revision: int,
+        version: TemplateVersionRef | None = None,
+    ) -> None:
+        await self._commit_rejection(
+            outcome=AuditOutcome.STALE,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            session_id=session_id,
+            document_type=document_type,
+            action=action,
+            version=version,
+            registry_revision=registry_revision,
+        )
+        raise TemplateCenterError(TemplateErrorCode.REGISTRY_STALE)
+
+    async def _transition(
+        self,
+        actor: object,
+        *,
+        action: TemplateCapability,
+        document_type: str | DocumentType,
+        target_version_id: UUID | None,
+        expected_registry_revision: int,
+        expected_active_version_id: UUID | None,
+    ) -> TransitionReceipt:
+        tenant_id, user_id, session_id = self._session_scope(actor)
+        try:
+            self._contract_registry.resolve(document_type)
+            normalized_type = (
+                document_type
+                if type(document_type) is DocumentType
+                else DocumentType(document_type)
+            )
+        except Exception as error:
+            if isinstance(error, TemplateCenterError):
+                raise
+            raise TemplateCenterError(
+                TemplateErrorCode.UNKNOWN_DOCUMENT_TYPE
+            ) from error
+        expected_revision, expected_active = self._expected_pointer(
+            expected_registry_revision, expected_active_version_id
+        )
+        if target_version_id is not None and type(target_version_id) is not UUID:
+            raise TemplateCenterError(TemplateErrorCode.INPUT_INVALID)
+        await self._authorize_lifecycle(
+            actor,
+            action=action,
+            document_type=normalized_type,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            session_id=session_id,
+        )
+        snapshot = await self._snapshot(tenant_id, normalized_type)
+        current_version = None
+        if snapshot.active_version_id is not None:
+            current_version = await self._validated_target(
+                tenant_id=tenant_id,
+                document_type=normalized_type,
+                version_id=snapshot.active_version_id,
+            )
+        if (
+            snapshot.registry_revision != expected_revision
+            or snapshot.active_version_id != expected_active
+        ):
+            await self._stale(
+                tenant_id=tenant_id,
+                user_id=user_id,
+                session_id=session_id,
+                document_type=normalized_type,
+                action=action,
+                registry_revision=snapshot.registry_revision,
+                version=current_version,
+            )
+        if target_version_id is None:
+            target = None
+        else:
+            target = await self._validated_target(
+                tenant_id=tenant_id,
+                document_type=normalized_type,
+                version_id=target_version_id,
+            )
+            if target is None:
+                await self._commit_rejection(
+                    outcome=AuditOutcome.DENIED,
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    session_id=session_id,
+                    document_type=normalized_type,
+                    action=action,
+                    registry_revision=snapshot.registry_revision,
+                )
+                raise TemplateCenterError(TemplateErrorCode.VERSION_NOT_FOUND)
+        new_revision = snapshot.registry_revision + 1
+        now = self._now()
+        transition = TemplateTransitionEvent(
+            event_id=uuid4(),
+            tenant_id=tenant_id,
+            document_type=normalized_type,
+            registry_revision=new_revision,
+            active_version_id=(
+                target.template_version_id if target is not None else None
+            ),
+            active_content_sha256=(
+                target.content_sha256 if target is not None else None
+            ),
+            occurred_at_utc=now,
+        )
+        audit_version = target if target is not None else current_version
+        try:
+            unit = await self._transaction_port.begin(tenant_id, normalized_type)
+            await unit.stage_transition(
+                transition,
+                expected_registry_revision=expected_revision,
+                expected_active_version_id=expected_active,
+            )
+            await unit.stage_audit(
+                TemplateAuditEvent(
+                    event_id=uuid4(),
+                    action=action,
+                    outcome=AuditOutcome.ACCEPTED,
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    session_hash=self._session_hash(session_id),
+                    document_type=normalized_type,
+                    template_version_id=(
+                        audit_version.template_version_id
+                        if audit_version is not None
+                        else None
+                    ),
+                    content_sha256=(
+                        audit_version.content_sha256
+                        if audit_version is not None
+                        else None
+                    ),
+                    contract_id=(
+                        audit_version.contract_id if audit_version is not None else None
+                    ),
+                    contract_version=(
+                        audit_version.contract_version
+                        if audit_version is not None
+                        else None
+                    ),
+                    registry_revision=new_revision,
+                    occurred_at_utc=now,
+                )
+            )
+            receipt = await unit.commit()
+            if type(receipt) is not CommitReceipt or receipt.committed is not True:
+                raise RuntimeError("invalid commit receipt")
+        except TemplateCenterError as error:
+            if error.code is TemplateErrorCode.REGISTRY_STALE:
+                latest = await self._snapshot(tenant_id, normalized_type)
+                await self._stale(
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    session_id=session_id,
+                    document_type=normalized_type,
+                    action=action,
+                    registry_revision=latest.registry_revision,
+                )
+            raise
+        except Exception as error:
+            raise TemplateCenterError(TemplateErrorCode.STORAGE_FAILED) from error
+        return TransitionReceipt(
+            document_type=normalized_type,
+            active_version_id=transition.active_version_id,
+            registry_revision=new_revision,
+            content_sha256=transition.active_content_sha256,
+        )
+
+    async def activate(
+        self,
+        actor: object,
+        *,
+        document_type: str | DocumentType,
+        version_id: UUID,
+        expected_registry_revision: int,
+        expected_active_version_id: UUID | None,
+    ) -> TransitionReceipt:
+        return await self._transition(
+            actor,
+            action=TemplateCapability.ACTIVATE,
+            document_type=document_type,
+            target_version_id=version_id,
+            expected_registry_revision=expected_registry_revision,
+            expected_active_version_id=expected_active_version_id,
+        )
+
+    async def deactivate(
+        self,
+        actor: object,
+        *,
+        document_type: str | DocumentType,
+        expected_registry_revision: int,
+        expected_active_version_id: UUID | None,
+    ) -> TransitionReceipt:
+        return await self._transition(
+            actor,
+            action=TemplateCapability.DEACTIVATE,
+            document_type=document_type,
+            target_version_id=None,
+            expected_registry_revision=expected_registry_revision,
+            expected_active_version_id=expected_active_version_id,
+        )
+
+    async def rollback(
+        self,
+        actor: object,
+        *,
+        document_type: str | DocumentType,
+        target_version_id: UUID,
+        expected_registry_revision: int,
+        expected_active_version_id: UUID | None,
+    ) -> TransitionReceipt:
+        return await self._transition(
+            actor,
+            action=TemplateCapability.ROLLBACK,
+            document_type=document_type,
+            target_version_id=target_version_id,
+            expected_registry_revision=expected_registry_revision,
+            expected_active_version_id=expected_active_version_id,
+        )
