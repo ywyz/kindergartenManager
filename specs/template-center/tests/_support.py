@@ -508,11 +508,30 @@ class MemoryExportPort:
             if self.parse_mode == "binding-mismatch"
             else binding
         )
+        contract = api.TemplateContractManifest(
+            contract_id=binding.contract_id,
+            contract_version=binding.contract_version,
+            placeholder_contract_version=1,
+            structural_profile_id=binding.profile_id,
+            structural_profile_version=binding.profile_version,
+            renderer_id="kg.renderer.synthetic.candidate.v1",
+            parser_id="kg.parser.synthetic.candidate.v1",
+            allowed_parts=("word/document.xml",),
+            required_anchors=("table:word/document.xml:19x2",),
+        )
+        structure_summary_sha256 = api.validate_upload(
+            rendered_bytes,
+            "synthetic-rendered.docx",
+            api.DOCX_MIME_TYPE,
+            contract,
+        ).structure_summary_sha256
         return api.ExportParseReport(
             binding=parse_binding,
             valid=self.parse_mode != "invalid",
             structure_summary_sha256=(
-                "d" * 64 if self.parse_mode == "structure-mismatch" else "c" * 64
+                "d" * 64
+                if self.parse_mode == "structure-mismatch"
+                else structure_summary_sha256
             ),
             unresolved_token_ids=(
                 ("kg.synthetic.unresolved",) if self.parse_mode == "unresolved" else ()

@@ -137,11 +137,22 @@ class TemplateCandidateQualificationJob:
                 != rendered.rendered_sha256
             ):
                 raise ValueError("rendered_result_invalid")
+            rendered_validation = validate_upload(
+                content=rendered.rendered_bytes,
+                filename="rendered-candidate.docx",
+                content_type=(
+                    "application/vnd.openxmlformats-officedocument."
+                    "wordprocessingml.document"
+                ),
+                contract=profile.contract,
+            )
             report = await self._export_port.parse(binding, rendered.rendered_bytes)
             if (
                 type(report) is not ExportParseReport
                 or report.binding is not binding
                 or not report.valid
+                or report.structure_summary_sha256
+                != rendered_validation.structure_summary_sha256
                 or report.unresolved_token_ids
                 or report.has_macros
                 or report.has_external_relationships
