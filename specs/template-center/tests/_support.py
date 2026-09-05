@@ -546,8 +546,8 @@ class MemoryControlledSeedStore:
 
     def __init__(self, *, extra_seeds: dict[str, bytes] | None = None) -> None:
         self.seeds = {
-            "controlled-weekplan-seed-v1": docx_with_text("weekly candidate seed"),
-            "controlled-monthplan-seed-v1": docx_with_text("monthly candidate seed"),
+            "controlled-weekplan-seed-v2": docx_with_text("weekly candidate seed"),
+            "controlled-monthplan-seed-v2": docx_with_text("monthly candidate seed"),
         }
         if extra_seeds:
             self.seeds.update(

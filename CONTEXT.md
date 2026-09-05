@@ -240,6 +240,9 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
 5. Issue #55 已冻结角色权限矩阵；ADR-0008、模板中心第一期 spec/稳定 RED、周/月计划领域与导出
    spec/稳定 RED 已完成双轴 Review Standards 0 / Spec 0。下一步仍须拆成模板中心 T003 起步与周/月 WMP-3
    两条最小 GREEN，不得把权限、模板存储/版本、周/月业务、审核或文档中心合成一个交付；当前状态不授权 GREEN。
+6. 2026-09-05 已将周/月候选文件清理为受控 v2 seed，并新增仅作参考、不进入关闭 registry 的脱敏
+   `templates/1530.docx`；旧 v1 seed SHA、结构 profile 与 Office 证据全部失效。精确 v2 SHA/profile 只见
+   `specs/template-center/spec.md` §3.12 和 `specs/weekly-monthly-plans/spec.md` §7.1。
 
 ## 11. 更新规则
 

@@ -7,24 +7,26 @@ from dataclasses import FrozenInstanceError, fields, replace
 from hashlib import sha256
 from importlib import import_module
 from inspect import signature
+from pathlib import Path
 from uuid import UUID
+from zipfile import ZipFile
 
 import pytest
-
 from _support import (
+    OFFICE_CLIENT_VERSIONS,
+    RESERVED_TYPES,
     MemoryControlledSeedStore,
     MemoryExportPort,
     MemoryOfficeQualificationPort,
     MemoryQualificationEvidenceStore,
-    RESERVED_TYPES,
     docx_with_external_relationship,
     docx_with_macro_member,
     docx_with_safe_office_support_parts,
     docx_with_structure_profile_mismatch,
     docx_with_table_shapes,
     docx_with_text,
-    OFFICE_CLIENT_VERSIONS,
 )
+from docx import Document
 
 
 def test_candidate_registry_pins_released_seed_hashes_and_exact_table_profiles():
@@ -41,14 +43,14 @@ def test_candidate_registry_pins_released_seed_hashes_and_exact_table_profiles()
     ) == (
         (
             "weekly_activity_plan",
-            "controlled-weekplan-seed-v1",
-            "226c8208659bb6334533499b417aaf5f7ccad1e82d3a7cd6b8955d91a2b6417a",
-            ("tables:word/document.xml:2x9x7",),
+            "controlled-weekplan-seed-v2",
+            "157abf313206d94a90337807e490e0ea0ad8b72cf0d3eb6d7ef0ed6a6aa93f14",
+            ("tables:word/document.xml:3x9x7",),
         ),
         (
             "monthly_theme_activity_plan",
-            "controlled-monthplan-seed-v1",
-            "787f1a9be8aaebd27cf87c25747a3f8e70e584ac5bfd1c068ffedc2df54a4ac6",
+            "controlled-monthplan-seed-v2",
+            "de806aed3289f0a5f0019318aec63380f681dae3113383d47d03b363337b69d5",
             ("tables:word/document.xml:1x8x4",),
         ),
     )
@@ -60,7 +62,7 @@ def test_unique_validator_enforces_exact_candidate_table_count_rows_and_grid():
     monthly = api.CANDIDATE_QUALIFICATION_PROFILES[1]
 
     api.validate_upload(
-        docx_with_table_shapes((9, 7), (9, 7)),
+        docx_with_table_shapes((9, 7), (9, 7), (9, 7)),
         "synthetic-weekly.docx",
         api.DOCX_MIME_TYPE,
         weekly.contract,
@@ -73,7 +75,8 @@ def test_unique_validator_enforces_exact_candidate_table_count_rows_and_grid():
     )
     for content, contract in (
         (docx_with_table_shapes((9, 7)), weekly.contract),
-        (docx_with_table_shapes((9, 7), (9, 6)), weekly.contract),
+        (docx_with_table_shapes((9, 7), (9, 7)), weekly.contract),
+        (docx_with_table_shapes((9, 7), (9, 7), (9, 6)), weekly.contract),
         (docx_with_table_shapes((8, 4), (8, 4)), monthly.contract),
         (docx_with_table_shapes((8, 3)), monthly.contract),
     ):
@@ -85,6 +88,89 @@ def test_unique_validator_enforces_exact_candidate_table_count_rows_and_grid():
                 contract,
             )
         assert caught.value.code is api.TemplateErrorCode.VALIDATION_FAILED
+
+
+def test_released_v2_candidate_files_are_hash_bound_structurally_sanitized_seeds():
+    api = _api()
+    repository_root = Path(__file__).resolve().parents[3]
+    paths = {
+        "weekly_activity_plan": repository_root / "templates" / "weekplan.docx",
+        "monthly_theme_activity_plan": repository_root / "templates" / "monthplan.docx",
+    }
+
+    for profile in api.CANDIDATE_QUALIFICATION_PROFILES:
+        path = paths[profile.document_type.value]
+        content = path.read_bytes()
+        assert sha256(content).hexdigest() == profile.seed_handle.expected_sha256
+        receipt = api.validate_upload(
+            content,
+            path.name,
+            api.DOCX_MIME_TYPE,
+            profile.contract,
+        )
+        assert receipt.structural_profile_id == profile.profile_id
+        assert receipt.structural_profile_version == profile.profile_version == 2
+        with ZipFile(path) as package:
+            assert not any(name.startswith("customXml/") for name in package.namelist())
+            assert b'TargetMode="External"' not in b"".join(
+                package.read(name)
+                for name in package.namelist()
+                if name.endswith(".rels")
+            )
+            core = package.read("docProps/core.xml")
+            assert b"<dc:creator>" not in core
+            assert b"<cp:lastModifiedBy>" not in core
+
+    weekly = Document(paths["weekly_activity_plan"])
+    assert [len(table.rows) for table in weekly.tables] == [9, 9, 9]
+    assert all(len(table.columns) == 7 for table in weekly.tables)
+    assert (
+        tuple(weekly.paragraphs[index].text for index in (1, 5, 8))
+        == ("主题名称：____  班级：____  周次：____  日期：____",) * 3
+    )
+    assert (
+        tuple(weekly.paragraphs[index].text for index in (2, 6, 9))
+        == ("教师：____  保育员：____",) * 3
+    )
+    for table in weekly.tables:
+        assert table.rows[0].cells[1].text == ""
+        assert all(
+            not cell.text.strip() for row in table.rows[1:5] for cell in row.cells[2:]
+        )
+        assert all(not row.cells[1].text.strip() for row in table.rows[5:])
+
+    monthly = Document(paths["monthly_theme_activity_plan"])
+    assert monthly.paragraphs[1].text == (
+        "班级：____  执行年月：____  带班老师：____  保育老师：____"
+    )
+    assert monthly.tables[0].rows[1].cells[0].text.strip() == (
+        "本月主题：\n上月分析：\n本月重点："
+    )
+    for row_index in (3, 4, 5):
+        assert not monthly.tables[0].rows[row_index].cells[1].text.strip()
+        assert not monthly.tables[0].rows[row_index].cells[3].text.strip()
+    assert not monthly.tables[0].rows[7].cells[0].text.strip()
+
+    safety = repository_root / "templates" / "1530.docx"
+    assert sha256(safety.read_bytes()).hexdigest() == (
+        "e26b258921db61ac070b7ef124bab75316975d567b046c668ecb685c6ccba540"
+    )
+    with ZipFile(safety) as package:
+        assert not any(name.startswith("customXml/") for name in package.namelist())
+        assert b'TargetMode="External"' not in b"".join(
+            package.read(name) for name in package.namelist() if name.endswith(".rels")
+        )
+        core = package.read("docProps/core.xml")
+        assert b"<dc:creator>" not in core
+        assert b"<cp:lastModifiedBy>" not in core
+    safety_doc = Document(safety)
+    assert safety_doc.paragraphs[0].text == "幼儿园“1530”安全教育记录"
+    assert safety_doc.paragraphs[1].text == "班级：____  周次：____  时间：____"
+    assert all(
+        not safety_doc.tables[0].rows[row_index].cells[column_index].text.strip()
+        for row_index in range(1, 7)
+        for column_index in (2, 3)
+    )
 
 
 @pytest.mark.parametrize("include_directories", [False, True], ids=["parts", "dirs"])
@@ -118,16 +204,16 @@ async def test_registered_seed_handle_cannot_be_rebound_to_different_valid_bytes
     api = _api()
     seeds = MemoryControlledSeedStore()
     seeds.register_controlled_seed(
-        "controlled-weekplan-seed-v1", docx_with_text("rebound candidate seed")
+        "controlled-weekplan-seed-v2", docx_with_text("rebound candidate seed")
     )
     job, effects = _job(api, seeds=seeds)
 
     with pytest.raises(api.TemplateCenterError) as caught:
         await job.qualify(
             document_type="weekly_activity_plan",
-            seed_handle="controlled-weekplan-seed-v1",
+            seed_handle="controlled-weekplan-seed-v2",
             fixture=_fixture(api),
-            profile_id="weekly_activity_plan-profile-v1",
+            profile_id="weekly_activity_plan-profile-v2",
         )
 
     assert caught.value.code is api.TemplateErrorCode.VALIDATION_FAILED
@@ -208,8 +294,8 @@ class _StringSubclass(str):
         (_EqualityBypass(), _EqualityBypass(), _EqualityBypass()),
         (
             _StringSubclass("weekly_activity_plan"),
-            _StringSubclass("controlled-weekplan-seed-v1"),
-            _StringSubclass("weekly_activity_plan-profile-v1"),
+            _StringSubclass("controlled-weekplan-seed-v2"),
+            _StringSubclass("weekly_activity_plan-profile-v2"),
         ),
     ],
     ids=["custom-equality", "str-subclass"],
@@ -282,8 +368,8 @@ def test_candidate_job_and_contracts_are_closed_immutable_and_internal_only():
 @pytest.mark.parametrize(
     ("document_type", "seed_handle"),
     [
-        ("weekly_activity_plan", "controlled-weekplan-seed-v1"),
-        ("monthly_theme_activity_plan", "controlled-monthplan-seed-v1"),
+        ("weekly_activity_plan", "controlled-weekplan-seed-v2"),
+        ("monthly_theme_activity_plan", "controlled-monthplan-seed-v2"),
     ],
 )
 async def test_reserved_candidate_qualification_uses_controlled_seed_and_same_opaque_export_port(
@@ -296,16 +382,16 @@ async def test_reserved_candidate_qualification_uses_controlled_seed_and_same_op
         document_type=document_type,
         seed_handle=seed_handle,
         fixture=_fixture(api),
-        profile_id=f"{document_type}-profile-v1",
+        profile_id=f"{document_type}-profile-v2",
     )
 
     assert evidence.document_type == document_type
     assert evidence.qualification_status == "passed"
     assert len(evidence.seed_sha256) == 64
-    assert evidence.profile_id == f"{document_type}-profile-v1"
+    assert evidence.profile_id == f"{document_type}-profile-v2"
     assert len(evidence.rendered_sha256) == 64
     assert len(evidence.parse_report_sha256) == 64
-    assert evidence.profile_version == 1
+    assert evidence.profile_version == 2
     assert evidence.office_evidence_id == "office-qualification-v1"
     assert evidence.office_client_versions
     assert evidence.fixture_id == "weekly-monthly-fixture-v1"
@@ -349,22 +435,22 @@ async def test_reserved_candidate_qualification_uses_controlled_seed_and_same_op
     [
         (
             "weekly_activity_plan",
-            "controlled-monthplan-seed-v1",
-            "weekly_activity_plan-profile-v1",
+            "controlled-monthplan-seed-v2",
+            "weekly_activity_plan-profile-v2",
         ),
         (
             "monthly_theme_activity_plan",
-            "controlled-weekplan-seed-v1",
-            "monthly_theme_activity_plan-profile-v1",
+            "controlled-weekplan-seed-v2",
+            "monthly_theme_activity_plan-profile-v2",
         ),
         (
             "weekly_activity_plan",
-            "controlled-weekplan-seed-v1",
-            "monthly_theme_activity_plan-profile-v1",
+            "controlled-weekplan-seed-v2",
+            "monthly_theme_activity_plan-profile-v2",
         ),
         (
             "weekly_activity_plan",
-            "controlled-weekplan-seed-v1",
+            "controlled-weekplan-seed-v2",
             "candidate-profile-v999",
         ),
     ],
@@ -408,7 +494,7 @@ async def test_registered_candidate_seed_reuses_security_validator_and_fails_bef
 ):
     """A registered handle is not a trust bypass: security/profile failures stop the pipeline."""
     api = _api()
-    seed_handle = "controlled-weekplan-seed-v1"
+    seed_handle = "controlled-weekplan-seed-v2"
     seeds = MemoryControlledSeedStore()
     seeds.register_controlled_seed(seed_handle, seed_content)
     job, effects = _job(api, seeds=seeds)
@@ -418,7 +504,7 @@ async def test_registered_candidate_seed_reuses_security_validator_and_fails_bef
             document_type="weekly_activity_plan",
             seed_handle=seed_handle,
             fixture=_fixture(api),
-            profile_id="weekly_activity_plan-profile-v1",
+            profile_id="weekly_activity_plan-profile-v2",
         )
 
     # This is deliberately distinct from preflight rejection: the controlled seed
@@ -481,15 +567,15 @@ async def test_incomplete_office_qualification_fails_after_render_without_passed
     with pytest.raises(api.TemplateCenterError):
         await job.qualify(
             document_type="weekly_activity_plan",
-            seed_handle="controlled-weekplan-seed-v1",
+            seed_handle="controlled-weekplan-seed-v2",
             fixture=_fixture(api),
-            profile_id="weekly_activity_plan-profile-v1",
+            profile_id="weekly_activity_plan-profile-v2",
         )
 
     # The seed passed the common security/profile stage, so render/parse and the
     # Office call are observable; the incomplete Office result must still fail closed.
     assert effects["seeds"].read_calls == [
-        ("controlled-weekplan-seed-v1", "weekly_activity_plan")
+        ("controlled-weekplan-seed-v2", "weekly_activity_plan")
     ]
     assert len(effects["export"].render_calls) == 1
     assert len(effects["export"].parse_calls) == 1
@@ -544,9 +630,9 @@ async def test_candidate_pipeline_failures_short_circuit_without_evidence(
     with pytest.raises(api.TemplateCenterError) as caught:
         await job.qualify(
             document_type="weekly_activity_plan",
-            seed_handle="controlled-weekplan-seed-v1",
+            seed_handle="controlled-weekplan-seed-v2",
             fixture=_fixture(api),
-            profile_id="weekly_activity_plan-profile-v1",
+            profile_id="weekly_activity_plan-profile-v2",
         )
 
     assert caught.value.code is api.TemplateErrorCode.EXPORT_FAILED
@@ -575,9 +661,9 @@ async def test_render_and_parse_cannot_self_attest_unbound_content(
     with pytest.raises(api.TemplateCenterError) as caught:
         await job.qualify(
             document_type="weekly_activity_plan",
-            seed_handle="controlled-weekplan-seed-v1",
+            seed_handle="controlled-weekplan-seed-v2",
             fixture=_fixture(api),
-            profile_id="weekly_activity_plan-profile-v1",
+            profile_id="weekly_activity_plan-profile-v2",
         )
 
     assert caught.value.code is api.TemplateErrorCode.EXPORT_FAILED
@@ -595,9 +681,9 @@ async def test_candidate_evidence_append_failure_is_sanitized_and_not_visible():
     with pytest.raises(api.TemplateCenterError) as caught:
         await job.qualify(
             document_type="weekly_activity_plan",
-            seed_handle="controlled-weekplan-seed-v1",
+            seed_handle="controlled-weekplan-seed-v2",
             fixture=_fixture(api),
-            profile_id="weekly_activity_plan-profile-v1",
+            profile_id="weekly_activity_plan-profile-v2",
         )
 
     assert caught.value.code is api.TemplateErrorCode.STORAGE_FAILED
@@ -610,9 +696,9 @@ async def test_candidate_evidence_append_failure_is_sanitized_and_not_visible():
     ("document_type", "seed_handle", "provenance"),
     [
         ("weekly_activity_plan", "../templates/weekplan.docx", "synthetic"),
-        ("monthly_theme_activity_plan", "controlled-monthplan-seed-v1", "business"),
-        ("daily_plan", "controlled-weekplan-seed-v1", "synthetic"),
-        ("unknown_type", "controlled-weekplan-seed-v1", "synthetic"),
+        ("monthly_theme_activity_plan", "controlled-monthplan-seed-v2", "business"),
+        ("daily_plan", "controlled-weekplan-seed-v2", "synthetic"),
+        ("unknown_type", "controlled-weekplan-seed-v2", "synthetic"),
     ],
 )
 async def test_candidate_qualification_rejects_uncontrolled_or_non_reserved_inputs_without_side_effects(
@@ -645,9 +731,9 @@ async def test_qualification_is_not_formal_preview_or_enablement_and_exposes_no_
 
     evidence = await job.qualify(
         document_type=RESERVED_TYPES[0],
-        seed_handle="controlled-weekplan-seed-v1",
+        seed_handle="controlled-weekplan-seed-v2",
         fixture=_fixture(api),
-        profile_id="weekly_activity_plan-profile-v1",
+        profile_id="weekly_activity_plan-profile-v2",
     )
     registry = api.build_initial_document_registry()
 

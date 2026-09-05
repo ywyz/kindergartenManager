@@ -6,12 +6,14 @@
 
 - Issue #55 接受三角色的 tenant/teacher/class 读取、审核、导出和删除矩阵；在矩阵未接受前不能为跨教师行为写 GREEN。
 - 模板中心 ADR、第一期 spec 和稳定 RED 通过 Review；周/月 exporter 只能依赖其唯一 opaque TemplateExportPort，不能接触 blob/path 或实现模板 CRUD。
-- 当前 templates/weekplan.docx、templates/monthplan.docx 是用户提供的未跟踪模板。它们只读解析和验收，不能移动、覆盖、重命名或写回。
+- 当前 templates/weekplan.docx、templates/monthplan.docx 是已脱敏、受 SHA 约束的仓库 candidate seed。后续只能通过新的版本化 profile 变更，不得原地静默替换。
 - 当前 DailyPlan/现有五类 exporter 的行为证据继续有效但不自动覆盖周/月；任何接入都需在新 SHA 重跑受影响门禁。
 
-本次只读基线（2026-09-02 工作树）：weekplan.docx 为 33,007 bytes、SHA-256
-226c8208659bb6334533499b417aaf5f7ccad1e82d3a7cd6b8955d91a2b6417a；monthplan.docx 为
-19,215 bytes、SHA-256 787f1a9be8aaebd27cf87c25747a3f8e70e584ac5bfd1c068ffedc2df54a4ac6。
+当前 v2 基线（2026-09-05）：weekplan.docx 为 22,646 bytes、SHA-256
+157abf313206d94a90337807e490e0ea0ad8b72cf0d3eb6d7ef0ed6a6aa93f14；monthplan.docx 为
+10,769 bytes、SHA-256 de806aed3289f0a5f0019318aec63380f681dae3113383d47d03b363337b69d5。
+脱敏参考资产 templates/1530.docx 为 10,998 bytes、SHA-256
+e26b258921db61ac070b7ef124bab75316975d567b046c668ecb685c6ccba540；它不属于周/月 registry。
 模板字节变化即令本基线和相关验收证据失效；不得为了让 RED 通过而改写模板。
 
 ## 任务顺序

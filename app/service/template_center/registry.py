@@ -11,7 +11,6 @@ from app.service.template_center.contracts import (
     TemplateErrorCode,
 )
 
-
 GLOBAL_KNOWN_DOCUMENT_TYPES = tuple(item.value for item in DocumentType)
 PHASE1_ENABLED_DOCUMENT_TYPES = GLOBAL_KNOWN_DOCUMENT_TYPES[:5]
 PHASE1_RESERVED_DOCUMENT_TYPES = GLOBAL_KNOWN_DOCUMENT_TYPES[5:]
@@ -19,16 +18,18 @@ PHASE1_RESERVED_DOCUMENT_TYPES = GLOBAL_KNOWN_DOCUMENT_TYPES[5:]
 _CANDIDATE_PROFILE_ROWS = (
     (
         DocumentType.WEEKLY_ACTIVITY_PLAN,
-        "controlled-weekplan-seed-v1",
-        "weekly_activity_plan-profile-v1",
-        "226c8208659bb6334533499b417aaf5f7ccad1e82d3a7cd6b8955d91a2b6417a",
-        "tables:word/document.xml:2x9x7",
+        "controlled-weekplan-seed-v2",
+        "weekly_activity_plan-profile-v2",
+        2,
+        "157abf313206d94a90337807e490e0ea0ad8b72cf0d3eb6d7ef0ed6a6aa93f14",
+        "tables:word/document.xml:3x9x7",
     ),
     (
         DocumentType.MONTHLY_THEME_ACTIVITY_PLAN,
-        "controlled-monthplan-seed-v1",
-        "monthly_theme_activity_plan-profile-v1",
-        "787f1a9be8aaebd27cf87c25747a3f8e70e584ac5bfd1c068ffedc2df54a4ac6",
+        "controlled-monthplan-seed-v2",
+        "monthly_theme_activity_plan-profile-v2",
+        2,
+        "de806aed3289f0a5f0019318aec63380f681dae3113383d47d03b363337b69d5",
         "tables:word/document.xml:1x8x4",
     ),
 )
@@ -106,6 +107,7 @@ def _candidate_profile(
     document_type: DocumentType,
     handle_id: str,
     profile_id: str,
+    profile_version: int,
     seed_sha256: str,
     table_anchor: str,
 ) -> CandidateQualificationProfile:
@@ -116,10 +118,10 @@ def _candidate_profile(
     )
     contract = TemplateContractManifest(
         contract_id=f"kg.template.{document_type.value}.candidate",
-        contract_version=1,
+        contract_version=profile_version,
         placeholder_contract_version=1,
         structural_profile_id=profile_id,
-        structural_profile_version=1,
+        structural_profile_version=profile_version,
         renderer_id=f"kg.renderer.{document_type.value}.candidate.v1",
         parser_id=f"kg.parser.{document_type.value}.candidate.v1",
         allowed_parts=allowed_parts,
@@ -133,7 +135,7 @@ def _candidate_profile(
             expected_sha256=seed_sha256,
         ),
         profile_id=profile_id,
-        profile_version=1,
+        profile_version=profile_version,
         fixture_id="weekly-monthly-fixture-v1",
         contract=contract,
     )

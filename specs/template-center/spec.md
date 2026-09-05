@@ -396,6 +396,13 @@ TemplateCandidateQualificationJob.qualify(
 ) -> CandidateQualificationEvidence
 ```
 
+当前受控 v2 发布物固定为：weekly handle `controlled-weekplan-seed-v2`、profile
+`weekly_activity_plan-profile-v2`（3×9×7 表结构、SHA-256
+`157abf313206d94a90337807e490e0ea0ad8b72cf0d3eb6d7ef0ed6a6aa93f14`）；monthly handle
+`controlled-monthplan-seed-v2`、profile `monthly_theme_activity_plan-profile-v2`（1×8×4 表结构、SHA-256
+`de806aed3289f0a5f0019318aec63380f681dae3113383d47d03b363337b69d5`）。v1 seed/profile 与其 Office
+证据已失效，不得与 v2 混用。
+
 该 job 的构造只允许注入 `controlled_seed_store`、唯一的 `TemplateExportPort`、`office_qualification_port` 和
 `qualification_evidence_store`；它没有 actor/session、policy、`TemplateCenter` 或业务 repository 依赖。`qualify` 是
 唯一的内部方法，`CandidateQualificationEvidence` 的关闭字段至少为：

@@ -318,6 +318,10 @@ Agent WRITE 的精确本地交付状态、Review 轮次、SHA 与测试证据仅
 5. 在模板版本可追溯后建设统一教学文档中心；审核流和资源复用继续拆成独立 Issue。
 6. 仅在幼儿身份、隐私、保留/删除和跨教师权限冻结后规划成长档案和管理视图。
 
+2026-09-05 基线修订：周/月候选模板已脱敏并发布为 v2 seed；旧 v1 SHA/profile/Office evidence 不再有效。
+`templates/1530.docx`（SHA-256 `e26b258921db61ac070b7ef124bab75316975d567b046c668ecb685c6ccba540`）
+仅作为脱敏参考资产跟踪，不增加 document type、registry、active 或 exporter 能力。
+
 明确不做：把产品方向混入 Issue #54；开放 Agent Provider WRITE；在同一 Issue 中同时实现模板中心、复杂审批、
 成长档案、家长端和多园 SaaS；没有真实需求时提前拆分微服务。
 

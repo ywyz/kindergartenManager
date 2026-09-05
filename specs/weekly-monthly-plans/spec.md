@@ -332,7 +332,7 @@ build_export_filename(snapshot, binding) 必须使用快照值、当前 active b
 - `payload_path` 是 exporter 从不可变快照取值的内部路径，可以出现 `[]`，如 `days[].day_date`；它永远不直接
   作为 token_id。`[]` 只能表示已登记的重复区域项，不表示任意列表循环。
 
-当前两个未跟踪模板没有显式 token、其它双大括号 marker 或 Word content-control marker；示例文本不是占位符，不能作为替换键。
+当前两个受控 v2 seed 没有显式 token、其它双大括号 marker 或 Word content-control marker；空白业务区域不是占位符，不能作为替换键。
 后续为种子建立结构映射时，必须以本节的 token_id 和显式 profile 注册，不得从示例正文自动推断。
 
 周模板 token/payload 映射（`WEEKLY_PLACEHOLDER_MAPPING`）为：
@@ -401,10 +401,10 @@ build_export_filename(snapshot, binding) 必须使用快照值、当前 active b
 
 | 文件 | 解析结构 | 当前字节数 / SHA-256（只读基线） | 业务含义 |
 |---|---|---|---|
-| templates/weekplan.docx | 8 个正文段落、2 张 9×7 表；每表含周次、周一至周五以及学习/游戏/周级栏目 | 33,007 / 226c8208659bb6334533499b417aaf5f7ccad1e82d3a7cd6b8955d91a2b6417a | 当前文件含两组示例周内容，注册为模板时必须标明可重复 section，不能把示例当数据 |
-| templates/monthplan.docx | 3 个正文段落、1 张 8×4 表；含上月分析/本月重点、主题目标、生活习惯、游戏活动、环境创设、家园共育、其它、活动内容 | 19,215 / 787f1a9be8aaebd27cf87c25747a3f8e70e584ac5bfd1c068ffedc2df54a4ac6 | 单月主题活动计划的布局基线 |
+| templates/weekplan.docx | 11 个正文段落、3 张 9×7 表；每表含周次、周一至周五以及学习/游戏/周级栏目 | 22,646 / 157abf313206d94a90337807e490e0ea0ad8b72cf0d3eb6d7ef0ed6a6aa93f14 | 已清除园所、班级、人员、日期和示例业务正文；三组 section 属于受控 v2 结构 profile |
+| templates/monthplan.docx | 3 个正文段落、1 张 8×4 表；含上月分析/本月重点、主题目标、生活习惯、游戏活动、环境创设、家园共育、其它、活动内容 | 10,769 / de806aed3289f0a5f0019318aec63380f681dae3113383d47d03b363337b69d5 | 已清除班级、人员、年月和示例业务正文的 v2 布局基线 |
 
-两份文件都没有可消费的占位符 marker；模板中心 T011-C 必须先为其建立带 document type、结构校验、candidate profile 和
+两份文件都没有可消费的占位符 marker；模板中心 T011-C 必须先为 v2 seed 建立带 document type、结构校验、candidate profile 和
 版本/hash 证据的受控 qualification（不是 active，也不是正式导出），替换/绑定示例内容的具体机制由模板中心 ADR 负责；
 T011-E 启用前不得由周/月 exporter 消费。周/月 exporter 不得因当前样例有两个周表而生成第二个不相关计划。
 
