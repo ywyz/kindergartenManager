@@ -53,6 +53,13 @@
       "files": 204,
       "backend": "luna_worker",
       "fallback_note": "graphify label OpenAI-compatible and DeepSeek each timed out after 45 seconds in the response body (exit 124)"
+    },
+    {
+      "date": "2026-09-06T14:27:22.405436+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 134,
+      "backend": "luna_worker_inline_fallback"
     }
   ],
   "total_input_tokens": 0,

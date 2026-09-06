@@ -1,16 +1,16 @@
 {
-  "node_count": 3192,
-  "unverified_node_count": 0,
-  "raw_edge_count": 7337,
+  "node_count": 7230,
+  "unverified_node_count": 1,
+  "raw_edge_count": 17325,
   "non_object_edges": 0,
   "missing_endpoint_edges": 0,
   "dangling_endpoint_edges": 0,
   "self_loop_edges": 0,
-  "valid_candidate_edges": 7337,
+  "valid_candidate_edges": 17325,
   "exact_duplicate_edges": 0,
-  "directed_unique_endpoint_pairs": 7337,
+  "directed_unique_endpoint_pairs": 17325,
   "directed_same_endpoint_collapsed_edges": 0,
-  "undirected_unique_endpoint_pairs": 7337,
+  "undirected_unique_endpoint_pairs": 17325,
   "undirected_same_endpoint_collapsed_edges": 0,
   "same_endpoint_group_count": 0,
   "relation_variant_groups": 0,
@@ -18,81 +18,81 @@
   "source_location_variant_groups": 0,
   "context_variant_groups": 0,
   "post_build_graph_type": "Graph",
-  "post_build_node_count": 3192,
-  "post_build_edge_count": 7337,
+  "post_build_node_count": 7230,
+  "post_build_edge_count": 17325,
   "post_build_error": "",
   "producer_suppression": {
-    "path": "/home/admin/.local/share/uv/tools/graphifyy/lib/python3.14/site-packages/graphify/extract.py",
+    "path": "/home/ywyz/.local/share/uv/tools/graphifyy/lib/python3.14/site-packages/graphify/extract.py",
     "total_sites": 12,
     "sites": [
       {
-        "line": 1154,
+        "line": 1204,
         "name": "seen_ids",
         "tuple_arity": 0,
         "sample": "seen_ids = {n[\"id\"] for n in nodes}"
       },
       {
-        "line": 1420,
+        "line": 1520,
         "name": "seen_ids",
         "tuple_arity": 0,
         "sample": "seen_ids = {n[\"id\"] for n in nodes}"
       },
       {
-        "line": 1422,
+        "line": 1522,
         "name": "seen_doc_refs",
         "tuple_arity": 0,
         "sample": "seen_doc_refs: set[str] = set()"
       },
       {
-        "line": 1782,
+        "line": 1885,
         "name": "seen_ids",
         "tuple_arity": 0,
         "sample": "seen_ids: set[str] = {n[\"id\"] for n in nodes}"
       },
       {
-        "line": 1929,
+        "line": 2032,
         "name": "seen_ids",
         "tuple_arity": 0,
         "sample": "seen_ids = {n.get(\"id\") for n in nodes}"
       },
       {
-        "line": 2460,
+        "line": 2670,
         "name": "seen_keys",
         "tuple_arity": 0,
         "sample": "seen_keys: set[tuple] = set()"
       },
       {
-        "line": 2629,
+        "line": 2839,
         "name": "seen_keys",
         "tuple_arity": 0,
         "sample": "seen_keys: set[tuple] = set()"
       },
       {
-        "line": 4035,
+        "line": 4436,
         "name": "seen_ids",
         "tuple_arity": 0,
         "sample": "seen_ids: set[str] = set()"
       },
       {
-        "line": 4143,
+        "line": 4544,
         "name": "seen_ids",
         "tuple_arity": 0,
         "sample": "seen_ids: set[str] = set()"
       },
       {
-        "line": 4222,
+        "line": 4623,
         "name": "seen_ids",
         "tuple_arity": 0,
         "sample": "seen_ids: set[str] = set()"
       },
       {
-        "line": 4737,
+        "line": 5138,
         "name": "seen_ids",
         "tuple_arity": 0,
         "sample": "seen_ids: set[str] = set()"
       },
       {
-        "line": 4738,
+        "line": 5139,
         "name": "seen_edges",
         "tuple_arity": 4,
         "sample": "seen_edges: set[tuple[str, str, str, str | None]] = set()"
