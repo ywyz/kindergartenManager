@@ -75,3 +75,21 @@ T011-C 的自动实现候选 `tested_code_sha=301c2d5f2b247cb5544783f2494de97366
 - 未实现 WMP-6 orchestration、active/CRUD/业务读写或正式下载；两份用户模板保持未跟踪、未提交。
 
 最终 evidence closure SHA、exact-SHA Quality/CodeQL 与 Issue 回写以 Issue #56 为外部证据；该门不关闭 Issue。
+
+## 2026-09-06 WMP-6 前置治理说明
+
+上述 T011-C 是已经完成的模板中心单候选 qualification，不能再以 `WMP-6 / T011-C` 别名重新宣称。它的
+evidence 只绑定当时未跟踪的原始 weekplan/monthplan hash。后续 WMP-6 是独立的周/月应用层 orchestration：只会严格
+串行调用本目录已经完成的 `TemplateCandidateQualificationJob.qualify` seam，不复制 validator、registry、contracts 或
+export port。
+
+用户随后明确授权清除两份模板中的机构、班级、人员、日期、示例正文、文档作者/时间、应用 GUID、custom XML/properties
+和修订标识，并将脱敏文件提交。
+当前新 hash 为：
+
+- `templates/weekplan.docx`：`f6c17c137f04e29a68524ed400eb395984e93a16c234a065b5794d9f49a9347b`
+- `templates/monthplan.docx`：`f2e5dbe2a468dd15c55cdd6b70c5e15fe63048a3708b151732e208703b0d11f4`
+
+本次字节变化不会倒推修改、覆盖或作废历史记录本身，但旧 qualification evidence 不能证明新文件已 qualified。WMP-6
+GREEN 前必须由另一个明确授权的模板中心证据门决定新 seed/profile 版本并对这两个精确 hash 重新 qualification；在此之前
+保持 reserved/disabled，不执行 T011-E，不创建 active pointer、TemplateVersion、ExportRecord 或正式下载。

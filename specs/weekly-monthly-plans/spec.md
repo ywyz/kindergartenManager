@@ -1,12 +1,13 @@
 # 周/月计划领域与 Word 导出契约
 
-- 状态：冻结稳定 RED；双轴 Review Standards 0 / Spec 0；不授权 GREEN
+- 状态：WMP-3/WMP-4/WMP-5 已实现；WMP-6 orchestration 独立稳定 RED；不授权 WMP-6 GREEN
 - 规划 Issue：[Issue #55](https://github.com/ywyz/kindergartenManager/issues/55)
+- 模板中心证据 Issue：[Issue #56](https://github.com/ywyz/kindergartenManager/issues/56)（保持 OPEN）
 - 依赖：ADR-0004、模板中心 ADR/第一期 spec、Issue #55 角色权限矩阵
 - 当前模板来源：templates/weekplan.docx、templates/monthplan.docx
 - 领域术语：周视角 = 每周活动计划；月视角 = 月活动计划（主题活动计划）
 
-本文件只冻结周/月计划的领域事实、聚合边界、导出输入输出和验收口径。它不创建数据库表、迁移、页面、审核工作流或模板 CRUD。稳定 RED 只验证下面约定的公开契约尚未存在；RED 通过后仍必须先完成 Review，再分别进入最小 GREEN。
+本文件只冻结周/月计划的领域事实、聚合边界、导出输入输出和验收口径。它不创建数据库表、迁移、页面、审核工作流或模板 CRUD。WMP-6 稳定 RED 只验证下面约定的 orchestration 公开契约尚未存在；RED 提交后仍必须先完成独立 Review 和 exact-SHA 门禁，再由新的明确授权进入最小 GREEN。
 
 ## 1. 目标和范围
 
@@ -306,8 +307,9 @@ rollback 或 delete。
   tenant/document type 不匹配、active 发生变更或 hash/contract 证据不一致时 fail-closed。
 - 本期不接受 requested_version、template_version 选择器、历史版本重生或调用方提供的 binding。历史版本重生属于后续
   统一文档中心 spec，不得在周/月 exporter 中预留旁路。
-- exporter 不读取 templates/weekplan.docx、templates/monthplan.docx、用户传入路径或 blob；两份仓库模板只作为模板中心
-  candidate qualification / structure / Office 验收的只读来源。
+- exporter 不读取 templates/weekplan.docx、templates/monthplan.docx、用户传入路径或 blob；两份仓库模板只可作为模板中心
+  candidate qualification / structure / Office 验收的受控来源。当前已提交的脱敏字节尚未取得新的 qualification evidence，
+  不能由旧 hash 的 T011-C 证据或周/月 exporter 消费。
 - TemplateExportPort 失败时不得静默切换旧版本、从零构建、重新请求或猜测另一 document type；正式导出必须显式失败。
 
 ### 6.4 文件名
@@ -332,8 +334,8 @@ build_export_filename(snapshot, binding) 必须使用快照值、当前 active b
 - `payload_path` 是 exporter 从不可变快照取值的内部路径，可以出现 `[]`，如 `days[].day_date`；它永远不直接
   作为 token_id。`[]` 只能表示已登记的重复区域项，不表示任意列表循环。
 
-当前两个未跟踪模板没有显式 token、其它双大括号 marker 或 Word content-control marker；示例文本不是占位符，不能作为替换键。
-后续为种子建立结构映射时，必须以本节的 token_id 和显式 profile 注册，不得从示例正文自动推断。
+当前两个已脱敏模板没有显式 token、其它双大括号 marker 或 Word content-control marker；空白单元格和栏目标签不是占位符，不能作为替换键。
+后续为脱敏种子建立新版本结构映射时，必须以本节的 token_id 和显式 profile 注册，不得从正文或空白区域自动推断。
 
 周模板 token/payload 映射（`WEEKLY_PLACEHOLDER_MAPPING`）为：
 
@@ -395,18 +397,27 @@ build_export_filename(snapshot, binding) 必须使用快照值、当前 active b
 
 ## 7. 模板基线和 Word 验收
 
-### 7.1 对已给模板的只读解析基线
+### 7.1 历史 T011-C 证据与当前脱敏基线
 
-基线由 .venv/bin/python 的 python-docx 只读打开得到，不写回 DOCX：
+模板中心 T011-C 已独立完成；它不是 WMP-6 的别名。Issue #56 记录的 evidence closure SHA
+`9e4708bd9c96c2fba9c7c58c1c8e264f814479c7` 只绑定当时未跟踪的原始候选字节：
 
-| 文件 | 解析结构 | 当前字节数 / SHA-256（只读基线） | 业务含义 |
+| 历史候选 | 解析结构 | T011-C 已验证字节数 / SHA-256 | 证据边界 |
 |---|---|---|---|
-| templates/weekplan.docx | 8 个正文段落、2 张 9×7 表；每表含周次、周一至周五以及学习/游戏/周级栏目 | 33,007 / 226c8208659bb6334533499b417aaf5f7ccad1e82d3a7cd6b8955d91a2b6417a | 当前文件含两组示例周内容，注册为模板时必须标明可重复 section，不能把示例当数据 |
-| templates/monthplan.docx | 3 个正文段落、1 张 8×4 表；含上月分析/本月重点、主题目标、生活习惯、游戏活动、环境创设、家园共育、其它、活动内容 | 19,215 / 787f1a9be8aaebd27cf87c25747a3f8e70e584ac5bfd1c068ffedc2df54a4ac6 | 单月主题活动计划的布局基线 |
+| templates/weekplan.docx | 2 张 9×7 表 | 33,007 / 226c8208659bb6334533499b417aaf5f7ccad1e82d3a7cd6b8955d91a2b6417a | 只证明该旧 hash 的 candidate qualification；不等于 active 或 WMP-6 |
+| templates/monthplan.docx | 1 张 8×4 表 | 19,215 / 787f1a9be8aaebd27cf87c25747a3f8e70e584ac5bfd1c068ffedc2df54a4ac6 | 只证明该旧 hash 的 candidate qualification；不等于 active 或 WMP-6 |
 
-两份文件都没有可消费的占位符 marker；模板中心 T011-C 必须先为其建立带 document type、结构校验、candidate profile 和
-版本/hash 证据的受控 qualification（不是 active，也不是正式导出），替换/绑定示例内容的具体机制由模板中心 ADR 负责；
-T011-E 启用前不得由周/月 exporter 消费。周/月 exporter 不得因当前样例有两个周表而生成第二个不相关计划。
+本轮按用户明确授权删除示例正文、机构/班级/人员/日期信息、作者/时间/应用标识、custom XML/properties 与修订标识后，
+保留布局并提交新的候选字节；ZIP member 时间统一为无身份含义的固定值：
+
+| 当前脱敏候选 | 保留结构与渲染页数 | 当前字节数 / SHA-256 | 当前资格状态 |
+|---|---|---|---|
+| templates/weekplan.docx | 2 张 9×7 表；LibreOffice 渲染 2 页 | 17,717 / f6c17c137f04e29a68524ed400eb395984e93a16c234a065b5794d9f49a9347b | 未重新 qualification；不得复用旧证据 |
+| templates/monthplan.docx | 1 张 8×4 表；LibreOffice 渲染 1 页 | 9,482 / f2e5dbe2a468dd15c55cdd6b70c5e15fe63048a3708b151732e208703b0d11f4 | 未重新 qualification；不得复用旧证据 |
+
+两份当前文件都没有可消费的占位符 marker。旧 candidate profile 的 seed hash 与当前字节不一致，因而任何把旧 T011-C
+evidence 关联到当前脱敏文件的尝试都必须 fail closed。是否新建 seed/profile 版本并重新执行模板中心 candidate
+qualification，是 WMP-6 GREEN 之前的独立决策和证据门；本轮不修改模板中心 registry，也不重新宣称 T011-C。
 
 ### 7.2 自动验收
 
@@ -425,39 +436,164 @@ T011-E 启用前不得由周/月 exporter 消费。周/月 exporter 不得因当
 
 exporter 在成功、拒绝、TemplateExportPort 失败、文档校验失败、取消和超时路径都不得修改周/月业务正文、版本、状态、审核记录或当前每日计划。若产品批准保存导出索引，未来 ExportRecord 必须额外可追溯 document_type、业务 plan_version、实际 active template_version、template/content checksum、操作者和时间；该 schema/事务另行设计，不由本 RED 预建。
 
-## 8. 稳定 RED 和门禁顺序
+## 8. WMP-6 qualification orchestration 关闭契约
 
-稳定 RED 分为两个互不合并的文件：
+### 8.1 命名治理与唯一职责
+
+只读治理核对确认了命名冲突：在基线 SHA `9e4708bd9c96c2fba9c7c58c1c8e264f814479c7`，本文件旧门禁和
+tasks/README 使用了 `WMP-6 / T011-C`；同一 SHA 的模板中心测试说明及
+[Issue #56 evidence comment](https://github.com/ywyz/kindergartenManager/issues/56#issuecomment-5557264965) 则明确
+T011-C 已完成而 WMP-6 orchestration 未实现。该冲突只通过本节拆分名称和后续门禁解决，不倒写 T011-C 历史证据。
+
+- `T011-C` 是模板中心已经完成的单候选 `TemplateCandidateQualificationJob.qualify(...)` seam：它对一个受控 seed 和
+  `SyntheticQualificationFixture` 形成一个 `CandidateQualificationEvidence`。本文件不改写该事实、不复制其 validator、
+  registry、contracts、export port 或 Office 判定。
+- `WMP-6` 是尚未实现的周/月应用层编排：它只把一个固定 weekly synthetic snapshot 和一个固定 monthly synthetic
+  snapshot 严格串行交给上述 T011-C seam，并在两项证据均与调用绑定一致时返回一个内存聚合 receipt。
+- `WMP-7 / T011-E` 仍是后续启用门；WMP-8/WMP-9 仍是正式 exporter 与正式业务验收。本轮不创建这些能力，也不把
+  T011-C 重新编号或重新宣称完成。
+
+未来唯一模块为 `app.service.weekly_monthly_plans.qualification_orchestration`。它只能公开：关闭错误类型、两个强类型
+synthetic snapshot、固定双候选 request、聚合 receipt 和 `WeeklyMonthlyQualificationOrchestrator`；不得公开 registry、
+validator、TemplateExportPort、CRUD、active、download、fallback 或动态发现 seam。
+
+该模块的生产依赖导入也属于关闭契约：除 Python 标准库外，只能导入本包 `contracts`/`export_contracts` 与模板中心
+`contracts`/`registry`；禁止导入 repository、ORM/database、integration、UI/API、文件/网络 adapter、TemplateCenter
+service 或动态 import/discovery。结构 RED 以 AST 固定允许列表及禁止的 write/active/export/retry/fallback 调用名，防止
+通过私有全局依赖绕过单一 qualification job 构造器。它还拒绝 `__import__`、`getattr`/`setattr`、`eval`/`exec`、
+globals/locals/vars 等动态解析原语，并要求每个 call target 都是静态 `Name` 或 `Attribute`；不得通过 alias、subscript、
+lambda 或其它间接 callable 绕过 import/call allowlist。
+
+### 8.2 输入、映射和严格顺序
+
+`WeeklySyntheticQualificationSnapshot` 与 `MonthlySyntheticQualificationSnapshot` 都是 frozen + slots 的关闭 DTO，字段恰好为：
+
+~~~text
+snapshot_id
+provenance
+plan
+captured_at_utc
+~~~
+
+- weekly snapshot ID 固定为 `weekly-qualification-snapshot-v1`，plan 必须是精确 `WeeklyActivityPlan`；monthly snapshot ID
+  固定为 `monthly-qualification-snapshot-v1`，plan 必须是精确 `MonthlyThemeActivityPlan`。
+- provenance 只能是精确 `synthetic`；captured_at_utc 只能是精确 UTC datetime。不得接收业务 snapshot、dict、子类、
+  path、blob、URL、bytes、document type 字符串或模板版本选择器。
+- `synthetic` 不是调用方可自我声明的标签：两个 plan 还必须逐字段等于本轮 RED 中 `_weekly_plan` / `_monthly_plan` 的关闭
+  canonical fixture vector（固定 7001/7101/7201 synthetic scope、7301/7501 plan、2030-09-30 跨月至 2030-10 月周期、
+  显式“合成”文本、version 1、draft、空 source IDs）。任何其它即使领域上合法的班级、教师、ID、日期或正文都以
+  `input_invalid` 拒绝。未来如需换 fixture，必须先版本化 snapshot ID/contract 并另行冻结 RED，不能接受业务快照包装。
+- `WeeklyMonthlyQualificationRequest` 字段恰好是 `weekly_snapshot`、`monthly_snapshot`；没有列表、顺序参数、可选候选、
+  动态 document type 或 fallback。
+
+orchestrator 构造器只接收 `qualification_job`，公开方法只有异步 `run(request)`。`run` 必须按下列固定顺序执行，后一步
+不得在前一步返回且通过 binding 检查前开始：
+
+1. 从模板中心已关闭的 `CANDIDATE_QUALIFICATION_PROFILES` 中为 `weekly_activity_plan` 精确解析唯一 profile；从 WMP-5
+   `WEEKLY_PLACEHOLDER_MAPPING` 与 `WEEKLY_REPEATABLE_REGION_MAPPING` 形成 mapping 绑定。
+2. 把 weekly snapshot 适配为现有 `SyntheticQualificationFixture`，以精确 document type、该 profile 的 seed handle/profile
+   ID 调用一次 `qualification_job.qualify(...)`。
+3. weekly evidence 绑定通过后，再为 `monthly_theme_activity_plan` 精确解析唯一 profile，并使用
+   `MONTHLY_PLACEHOLDER_MAPPING` 与 `MONTHLY_ORDERED_LIST_MAPPING` 调用一次同一 job。
+4. monthly evidence 绑定通过后才构造并返回 receipt。
+
+fixture ID 使用所选 profile 的关闭 `fixture_id`，provenance 固定 synthetic。fixture `values` 按 WMP-5 placeholder mapping
+的登记顺序形成 `(token_id, value)` tuple；日期转 ISO `YYYY-MM-DD`，year_month 转 `YYYY-MM`，teacher/list/day 值均转为
+深度不可变 tuple。weekly 的 `days` 总值是五个 `(date, weekday, weekday_cn, morning_talk, collective_activity,
+area_game, outdoor_game)` tuple；各 `days.*` token 同时取得对应有序列。不得从模板正文、文件或运行时反射发现字段。
+
+### 8.3 evidence 绑定与成功 receipt
+
+WMP-6 只检查 T011-C 返回对象与本次调用的绑定事实：对象必须是精确 `CandidateQualificationEvidence`，且 document type、
+seed SHA-256、profile ID/version 和 fixture ID 必须分别等于所选关闭 profile/fixture。rendered/parse/Office 资格如何成立仍由
+T011-C 唯一负责；WMP-6 不重新实现或重新判断 validator、parse、Office compatibility 或 checker。
+
+只有两项绑定都通过，才返回 frozen + slots 的 `WeeklyMonthlyQualificationReceipt`，字段恰好为：
+
+~~~text
+batch_sha256
+weekly_snapshot_sha256
+monthly_snapshot_sha256
+weekly_mapping_sha256
+monthly_mapping_sha256
+weekly_evidence
+monthly_evidence
+~~~
+
+receipt 没有 `status` 或 `persisted` 字段；其存在即表示该批次两项均通过。两项 evidence 本身携带 profile、seed、rendered、
+parse、Office 与 qualification ID 绑定，不另造一份模板中心 contract。receipt dataclass 必须关闭公共初始化
+（`init=False` 或等价 issuer-only 机制）；只有 `run()` 的双成功路径能签发实例，外部以七个公开字段直接构造或通过
+`dataclasses.replace()` 重构都必须失败。
+
+哈希契约版本固定为 `weekly-monthly-qualification-orchestration.v1`。canonical JSON 使用 UTF-8、`ensure_ascii=False`、
+key 排序和紧凑分隔符；dataclass 按字段名转 object、Enum 转 wire value、UTC datetime 转带 `Z` 的 ISO 文本、date 转 ISO
+文本、UUID 转字符串、tuple 转 array。snapshot hash 对 `{document_type, snapshot}` 求 SHA-256；mapping hash 对
+`{document_type, profile}` 求 SHA-256，其中 profile 是 placeholder mapping 与对应 repeatable/ordered-list mapping 的有序项；
+batch hash 对 contract version 以及 weekly/monthly 各自的 snapshot hash、mapping hash、完整 evidence 求 SHA-256。
+这些哈希只作内存 receipt 的不可变绑定，不新增调用方可传的 bytes/blob/path 能力。
+
+### 8.4 fail-closed 与原子性
+
+关闭错误码恰好是 `input_invalid`、`qualification_failed`、`evidence_mismatch`；异常字符串只含稳定错误码，不暴露原异常、
+fixture 内容或端口细节。
+
+- weekly 调用失败或其 evidence 不匹配：不开始 monthly，不重试，不产生 receipt。
+- monthly 调用失败或其 evidence 不匹配：返回关闭错误，不重试、不补偿、不产生 receipt。此时 T011-C 已 append 的 weekly
+  evidence 可以保留；WMP-6 不拥有其 evidence store，不能回滚或删除它。
+- 因此本门冻结的是**聚合结果发布原子性**，不是两项 T011-C evidence 的事务回滚。任何把“无 receipt”解释为“首项
+  evidence 未发生”的实现或测试都违反本契约。
+- 成功与所有失败路径都不得创建/修改 active pointer、TemplateVersion、ExportRecord、正式下载、周/月业务正文、数据库
+  行、审核状态或审计记录，也不得调用 activate、rollback、retry、fallback、CRUD 或动态发现。
+
+### 8.5 本轮非目标
+
+本轮只提交 spec、synthetic fake-only RED 和脱敏模板；不创建
+`app.service.weekly_monthly_plans.qualification_orchestration`，不修改 T011-C 生产 seam/registry，不实现 WMP-6 GREEN、
+T011-E、WMP-7、WMP-8、WMP-9、路径/blob/URL/任意 bytes、模板 CRUD、fallback 或正式业务导出。
+
+## 9. 稳定 RED 和门禁顺序
+
+本目录的契约/制品门分为五个互不合并的文件：
 
 1. tests/test_weekly_monthly_domain_contracts_red.py：value object、周/月聚合、跨月周、版本/状态、不变量、聚合边界和权限端口。
-2. tests/test_weekly_monthly_export_contracts_red.py：document type、snapshot/result、opaque TemplateExportPort 三段调用、关闭占位符映射、文件名、active-only、无 fallback 和 Word 安全 metadata。
+2. tests/test_weekly_monthly_aggregate_read_red.py：actor-scoped repository 读取、来源边界和不可变 aggregate snapshot。
+3. tests/test_weekly_monthly_export_contracts_red.py：document type、snapshot/result、opaque TemplateExportPort 三段调用、关闭占位符映射、文件名、active-only、无 fallback 和 Word 安全 metadata。
+4. tests/test_wmp6_qualification_orchestration_red.py：本节固定双候选顺序、synthetic snapshot/fixture、T011-C evidence 绑定、
+   聚合发布原子性、失败关闭和零副作用。
+5. tests/test_weekly_monthly_template_privacy_gate.py：只检查两个已提交 DOCX 的文本 allowlist、包元数据、外链、修订标识和
+   固定 ZIP member 时间；它是脱敏制品门，不属于 WMP-6 orchestration RED，也不构成 qualification。
 
-当前工作树预期两个文件 collection clean；失败只应指向尚未提供的 app.service.weekly_monthly_plans.contracts 与 app.service.weekly_monthly_plans.export_contracts 公共 seam。不得使用 skip/xfail、固定 sleep、真实网络、真实凭据、模板写回或临时实现来制造 RED。连续两次运行必须得到相同 collected/passed/failed 分布和相同失败节点集合。
+前三个文件是 WMP-3/WMP-4/WMP-5 已实现基线；WMP-6 文件必须 collection clean，且只因尚未提供的正式
+`app.service.weekly_monthly_plans.qualification_orchestration` seam 失败。不得使用 skip/xfail、固定 sleep、真实网络、
+真实凭据、模板读取、数据库或临时实现来制造 RED。连续两次运行必须得到相同 collected/passed/failed 分布、失败节点集合
+和 node-only hash。
 
 门禁顺序固定为：
 
 ~~~text
 WMP-0 Issue #55 权限矩阵 + 模板中心 ADR/spec 依赖确认
   → WMP-1 本 spec/导出映射 Review（Standards 0/0、Spec 0/0）
-  → WMP-2 两份稳定 RED（当前阶段）
+  → WMP-2 领域/读取/导出稳定 RED
   → WMP-3 最小 GREEN：纯领域 DTO/不变量（无 DB/UI/模板）
   → WMP-4 领域 service/repository 读取与不可变 snapshot（经 AuthorizationPort）
   → WMP-5 纯 token/payload mapping profile 与 filename GREEN（不读模板、不接模板端口）
-  → WMP-6/T011-C 模板中心 candidate qualification：synthetic fixture + 结构绑定 + LibreOffice 实开/导出 + Word OOXML 兼容目标（无 active/正式交付）
+  → T011-C 模板中心 candidate qualification（已独立完成；不是 WMP-6）
+  → 当前脱敏 candidate 的新 hash/profile/evidence 独立门（尚未授权或完成）
+  → WMP-6 周/月 qualification orchestration：固定 weekly → monthly、聚合 receipt（当前仅 RED）
   → WMP-7/T011-E 模板中心启用两个周/月 document type（只开放 active opaque binding）
   → WMP-8 formal exporter：TemplateExportPort.resolve_active → render → parse
   → WMP-9 正式业务 Word/LibreOffice + Issue #55 跨教师读取/审核/导出/删除验收（各有独立证据）
 ~~~
 
-WMP-3、WMP-4、WMP-5、WMP-8 是可分别 Review 的最小 GREEN；T011-C/T011-E 属模板中心边界，不能因纯 mapping 或
-candidate qualification 通过就宣称 active、正式业务导出或审核流完成。
+WMP-3、WMP-4、WMP-5、WMP-6、WMP-8 是可分别 Review 的最小 GREEN；T011-C/T011-E 属模板中心边界。旧 T011-C
+通过、纯 mapping 通过或 WMP-6 RED 均不能推导当前脱敏模板已 qualified、active、正式业务导出或审核流完成。
 
-## 9. 下一步
+## 10. 下一步
 
-1. 由 Issue #55 先接受三角色的 tenant/teacher/class 读取、审核、导出和删除矩阵，并固定拒绝、审计和跨教师边界；本 spec 只消费该端口。
-2. 由模板中心 ADR/spec 固定权威来源、版本/hash、安全文件/对象存储、回滚、占位符和 Word 实机签字标准；本切片仅使用其 opaque TemplateExportPort。
-3. 对本目录两份 RED 连续两次运行并记录 exact SHA、收集计数、失败节点和 node hash；Review 通过前不写领域 GREEN。
-4. Review 通过后先实现 WMP-3 的纯 DTO/value-object，再独立实现 WMP-4 snapshot 和 WMP-5 纯 mapping；这三步均不依赖 active 模板。
-5. 由模板中心执行 T011-C：使用 synthetic fixture 完成 weekplan/monthplan 的结构绑定、LibreOffice 实开/导出与 Word OOXML 兼容目标 qualification；该步骤不要求服务器运行 Word，不激活、不产生正式业务导出。
-6. T011-C/T011-E Review 通过并启用两类 document type 后，才实现 WMP-8 的 active-only TemplateExportPort 接线。
-7. 最后在固定同一 tested_code_sha 上完成正式业务的 Windows Word/LibreOffice、跨月周、长文本、空槽位、active binding version/hash 和零副作用验收；证据与 Issue 回写仍是独立门。
+1. 对 WMP-6 独立 RED 连续运行两次，记录 exact SHA、collected/passed/failed、失败节点集合和 node-only hash；由只读 reviewer
+   独立审查，Quality/CodeQL 通过并回写 Issue #56，Issue 保持 OPEN。
+2. 在任何 WMP-6 GREEN 之前，先用独立任务决定当前两个脱敏 hash 的 seed handle/profile 版本策略，并重新执行模板中心
+   candidate qualification。该门必须产生绑定新 hash 的新 evidence；不得覆写或冒充旧 T011-C 证据，也不得启用类型。
+3. 新 evidence 通过 Review 与 exact-SHA 门后，再请求独立 WMP-6 GREEN 授权；GREEN 只能实现第 8 节 seam，使本轮 46 个
+   synthetic fake-only RED 节点转绿，不得顺带实现 T011-E/WMP-7/WMP-8/WMP-9。
+4. WMP-6 GREEN 通过后，才分别规划 T011-E/WMP-7 active gate、WMP-8 active-only formal exporter 和 WMP-9 正式业务验收。
