@@ -467,3 +467,8 @@ Issue #55 冻结三角色的同租户权限边界；[ADR-0008](../docs/ADR/ADR-0
 [周/月计划领域及导出契约](../specs/weekly-monthly-plans/spec.md) 是两个独立稳定 RED 边界，最终双轴 Review
 均为 Standards 0 / Spec 0。模板中心正式导出只提供 active-only opaque binding + render/parse；周/月候选
 先经不可交付的 T011 synthetic qualification，再启用文档类型。该设计基线不授权 GREEN、迁移、合并或发布。
+
+2026-09-06：Issue #56 的 T006 lifecycle 与 T011-C candidate qualification 已完成串行实现门。T011-C
+保持内部窄 seam：唯一 OOXML validator、candidate-kind opaque export binding、同一 rendered SHA、
+LibreOffice 26.2.5.2 实开/导出，以及关闭的 `microsoft-word/ooxml-docx` 兼容目标；服务器不运行 Word。
+该记录不授权 WMP-6 orchestration、T011-E enablement、active 周/月导出或 Issue 关闭；精确 closure 证据见 Issue #56。

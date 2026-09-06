@@ -237,9 +237,10 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
    只在提交后形成。生产管理员密码轮换与旧会话失效是 2026-08-31 的另一条独立证据。
 4. R5-R 的隔离真实 MySQL 与 Linux python-docx 恢复矩阵已通过；Windows Word、生产恢复和其他业务模块人工
    回归仍是独立工作，不与 Agent、liveness 或部署脚本结果互相替代。
-5. Issue #55 已冻结角色权限矩阵；ADR-0008、模板中心第一期 spec/稳定 RED、周/月计划领域与导出
-   spec/稳定 RED 已完成双轴 Review Standards 0 / Spec 0。下一步仍须拆成模板中心 T003 起步与周/月 WMP-3
-   两条最小 GREEN，不得把权限、模板存储/版本、周/月业务、审核或文档中心合成一个交付；当前状态不授权 GREEN。
+5. Issue #56 的模板中心 T006 与 T011-C 已按串行门完成；T011-C 仅为受控 synthetic candidate
+   qualification，服务器以唯一 OOXML validator、同一 rendered SHA、LibreOffice 26.2.5.2 实开/导出和
+   `microsoft-word/ooxml-docx` 兼容目标验收，不运行 Word，也未启用周/月类型。下一步只能先提出 WMP-6
+   orchestration 的独立 RED 方案，不能实施 WMP-6、T011-E、正式业务导出或其他模板中心能力。
 
 ## 11. 更新规则
 

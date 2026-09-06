@@ -57,3 +57,21 @@ T003–T011 顺序实现。当前目录的 RED 结果不构成 GREEN、合并、
 两次失败 node ID 完全一致；`--tb=short -x` 的首个异常为
 `ModuleNotFoundError: No module named 'app.service.template_center'`。无 skip、xfail 或 collection error。
 这是缺失正式 seam 的预期 RED，不是生产实现或 GREEN 授权。
+
+## 2026-09-06 T006 / T011-C 串行门证据
+
+T006 在 `cfa141a3fdbd094560d057e47a50bd733cbc5256` 完成 tenant/document-type scoped active pointer、
+CAS activate、deactivate 与 rollback；exact-SHA Quality/CodeQL 均通过，Issue #56 保持 OPEN。
+
+T011-C 的自动实现候选 `tested_code_sha=301c2d5f2b247cb5544783f2494de97366810480`：
+
+- 独立初始 RED 连续两次 `5 failed / 39 passed`；reviewer 的 rendered-bytes 绑定 finding 再先固定为
+  连续两次 `4 failed / 41 passed`，之后才由 main 修复；
+- 专项 `45 passed`；T003–T006 + T011-C 累积 `216 passed`；全库 `1129 passed / 1 skipped`；
+- 模板中心全目录 `231 passed / 12 failed`，12 项均为未实施的 T007–T009 既定 future RED；
+- 独立只读 reviewer 最终 Code H/M/L `0/0/0`，Standards/Spec/scope-creep `0/0/0`；
+- 两个 released candidate 均由唯一 validator 验证，LibreOffice `26.2.5.2` 实际打开并导出；服务器
+  不运行 Word，资格 evidence 使用关闭的 `microsoft-word/ooxml-docx` 兼容目标并绑定实际 rendered SHA；
+- 未实现 WMP-6 orchestration、active/CRUD/业务读写或正式下载；两份用户模板保持未跟踪、未提交。
+
+最终 evidence closure SHA、exact-SHA Quality/CodeQL 与 Issue 回写以 Issue #56 为外部证据；该门不关闭 Issue。
