@@ -495,7 +495,8 @@ contract 版本，且首次正式导入仍须走普通五类之外另行批准�
   宏/外链时不得 fallback。
 - T011 candidate qualification 只能使用受控 weekplan/monthplan seed 与 synthetic fixture，通过同一 opaque
   `TemplateExportPort.render/parse` 产生 hash/profile/Office evidence；已登记但不安全/损坏/结构或 profile 不匹配的
-  seed 必须在安全阶段拒绝，Office failed/缺 Word/缺 LibreOffice/缺 evidence ID/缺精确版本也必须在 Office 阶段拒绝。
+  seed 必须在安全阶段拒绝，Office failed、缺 LibreOffice、缺 evidence ID/精确版本或缺失/模糊/额外的
+  `microsoft-word/ooxml-docx` 兼容目标也必须在 Office 阶段拒绝。
   这些失败不产生 passed evidence 或 enablement；候选 job 不产生 active/version/public projection/upload/preview/
   resolve_active/正式下载，且 evidence 未同时满足周/月独立业务门时不得启用 reserved 类型。
 
@@ -558,8 +559,8 @@ RED 需要满足：
 10. **T010：五类 exporter 接线** —— 每一类单独建立 adapter/RED/GREEN/Word 验收，正式导出记录实际 template
     version/hash；不在模板中心 GREEN 中顺手改周/月业务。
 11. **T011：reserved candidate qualification 与 enablement gate** —— 在周/月各自独立 spec/RED/Review 通过后，先运行
-    §3.12 内部窄 seam；它只产生候选资格 evidence，不进入 TemplateCenter 的 public seam。所有 hash/profile/Office
-    evidence 和人工门通过后，才发布 registry/contract v+1，将两个 reserved 类型启用。
+    §3.12 内部窄 seam；它只产生候选资格 evidence，不进入 TemplateCenter 的 public seam。所有 hash/profile、
+    LibreOffice 实开/导出和 Word OOXML 兼容 evidence 通过后，才发布 registry/contract v+1，将两个 reserved 类型启用。
 
 每一步都按 `Issue/任务 → 稳定 RED → 最小 GREEN → 双轴 Review → 当前 SHA 自动验证 → 目标平台人工验收`。
 任何 GREEN/Review/CI 结果都不自动授权下一步、merge、Issue 关闭或 release。

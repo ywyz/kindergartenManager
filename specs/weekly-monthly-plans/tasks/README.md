@@ -70,5 +70,6 @@ LibreOffice 实开/导出与 Word OOXML 兼容目标的模板级证据，但不�
 
 - 每个门使用固定 tested_code_sha，后续代码/测试/模板变更会使旧证据失效。
 - Review、Quality、Issue 回写、合并和发布均为独立授权；本目录任务状态不能推导其完成。
-- Word 自动解析 PASS 不能替代 Word/LibreOffice 实机 PASS；T011 candidate PASS 不能替代 active/正式业务导出 PASS。
+- T011-C 的 OOXML 自动解析不能替代 LibreOffice 实开/导出；T011 candidate PASS 也不能替代 WMP-9 的
+  Windows Word/LibreOffice 实机视觉门、active 或正式业务导出 PASS。
 - 导出结果必须证明业务表、DailyPlan、revision、status、audit、preview、exports（除经授权 append-only 索引外）无隐式变化。
