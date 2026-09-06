@@ -338,26 +338,35 @@ Agent WRITE 的精确本地交付状态、Review 轮次、SHA 与测试证据仅
 7. 审核流和资源复用继续拆成独立 Issue。
 8. 仅在幼儿身份、隐私、保留/删除和跨教师权限冻结后规划成长档案和管理视图。
 
-2026-09-06 已登记的后续独立产品需求（均不构成当前 GREEN 授权）：
+2026-09-06 至 2026-09-07 已登记的后续独立产品需求（均不构成当前 GREEN 授权）：
 
 - 账户、安全与审计：[Issue #62](https://github.com/ywyz/kindergartenManager/issues/62) 统一用户操作日志，
   [Issue #63](https://github.com/ywyz/kindergartenManager/issues/63) 管理员邀请码约束的用户自助注册，
   [Issue #64](https://github.com/ywyz/kindergartenManager/issues/64) 基于阿里云短信服务的验证码、限流与防重放。
 - 数据迁移与文档交付：[Issue #65](https://github.com/ywyz/kindergartenManager/issues/65) 将受支持的旧版
   SQLite 数据安全导入当前登录账户，[Issue #66](https://github.com/ywyz/kindergartenManager/issues/66)
-  Word 生成后的独立页/缩略图预览，以及 [Issue #68](https://github.com/ywyz/kindergartenManager/issues/68)
-  教材与教案知识库、格式治理、检索和重复教案提示。
+  仅提供 Word 生成后的页面小窗口预览，以及 [Issue #68](https://github.com/ywyz/kindergartenManager/issues/68)
+  教材与教案知识库、格式治理、检索和重复教案提示；#68 不长期保留带水印原件。
 - 页面与统一组件：[Issue #67](https://github.com/ywyz/kindergartenManager/issues/67) 每日活动计划响应式左右分栏，
   [Issue #71](https://github.com/ywyz/kindergartenManager/issues/71) 首页与侧边栏入口统一并分区，
   [Issue #72](https://github.com/ywyz/kindergartenManager/issues/72) 修复保存/导航后的夜间主题漂移，以及
-  [Issue #73](https://github.com/ywyz/kindergartenManager/issues/73) 各文档日历的有内容蓝点与完整中文本地化。
+  [Issue #73](https://github.com/ywyz/kindergartenManager/issues/73) 各文档日历的有内容蓝点与完整中文本地化；蓝点只表示
+  当前 actor 在稳定授权范围内可见的已有内容。
+- 学年、班级与历史：[Issue #75](https://github.com/ywyz/kindergartenManager/issues/75) 冻结园所统一学年/学期、
+  每学年独立标准班级实例、双教师授权和显式别名迁移；完成该身份门后，
+  [Issue #74](https://github.com/ywyz/kindergartenManager/issues/74) 再为所有正式 Word 业务增加统一日历选期、
+  历史查询、重新显示和安全载入编辑。
 - Agent 与 AI 体验：[Issue #69](https://github.com/ywyz/kindergartenManager/issues/69) 按文档类型分门扩展受控
-  READ/DRAFT 能力；[Issue #70](https://github.com/ywyz/kindergartenManager/issues/70) 提供应用侧可解释进度、
+  READ/DRAFT 能力，顺序固定为游戏观察记录、一对一倾听、其他文档；
+  [Issue #70](https://github.com/ywyz/kindergartenManager/issues/70) 提供用户可见的阶段进度和简短依据、
   联网开关并把 AI 设置迁入配置中心。#70 不要求、不展示或持久化模型隐藏思维链；新增搜索 provider/tool
   仍须另行冻结 ADR/spec/稳定 RED，不得静默扩大 Agent Foundation。
 
-上述需求必须按依赖和风险拆门排序；“所有文档”“已有内容”“联网”和历史 SQLite 支持范围等产品选择，
-在各自设计门开始前由用户确认，未确认部分 fail closed，不从本路线图文字推导默认授权。
+上述需求必须按依赖和风险拆门排序。2026-09-07 已确认：#65 不导入 AI Key、身份数据或旧
+`export_records` 路径行；#66 只做小窗口预览；#68 不长期保留带水印原件；#69 按上述顺序扩展；#70 不输出
+隐藏思维链；#73 按当前授权显示蓝点；#75 采用园所管理员统一配置、每学年独立班级实例、同班双教师共享读取但
+默认仅创建者编辑、显式共同编辑/移交和人工确认别名。未冻结的实现细节继续 fail closed，不从本路线图推导
+数据库迁移或 GREEN 授权。
 
 明确不做：把产品方向混入 Issue #54；开放 Agent Provider WRITE；在同一 Issue 中同时实现模板中心、复杂审批、
 成长档案、家长端和多园 SaaS；没有真实需求时提前拆分微服务。

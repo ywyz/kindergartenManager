@@ -1308,10 +1308,10 @@
     "semantic_hash": "48b0b790cf5f8a7194f2fd399af84ce0"
   },
   "docs/ROADMAP.md": {
-    "mtime": 1788703088.6932528,
-    "seen": 1788704842.3813612,
-    "ast_hash": "c6c2c8e698f10cb973f4cc2716a42825",
-    "semantic_hash": "c6c2c8e698f10cb973f4cc2716a42825"
+    "mtime": 1788732994.2656145,
+    "seen": 1788733279.027052,
+    "ast_hash": "b54fa127d21a695d2134021174655e72",
+    "semantic_hash": "b54fa127d21a695d2134021174655e72"
   },
   "docs/USER_MANUAL.md": {
     "mtime": 1788334986.785075,
@@ -2776,5 +2776,29 @@
     "seen": 1788704842.381414,
     "ast_hash": "168696bea49a14cfd0a860c0347a7c2e",
     "semantic_hash": "168696bea49a14cfd0a860c0347a7c2e"
+  },
+  "app/auth/password.py": {
+    "mtime": 1788180762.2060654,
+    "seen": 1788733279.0266244,
+    "ast_hash": "0d191f023f000ca0c680858402af9f9c",
+    "semantic_hash": "0d191f023f000ca0c680858402af9f9c"
+  },
+  "specs/ui-theme/manual/browser_acceptance.cjs": {
+    "mtime": 1788689895.5098388,
+    "seen": 1788733279.026877,
+    "ast_hash": "85856405dea45e6606b5151a4e1caa5e",
+    "semantic_hash": "85856405dea45e6606b5151a4e1caa5e"
+  },
+  "tests/test_config_secrets.py": {
+    "mtime": 1788180762.2929423,
+    "seen": 1788733279.0269144,
+    "ast_hash": "eb83119918c03836a8b45f26eb04f3d0",
+    "semantic_hash": "eb83119918c03836a8b45f26eb04f3d0"
+  },
+  "tests/test_password.py": {
+    "mtime": 1788180762.2949424,
+    "seen": 1788733279.0269787,
+    "ast_hash": "e03179e91472d58d4f6cbfbab79d6f14",
+    "semantic_hash": "e03179e91472d58d4f6cbfbab79d6f14"
   }
 }
