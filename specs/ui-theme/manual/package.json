@@ -1,0 +1,9 @@
+{
+  "name": "kindergarten-manager-ui-theme-acceptance",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Test-only locked runtime for the global theme browser acceptance",
+  "devDependencies": {
+    "playwright-core": "1.57.0"
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "status": "PASS",
+  "browser": "Google Chrome",
+  "browser_version": "152.0.7977.82",
+  "base_url": "loopback-redacted",
+  "storage_values": [
+    "day",
+    "night"
+  ],
+  "scenarios": [
+    "default_day",
+    "day_to_night_to_day",
+    "navigation_persists",
+    "refresh_persists",
+    "invalid_storage_falls_back_to_day",
+    "separate_browser_context_defaults_to_day",
+    "different_login_has_no_sensitive_theme_storage",
+    "header_drawer_body_text_border_hover_selected"
+  ],
+  "colors": {
+    "day": {
+      "bodyBackground": "rgb(248, 250, 252)",
+      "bodyText": "rgb(30, 41, 59)",
+      "headerBackground": "rgb(29, 78, 216)",
+      "headerBorder": "rgb(30, 64, 175)",
+      "drawerBackground": "rgb(248, 250, 252)",
+      "drawerText": "rgb(51, 65, 85)",
+      "drawerBorder": "rgb(226, 232, 240)",
+      "selectedBackground": null,
+      "selectedText": null
+    },
+    "night": {
+      "bodyBackground": "rgb(15, 23, 42)",
+      "bodyText": "rgb(226, 232, 240)",
+      "headerBackground": "rgb(23, 37, 84)",
+      "headerBorder": "rgb(51, 65, 85)",
+      "drawerBackground": "rgb(17, 24, 39)",
+      "drawerText": "rgb(226, 232, 240)",
+      "drawerBorder": "rgb(51, 65, 85)",
+      "selectedBackground": "rgb(30, 58, 95)",
+      "selectedText": "rgb(191, 219, 254)"
+    },
+    "nightHoverBackground": "rgba(30, 58, 95, 0.165)"
+  },
+  "screenshots": [
+    {
+      "file": "day-home.png",
+      "size_bytes": 74315,
+      "sha256": "b60267a791fe9453b1e93d6ab2dfb824be2d867a360a000b9881a18228eabe11"
+    },
+    {
+      "file": "night-home-hover.png",
+      "size_bytes": 75375,
+      "sha256": "ce734bedb5f69953d1783f6e72da83a2542f233bee718a30198cc31929e45dea"
+    }
+  ]
+}
