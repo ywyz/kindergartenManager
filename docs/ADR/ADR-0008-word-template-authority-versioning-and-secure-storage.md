@@ -236,6 +236,22 @@ spec 选择不同的块数量或重复策略，必须创建新结构 profile 和
 版本/OS/字体清单与打印 PDF 作为不可省略的证据；缺任何一项都不能宣称人工门通过。两种环境都须
 执行，且结果分别判定，不能用一侧通过替代另一侧。
 
+#### 5.1 T011-C 服务器 candidate qualification 的窄例外
+
+T011-C 不是正式业务导出或桌面端视觉保真验收：在线服务器只生成可下载的标准 `.docx`，不运行
+Microsoft Word。因此本门不要求 Windows/Word 16.0 实机执行；它必须同时满足以下关闭条件：
+
+1. seed 与 rendered bytes 均由唯一的上传 validator 通过 DOCX MIME、ZIP/XML、Content Types、关系、
+   宏/OLE/ActiveX/外链、允许部件和冻结结构 profile 校验，并以 SHA-256 绑定；
+2. 唯一 export port 的 parse report 与同一 rendered bytes 的结构摘要绑定且完整；
+3. 在 Linux 服务器用 LibreOffice 24.2 或更高精确版本实际打开并导出，记录不可变 evidence ID；
+4. 资格 evidence 以关闭标识 `microsoft-word/ooxml-docx` 声明 Microsoft Word OOXML `.docx` 兼容目标，
+   不得用模糊的 `word`、`docx` 或“Office 可打开”字符串代替。
+
+该例外只改变 T011-C 的模板级 candidate qualification，不替代 T010 五类正式 exporter、WMP-9 正式
+周/月业务导出或本节 Windows Word 视觉保真矩阵。进入这些后续门时仍须按其独立 spec 执行真实 Word
+与 LibreOffice 验收。
+
 人工/自动证据的必填字段冻结如下（正文、幼儿/教师姓名和密钥不得进入证据）：
 
 `evidence_schema_version`、`evidence_id`、`result`、稳定 `error_code`（失败时）、`document_type`、

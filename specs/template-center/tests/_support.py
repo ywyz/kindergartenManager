@@ -567,10 +567,8 @@ class MemoryControlledSeedStore:
         return self.seeds[handle_id]
 
 
-OFFICE_CLIENT_VERSIONS = (
-    "word/16.0.17328.20124",
-    "libreoffice/24.2.7.2",
-)
+OFFICE_CLIENT_VERSIONS = ("libreoffice/26.2.5.2",)
+OFFICE_COMPATIBILITY_TARGETS = ("microsoft-word/ooxml-docx",)
 
 
 class MemoryOfficeQualificationPort:
@@ -580,12 +578,14 @@ class MemoryOfficeQualificationPort:
         status: str = "passed",
         evidence_id: str | None = "office-qualification-v1",
         client_versions: tuple[str, ...] = OFFICE_CLIENT_VERSIONS,
+        compatibility_targets: tuple[str, ...] = OFFICE_COMPATIBILITY_TARGETS,
         raises: bool = False,
     ) -> None:
         self.calls: list[tuple[object, object, str]] = []
         self.status = status
         self.evidence_id = evidence_id
         self.client_versions = client_versions
+        self.compatibility_targets = compatibility_targets
         self.raises = raises
 
     async def qualify(
@@ -600,6 +600,7 @@ class MemoryOfficeQualificationPort:
             evidence_id=self.evidence_id,
             status=self.status,
             client_versions=self.client_versions,
+            compatibility_targets=self.compatibility_targets,
         )
 
 

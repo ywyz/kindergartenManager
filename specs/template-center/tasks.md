@@ -15,7 +15,7 @@
 | T008 | synthetic preview 与 export parser port | T006/T007 | synthetic-only、零持久化、版本 hash 追踪、无 fallback | 不改业务字段 |
 | T009 | backup/isolated restore | R5-R、T006 | owner-only artifact、manifest、篡改/路径/tenant/hash 原子失败 | 不运行生产恢复 |
 | T010 | 五类 exporter 分开接线 | T008/T009 | 每类独立 RED/GREEN、Word/LibreOffice 人工验收 | 一次只接一类 |
-| T011 | 周/月 reserved candidate qualification 与 enablement gate | T010；两个独立周/月 spec/RED/Review | 受控 seed/fixture；同一安全 validator 拒绝 macro/external-rel/bad-ZIP/structure-profile mismatch；Office status、Word/LibreOffice 精确版本和 evidence ID 完整；全部通过后发布 registry v+1 启用七类 | 内部窄 job；无 public projection/upload/preview/resolve_active、active、业务读写或正式下载 |
+| T011 | 周/月 reserved candidate qualification 与 enablement gate | T010；两个独立周/月 spec/RED/Review | 受控 seed/fixture；同一安全 validator 拒绝 macro/external-rel/bad-ZIP/structure-profile mismatch；T011-C 要求 LibreOffice 精确版本、`microsoft-word/ooxml-docx` 兼容目标和 evidence ID 完整；全部通过后发布 registry v+1 启用七类 | 内部窄 job；服务器不运行 Word；无 public projection/upload/preview/resolve_active、active、业务读写或正式下载 |
 
 ## 状态纪律
 
@@ -23,7 +23,7 @@
 - T003–T009 每个任务都要有自己的稳定 RED；Review finding 必须先追加 RED 再修正。
 - T010 的五类 exporter 不能在同一个变更中合并周/月业务。
 - T011 的 candidate qualification 不是正式 Preview：只能消费受控 seed/fixture、复用 T004 安全 validator，并在
-  synthetic render/parse 后检查 Office status、Word/LibreOffice 精确版本和 evidence ID；任何前置、安全或 Office
+  synthetic render/parse 后检查 Office status、LibreOffice 精确版本、关闭的 Word OOXML 兼容目标和 evidence ID；任何前置、安全或 Office
   失败都不能追加 passed evidence、创建 version/active/ExportRecord 或业务读写。只有周/月模型、字段映射、Word
   解析和人工验收标准及该 evidence 全部通过后，才可发布新 registry/contract 版本启用两个 reserved 类型。
 - 任一局部 GREEN 不代表 Standards/Spec 0/0、固定 SHA、merge、Issue 关闭或 release。

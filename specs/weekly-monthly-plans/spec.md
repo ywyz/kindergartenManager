@@ -419,7 +419,7 @@ T011-E 启用前不得由周/月 exporter 消费。周/月 exporter 不得因当
 4. 所有已注册必需 marker 都已消费，输出不含 marker、模板示例文本、None、Python repr 或未净化错误正文。
 5. DOCX 包拒绝宏、ActiveX、嵌入可执行对象、未批准外链和外部关系；模板和业务文本不能触发网络、shell、Python 或 SQL。
 6. 不允许模板缺失/版本错误时从零构建正式文档，也不允许静默使用另一个 document type 或旧版本。
-7. Word/LibreOffice 实机验收另为独立门：中文字体、表格边框/合并、分页、长文本换行、中文标点、示例内容清理和打印/PDF 视觉保真均须记录目标版本与脱敏结果；自动可解析不等于实机 PASS。
+7. T011-C 模板级门在服务器以唯一 OOXML validator、结构绑定 parse、LibreOffice 24.2+ 实际打开/导出和关闭的 `microsoft-word/ooxml-docx` 兼容目标验收，不要求服务器运行 Word；WMP-9 正式业务导出的 Windows Word/LibreOffice 实机视觉保真仍是后续独立门。中文字体、表格边框/合并、分页、长文本换行、中文标点、示例内容清理和打印/PDF 均须按各门记录目标版本与脱敏结果；自动可解析不等于实机 PASS。
 
 ### 7.3 零副作用和可追溯性
 
@@ -443,7 +443,7 @@ WMP-0 Issue #55 权限矩阵 + 模板中心 ADR/spec 依赖确认
   → WMP-3 最小 GREEN：纯领域 DTO/不变量（无 DB/UI/模板）
   → WMP-4 领域 service/repository 读取与不可变 snapshot（经 AuthorizationPort）
   → WMP-5 纯 token/payload mapping profile 与 filename GREEN（不读模板、不接模板端口）
-  → WMP-6/T011-C 模板中心 candidate qualification：synthetic fixture + 结构/模板级 Office 证据（无 active/正式交付）
+  → WMP-6/T011-C 模板中心 candidate qualification：synthetic fixture + 结构绑定 + LibreOffice 实开/导出 + Word OOXML 兼容目标（无 active/正式交付）
   → WMP-7/T011-E 模板中心启用两个周/月 document type（只开放 active opaque binding）
   → WMP-8 formal exporter：TemplateExportPort.resolve_active → render → parse
   → WMP-9 正式业务 Word/LibreOffice + Issue #55 跨教师读取/审核/导出/删除验收（各有独立证据）
@@ -458,6 +458,6 @@ candidate qualification 通过就宣称 active、正式业务导出或审核流�
 2. 由模板中心 ADR/spec 固定权威来源、版本/hash、安全文件/对象存储、回滚、占位符和 Word 实机签字标准；本切片仅使用其 opaque TemplateExportPort。
 3. 对本目录两份 RED 连续两次运行并记录 exact SHA、收集计数、失败节点和 node hash；Review 通过前不写领域 GREEN。
 4. Review 通过后先实现 WMP-3 的纯 DTO/value-object，再独立实现 WMP-4 snapshot 和 WMP-5 纯 mapping；这三步均不依赖 active 模板。
-5. 由模板中心执行 T011-C：使用 synthetic fixture 完成 weekplan/monthplan 的结构与模板级 Word/LibreOffice qualification；该步骤不激活、不产生正式业务导出。
+5. 由模板中心执行 T011-C：使用 synthetic fixture 完成 weekplan/monthplan 的结构绑定、LibreOffice 实开/导出与 Word OOXML 兼容目标 qualification；该步骤不要求服务器运行 Word，不激活、不产生正式业务导出。
 6. T011-C/T011-E Review 通过并启用两类 document type 后，才实现 WMP-8 的 active-only TemplateExportPort 接线。
 7. 最后在固定同一 tested_code_sha 上完成正式业务的 Windows Word/LibreOffice、跨月周、长文本、空槽位、active binding version/hash 和零副作用验收；证据与 Issue 回写仍是独立门。

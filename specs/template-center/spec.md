@@ -409,7 +409,8 @@ profile_version: positive int
 rendered_sha256: lowercase 64-hex SHA-256
 parse_report_sha256: lowercase 64-hex SHA-256
 office_evidence_id: opaque evidence reference
-office_client_versions: tuple of supported client identifiers
+office_client_versions: exact LibreOffice client version tuple
+office_compatibility_targets: (microsoft-word/ooxml-docx,)
 fixture_id: closed synthetic fixture identifier
 checker_version: closed checker identifier
 qualified_at_utc: timezone-aware UTC
@@ -433,21 +434,23 @@ qualification_status: passed | failed
 3. 只有安全/profile 阶段通过后才可做 synthetic render/parse；render/parse 失败、输出 hash/结构不一致或解析报告不
    完整时拒绝，不调用 Office qualification。无论失败发生在哪一阶段，都不创建 active/version/ExportRecord 或正式
    下载物，不触发 registry enablement。
-4. Office 结果只有同时满足 `status=passed`、非空 opaque `evidence_id`，以及 profile 要求的两项精确目标客户端版本/
-   build 才能通过：一项 Microsoft Word（`16.0.xxxxx.xxxxx` build）和一项 LibreOffice（`24.2` 或更高的精确版本/
-   build）。缺 Word、缺 LibreOffice、只有 family 无精确版本、缺 evidence ID 或 `status=failed` 均 fail closed；不得
+4. T011-C 是在线服务器的模板级 candidate qualification，不是正式业务 Word 视觉验收。Office 结果只有同时满足
+   `status=passed`、非空 opaque `evidence_id`、唯一 LibreOffice `24.2` 或更高精确版本/build，以及唯一关闭兼容目标
+   `microsoft-word/ooxml-docx` 才能通过。缺 LibreOffice、只有 family 无精确版本、缺或模糊/额外兼容目标、缺 evidence
+   ID 或 `status=failed` 均 fail closed；服务器不要求安装或运行 Word 16.0。兼容目标必须由同一 rendered bytes 已通过
+   的唯一 OOXML validator、结构绑定 parse report 与 LibreOffice 实际打开/导出共同支撑，不能仅凭字符串自证。不得
    追加 `qualification_status=passed`，也不得启用 reserved 类型。失败 evidence 若被记录只能是不可变 `failed` 结果，
    且不含 seed/rendered bytes、路径、业务正文或客户端原始输出。
 
 资格结果只生成/保存不可变的 `CandidateQualificationEvidence`，至少含 qualification ID、reserved document type、
-seed SHA-256、profile ID/版本、rendered/parse 结构 hash、Office/LibreOffice qualification evidence ID 与客户端
-版本、fixture ID、checker 版本和 UTC 时间；不含 rendered bytes、seed bytes、路径、URL、业务正文或 active/version
+seed SHA-256、profile ID/版本、rendered/parse 结构 hash、LibreOffice qualification evidence ID 与精确客户端
+版本、`microsoft-word/ooxml-docx` 兼容目标、fixture ID、checker 版本和 UTC 时间；不含 rendered bytes、seed bytes、路径、URL、业务正文或 active/version
 记录。内部 job 不创建 TemplateVersion、active pointer、正式 audit/ExportRecord、正式下载物，也不读写业务数据；
 它没有 public `project`/`upload`/`preview`/`resolve_active`/CRUD 方法。资格 evidence 不是 `TemplatePreviewReceipt`，
 不返回 preview bytes 或 `persisted` 标志，不能替代正式 Preview 或 Office 人工门。
 
 只有在两个独立周/月业务 spec 的数据模型/导出契约、稳定 RED、Review、候选 synthetic render/parse、结构 profile
-和 Word/LibreOffice evidence 均通过后，治理迁移才可以把对应两项从 reserved 改为 enabled；该变更发布新的 registry/
+和 T011-C LibreOffice/Word-OOXML-compatibility evidence 均通过后，治理迁移才可以把对应两项从 reserved 改为 enabled；该变更发布新的 registry/
 contract 版本，且首次正式导入仍须走普通五类之外另行批准的 seed/version 流程。candidate qualification evidence 本身
 不会自动启用类型，不能成为通用 CRUD、模板下载、active 查询或业务导出能力。
 

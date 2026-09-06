@@ -23,6 +23,7 @@ from _support import (
     docx_with_structure_profile_mismatch,
     docx_with_table_shapes,
     docx_with_text,
+    OFFICE_COMPATIBILITY_TARGETS,
     OFFICE_CLIENT_VERSIONS,
 )
 
@@ -262,6 +263,7 @@ def test_candidate_job_and_contracts_are_closed_immutable_and_internal_only():
         "parse_report_sha256",
         "office_evidence_id",
         "office_client_versions",
+        "office_compatibility_targets",
         "fixture_id",
         "checker_version",
         "qualified_at_utc",
@@ -308,6 +310,10 @@ async def test_reserved_candidate_qualification_uses_controlled_seed_and_same_op
     assert evidence.profile_version == 1
     assert evidence.office_evidence_id == "office-qualification-v1"
     assert evidence.office_client_versions
+    assert evidence.office_client_versions == ("libreoffice/26.2.5.2",)
+    assert evidence.office_compatibility_targets == (
+        "microsoft-word/ooxml-docx",
+    )
     assert evidence.fixture_id == "weekly-monthly-fixture-v1"
     assert type(evidence.qualification_id) is UUID
     assert evidence.checker_version == "template-candidate-qualification.v1"
@@ -440,34 +446,84 @@ async def test_registered_candidate_seed_reuses_security_validator_and_fails_bef
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("case_id", "status", "evidence_id", "client_versions"),
+    (
+        "case_id",
+        "status",
+        "evidence_id",
+        "client_versions",
+        "compatibility_targets",
+    ),
     [
-        ("office-failed", "failed", "office-failure-v1", OFFICE_CLIENT_VERSIONS),
-        ("missing-word", "passed", "office-without-word-v1", ("libreoffice/24.2.7.2",)),
+        (
+            "office-failed",
+            "failed",
+            "office-failure-v1",
+            OFFICE_CLIENT_VERSIONS,
+            OFFICE_COMPATIBILITY_TARGETS,
+        ),
         (
             "missing-libreoffice",
             "passed",
             "office-without-libreoffice-v1",
             ("word/16.0.17328.20124",),
+            OFFICE_COMPATIBILITY_TARGETS,
         ),
-        ("missing-evidence-id", "passed", None, OFFICE_CLIENT_VERSIONS),
+        (
+            "missing-evidence-id",
+            "passed",
+            None,
+            OFFICE_CLIENT_VERSIONS,
+            OFFICE_COMPATIBILITY_TARGETS,
+        ),
         (
             "missing-exact-client-version",
             "passed",
             "office-unversioned-v1",
-            ("word", "libreoffice"),
+            ("libreoffice",),
+            OFFICE_COMPATIBILITY_TARGETS,
+        ),
+        (
+            "libreoffice-below-floor",
+            "passed",
+            "office-old-libreoffice-v1",
+            ("libreoffice/24.1.9.2",),
+            OFFICE_COMPATIBILITY_TARGETS,
+        ),
+        (
+            "missing-word-compatibility-target",
+            "passed",
+            "office-without-word-target-v1",
+            OFFICE_CLIENT_VERSIONS,
+            (),
+        ),
+        (
+            "generic-word-target",
+            "passed",
+            "office-generic-word-target-v1",
+            OFFICE_CLIENT_VERSIONS,
+            ("microsoft-word",),
+        ),
+        (
+            "extra-compatibility-target",
+            "passed",
+            "office-extra-target-v1",
+            OFFICE_CLIENT_VERSIONS,
+            ("microsoft-word/ooxml-docx", "other-office/docx"),
         ),
     ],
     ids=[
         "office-failed",
-        "missing-word",
         "missing-libreoffice",
         "missing-evidence-id",
         "missing-exact-client-version",
+        "libreoffice-below-floor",
+        "missing-word-compatibility-target",
+        "generic-word-target",
+        "extra-compatibility-target",
     ],
 )
 async def test_incomplete_office_qualification_fails_after_render_without_passed_evidence_or_enablement(
-    case_id, status, evidence_id, client_versions
+    case_id, status, evidence_id, client_versions, compatibility_targets
 ):
     """Office evidence is an independent required gate, not a best-effort annotation."""
     api = _api()
@@ -475,6 +531,7 @@ async def test_incomplete_office_qualification_fails_after_render_without_passed
         status=status,
         evidence_id=evidence_id,
         client_versions=client_versions,
+        compatibility_targets=compatibility_targets,
     )
     job, effects = _job(api, office=office)
 

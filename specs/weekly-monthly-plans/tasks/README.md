@@ -24,7 +24,7 @@
 | WMP-3 | 领域最小 GREEN | app.service.weekly_monthly_plans.contracts | 只实现严格不可变 DTO/value object 与不变量；不建表、不迁移、不接 UI/模板 |
 | WMP-4 | 聚合读取与快照 | 独立 service/repository 用例 | tenant + 授权 actor + class + version 精确读取；跨月周不拆分；审核状态只读，不实现 workflow |
 | WMP-5 | 纯周/月 mapping profile | app.service.weekly_monthly_plans.export_contracts | 只冻结 token_id/payload_path、显式重复区域和 filename 规则；不读模板、不接 TemplateExportPort |
-| WMP-6 / T011-C | 模板中心 candidate qualification | 模板中心 T011、synthetic fixture、weekplan/monthplan 只读种子 | 先完成结构和模板级 Word/LibreOffice 证据；无 active、无正式业务导出、无周/月业务写入 |
+| WMP-6 / T011-C | 模板中心 candidate qualification | 模板中心 T011、synthetic fixture、weekplan/monthplan 只读种子 | 先完成结构绑定、LibreOffice 实开/导出和 `microsoft-word/ooxml-docx` 兼容证据；服务器不运行 Word；无 active、无正式业务导出、无周/月业务写入 |
 | WMP-7 / T011-E | 启用周/月文档类型 | 模板中心 registry + T011-C 通过 | 两类型才可从 disabled 变为 enabled；只开放 active opaque binding；历史版本重生仍不在本期 |
 | WMP-8 | formal TemplateExportPort exporter | resolve_active → render → parse | 只消费 active binding/rendered/report；无路径、blob、requested version、fallback 或模板 CRUD |
 | WMP-9 | 正式业务 Word/权限验收 | 固定 SHA、Issue #55 矩阵、Word/LibreOffice | 周/月业务 snapshot 与正式导出分别验收；跨教师读取、审核、导出、删除有独立证据 |
@@ -61,7 +61,7 @@ WMP-5 只冻结纯导出 mapping，不接模板中心：
 - token_id 不得含 `[]`；mapping 不得引入模板路径、blob 或版本选择器。
 
 WMP-6/T011-C 由模板中心以 synthetic fixture 对两份种子做 candidate qualification：通过结构、token/profile、安全和
-Word/LibreOffice 模板级证据，但不激活、不接受真实周/月 snapshot、不创建正式 ExportRecord。T011-C 通过并经 Review 后才可
+LibreOffice 实开/导出与 Word OOXML 兼容目标的模板级证据，但不激活、不接受真实周/月 snapshot、不创建正式 ExportRecord。T011-C 通过并经 Review 后才可
 执行 WMP-7/T011-E；随后 WMP-8 才能接 TemplateExportPort 的 active-only 三段调用。
 
 任何数据库 schema、Alembic、页面、权限矩阵复制、审核 transition、模板上传或版本回滚实现都属于其他门，不能藏在上述 GREEN 中。

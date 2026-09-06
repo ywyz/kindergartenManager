@@ -14,7 +14,7 @@ transaction/audit/policy/export/backup ports 和合成 OOXML bytes，不读取�
 | `test_template_center_lifecycle_red.py` | validation 与 active pointer 分离、validated 重复 active、CAS/stale/跨租户拒绝、active 唯一、blob 不删除、审计 |
 | `test_template_center_preview_export_red.py` | synthetic-only preview、零持久化、resolve/render/parse 版本证据、无 active 不 fallback |
 | `test_template_center_backup_red.py` | manifest 闭合、owner-only/隔离 staging、篡改/未知成员/权限/路径/tenant/hash 失败和原子恢复 |
-| `test_template_center_candidate_qualification_red.py` | T011 受控周/月 seed/fixture qualification、前置拒绝与安全阶段 macro/external-rel/bad-ZIP/structure-profile mismatch、Office failed/缺 Word/缺 LibreOffice/缺 evidence ID/精确版本、同一 opaque export port render/parse、无 public CRUD/active/正式 Preview |
+| `test_template_center_candidate_qualification_red.py` | T011 受控周/月 seed/fixture qualification、前置拒绝与安全阶段 macro/external-rel/bad-ZIP/structure-profile mismatch、Office failed/缺 LibreOffice/缺 evidence ID/精确版本/关闭的 `microsoft-word/ooxml-docx` 兼容目标、同一 opaque export port render/parse、无 public CRUD/active/正式 Preview |
 
 测试对应的最小公开对象和方法在 [`../spec.md`](../spec.md) §3.3、§3.7、§3.10、§3.11 中冻结；T011 内部候选资格
 窄 seam 在 §3.12 冻结。候选资格测试不把内部 job 当作 `TemplateCenter` 公共 API。端口的 fake 只记录可观察调用和
