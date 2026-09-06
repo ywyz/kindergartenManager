@@ -240,7 +240,9 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
 5. Issue #56 的模板中心 T006 与 T011-C 已按串行门完成；T011-C 仅为受控 synthetic 单候选 qualification，
    不是 WMP-6 的别名。WMP-6 orchestration 已另行冻结为固定 weekly → monthly、只调用既有 T011-C seam、
    仅两项均通过才返回内存 receipt 的 synthetic fake-only RED；尚未授权或实现 GREEN。用户授权提交的两份脱敏
-   模板产生了新 hash，旧 T011-C evidence 不覆盖新字节；WMP-6 GREEN 前必须先有独立的新 profile/evidence 门。
+   模板产生的新 hash 已通过独立 template-center evidence refresh：历史 v1 绑定保留，当前字节追加关闭 v2
+   seed/profile 与 LibreOffice 证据，类型仍 disabled。该结果只满足后续另行申请 WMP-6 GREEN 的模板资格前置条件；
+   WMP-6 GREEN、T011-E/WMP-7、WMP-8、WMP-9 仍未实施。
    不得实施 T011-E、active、正式业务导出或其他模板中心能力，Issue #56 保持 OPEN。
 
 ## 11. 更新规则

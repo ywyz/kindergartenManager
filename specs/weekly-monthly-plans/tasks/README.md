@@ -14,8 +14,8 @@
 19,215 bytes、SHA-256 787f1a9be8aaebd27cf87c25747a3f8e70e584ac5bfd1c068ffedc2df54a4ac6。
 该证据只绑定旧字节。当前脱敏候选分别为 17,717 bytes / SHA-256
 f6c17c137f04e29a68524ed400eb395984e93a16c234a065b5794d9f49a9347b，以及 9,482 bytes / SHA-256
-f2e5dbe2a468dd15c55cdd6b70c5e15fe63048a3708b151732e208703b0d11f4。旧 T011-C evidence 不得转移到新 hash；
-本轮不修改 registry、不重新 qualification，也不重新宣称 T011-C。
+f2e5dbe2a468dd15c55cdd6b70c5e15fe63048a3708b151732e208703b0d11f4。旧 T011-C evidence 未转移到新 hash；
+当前 hash 已通过下述独立 evidence refresh，历史结果保持原义。
 
 ## 任务顺序
 
@@ -28,7 +28,7 @@ f2e5dbe2a468dd15c55cdd6b70c5e15fe63048a3708b151732e208703b0d11f4。旧 T011-C ev
 | WMP-4 | 聚合读取与快照 | 独立 service/repository 用例 | tenant + 授权 actor + class + version 精确读取；跨月周不拆分；审核状态只读，不实现 workflow |
 | WMP-5 | 纯周/月 mapping profile | app.service.weekly_monthly_plans.export_contracts | 只冻结 token_id/payload_path、显式重复区域和 filename 规则；不读模板、不接 TemplateExportPort |
 | T011-C（已独立完成） | 模板中心单候选 qualification seam | 模板中心 T011、受控 seed、synthetic fixture | 历史 evidence 只绑定旧候选 hash；不是 WMP-6，不重做、不启用、不正式导出 |
-| 当前脱敏候选 evidence refresh（待独立授权） | 新 hash/profile/evidence 门 | 两个已提交脱敏候选 | 必须新版本绑定并重新 qualification；不得覆写旧 evidence、不得 active |
+| 当前脱敏候选 evidence refresh（已独立完成） | 新 hash/profile/evidence 门 | 两个已提交脱敏候选 | v1 历史绑定保留；v2 精确 hash/profile/LibreOffice evidence 追加；仍不得 active |
 | WMP-6（当前仅 RED） | 周/月 qualification orchestration | tests/test_wmp6_qualification_orchestration_red.py、已完成 T011-C `qualify` seam | 固定 weekly → monthly；只用 immutable synthetic snapshots/fake job；两项通过才返回内存 receipt；不实现 GREEN |
 | WMP-7 / T011-E | 启用周/月文档类型 | 模板中心 registry + T011-C 通过 | 两类型才可从 disabled 变为 enabled；只开放 active opaque binding；历史版本重生仍不在本期 |
 | WMP-8 | formal TemplateExportPort exporter | resolve_active → render → parse | 只消费 active binding/rendered/report；无路径、blob、requested version、fallback 或模板 CRUD |
@@ -103,6 +103,17 @@ repository/database/integration 依赖、动态发现和 write/active/export 旁
 
 由于本轮脱敏使候选 hash 改变，WMP-6 GREEN 之前必须先用另一个明确授权的模板中心任务为当前 hash 建立新版本
 profile/evidence。该证据 refresh 不得借 WMP-6 名义重做或覆盖旧 T011-C，也不得顺带执行 WMP-7/T011-E。
+
+## 2026-09-06 当前脱敏候选 evidence refresh
+
+模板中心已为当前两个精确 hash 追加关闭 v2 seed/profile：weekly/monthly 分别使用
+`controlled-weekplan-seed-v2` / `controlled-monthplan-seed-v2` 与对应 `*-profile-v2`，profile、candidate
+contract 和 structural profile version 均为 2；fixture 与 renderer/parser 仍为 v1。历史 v1 记录未覆盖，任意
+跨版本组合失败关闭。新增 refresh 9 项与既有 T011-C 45 项均通过，LibreOffice `26.2.5.2 620(Build:2)`
+实际打开/导出并形成绑定输入、导出 DOCX、结构摘要与 PDF hash 的追加证据；独立只读 reviewer 为 0/0/0。
+
+该 evidence 已满足“另行申请 WMP-6 GREEN”的模板资格前置条件，但不等于 WMP-6 已获授权或实现。现有 WMP-6
+仍保持 46 个稳定 RED；T011-E/WMP-7、WMP-8、WMP-9 仍分别需要独立授权、实现和验收。
 
 任何数据库 schema、Alembic、页面、权限矩阵复制、审核 transition、模板上传或版本回滚实现都属于其他门，不能藏在上述 GREEN 中。
 

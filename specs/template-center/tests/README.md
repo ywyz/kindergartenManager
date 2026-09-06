@@ -93,3 +93,35 @@ export port。
 本次字节变化不会倒推修改、覆盖或作废历史记录本身，但旧 qualification evidence 不能证明新文件已 qualified。WMP-6
 GREEN 前必须由另一个明确授权的模板中心证据门决定新 seed/profile 版本并对这两个精确 hash 重新 qualification；在此之前
 保持 reserved/disabled，不执行 T011-E，不创建 active pointer、TemplateVersion、ExportRecord 或正式下载。
+
+## 2026-09-06 当前脱敏候选 qualification evidence refresh
+
+本门从已完整验证并推送的 `f752eb6713954e6081965c02e62394505304ce6f` 开始，仅追加当前脱敏候选的
+关闭 profile/evidence，不覆盖上节历史 T011-C：
+
+- 历史 weekly/monthly v1 handle、profile、version、contract version 与旧 hash 原样保留；
+- 新增 `controlled-weekplan-seed-v2` + `weekly_activity_plan-profile-v2`，profile/contract/structural version
+  均为 2，精确绑定 `f6c17c137f04e29a68524ed400eb395984e93a16c234a065b5794d9f49a9347b`；
+- 新增 `controlled-monthplan-seed-v2` + `monthly_theme_activity_plan-profile-v2`，profile/contract/structural
+  version 均为 2，精确绑定 `f2e5dbe2a468dd15c55cdd6b70c5e15fe63048a3708b151732e208703b0d11f4`；
+- `weekly-monthly-fixture-v1` 与既有 renderer/parser v1 保持不变；v1/v2 handle/profile 交叉组合均在 seed
+  读取前失败关闭。
+
+稳定 RED 先于生产实现提交：最终为 9 collected、5 passed / 4 failed，连续两次节点及失败集合一致；node-only
+SHA-256 为 `0d9c5f5bdfce901452d0b220807c2af53d7a463787f97db39eccc9dbec9738bd`，failure-node SHA-256
+为 `7c34a268453d3b5dfcc858d73b740de5df78d4f302222243368c91140502a254`。最小 GREEN 只向关闭 registry
+追加两项 profile，并让既有 profile 构造器显式承载版本；`TemplateCandidateQualificationJob.qualify`、唯一 validator、
+contracts、export/parse 与 Office 完整性判断均未复制或改写。refresh 9 项与既有 T011-C 45 项合计 54 passed。
+
+真实 Office 证据使用 LibreOffice `26.2.5.2 620(Build:2)` 分别打开并导出两个精确输入。输入在执行前后 hash
+不变；导出 DOCX 再次通过唯一 validator：
+
+| evidence reference | 输入/rendered SHA-256 | 导出 DOCX SHA-256 / structure SHA-256 | PDF SHA-256 / 页数 |
+|---|---|---|---|
+| `candidate-refresh-20260906-weekly-v2-lo-26.2.5.2` | `f6c17c137f04e29a68524ed400eb395984e93a16c234a065b5794d9f49a9347b` | `2fc90678f7a30d711331e6e17fa6c491d3da0ea25bd5bdb8ecf2de8a6e13750e` / `dab4a78999831c486f9df25400f82800d2f4ff18ce076571cc9c64a830efe9c6` | `4c701dc189459f94707970c763ae24627089f3109e8bcdb5042a8f3a8c69d215` / 2 |
+| `candidate-refresh-20260906-monthly-v2-lo-26.2.5.2` | `f2e5dbe2a468dd15c55cdd6b70c5e15fe63048a3708b151732e208703b0d11f4` | `27042d45f6193468d4292911ddae1fe0586e0188ee4a1b33df0abc1ea2070f9e` / `2c97f5602d9afbd45b240871a5f5b1ea789cccabcc566378c776f1c2b63829a4` | `751044a51d81ebb6ecb07e2c09dbbe376897f7636682744907b9f50c7e40a19b` / 1 |
+
+临时 DOCX/PDF 已清除；证据只保留关闭摘要，不保留正文或路径。独立只读 reviewer 对代码、Standards、Spec、
+scope-creep 的 H/M/L 均为 0/0/0。周/月两类型仍为 reserved/disabled；本门没有 WMP-6 GREEN、T011-E、active
+pointer、TemplateVersion、ExportRecord、正式下载或业务写入。最终 exact-SHA Quality/CodeQL 和 evidence closure
+以 Issue #56 的追加评论为准，Issue 保持 OPEN。

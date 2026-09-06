@@ -472,3 +472,7 @@ Issue #55 冻结三角色的同租户权限边界；[ADR-0008](../docs/ADR/ADR-0
 保持内部窄 seam：唯一 OOXML validator、candidate-kind opaque export binding、同一 rendered SHA、
 LibreOffice 26.2.5.2 实开/导出，以及关闭的 `microsoft-word/ooxml-docx` 兼容目标；服务器不运行 Word。
 该记录不授权 WMP-6 orchestration、T011-E enablement、active 周/月导出或 Issue 关闭；精确 closure 证据见 Issue #56。
+
+同日后续独立 evidence refresh 为已提交的脱敏 week/month 候选追加 v2 seed/profile 与精确 hash、LibreOffice
+打开/导出证据；历史 T011-C v1 绑定不覆盖、不迁移。周/月类型继续 reserved/disabled。该门仅使模板资格足以支持
+后续另行申请 WMP-6 GREEN，不实现 WMP-6、T011-E/WMP-7、WMP-8 或 WMP-9；精确 closure 仍见 Issue #56。

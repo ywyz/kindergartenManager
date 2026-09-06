@@ -316,8 +316,8 @@ Agent WRITE 的精确本地交付状态、Review 轮次、SHA 与测试证据仅
 4. 模板中心 T006 与 T011-C 已于 2026-09-06 串行通过；T011-C 只完成服务器侧受控单候选
    qualification，不是 WMP-6 的别名，也未启用周/月类型。WMP-6 orchestration 已独立冻结为 fixed-pair、
    weekly → monthly 严格串行、synthetic fake-only RED；未获新的 GREEN 授权前不得实现。两份模板脱敏提交后的
-   新 hash 不受旧 T011-C evidence 覆盖，必须先走独立的新 profile/evidence 门；其后才可请求 WMP-6 GREEN，
-   仍不得顺带实施 T011-E 或 active-only 周/月正式导出接线。
+   新 hash 不受旧 T011-C evidence 覆盖，现已通过独立的新 v2 profile/evidence 门并保留历史 v1；因此模板资格
+   前置条件已满足，但 WMP-6 GREEN 仍须另行申请，且不得顺带实施 T011-E 或 active-only 周/月正式导出接线。
 5. 在模板版本可追溯后建设统一教学文档中心；审核流和资源复用继续拆成独立 Issue。
 6. 仅在幼儿身份、隐私、保留/删除和跨教师权限冻结后规划成长档案和管理视图。
 
