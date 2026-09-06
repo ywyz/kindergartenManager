@@ -18,6 +18,7 @@ from inspect import iscoroutinefunction, signature
 import json
 from pathlib import Path
 import re
+import traceback
 from typing import get_type_hints
 from uuid import UUID
 
@@ -153,7 +154,7 @@ def _profile(document_type: str):
     matches = tuple(
         profile
         for profile in tc.CANDIDATE_QUALIFICATION_PROFILES
-        if profile.document_type.value == document_type
+        if profile.document_type.value == document_type and profile.profile_version == 2
     )
     assert len(matches) == 1
     return matches[0]
@@ -449,6 +450,12 @@ def test_wmp6_public_contract_is_closed_and_does_not_reexport_other_layers():
     assert not {
         name for name in public_names if any(token in name for token in forbidden)
     }
+
+
+def test_wmp6_module_exposes_only_its_closed_public_contract():
+    api = _api()
+
+    assert {name for name in vars(api) if not name.startswith("_")} == set(api.__all__)
 
 
 def test_wmp6_errors_are_an_exact_closed_sanitized_set():
@@ -867,6 +874,32 @@ async def test_wmp6_weekly_failure_is_sanitized_and_short_circuits_without_retry
     assert job.completed_evidence == []
     assert job.overlap_detected is False
     _assert_no_forbidden_effects(job)
+
+
+@pytest.mark.asyncio
+async def test_wmp6_qualification_failure_suppresses_original_exception_traceback():
+    api = _api()
+    job = MemoryQualificationJob(
+        {
+            "weekly_activity_plan": RuntimeError(
+                "synthetic secret port and fixture detail must not escape"
+            )
+        }
+    )
+
+    with pytest.raises(api.QualificationOrchestrationError) as caught:
+        await api.WeeklyMonthlyQualificationOrchestrator(job).run(_request(api))
+
+    formatted = "".join(
+        traceback.format_exception(
+            caught.type,
+            caught.value,
+            caught.tb,
+            chain=True,
+        )
+    )
+    assert "synthetic secret port and fixture detail" not in formatted
+    assert "RuntimeError" not in formatted
 
 
 def _mismatched_evidence(document_type, mismatch):
