@@ -311,12 +311,10 @@ async def test_reserved_candidate_qualification_uses_controlled_seed_and_same_op
     assert evidence.office_evidence_id == "office-qualification-v1"
     assert evidence.office_client_versions
     assert evidence.office_client_versions == ("libreoffice/26.2.5.2",)
-    assert evidence.office_compatibility_targets == (
-        "microsoft-word/ooxml-docx",
-    )
+    assert evidence.office_compatibility_targets == ("microsoft-word/ooxml-docx",)
     assert evidence.fixture_id == "weekly-monthly-fixture-v1"
     assert type(evidence.qualification_id) is UUID
-    assert evidence.checker_version == "template-candidate-qualification.v1"
+    assert evidence.checker_version == "template-candidate-qualification.v2"
     assert evidence.qualified_at_utc.utcoffset().total_seconds() == 0
     assert not hasattr(evidence, "rendered_bytes")
     assert not hasattr(evidence, "seed_bytes")

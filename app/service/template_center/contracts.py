@@ -908,6 +908,7 @@ class OfficeQualificationResult:
     evidence_id: str | None
     status: str
     client_versions: tuple[str, ...]
+    compatibility_targets: tuple[str, ...]
 
     def __post_init__(self) -> None:
         if (
@@ -917,9 +918,13 @@ class OfficeQualificationResult:
             )
             or type(self.status) is not str
             or type(self.client_versions) is not tuple
+            or type(self.compatibility_targets) is not tuple
         ):
             raise ValueError("office_qualification_result_invalid")
-        if not all(type(item) is str and item for item in self.client_versions):
+        if not all(
+            type(item) is str and item
+            for item in self.client_versions + self.compatibility_targets
+        ):
             raise ValueError("office_qualification_result_invalid")
 
 
@@ -934,6 +939,7 @@ class CandidateQualificationEvidence:
     parse_report_sha256: str
     office_evidence_id: str
     office_client_versions: tuple[str, ...]
+    office_compatibility_targets: tuple[str, ...]
     fixture_id: str
     checker_version: str
     qualified_at_utc: datetime
@@ -953,6 +959,10 @@ class CandidateQualificationEvidence:
         )
         if type(self.office_client_versions) is not tuple or not all(
             type(item) is str and item for item in self.office_client_versions
+        ):
+            raise ValueError("candidate_qualification_evidence_invalid")
+        if type(self.office_compatibility_targets) is not tuple or not all(
+            type(item) is str and item for item in self.office_compatibility_targets
         ):
             raise ValueError("candidate_qualification_evidence_invalid")
         _nonempty_text(self.fixture_id, "candidate_qualification_evidence_invalid")

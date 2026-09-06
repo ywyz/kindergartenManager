@@ -23,8 +23,8 @@ from app.service.template_center.registry import candidate_profile
 from app.service.template_center.validator import validate_upload
 
 
-CANDIDATE_CHECKER_VERSION = "template-candidate-qualification.v1"
-_WORD_VERSION = re.compile(r"word/16\.0\.[0-9]{5}\.[0-9]{5}")
+CANDIDATE_CHECKER_VERSION = "template-candidate-qualification.v2"
+_WORD_OOXML_COMPATIBILITY_TARGET = "microsoft-word/ooxml-docx"
 _LIBREOFFICE_VERSION = re.compile(
     r"libreoffice/(?P<major>[0-9]+)\.(?P<minor>[0-9]+)\.(?P<patch>[0-9]+)(?:\.(?P<build>[0-9]+))?"
 )
@@ -49,17 +49,16 @@ def _office_result_is_complete(result: OfficeQualificationResult) -> bool:
         result.status != "passed"
         or type(result.evidence_id) is not str
         or not result.evidence_id.strip()
-        or len(result.client_versions) != 2
-        or len(set(result.client_versions)) != 2
+        or len(result.client_versions) != 1
+        or result.compatibility_targets != (_WORD_OOXML_COMPATIBILITY_TARGET,)
     ):
         return False
-    word = [item for item in result.client_versions if _WORD_VERSION.fullmatch(item)]
     libreoffice = []
     for item in result.client_versions:
         match = _LIBREOFFICE_VERSION.fullmatch(item)
         if match and (int(match["major"]), int(match["minor"])) >= (24, 2):
             libreoffice.append(item)
-    return len(word) == 1 and len(libreoffice) == 1
+    return len(libreoffice) == 1
 
 
 class TemplateCandidateQualificationJob:
@@ -183,6 +182,7 @@ class TemplateCandidateQualificationJob:
             parse_report_sha256=_parse_report_sha256(report),
             office_evidence_id=office.evidence_id,
             office_client_versions=office.client_versions,
+            office_compatibility_targets=office.compatibility_targets,
             fixture_id=fixture.fixture_id,
             checker_version=CANDIDATE_CHECKER_VERSION,
             qualified_at_utc=datetime.now(timezone.utc),
