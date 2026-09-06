@@ -21,6 +21,7 @@ _CANDIDATE_PROFILE_ROWS = (
         DocumentType.WEEKLY_ACTIVITY_PLAN,
         "controlled-weekplan-seed-v1",
         "weekly_activity_plan-profile-v1",
+        1,
         "226c8208659bb6334533499b417aaf5f7ccad1e82d3a7cd6b8955d91a2b6417a",
         "tables:word/document.xml:2x9x7",
     ),
@@ -28,7 +29,24 @@ _CANDIDATE_PROFILE_ROWS = (
         DocumentType.MONTHLY_THEME_ACTIVITY_PLAN,
         "controlled-monthplan-seed-v1",
         "monthly_theme_activity_plan-profile-v1",
+        1,
         "787f1a9be8aaebd27cf87c25747a3f8e70e584ac5bfd1c068ffedc2df54a4ac6",
+        "tables:word/document.xml:1x8x4",
+    ),
+    (
+        DocumentType.WEEKLY_ACTIVITY_PLAN,
+        "controlled-weekplan-seed-v2",
+        "weekly_activity_plan-profile-v2",
+        2,
+        "f6c17c137f04e29a68524ed400eb395984e93a16c234a065b5794d9f49a9347b",
+        "tables:word/document.xml:2x9x7",
+    ),
+    (
+        DocumentType.MONTHLY_THEME_ACTIVITY_PLAN,
+        "controlled-monthplan-seed-v2",
+        "monthly_theme_activity_plan-profile-v2",
+        2,
+        "f2e5dbe2a468dd15c55cdd6b70c5e15fe63048a3708b151732e208703b0d11f4",
         "tables:word/document.xml:1x8x4",
     ),
 )
@@ -106,6 +124,7 @@ def _candidate_profile(
     document_type: DocumentType,
     handle_id: str,
     profile_id: str,
+    profile_version: int,
     seed_sha256: str,
     table_anchor: str,
 ) -> CandidateQualificationProfile:
@@ -116,10 +135,10 @@ def _candidate_profile(
     )
     contract = TemplateContractManifest(
         contract_id=f"kg.template.{document_type.value}.candidate",
-        contract_version=1,
+        contract_version=profile_version,
         placeholder_contract_version=1,
         structural_profile_id=profile_id,
-        structural_profile_version=1,
+        structural_profile_version=profile_version,
         renderer_id=f"kg.renderer.{document_type.value}.candidate.v1",
         parser_id=f"kg.parser.{document_type.value}.candidate.v1",
         allowed_parts=allowed_parts,
@@ -133,7 +152,7 @@ def _candidate_profile(
             expected_sha256=seed_sha256,
         ),
         profile_id=profile_id,
-        profile_version=1,
+        profile_version=profile_version,
         fixture_id="weekly-monthly-fixture-v1",
         contract=contract,
     )

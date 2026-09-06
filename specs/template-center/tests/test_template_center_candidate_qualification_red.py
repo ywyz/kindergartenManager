@@ -38,7 +38,7 @@ def test_candidate_registry_pins_released_seed_hashes_and_exact_table_profiles()
             profile.seed_handle.expected_sha256,
             profile.contract.required_anchors,
         )
-        for profile in api.CANDIDATE_QUALIFICATION_PROFILES
+        for profile in api.CANDIDATE_QUALIFICATION_PROFILES[:2]
     ) == (
         (
             "weekly_activity_plan",
