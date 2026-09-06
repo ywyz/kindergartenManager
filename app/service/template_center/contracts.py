@@ -909,6 +909,7 @@ class OfficeQualificationResult:
     status: str
     client_versions: tuple[str, ...]
     compatibility_targets: tuple[str, ...]
+    rendered_sha256: str
 
     def __post_init__(self) -> None:
         if (
@@ -926,6 +927,7 @@ class OfficeQualificationResult:
             for item in self.client_versions + self.compatibility_targets
         ):
             raise ValueError("office_qualification_result_invalid")
+        _sha256(self.rendered_sha256, "office_qualification_result_invalid")
 
 
 @dataclass(frozen=True, slots=True)

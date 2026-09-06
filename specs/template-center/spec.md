@@ -438,7 +438,8 @@ qualification_status: passed | failed
    `status=passed`、非空 opaque `evidence_id`、唯一 LibreOffice `24.2` 或更高精确版本/build，以及唯一关闭兼容目标
    `microsoft-word/ooxml-docx` 才能通过。缺 LibreOffice、只有 family 无精确版本、缺或模糊/额外兼容目标、缺 evidence
    ID 或 `status=failed` 均 fail closed；服务器不要求安装或运行 Word 16.0。兼容目标必须由同一 rendered bytes 已通过
-   的唯一 OOXML validator、结构绑定 parse report 与 LibreOffice 实际打开/导出共同支撑，不能仅凭字符串自证。不得
+   的唯一 OOXML validator、结构绑定 parse report 与 LibreOffice 实际打开/导出共同支撑；Office port 必须接收同一
+   `RenderedTemplate`，结果必须回传其 `rendered_sha256` 并与当前 hash 严格相等，不能仅凭字符串或结构摘要自证。不得
    追加 `qualification_status=passed`，也不得启用 reserved 类型。失败 evidence 若被记录只能是不可变 `failed` 结果，
    且不含 seed/rendered bytes、路径、业务正文或客户端原始输出。
 

@@ -248,6 +248,9 @@ Microsoft Word。因此本门不要求 Windows/Word 16.0 实机执行；它必�
 4. 资格 evidence 以关闭标识 `microsoft-word/ooxml-docx` 声明 Microsoft Word OOXML `.docx` 兼容目标，
    不得用模糊的 `word`、`docx` 或“Office 可打开”字符串代替。
 
+LibreOffice qualification port 必须接收本次同一个 `RenderedTemplate`，其关闭结果必须回传所验
+`rendered_sha256`；job 仅在该 hash 与当前 rendered bytes 严格相等时接受 evidence，结构摘要相同不能替代字节绑定。
+
 该例外只改变 T011-C 的模板级 candidate qualification，不替代 T010 五类正式 exporter、WMP-9 正式
 周/月业务导出或本节 Windows Word 视觉保真矩阵。进入这些后续门时仍须按其独立 spec 执行真实 Word
 与 LibreOffice 验收。

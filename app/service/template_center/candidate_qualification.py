@@ -44,11 +44,14 @@ def _parse_report_sha256(report: ExportParseReport) -> str:
     ).hexdigest()
 
 
-def _office_result_is_complete(result: OfficeQualificationResult) -> bool:
+def _office_result_is_complete(
+    result: OfficeQualificationResult, rendered_sha256: str
+) -> bool:
     if (
         result.status != "passed"
         or type(result.evidence_id) is not str
         or not result.evidence_id.strip()
+        or result.rendered_sha256 != rendered_sha256
         or len(result.client_versions) != 1
         or result.compatibility_targets != (_WORD_OOXML_COMPATIBILITY_TARGET,)
     ):
@@ -161,12 +164,12 @@ class TemplateCandidateQualificationJob:
             ):
                 raise ValueError("parse_report_invalid")
             office = await self._office_qualification_port.qualify(
-                binding, report, profile_id
+                binding, rendered, report, profile_id
             )
             if type(
                 office
             ) is not OfficeQualificationResult or not _office_result_is_complete(
-                office
+                office, rendered.rendered_sha256
             ):
                 raise ValueError("office_result_invalid")
         except Exception as error:
