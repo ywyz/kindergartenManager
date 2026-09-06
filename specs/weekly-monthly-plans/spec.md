@@ -1,13 +1,13 @@
 # 周/月计划领域与 Word 导出契约
 
-- 状态：WMP-3～WMP-7 已完成；下一道独立门为 WMP-8 formal exporter
+- 状态：WMP-3～WMP-8 已完成；下一道独立门为 WMP-9 正式业务验收
 - 规划 Issue：[Issue #55](https://github.com/ywyz/kindergartenManager/issues/55)
 - 模板中心证据 Issue：[Issue #56](https://github.com/ywyz/kindergartenManager/issues/56)（保持 OPEN）
 - 依赖：ADR-0004、模板中心 ADR/第一期 spec、Issue #55 角色权限矩阵
 - 当前模板来源：templates/weekplan.docx、templates/monthplan.docx
 - 领域术语：周视角 = 每周活动计划；月视角 = 月活动计划（主题活动计划）
 
-本文件只冻结周/月计划的领域事实、聚合边界、导出输入输出和验收口径。它不创建数据库表、迁移、页面、审核工作流或模板 CRUD。WMP-7 目标是只启用当前周/月候选到 ACTIVE opaque binding 的关闭消费边界；正式 render/parse 仍属于未来 WMP-8。
+本文件只冻结周/月计划的领域事实、聚合边界、导出输入输出和验收口径。它不创建数据库表、迁移、页面、审核工作流或模板 CRUD。WMP-7 只启用当前周/月候选到 ACTIVE opaque binding 的关闭消费边界；WMP-8 已以冻结 snapshot 完成 active-only formal render/parse，正式业务与 Word/LibreOffice 验收仍属于独立 WMP-9。
 
 ## 1. 目标和范围
 
@@ -615,6 +615,8 @@ closure、weakref、对象 identity 或命名约定描述为安全边界。
 
 ## 11. 下一步
 
-WMP-7 设计缺口解决并独立通过后，下一道独立门为 WMP-8：只消费已经验证的 ACTIVE binding，冻结并实现
-`TemplateExportPort.resolve_active → render → parse` formal exporter。WMP-8 不重生历史版本，不实现 fallback、模板 CRUD、
-审核流、WMP-9 正式业务验收、统一文档中心、远程对象存储或 Agent 能力扩展。
+WMP-8 已完成：只消费 WMP-7 已验证的 ACTIVE binding，以 await 前冻结 snapshot 串行执行
+`TemplateExportPort.resolve_active → render → parse`，并闭合 payload、rendered artifact 与 parse report 身份；未实现
+历史版本重生、fallback、模板 CRUD、审核流、统一文档中心、远程对象存储或 Agent 能力扩展。
+
+下一道独立门为 WMP-9 正式业务验收；WMP-8 的局部 GREEN 不构成 WMP-9 的 Word/LibreOffice、权限或产品验收证据。

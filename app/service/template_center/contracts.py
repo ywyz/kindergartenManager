@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from enum import Enum
 import re
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from enum import Enum
 from typing import Protocol
 from uuid import UUID
-
 
 DOCX_MIME_TYPE = (
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -116,13 +115,13 @@ def _sha256(value: object, code: str) -> None:
 
 
 def _utc(value: object, code: str) -> None:
-    if type(value) is not datetime or value.tzinfo is not timezone.utc:
+    if type(value) is not datetime or value.tzinfo is not UTC:
         raise ValueError(code)
 
 
 def _deeply_immutable(value: object) -> bool:
     if value is None or type(value) in {bool, int, float, str, bytes, UUID, datetime}:
-        return type(value) is not datetime or value.tzinfo is timezone.utc
+        return type(value) is not datetime or value.tzinfo is UTC
     return type(value) is tuple and all(_deeply_immutable(item) for item in value)
 
 
@@ -362,7 +361,7 @@ class TemplateValidationEvidence:
         receipt: TemplateValidationReceipt,
         *,
         validated_at_utc: datetime,
-    ) -> "TemplateValidationEvidence":
+    ) -> TemplateValidationEvidence:
         if type(receipt) is not TemplateValidationReceipt:
             raise ValueError("template_validation_evidence_invalid")
         return cls(
@@ -803,7 +802,7 @@ class TemplateExportBinding:
         candidate_binding_id: UUID,
         profile_id: str,
         profile_version: int,
-    ) -> "TemplateExportBinding":
+    ) -> TemplateExportBinding:
         return cls(
             document_type=document_type,
             content_sha256=content_sha256,
@@ -821,6 +820,7 @@ class RenderedTemplate:
     binding: TemplateExportBinding
     rendered_bytes: bytes
     rendered_sha256: str
+    payload_sha256: str | None = None
 
     def __post_init__(self) -> None:
         if (
@@ -829,6 +829,8 @@ class RenderedTemplate:
         ):
             raise ValueError("rendered_template_invalid")
         _sha256(self.rendered_sha256, "rendered_template_invalid")
+        if self.payload_sha256 is not None:
+            _sha256(self.payload_sha256, "rendered_template_invalid")
 
 
 @dataclass(frozen=True, slots=True)
@@ -839,6 +841,8 @@ class ExportParseReport:
     unresolved_token_ids: tuple[str, ...]
     has_macros: bool
     has_external_relationships: bool
+    rendered_sha256: str | None = None
+    payload_sha256: str | None = None
 
     def __post_init__(self) -> None:
         if (
@@ -851,6 +855,10 @@ class ExportParseReport:
         ):
             raise ValueError("export_parse_report_invalid")
         _sha256(self.structure_summary_sha256, "export_parse_report_invalid")
+        if self.rendered_sha256 is not None:
+            _sha256(self.rendered_sha256, "export_parse_report_invalid")
+        if self.payload_sha256 is not None:
+            _sha256(self.payload_sha256, "export_parse_report_invalid")
 
 
 @dataclass(frozen=True, slots=True)

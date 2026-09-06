@@ -237,13 +237,16 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
    只在提交后形成。生产管理员密码轮换与旧会话失效是 2026-08-31 的另一条独立证据。
 4. R5-R 的隔离真实 MySQL 与 Linux python-docx 恢复矩阵已通过；Windows Word、生产恢复和其他业务模块人工
    回归仍是独立工作，不与 Agent、liveness 或部署脚本结果互相替代。
-5. Issue #56 的模板中心 T006、T011-C、当前脱敏 v2 evidence refresh、WMP-6 fixed-pair orchestration 与
-   WMP-7/T011-E 本地 GREEN 已分别完成。WMP-7 明确采用可信进程内 capability 边界，不声称抵御恶意同进程
+5. Issue #56 的模板中心 T006、T011-C、当前脱敏 v2 evidence refresh、WMP-6 fixed-pair orchestration、
+   WMP-7/T011-E 与 WMP-8 formal exporter 本地 GREEN 已分别完成。WMP-7 明确采用可信进程内 capability 边界，不声称抵御恶意同进程
    反射/monkeypatch；它以无状态 verifier 重算 receipt，并绑定 canonical snapshot、当前 v2 evidence/完整 contract，
-   只为 weekly/monthly 提供 active opaque binding，未新增数据库/Alembic、CRUD 或 WMP-8。最终 33 节点连续两次全绿，
+   只为 weekly/monthly 提供 active opaque binding。WMP-8 只消费该 binding，按 `resolve_active → render → parse`
+   串行执行，并把 await 前冻结的 payload、rendered artifact 与 parser report 哈希闭合；未新增数据库/Alembic、CRUD、
+   持久化、Agent 能力或 WMP-9。WMP-7 最终 33 节点连续两次全绿，
    只读 Review 0/0/0。测试代码 `87088e51969964f07a6f50b4fc8345b070c73af3` 已 push，且该 exact SHA 的
    Quality `34037552898` 与 CodeQL `34037552662` 均成功；Issue #56/#57 在 docs closure SHA 自身 CI 后回写。
-   下一道独立门明确为 WMP-8 formal exporter，目前不得进入。
+   WMP-8 最终 43 节点连续两次全绿且只读 Review 0/0/0；最终 exact-SHA Quality/CodeQL 与 Issue 回写以
+   Issue #56/#57 的外部证据为准。下一道独立门明确为 WMP-9 正式业务验收，目前不得进入。
 
 ## 11. 更新规则
 

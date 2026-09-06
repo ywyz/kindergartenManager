@@ -31,7 +31,7 @@ f2e5dbe2a468dd15c55cdd6b70c5e15fe63048a3708b151732e208703b0d11f4。旧 T011-C ev
 | 当前脱敏候选 evidence refresh（已独立完成） | 新 hash/profile/evidence 门 | 两个已提交脱敏候选 | v1 历史绑定保留；v2 精确 hash/profile/LibreOffice evidence 追加；仍不得 active |
 | WMP-6（已完成） | 周/月 qualification orchestration | tests/test_wmp6_qualification_orchestration_red.py、已完成 T011-C `qualify` seam | 固定 weekly → monthly；只用 immutable synthetic snapshots/fake job；两项通过才返回短期内存 receipt |
 | WMP-7 / T011-E（GREEN） | 仅启用周/月 READ descriptor 与 active opaque binding | 当前 v2 evidence + WMP-6 receipt + TemplateExportPort | 33/33、Review 0/0/0；tested code exact-SHA Quality/CodeQL 成功 |
-| WMP-8 | formal TemplateExportPort exporter | resolve_active → render → parse | 只消费 active binding/rendered/report；无路径、blob、requested version、fallback 或模板 CRUD |
+| WMP-8（GREEN） | formal TemplateExportPort exporter | resolve_active → render → parse | 43/43、Review 0/0/0；只消费 active binding/rendered/report；无路径、blob、requested version、fallback 或模板 CRUD |
 | WMP-9 | 正式业务 Word/权限验收 | 固定 SHA、Issue #55 矩阵、Word/LibreOffice | 周/月业务 snapshot 与正式导出分别验收；跨教师读取、审核、导出、删除有独立证据 |
 
 ## RED 运行
@@ -165,6 +165,30 @@ Agent Foundation 为 261 passed；本次 4 个 Python 文件 Ruff 0.16.6 与 for
 [Quality run 34037552898](https://github.com/ywyz/kindergartenManager/actions/runs/34037552898) 与
 [CodeQL run 34037552662](https://github.com/ywyz/kindergartenManager/actions/runs/34037552662) 均成功。
 本证据只证明 commit/push/CI，不外推为 release 或 deploy；最终 Issue #56/#57 回写同时记录后续 docs closure SHA。
+
+## 2026-09-07 WMP-8 formal exporter 独立门证据
+
+本门从已提交、推送且 exact-SHA Quality/CodeQL 成功的
+`269b23e48ee7060790fbcbdc14f83f35f7d2de2d` 开始。WMP-7 tested-code
+`87088e51969964f07a6f50b4fc8345b070c73af3` 与 evidence-closure
+`b4704b5f1a6123dde65d50e7b65af95f93c3eb82` 均为该起点祖先；closure 到起点只含生成图谱刷新与
+ROADMAP 学年/班级决策文档，没有 WMP-7 capability、模板绑定或安全契约变化。
+
+初始稳定 RED 为 29 collected / 0 passed / 29 failed，连续两次均只因正式
+`app.service.weekly_monthly_plans.formal_exporter` 缺失；node-only SHA-256 为
+`10f738e1677ce707d4a1f64e59724d4c2713f60e791080f48c190d7cac1efa7d`。Review finding 均遵循先独立 RED、
+复现失败、再最小修复：补齐 provider capability/损坏 snapshot 脱敏、payload/rendered/parse 三段身份闭合、DTO predicate
+异常脱敏、首次 await 前 snapshot 冻结与漂移拒绝、损坏 exact-class request 拒绝，以及 replayed artifact 的 parser-extracted
+payload 身份；提交前文档复审还以两个独立 RED 修正 WMP-8 日期/未完成 CI 状态与 spec 下一门收敛。最终只读 reviewer
+High/Medium/Low 为 0/0/0。
+
+最终 WMP-8 完整集合为 43 collected；连续两次均为 43 passed / 0 failed，完整节点集合及顺序一致，node-only
+SHA-256 均为 `67af6b5d1aec23f9c753ed0ddc13819f034f130bbde0a6e5b0c14c83c67f99b8`。实现只扩展向后兼容的
+render/parse 身份 receipt，并增加 active-only、零持久化 exporter；没有数据库字段、Alembic、模板 CRUD、路径/blob/URL、
+历史版本、fallback、自动重试、Agent 能力或 WMP-9。
+
+最终提交/推送 SHA、该 exact SHA 的 Quality/CodeQL 链接、完整 43 节点清单及全部验证结果以 Issue #56/#57
+的相同外部回写为准；文档不以待生成 SHA 自我引用。下一道独立门为 WMP-9 正式业务验收。
 
 ## 证据要求
 

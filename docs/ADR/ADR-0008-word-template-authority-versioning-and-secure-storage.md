@@ -51,6 +51,15 @@ Office/checker 证据及完整 contract；缺失、过期、漂移、跨版本�
 Python 扩展纳入同一进程，或需要跨进程/持久化 receipt，本补充不再适用；届时必须先冻结外部 signer/HSM/KMS、轮换、
 并发、过期、重放和迁移契约，只能在新 ADR/spec/稳定 RED 获得授权后实现。
 
+### WMP-8 formal exporter 身份闭合补充（2026-09-07）
+
+WMP-8 不取得 registry、descriptor、candidate evidence、路径、blob 或 storage handle。它在第一次模板 await 前深冻结
+weekly/monthly snapshot，并只按 `resolve_active → render → resolve_active → parse → resolve_active` 消费 WMP-7 已验证的
+ACTIVE opaque binding。renderer receipt 必须同时携带冻结 payload hash 与由 bytes 重算的 rendered hash；parser report
+必须从该 artifact 提取并回报同一 payload hash，并绑定同一 rendered hash。三方任一缺失、漂移、错配或跨版本组合均以
+稳定脱敏错误失败关闭。该门不创建 ExportRecord、active pointer/version 或其他持久化，也不增加模板中心 capability；
+正式 Word/LibreOffice 与业务权限验收仍属于独立 WMP-9。
+
 ### 1. 逻辑文档类型和权威来源
 
 逻辑类型注册表是全局闭合且版本化的，永远只认识下面七个 `document_type`。这里的“认识”不等于
