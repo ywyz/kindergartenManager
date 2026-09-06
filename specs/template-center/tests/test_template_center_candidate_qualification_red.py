@@ -253,6 +253,13 @@ def test_candidate_job_and_contracts_are_closed_immutable_and_internal_only():
         "fixture",
         "profile_id",
     )
+    assert {item.name for item in fields(api.OfficeQualificationResult)} == {
+        "evidence_id",
+        "status",
+        "client_versions",
+        "compatibility_targets",
+        "rendered_sha256",
+    }
     assert {item.name for item in fields(api.CandidateQualificationEvidence)} == {
         "qualification_id",
         "document_type",
@@ -338,8 +345,12 @@ async def test_reserved_candidate_qualification_uses_controlled_seed_and_same_op
     parse_binding, rendered_bytes = effects["export"].parse_calls[0]
     assert parse_binding is binding
     assert sha256(rendered_bytes).hexdigest() == evidence.rendered_sha256
-    office_binding, parse_report, office_profile = effects["office"].calls[0]
+    office_binding, office_rendered, parse_report, office_profile = effects[
+        "office"
+    ].calls[0]
     assert office_binding is binding
+    assert office_rendered.binding is binding
+    assert office_rendered.rendered_sha256 == evidence.rendered_sha256
     assert parse_report.binding is binding
     assert office_profile == evidence.profile_id
     assert effects["export"].resolve_calls == []
@@ -440,6 +451,25 @@ async def test_registered_candidate_seed_reuses_security_validator_and_fails_bef
         api.build_initial_document_registry().is_enabled("weekly_activity_plan")
         is False
     )
+
+
+@pytest.mark.asyncio
+async def test_office_evidence_for_different_rendered_bytes_fails_closed():
+    api = _api()
+    office = MemoryOfficeQualificationPort(rendered_sha256="f" * 64)
+    job, effects = _job(api, office=office)
+
+    with pytest.raises(api.TemplateCenterError) as caught:
+        await job.qualify(
+            document_type="weekly_activity_plan",
+            seed_handle="controlled-weekplan-seed-v1",
+            fixture=_fixture(api),
+            profile_id="weekly_activity_plan-profile-v1",
+        )
+
+    assert caught.value.code is api.TemplateErrorCode.EXPORT_FAILED
+    assert len(effects["office"].calls) == 1
+    assert effects["evidence"].items == []
 
 
 @pytest.mark.asyncio

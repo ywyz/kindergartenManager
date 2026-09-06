@@ -11,6 +11,7 @@ import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
+from inspect import signature
 from html import escape
 from io import BytesIO
 from types import SimpleNamespace
@@ -579,29 +580,41 @@ class MemoryOfficeQualificationPort:
         evidence_id: str | None = "office-qualification-v1",
         client_versions: tuple[str, ...] = OFFICE_CLIENT_VERSIONS,
         compatibility_targets: tuple[str, ...] = OFFICE_COMPATIBILITY_TARGETS,
+        rendered_sha256: str | None = None,
         raises: bool = False,
     ) -> None:
-        self.calls: list[tuple[object, object, str]] = []
+        self.calls: list[tuple[object, object, object, object]] = []
         self.status = status
         self.evidence_id = evidence_id
         self.client_versions = client_versions
         self.compatibility_targets = compatibility_targets
+        self.rendered_sha256 = rendered_sha256
         self.raises = raises
 
-    async def qualify(
-        self, binding: object, parse_report: object, profile_id: str
-    ) -> object:
+    async def qualify(self, binding: object, *args: object) -> object:
         from app.service import template_center as api
 
-        self.calls.append((binding, parse_report, profile_id))
+        if len(args) == 2:
+            rendered = None
+            parse_report, profile_id = args
+        elif len(args) == 3:
+            rendered, parse_report, profile_id = args
+        else:
+            raise TypeError("unexpected office qualification arguments")
+        self.calls.append((binding, rendered, parse_report, profile_id))
         if self.raises:
             raise RuntimeError("synthetic office failure with raw output")
-        return api.OfficeQualificationResult(
-            evidence_id=self.evidence_id,
-            status=self.status,
-            client_versions=self.client_versions,
-            compatibility_targets=self.compatibility_targets,
-        )
+        result = {
+            "evidence_id": self.evidence_id,
+            "status": self.status,
+            "client_versions": self.client_versions,
+            "compatibility_targets": self.compatibility_targets,
+        }
+        if "rendered_sha256" in signature(api.OfficeQualificationResult).parameters:
+            result["rendered_sha256"] = self.rendered_sha256 or getattr(
+                rendered, "rendered_sha256", "0" * 64
+            )
+        return api.OfficeQualificationResult(**result)
 
 
 class MemoryQualificationEvidenceStore:
