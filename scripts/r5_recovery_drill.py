@@ -16,8 +16,10 @@ import json
 import os
 import shutil
 import sqlite3
+import stat
 import subprocess
 import sys
+import uuid
 import zipfile
 from datetime import date
 from io import BytesIO
@@ -303,9 +305,73 @@ def _make_assets(source_root: Path, encryption_key: str) -> tuple[Path, Path, Pa
 
 
 def _write_secure(path: Path, payload: bytes) -> None:
-    path.write_bytes(payload)
-    if os.name == "posix":
-        path.chmod(0o600)
+    """Create a new private file, leaving no artifact when writing fails."""
+    if os.name != "posix":
+        raise RecoveryDrillError("Secure file creation is unsupported")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    no_follow = getattr(os, "O_NOFOLLOW", 0)
+    if not no_follow:
+        raise RecoveryDrillError("Secure file creation is unsupported")
+    flags |= no_follow
+
+    descriptor = -1
+    created = False
+    try:
+        # The mode is supplied to the create syscall itself.  chmod-after-write
+        # would expose sensitive payload bytes through the process umask window.
+        descriptor = os.open(path, flags, 0o600)
+        created = True
+        os.fchmod(descriptor, 0o600)
+        view = memoryview(payload)
+        while view:
+            written = os.write(descriptor, view)
+            if written <= 0:
+                raise OSError("Secure file write made no progress")
+            view = view[written:]
+        os.fsync(descriptor)
+    except BaseException as exc:
+        if descriptor >= 0:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+            descriptor = -1
+        if created:
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError:
+                raise RecoveryDrillError(
+                    "Secure file cleanup failed after creation error"
+                ) from None
+        if isinstance(exc, (KeyboardInterrupt, SystemExit)):
+            raise
+        raise RecoveryDrillError("Secure file creation failed") from None
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
+def _replace_secure(path: Path, payload: bytes) -> None:
+    """Atomically replace an existing synthetic asset with corrupted bytes."""
+    try:
+        metadata = path.lstat()
+    except OSError:
+        raise RecoveryDrillError("Synthetic asset cannot be corrupted") from None
+    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+        raise RecoveryDrillError("Synthetic asset cannot be corrupted")
+
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        _write_secure(temporary, payload)
+        os.replace(temporary, path)
+    except RecoveryDrillError:
+        temporary.unlink(missing_ok=True)
+        raise
+    except OSError:
+        temporary.unlink(missing_ok=True)
+        raise RecoveryDrillError("Synthetic asset replacement failed") from None
 
 
 def _seed_database(
@@ -512,9 +578,9 @@ def _corrupt_assets(
     exports_root: Path,
     templates_root: Path,
 ) -> None:
-    _write_secure(secrets_file, b"CORRUPTED-SECRETS")
-    _write_secure(exports_root / "before-recovery.docx", b"CORRUPTED-EXPORT")
-    _write_secure(templates_root / _TEMPLATE_NAMES[0], b"CORRUPTED-TEMPLATE")
+    _replace_secure(secrets_file, b"CORRUPTED-SECRETS")
+    _replace_secure(exports_root / "before-recovery.docx", b"CORRUPTED-EXPORT")
+    _replace_secure(templates_root / _TEMPLATE_NAMES[0], b"CORRUPTED-TEMPLATE")
 
 
 def _restore_and_verify_archive(

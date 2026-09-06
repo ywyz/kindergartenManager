@@ -12,7 +12,9 @@ from __future__ import annotations
 import hashlib
 import importlib
 import json
+import os
 import sqlite3
+import stat
 from pathlib import Path
 from typing import Any
 
@@ -227,3 +229,149 @@ def test_recovery_migration_environment_is_confined_to_work_root(
     assert environment["DATABASE_URL"].endswith(database.as_posix())
     assert environment["ENCRYPTION_KEY"] == "synthetic-encryption"
     assert len(environment["JWT_SECRET"]) >= 32
+
+
+def test_secure_write_creates_owner_only_file_without_following_links(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sensitive drill artifacts are private from the instant they exist."""
+    module = _drill_module()
+    target = tmp_path / "sensitive.bin"
+    calls: list[tuple[int, int, int]] = []
+    real_open = module.os.open
+
+    def inspect_open(
+        path: Path,
+        flags: int,
+        mode: int = 0o777,
+        *args: Any,
+        **kwargs: Any,
+    ) -> int:
+        descriptor = real_open(path, flags, mode, *args, **kwargs)
+        calls.append((flags, mode, stat.S_IMODE(os.fstat(descriptor).st_mode)))
+        return descriptor
+
+    monkeypatch.setattr(module.os, "open", inspect_open)
+    module._write_secure(target, b"synthetic-sensitive-payload")
+
+    assert target.read_bytes() == b"synthetic-sensitive-payload"
+    assert calls, "_write_secure must create through the low-level open API"
+    flags, mode, creation_mode = calls[0]
+    assert flags & os.O_CREAT
+    assert flags & os.O_EXCL
+    assert mode == 0o600
+    if os.name == "posix":
+        assert flags & os.O_NOFOLLOW
+        assert creation_mode == 0o600
+
+
+def test_secure_write_rejects_existing_file_and_symlink_without_modification(
+    tmp_path: Path,
+) -> None:
+    """A secure-create helper must never overwrite or follow an existing entry."""
+    module = _drill_module()
+    target = tmp_path / "sensitive.bin"
+    target.write_bytes(b"original")
+
+    with pytest.raises(module.RecoveryDrillError, match="secure|Secure|create"):
+        module._write_secure(target, b"replacement")
+    assert target.read_bytes() == b"original"
+
+    if os.name != "posix":
+        return
+    link_target = tmp_path / "link-target.bin"
+    link_target.write_bytes(b"link-target")
+    symlink = tmp_path / "sensitive-link.bin"
+    symlink.symlink_to(link_target)
+
+    with pytest.raises(module.RecoveryDrillError, match="secure|Secure|create"):
+        module._write_secure(symlink, b"must-not-follow")
+    assert symlink.is_symlink()
+    assert link_target.read_bytes() == b"link-target"
+
+
+def test_secure_write_removes_partial_file_after_write_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An interrupted write cannot leave a sensitive partial artifact behind."""
+    module = _drill_module()
+    target = tmp_path / "sensitive.bin"
+    real_write = module.os.write
+    write_count = 0
+
+    def fail_after_partial_write(descriptor: int, payload: Any) -> int:
+        nonlocal write_count
+        write_count += 1
+        if write_count == 1:
+            return real_write(descriptor, payload[:4])
+        raise OSError("injected write failure")
+
+    monkeypatch.setattr(module.os, "write", fail_after_partial_write)
+    with pytest.raises(module.RecoveryDrillError, match="secure|Secure|create"):
+        module._write_secure(target, b"payload-that-must-not-remain")
+
+    assert write_count >= 2
+    assert not target.exists()
+    assert not list(tmp_path.iterdir())
+
+
+def test_secure_write_fails_closed_when_owner_only_creation_is_unsupported(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Platforms without the proven POSIX primitive must not persist secrets."""
+    module = _drill_module()
+    target = tmp_path / "sensitive.bin"
+    opened = False
+
+    def unexpected_open(*_args: Any, **_kwargs: Any) -> int:
+        nonlocal opened
+        opened = True
+        raise AssertionError("unsupported platforms must fail before opening")
+
+    monkeypatch.setattr(module.os, "name", "nt")
+    monkeypatch.setattr(module.os, "open", unexpected_open)
+
+    with pytest.raises(module.RecoveryDrillError, match="unsupported"):
+        module._write_secure(target, b"synthetic-sensitive-payload")
+
+    assert opened is False
+    assert not target.exists()
+
+
+def test_secure_replace_is_private_and_rejects_symlinks(tmp_path: Path) -> None:
+    """Atomic synthetic corruption keeps 0600 and never follows its target."""
+    module = _drill_module()
+    target = tmp_path / "asset.bin"
+    target.write_bytes(b"original")
+    module._replace_secure(target, b"replacement")
+    assert target.read_bytes() == b"replacement"
+    assert stat.S_IMODE(target.stat().st_mode) == 0o600
+    assert list(tmp_path.iterdir()) == [target]
+
+    link_target = tmp_path / "link-target.bin"
+    link_target.write_bytes(b"link-target")
+    symlink = tmp_path / "asset-link.bin"
+    symlink.symlink_to(link_target)
+    with pytest.raises(module.RecoveryDrillError, match="cannot be corrupted"):
+        module._replace_secure(symlink, b"must-not-follow")
+    assert symlink.is_symlink()
+    assert link_target.read_bytes() == b"link-target"
+
+
+def test_secure_replace_cleans_temporary_file_when_replace_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failed atomic replace preserves the target and removes its temp file."""
+    module = _drill_module()
+    target = tmp_path / "asset.bin"
+    target.write_bytes(b"original")
+
+    def fail_replace(*_args: Any, **_kwargs: Any) -> None:
+        raise OSError("injected replace failure")
+
+    monkeypatch.setattr(module.os, "replace", fail_replace)
+    with pytest.raises(module.RecoveryDrillError, match="replacement failed"):
+        module._replace_secure(target, b"replacement")
+
+    assert target.read_bytes() == b"original"
+    assert list(tmp_path.iterdir()) == [target]
