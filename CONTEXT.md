@@ -241,8 +241,9 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
    WMP-7/T011-E 本地 GREEN 已分别完成。WMP-7 明确采用可信进程内 capability 边界，不声称抵御恶意同进程
    反射/monkeypatch；它以无状态 verifier 重算 receipt，并绑定 canonical snapshot、当前 v2 evidence/完整 contract，
    只为 weekly/monthly 提供 active opaque binding，未新增数据库/Alembic、CRUD 或 WMP-8。最终 33 节点连续两次全绿，
-   只读 Review 0/0/0；commit/push 与 exact-SHA Quality/CodeQL 尚待本轮闭合。下一道独立门明确为 WMP-8 formal
-   exporter，目前不得进入；Issue #56/#57 只在远端证据回写后更新。
+   只读 Review 0/0/0。测试代码 `87088e51969964f07a6f50b4fc8345b070c73af3` 已 push，且该 exact SHA 的
+   Quality `34037552898` 与 CodeQL `34037552662` 均成功；Issue #56/#57 在 docs closure SHA 自身 CI 后回写。
+   下一道独立门明确为 WMP-8 formal exporter，目前不得进入。
 
 ## 11. 更新规则
 

@@ -299,6 +299,17 @@ H0/M0/L0，Quality、CodeQL 与 Dependency Graph 精确 SHA 成功，Issue #52 �
   liveness/readiness、登录、五模块、图片、AI key、Word 与数据快照均 PASS。六类证据及互不替代规则只见
   `specs/operations-r5/evidence-ledger.md`；closure commit SHA 只能在提交后回读并由自身 Quality 固定。
 
+近期运维子计划（2026-09-06 新增）：
+
+1. [Issue #60](https://github.com/ywyz/kindergartenManager/issues/60) 独立规划生产定时备份、小时级 RPO、
+   MySQL binlog/PITR、Oracle2 异地加密复制、保留策略、恢复演练与系统内/外通知。
+2. #60 复用但不改写现有 R5-R/R5-P 的 artifact、evidence、database identity/revision、protected image 与
+   隔离恢复门禁；readiness、备份存在、异地复制成功和真实可恢复性继续是互不替代的证据。
+3. 完整恢复验证不按小时暂停生产运行；近期设计门必须先冻结每日完整基线、增量恢复点、调度/防重入、
+   `FAILED`/`STALE` 告警和失败不删除最近成功备份的契约。
+4. 本段只把 #60 纳入近期计划；真实生产 timer、binlog 配置、Oracle 节点、凭据、外部消息和恢复动作仍需
+   ADR/spec、稳定 RED、Review、隔离演练及独立明确授权。
+
 ## 11. R6：产品深化（模板、文档、审核与复用）
 
 状态：`串行交付中；WMP-8 为下一道独立门`（2026-09-06；模板中心 T006/T011-C、当前脱敏 v2 evidence、
@@ -319,8 +330,34 @@ Agent WRITE 的精确本地交付状态、Review 轮次、SHA 与测试证据仅
    canonical snapshot 和当前 v2 profile/evidence/完整 contract 绑定，只把 weekly/monthly 从 reserved 改为 enabled，
    对业务仅开放 active opaque binding。下一道独立门是 WMP-8 formal exporter；不得顺带实现 WMP-9、模板 CRUD、
    fallback、远程对象存储或 Agent 能力扩展。最终 exact-SHA 证据以本轮 Issue #56/#57 回写为准。
-5. 在模板版本可追溯后建设统一教学文档中心；审核流和资源复用继续拆成独立 Issue。
-6. 仅在幼儿身份、隐私、保留/删除和跨教师权限冻结后规划成长档案和管理视图。
+5. 在模板版本可追溯后，先由
+   [Issue #59](https://github.com/ywyz/kindergartenManager/issues/59) 冻结供应商中立的远程对象存储、稳定对象引用、
+   tenant/user 隔离、凭据、失败原子性及 MySQL BLOB/本地 exports 的可回滚迁移；再建设统一教学文档中心。
+6. #59 与 #60 必须分别验收：远程对象存储不是备份，备份也不能替代业务对象存储。#59 的远程对象
+   manifest/checksum 只有在 #60 独立纳入异地备份与恢复演练后，才能形成完整灾难恢复覆盖。
+7. 审核流和资源复用继续拆成独立 Issue。
+8. 仅在幼儿身份、隐私、保留/删除和跨教师权限冻结后规划成长档案和管理视图。
+
+2026-09-06 已登记的后续独立产品需求（均不构成当前 GREEN 授权）：
+
+- 账户、安全与审计：[Issue #62](https://github.com/ywyz/kindergartenManager/issues/62) 统一用户操作日志，
+  [Issue #63](https://github.com/ywyz/kindergartenManager/issues/63) 管理员邀请码约束的用户自助注册，
+  [Issue #64](https://github.com/ywyz/kindergartenManager/issues/64) 基于阿里云短信服务的验证码、限流与防重放。
+- 数据迁移与文档交付：[Issue #65](https://github.com/ywyz/kindergartenManager/issues/65) 将受支持的旧版
+  SQLite 数据安全导入当前登录账户，[Issue #66](https://github.com/ywyz/kindergartenManager/issues/66)
+  Word 生成后的独立页/缩略图预览，以及 [Issue #68](https://github.com/ywyz/kindergartenManager/issues/68)
+  教材与教案知识库、格式治理、检索和重复教案提示。
+- 页面与统一组件：[Issue #67](https://github.com/ywyz/kindergartenManager/issues/67) 每日活动计划响应式左右分栏，
+  [Issue #71](https://github.com/ywyz/kindergartenManager/issues/71) 首页与侧边栏入口统一并分区，
+  [Issue #72](https://github.com/ywyz/kindergartenManager/issues/72) 修复保存/导航后的夜间主题漂移，以及
+  [Issue #73](https://github.com/ywyz/kindergartenManager/issues/73) 各文档日历的有内容蓝点与完整中文本地化。
+- Agent 与 AI 体验：[Issue #69](https://github.com/ywyz/kindergartenManager/issues/69) 按文档类型分门扩展受控
+  READ/DRAFT 能力；[Issue #70](https://github.com/ywyz/kindergartenManager/issues/70) 提供应用侧可解释进度、
+  联网开关并把 AI 设置迁入配置中心。#70 不要求、不展示或持久化模型隐藏思维链；新增搜索 provider/tool
+  仍须另行冻结 ADR/spec/稳定 RED，不得静默扩大 Agent Foundation。
+
+上述需求必须按依赖和风险拆门排序；“所有文档”“已有内容”“联网”和历史 SQLite 支持范围等产品选择，
+在各自设计门开始前由用户确认，未确认部分 fail closed，不从本路线图文字推导默认授权。
 
 明确不做：把产品方向混入 Issue #54；开放 Agent Provider WRITE；在同一 Issue 中同时实现模板中心、复杂审批、
 成长档案、家长端和多园 SaaS；没有真实需求时提前拆分微服务。

@@ -448,9 +448,10 @@ T011-C 已完成而 WMP-6 orchestration 未实现。该冲突只通过本节拆�
 - `T011-C` 是模板中心已经完成的单候选 `TemplateCandidateQualificationJob.qualify(...)` seam：它对一个受控 seed 和
   `SyntheticQualificationFixture` 形成一个 `CandidateQualificationEvidence`。本文件不改写该事实、不复制其 validator、
   registry、contracts、export port 或 Office 判定。
-- `WMP-6` 是尚未实现的周/月应用层编排：它只把一个固定 weekly synthetic snapshot 和一个固定 monthly synthetic
+- `WMP-6` 在上述历史基线尚未实现；其后完成的周/月应用层编排只把一个固定 weekly synthetic snapshot 和一个固定 monthly synthetic
   snapshot 严格串行交给上述 T011-C seam，并在两项证据均与调用绑定一致时返回一个内存聚合 receipt。
-- `WMP-7 / T011-E` 仍是后续启用门；WMP-8/WMP-9 仍是正式 exporter 与正式业务验收。本轮不创建这些能力，也不把
+- 在本节记录的 WMP-6 门语境中，`WMP-7 / T011-E` 仍是后续启用门；它随后已由第 10 节的独立门完成。
+  WMP-8/WMP-9 仍是正式 exporter 与正式业务验收；WMP-6 本轮不创建这些能力，也不把
   T011-C 重新编号或重新宣称完成。
 
 未来唯一模块为 `app.service.weekly_monthly_plans.qualification_orchestration`。它只能公开：关闭错误类型、两个强类型

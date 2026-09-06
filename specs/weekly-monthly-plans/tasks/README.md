@@ -30,7 +30,7 @@ f2e5dbe2a468dd15c55cdd6b70c5e15fe63048a3708b151732e208703b0d11f4。旧 T011-C ev
 | T011-C（已独立完成） | 模板中心单候选 qualification seam | 模板中心 T011、受控 seed、synthetic fixture | 历史 evidence 只绑定旧候选 hash；不是 WMP-6，不重做、不启用、不正式导出 |
 | 当前脱敏候选 evidence refresh（已独立完成） | 新 hash/profile/evidence 门 | 两个已提交脱敏候选 | v1 历史绑定保留；v2 精确 hash/profile/LibreOffice evidence 追加；仍不得 active |
 | WMP-6（已完成） | 周/月 qualification orchestration | tests/test_wmp6_qualification_orchestration_red.py、已完成 T011-C `qualify` seam | 固定 weekly → monthly；只用 immutable synthetic snapshots/fake job；两项通过才返回短期内存 receipt |
-| WMP-7 / T011-E（本地 GREEN；待 exact-SHA CI） | 仅启用周/月 READ descriptor 与 active opaque binding | 当前 v2 evidence + WMP-6 receipt + TemplateExportPort | 33/33、Review 0/0/0；最终证据待 Issue #56/#57 回写 |
+| WMP-7 / T011-E（GREEN） | 仅启用周/月 READ descriptor 与 active opaque binding | 当前 v2 evidence + WMP-6 receipt + TemplateExportPort | 33/33、Review 0/0/0；tested code exact-SHA Quality/CodeQL 成功 |
 | WMP-8 | formal TemplateExportPort exporter | resolve_active → render → parse | 只消费 active binding/rendered/report；无路径、blob、requested version、fallback 或模板 CRUD |
 | WMP-9 | 正式业务 Word/权限验收 | 固定 SHA、Issue #55 矩阵、Word/LibreOffice | 周/月业务 snapshot 与正式导出分别验收；跨教师读取、审核、导出、删除有独立证据 |
 
@@ -161,8 +161,10 @@ WMP-7 为 81 passed，完整 WMP 为 229 passed。独立只读 reviewer 最终 H
 Agent Foundation 为 261 passed；本次 4 个 Python 文件 Ruff 0.16.6 与 format、`git diff --check` 通过。完整历史树仍有
 既有 Ruff/format 债务，不能归入 WMP-7；本地 pip-audit 因 PyPI proxy 503 失败，须以 exact-SHA Quality 远端结果为准。
 
-本节在提交前只构成 local GREEN。最终 commit/push、exact-SHA Quality/CodeQL 和 Issue #56/#57 回写将在取得远端证据后
-补入；在此之前不得把本段外推为 CI/release/deploy 完成。
+测试代码已提交并推送为 `87088e51969964f07a6f50b4fc8345b070c73af3`；该精确 SHA 的
+[Quality run 34037552898](https://github.com/ywyz/kindergartenManager/actions/runs/34037552898) 与
+[CodeQL run 34037552662](https://github.com/ywyz/kindergartenManager/actions/runs/34037552662) 均成功。
+本证据只证明 commit/push/CI，不外推为 release 或 deploy；最终 Issue #56/#57 回写同时记录后续 docs closure SHA。
 
 ## 证据要求
 
