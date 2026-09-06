@@ -37,6 +37,20 @@
 当前最大的边界事实：UI 已恢复本地账号登录、active 用户重读、JWT `jti` 会话与 RBAC，但这不能替代
 TLS、强密码、受控 Bootstrap/轮换和网络访问控制。桌面 frozen 模式只监听回环；源码和 Docker 模式可能对局域网/公网开放。
 
+### 2.1 应用进程内代码边界
+
+受审阅并随精确 SHA 发布的应用代码、锁定依赖和启动配置属于可信计算基。外部用户、上传文档、数据库正文、
+HTTP/UI 参数和外部服务响应均不得取得 Python import、反射、调试器、任意代码执行或 monkeypatch 能力。
+不受信任的同进程 Python 模块因此**不属于当前攻击面**：若攻击者已经能在应用进程中执行任意 Python，便可读取
+内存密钥、替换校验函数和直接调用底层端口，进程内对象 identity、module private、closure 或 weak reference 都不能
+构成独立安全边界；本项目也不声称 WMP-7 能抵御这种整进程失陷。
+
+WMP-7 的 receipt 是可信应用代码之间的内部完整性 capability，不是跨进程签名或可持久化凭证。其门禁仍必须对所有
+公开/外部输入失败关闭：只接受精确 receipt 类型，重算批次与映射 hash，固定 canonical snapshot hash，并重新匹配当前
+candidate hash、profile/version、qualification evidence 和完整 contract。receipt 不得序列化后从 HTTP、数据库、消息、
+插件或用户文档恢复；进程重启后只能重新运行 WMP-6。若未来允许第三方进程内插件、任意 Python 扩展或跨进程 receipt，
+必须另立 ADR，引入进程外 signer/HSM/KMS 或等价受保护验证边界，并重新评估密钥轮换、过期与重放。
+
 ## 3. 威胁分级
 
 | 等级 | 含义 |

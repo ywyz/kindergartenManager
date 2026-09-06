@@ -1,5 +1,9 @@
 # 模板中心第一期任务门
 
+> 2026-09-06 状态补充：T006、T011-C 与当前脱敏 v2 evidence 已完成；T011-E/WMP-7 也已通过独立门，
+> 仅以内部 registry 启用 weekly/monthly 的 READ descriptor，并向业务开放 ACTIVE opaque binding。
+> T007–T010 及其既有 future RED 不因该门自动完成。
+
 本表是 [`spec.md`](spec.md) §6 的可执行索引。所有状态初始为“待前置门/稳定 RED”；完成文档与 RED
 不等于允许实现 GREEN。
 

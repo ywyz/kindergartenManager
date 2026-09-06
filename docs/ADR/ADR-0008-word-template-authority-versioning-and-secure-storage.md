@@ -36,6 +36,21 @@
 
 ## 决策
 
+### WMP-7 receipt issuer 威胁模型补充（2026-09-06）
+
+WMP-7/T011-E 采用当前部署事实中的可信进程内 capability 边界：随精确 SHA 发布的应用代码与锁定依赖属于可信计算基，
+外部调用方不能执行任意 Python、反射或 monkeypatch。不受信任的同进程模块不属于本门攻击面；一旦出现任意同进程代码
+执行，进程内私有变量、closure、weakref 和对象 identity 都不能提供不可伪造性，本 ADR 不作相反声明。
+
+因此 WMP-6 receipt 不增加签名字段、数据库记录或外部 issuer。它只在当前进程中由关闭 orchestration 产生，不能从
+HTTP/DTO、数据库、消息或序列化值恢复，进程重启后必须重新 qualification。WMP-7 以无可变 authority state 的确定性校验
+重算 receipt 批次/映射完整性，固定 canonical snapshot，并把 evidence 重新绑定到当前精确 candidate hash、profile/version、
+Office/checker 证据及完整 contract；缺失、过期、漂移、跨版本组合或底层 ACTIVE binding 不一致均失败关闭。
+
+该选择不存在需托管或轮换的 WMP-7 密钥，也没有可跨重启或跨请求重放的 bearer receipt。若未来把不受信任插件或任意
+Python 扩展纳入同一进程，或需要跨进程/持久化 receipt，本补充不再适用；届时必须先冻结外部 signer/HSM/KMS、轮换、
+并发、过期、重放和迁移契约，只能在新 ADR/spec/稳定 RED 获得授权后实现。
+
 ### 1. 逻辑文档类型和权威来源
 
 逻辑类型注册表是全局闭合且版本化的，永远只认识下面七个 `document_type`。这里的“认识”不等于

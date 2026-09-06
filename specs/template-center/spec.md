@@ -72,6 +72,11 @@ Review RED；不能从本 spec 的局部 GREEN 推导其他阶段已授权。
 
 ### 3.1 关闭文档类型 registry
 
+> 状态补充（2026-09-06）：本节的 phase-1 五类 enabled/周月 reserved 是初始 registry 的历史冻结契约，仍由
+> `build_initial_document_registry()` 原样提供。WMP-7/T011-E 已新增独立、不可动态注册的内部 registry，仅在当前
+> v2 双候选 receipt/profile/evidence/完整 contract 同时匹配时，把 weekly/monthly descriptor 作为 READ enabled；
+> 业务侧仍只能通过 active opaque binding gate 消费，不能取得 registry、路径、blob、URL、CRUD 或 WMP-8 render/parse。
+
 全局已知文档类型闭合为七个；其顺序和 key 均属于契约：
 
 ```text

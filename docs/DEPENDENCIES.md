@@ -1,6 +1,6 @@
 # Python 依赖安全基线
 
-> 安全基线日期：2026-08-23；当前环境复核日期：2026-08-31。本文记录默认分支依赖策略、
+> 安全基线日期：2026-08-23；当前环境复核日期：2026-09-06。本文记录默认分支依赖策略、
 > Dependabot #11–#38 的修复边界和质量门禁。完整开发工具与 Skills 换机清单见
 > [DEVELOPMENT_WORKSTATION.md](DEVELOPMENT_WORKSTATION.md)。后续升级必须重新解析依赖并回读 GitHub 告警。
 
@@ -23,9 +23,9 @@
 | `python-engineio` | `4.14.0` |
 | `websockets` | `17.1` |
 
-本次 `uv lock --check`、`uv sync` 和 `uv pip check` 均通过。Ruff、pip-audit 与 PyInstaller 的本机工具
-版本分别为 `0.16.5`、`2.10.1`、`6.22.2`；CI workflow 当前仍显式 pin Ruff `0.15.22`，不能把本机最新版
-误写为 CI 已更新。本轮分别使用 PyPI 与 OSV 后端执行实时漏洞查询时，代理均返回 503；因此只能确认
+2026-09-06 锁刷新另将 Alembic、lxml、AnyIO 分别升级到 `1.19.2`、`6.1.3`、`4.15.1`，并将 Quality Ruff
+与 Release PyInstaller 分别固定为 `0.16.6`、`6.22.2`。本次 `uv lock --check`、`uv sync` 和 `uv pip check`
+均通过。pip-audit `2.10.1` 使用 requirements 隔离环境和本地环境查询时，PyPI 代理均返回 503；因此只能确认
 工具版本、锁解析和包兼容性，不能把历史审计结果当作当前漏洞扫描结论。依赖图告警是否 `fixed` 仍须在
 网络恢复后从默认分支和 GitHub 回读。
 
@@ -118,7 +118,7 @@ DATABASE_URL="$quality_database_url" .venv/bin/python -m alembic current
 uv lock --check
 uv sync --locked --all-groups
 uv pip check
-python -m pip install -r requirements.txt ruff==0.15.22 pip-audit==2.10.1
+python -m pip install -r requirements.txt ruff==0.16.6 pip-audit==2.10.1
 python -m pip check
 python -m pip_audit -r requirements.txt --strict
 ruff check app/auth/jwt.py tests/test_jwt.py tests/test_dependency_security_floor.py

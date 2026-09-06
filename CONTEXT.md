@@ -1,7 +1,7 @@
 # KindergartenManager 项目上下文
 
-> 状态快照：2026-09-02；发布源码基线：`main@f4687f05e8fdca5d22f5921922ec5c77a4d28bea`。
-> `v3.4.0-beta9` 已从该 SHA 发布为 prerelease；Release、OCI 和生产闭环的精确事实只见
+> 状态快照：2026-09-06；已验证、发布并部署的源码基线：`main@6bbff57f0c410459bcdb3bdd86980013d4b6c80e`。
+> `v3.4.0-beta10` 已从该 SHA 发布为 prerelease；Release、OCI 和生产闭环的精确事实只见
 > `specs/operations-r5/evidence-ledger.md`。evidence closure commit 的 SHA 必须在提交后回读并由自身
 > exact-SHA Quality 固定，不能预填或沿用 release source SHA。
 > Agent 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
@@ -237,13 +237,12 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
    只在提交后形成。生产管理员密码轮换与旧会话失效是 2026-08-31 的另一条独立证据。
 4. R5-R 的隔离真实 MySQL 与 Linux python-docx 恢复矩阵已通过；Windows Word、生产恢复和其他业务模块人工
    回归仍是独立工作，不与 Agent、liveness 或部署脚本结果互相替代。
-5. Issue #56 的模板中心 T006 与 T011-C 已按串行门完成；T011-C 仅为受控 synthetic 单候选 qualification，
-   不是 WMP-6 的别名。WMP-6 orchestration 已另行冻结为固定 weekly → monthly、只调用既有 T011-C seam、
-   仅两项均通过才返回内存 receipt 的 synthetic fake-only RED；尚未授权或实现 GREEN。用户授权提交的两份脱敏
-   模板产生的新 hash 已通过独立 template-center evidence refresh：历史 v1 绑定保留，当前字节追加关闭 v2
-   seed/profile 与 LibreOffice 证据，类型仍 disabled。该结果只满足后续另行申请 WMP-6 GREEN 的模板资格前置条件；
-   WMP-6 GREEN、T011-E/WMP-7、WMP-8、WMP-9 仍未实施。
-   不得实施 T011-E、active、正式业务导出或其他模板中心能力，Issue #56 保持 OPEN。
+5. Issue #56 的模板中心 T006、T011-C、当前脱敏 v2 evidence refresh、WMP-6 fixed-pair orchestration 与
+   WMP-7/T011-E 本地 GREEN 已分别完成。WMP-7 明确采用可信进程内 capability 边界，不声称抵御恶意同进程
+   反射/monkeypatch；它以无状态 verifier 重算 receipt，并绑定 canonical snapshot、当前 v2 evidence/完整 contract，
+   只为 weekly/monthly 提供 active opaque binding，未新增数据库/Alembic、CRUD 或 WMP-8。最终 33 节点连续两次全绿，
+   只读 Review 0/0/0；commit/push 与 exact-SHA Quality/CodeQL 尚待本轮闭合。下一道独立门明确为 WMP-8 formal
+   exporter，目前不得进入；Issue #56/#57 只在远端证据回写后更新。
 
 ## 11. 更新规则
 

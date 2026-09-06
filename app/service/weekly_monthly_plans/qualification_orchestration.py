@@ -1,5 +1,6 @@
 """Closed WMP-6 orchestration over the existing candidate qualification seam."""
 
+# ruff: noqa: BLE001, I001, RUF022, UP017 - preserve the frozen WMP-6 surface
 from dataclasses import asdict as _asdict
 from dataclasses import dataclass as _dataclass
 from dataclasses import is_dataclass as _is_dataclass
@@ -412,6 +413,42 @@ def _issue_receipt(
     object.__setattr__(receipt, "weekly_evidence", weekly_evidence)
     object.__setattr__(receipt, "monthly_evidence", monthly_evidence)
     return receipt
+
+
+def _verify_qualification_receipt(receipt: object) -> bool:
+    """Verify the state-free integrity envelope of one in-process receipt.
+
+    This is an internal integrity check, not a signature or an authentication
+    boundary against arbitrary code already executing in this process.
+    """
+    if type(receipt) is not WeeklyMonthlyQualificationReceipt:
+        return False
+    try:
+        weekly_mapping_sha256 = _mapping_hash(_WEEKLY_DOCUMENT_TYPE)
+        monthly_mapping_sha256 = _mapping_hash(_MONTHLY_DOCUMENT_TYPE)
+        if (
+            receipt.weekly_mapping_sha256 != weekly_mapping_sha256
+            or receipt.monthly_mapping_sha256 != monthly_mapping_sha256
+        ):
+            return False
+        expected_batch_sha256 = _hash(
+            {
+                "contract_version": QUALIFICATION_ORCHESTRATION_CONTRACT_VERSION,
+                "weekly": {
+                    "snapshot_sha256": receipt.weekly_snapshot_sha256,
+                    "mapping_sha256": weekly_mapping_sha256,
+                    "evidence": receipt.weekly_evidence,
+                },
+                "monthly": {
+                    "snapshot_sha256": receipt.monthly_snapshot_sha256,
+                    "mapping_sha256": monthly_mapping_sha256,
+                    "evidence": receipt.monthly_evidence,
+                },
+            }
+        )
+        return receipt.batch_sha256 == expected_batch_sha256
+    except (AttributeError, TypeError, ValueError):
+        return False
 
 
 class WeeklyMonthlyQualificationOrchestrator:

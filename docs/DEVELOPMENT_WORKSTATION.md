@@ -1,6 +1,6 @@
 # 开发电脑迁移与环境清单
 
-> 盘点日期：2026-08-31。本文把“官方最新版”“本机已安装”和“仍被阻塞”分开记录，避免把
+> 盘点日期：2026-09-06。本文把“官方最新版”“本机已安装”和“仍被阻塞”分开记录，避免把
 > 一个版本号同时当成项目锁定版本、CI 版本或本机状态。版本以本日期能够从官方发布渠道回读的结果为准。
 > Git 只承载项目源码、文档和仓库级 Skills；认证、密钥、浏览器会话和运行数据必须走独立安全流程。
 
@@ -14,12 +14,11 @@
 | 数据库 | 本地默认 SQLite；Compose/生产使用 MySQL 8 | Alembic、`docker-compose.yml` |
 | Web/UI | NiceGUI、FastAPI、Uvicorn | 锁文件与 requirements |
 | 文档/图片 | python-docx、Pillow、lxml | 锁文件与 requirements |
-| 质量 | pytest、pytest-asyncio；本机 Ruff `0.16.5`、pip-audit `2.10.1` | `pyproject.toml`、`quality.yml` |
+| 质量 | pytest、pytest-asyncio；Ruff `0.16.6`、pip-audit `2.10.1` | `pyproject.toml`、`quality.yml` |
 | 容器发布 | Docker、Compose v2、Buildx；CI 构建 `linux/amd64` 与 `linux/arm64` | `release.yml` |
 | 桌面发布 | PyInstaller；Windows 另需 Inno Setup 6，Linux 另需 gcc、dpkg-dev | Release workflow、打包脚本 |
 
-CI 当前仍显式安装 Ruff `0.15.22`，而本机已更新到官方最新版 `0.16.5`；这两个版本不要混写。
-若要让 CI 也跟随最新版，需要单独修改 workflow 并回读精确 SHA 结果。CI、Docker 和 Release 仍通过
+CI 与本机检查当前均使用 Ruff `0.16.6`；最终状态需在变更提交后回读 exact-SHA Quality。CI、Docker 和 Release 仍通过
 `requirements.txt` 安装，未直接消费 `uv.lock`；这也是待单独收敛的可复现性差异。
 
 ### 1.1 2026-08-31 官方最新版、本机状态与阻塞项
@@ -34,7 +33,7 @@ CI 当前仍显式安装 Ruff `0.15.22`，而本机已更新到官方最新版 `
 | ripgrep | `15.2.0` | `15.2.0` | 已满足 |
 | fd | `10.5.0` | `10.5.0` | 已满足 |
 | ast-grep | `0.45.3` | `0.45.3` | 已满足 |
-| Ruff | `0.16.5` | `0.16.5` | 已满足（CI 另有旧 pin） |
+| Ruff | `0.16.6` | `0.16.6` | 已满足；待本轮 exact-SHA CI 回读 |
 | pip-audit | `2.10.1` | `2.10.1` | 已满足 |
 | PyInstaller | `6.22.2` | `6.22.2` | 已满足 |
 | Docker Engine | `29.7.2` | `29.7.2` | 已满足 |

@@ -1,7 +1,8 @@
 # KindergartenManager 产品与工程路线图
 
-> 当前快照：2026-08-31；Agent Foundation/WRITE 已在 `main` 合入；
-> PR #53 已 no-ff 合并，Issue #52 已关闭，`v3.4.0-beta2` 已从该 merge SHA 发布。
+> 当前快照：2026-09-06；已验证、发布并部署的基线为
+> `v3.4.0-beta10@6bbff57f0c410459bcdb3bdd86980013d4b6c80e`。Agent Foundation/WRITE 已在 `main` 合入；
+> PR #53 已 no-ff 合并，Issue #52 已关闭；其历史 `v3.4.0-beta2` 证据不替代当前发布证据。
 > Agent WRITE 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
 > Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。精确 Review/CI/MySQL/Chrome lineage 仅以
 > `specs/agent-write/tests/README.md` 与 Issue #52 的 integration closure comment 为准。
@@ -68,7 +69,7 @@ R0 事实基线与图谱
 - codebase-memory：full index 已完成，共享压缩图已写入 `.codebase-memory/graph.db.zst`；易随生成报告变化的节点计数只记录在当次审查报告中。
 
 2026-08-31 当前复核补充：Python `3.14.7`、uv `0.12.7`、Graphify `0.9.53`、codebase-memory-mcp
-`0.10.8`、CodeGraph `1.6.0`、Ruff `0.16.5`、pip-audit `2.10.1`、PyInstaller `6.22.2`、Docker
+`0.10.8`、CodeGraph `1.6.0`、Ruff `0.16.6`、pip-audit `2.10.1`、PyInstaller `6.22.2`、Docker
 Engine `29.7.2`、Compose `5.5.0`、Buildx `0.36.1`、Git `2.53.0`、GitHub CLI `2.98.0`、fd `10.5.0`、
 ast-grep `0.45.3` 和 ripgrep `15.2.0` 已从官方发布渠道核对。Node 已通过 NVM 官方预编译包升级为
 `v26.8.1`（SHA-256 校验通过，未编译）；QEMU/binfmt 已注册并通过 aarch64 Alpine 容器验证。详细状态见
@@ -300,8 +301,8 @@ H0/M0/L0，Quality、CodeQL 与 Dependency Graph 精确 SHA 成功，Issue #52 �
 
 ## 11. R6：产品深化（模板、文档、审核与复用）
 
-状态：`设计基线已冻结，GREEN 未授权`（2026-09-02；ADR-0008、两个独立 spec/稳定 RED 的双轴 Review
-Standards 0 / Spec 0）。完整方向与阶段依赖见
+状态：`串行交付中；WMP-8 为下一道独立门`（2026-09-06；模板中心 T006/T011-C、当前脱敏 v2 evidence、
+WMP-3～WMP-7 已按各自门完成；其余能力仍未授权）。完整方向与阶段依赖见
 [`docs/PRODUCT_DIRECTION.md`](PRODUCT_DIRECTION.md)，规划跟踪见
 [Issue #55](https://github.com/ywyz/kindergartenManager/issues/55)；二者均不构成实现授权。
 
@@ -313,11 +314,11 @@ Agent WRITE 的精确本地交付状态、Review 轮次、SHA 与测试证据仅
 1. 三类角色的跨教师读取、审核、导出和删除矩阵已在 Issue #55 冻结；新增 GREEN 必须通过同租户、明确班级/教师授权投影。
 2. ADR-0008 已接受，只取代/细化 ADR-0004 的固定模板权威来源子决策；ADR-0004 的 AI/教师采用边界继续有效。
 3. 模板中心第一期与周/月计划领域及导出契约已形成两个独立 spec/稳定 RED，并完成双轴 Review 0/0。
-4. 模板中心 T006 与 T011-C 已于 2026-09-06 串行通过；T011-C 只完成服务器侧受控单候选
-   qualification，不是 WMP-6 的别名，也未启用周/月类型。WMP-6 orchestration 已独立冻结为 fixed-pair、
-   weekly → monthly 严格串行、synthetic fake-only RED；未获新的 GREEN 授权前不得实现。两份模板脱敏提交后的
-   新 hash 不受旧 T011-C evidence 覆盖，现已通过独立的新 v2 profile/evidence 门并保留历史 v1；因此模板资格
-   前置条件已满足，但 WMP-6 GREEN 仍须另行申请，且不得顺带实施 T011-E 或 active-only 周/月正式导出接线。
+4. 模板中心 T006、T011-C、当前脱敏 v2 evidence refresh、WMP-6 fixed-pair orchestration 与 WMP-7/T011-E
+   已于 2026-09-06 按独立门串行完成。WMP-7 采用可信进程内 capability 边界，以无状态 receipt 完整性重算、
+   canonical snapshot 和当前 v2 profile/evidence/完整 contract 绑定，只把 weekly/monthly 从 reserved 改为 enabled，
+   对业务仅开放 active opaque binding。下一道独立门是 WMP-8 formal exporter；不得顺带实现 WMP-9、模板 CRUD、
+   fallback、远程对象存储或 Agent 能力扩展。最终 exact-SHA 证据以本轮 Issue #56/#57 回写为准。
 5. 在模板版本可追溯后建设统一教学文档中心；审核流和资源复用继续拆成独立 Issue。
 6. 仅在幼儿身份、隐私、保留/删除和跨教师权限冻结后规划成长档案和管理视图。
 

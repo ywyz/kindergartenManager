@@ -29,8 +29,8 @@ f2e5dbe2a468dd15c55cdd6b70c5e15fe63048a3708b151732e208703b0d11f4。旧 T011-C ev
 | WMP-5 | 纯周/月 mapping profile | app.service.weekly_monthly_plans.export_contracts | 只冻结 token_id/payload_path、显式重复区域和 filename 规则；不读模板、不接 TemplateExportPort |
 | T011-C（已独立完成） | 模板中心单候选 qualification seam | 模板中心 T011、受控 seed、synthetic fixture | 历史 evidence 只绑定旧候选 hash；不是 WMP-6，不重做、不启用、不正式导出 |
 | 当前脱敏候选 evidence refresh（已独立完成） | 新 hash/profile/evidence 门 | 两个已提交脱敏候选 | v1 历史绑定保留；v2 精确 hash/profile/LibreOffice evidence 追加；仍不得 active |
-| WMP-6（当前仅 RED） | 周/月 qualification orchestration | tests/test_wmp6_qualification_orchestration_red.py、已完成 T011-C `qualify` seam | 固定 weekly → monthly；只用 immutable synthetic snapshots/fake job；两项通过才返回内存 receipt；不实现 GREEN |
-| WMP-7 / T011-E | 启用周/月文档类型 | 模板中心 registry + T011-C 通过 | 两类型才可从 disabled 变为 enabled；只开放 active opaque binding；历史版本重生仍不在本期 |
+| WMP-6（已完成） | 周/月 qualification orchestration | tests/test_wmp6_qualification_orchestration_red.py、已完成 T011-C `qualify` seam | 固定 weekly → monthly；只用 immutable synthetic snapshots/fake job；两项通过才返回短期内存 receipt |
+| WMP-7 / T011-E（本地 GREEN；待 exact-SHA CI） | 仅启用周/月 READ descriptor 与 active opaque binding | 当前 v2 evidence + WMP-6 receipt + TemplateExportPort | 33/33、Review 0/0/0；最终证据待 Issue #56/#57 回写 |
 | WMP-8 | formal TemplateExportPort exporter | resolve_active → render → parse | 只消费 active binding/rendered/report；无路径、blob、requested version、fallback 或模板 CRUD |
 | WMP-9 | 正式业务 Word/权限验收 | 固定 SHA、Issue #55 矩阵、Word/LibreOffice | 周/月业务 snapshot 与正式导出分别验收；跨教师读取、审核、导出、删除有独立证据 |
 
@@ -112,10 +112,57 @@ contract 和 structural profile version 均为 2；fixture 与 renderer/parser �
 跨版本组合失败关闭。新增 refresh 9 项与既有 T011-C 45 项均通过，LibreOffice `26.2.5.2 620(Build:2)`
 实际打开/导出并形成绑定输入、导出 DOCX、结构摘要与 PDF hash 的追加证据；独立只读 reviewer 为 0/0/0。
 
-该 evidence 已满足“另行申请 WMP-6 GREEN”的模板资格前置条件，但不等于 WMP-6 已获授权或实现。现有 WMP-6
-仍保持 46 个稳定 RED；T011-E/WMP-7、WMP-8、WMP-9 仍分别需要独立授权、实现和验收。
+该 evidence 随后已作为 WMP-6 GREEN 的模板资格前置条件；WMP-6 已在独立门完成。T011-E/WMP-7 当前因下述
+issuer 设计缺口停在稳定 RED；WMP-8、WMP-9 仍分别需要独立授权、实现和验收。
 
 任何数据库 schema、Alembic、页面、权限矩阵复制、审核 transition、模板上传或版本回滚实现都属于其他门，不能藏在上述 GREEN 中。
+
+## 2026-09-06 WMP-7 / T011-E 独立门证据
+
+本门从精确基线 `6bbff57f0c410459bcdb3bdd86980013d4b6c80e` 开始。初始 WMP-7 RED 为 23 collected / 23 failed，
+连续两次节点与失败集合一致，node-only/failure SHA-256 均为
+`7b2b24bb6aa741770a9ef57150e2f378b0bf08a28e7886bffc6aa6420a7d88cd`。只读 reviewer 的 5 项 finding
+先另行固定为 5 collected / 5 failed，连续两次 node-only/failure SHA-256 均为
+`09b92d487ba937d8105b1e31aae256136672cfd85e420aa8d4993537d8265378`，之后才修复。第二轮 reviewer
+发现真实 registry 接线与可变 receipt 列表问题；Main 再先补 2 个 RED，连续两次均为 5 passed / 2 failed，
+7-node SHA-256 为 `70cae7a383d010750bf4455e9b3816f62760364ea03074cf70876d612061ef61`，failure-node
+SHA-256 为 `492a31cbb5d8f54b23ce0b057629edadf0a015311dc6c21ccfa2b076bd49c739`，随后才修复。
+
+后续 reviewer 又固定了 value-equal clone、构造后 contract drift 与 closure authority 污染路径。由于任意不受信任同进程
+模块可反射或 monkeypatch Python private/closure，现有冻结七字段 receipt 无法提供所需不可伪造 issuer；解决方案将要求
+新的签名/受保护 issuer 契约，可能扩展持久化。按约束已撤回 production enablement 与 WMP-6 provenance 改动，停在
+spec/稳定 RED。最终稳定 RED 节点集合、连续两次计数和 node-only SHA-256 记录在本节交付验证中。
+
+最终撤回 production 实现后的关闭集合为 32 collected；连续两次均为 0 passed / 32 failed，失败节点及顺序
+完全一致，node-only/failure SHA-256 均为
+`6129257a8b57e07bfe813e3289b426676a479a0b396c67039505541940e60c12`。失败仅因正式
+`app.service.weekly_monthly_plans.template_enablement` seam 不存在；无 collection error、skip 或 xfail。
+
+WMP-8 仍明确是 WMP-7 解决后的下一道独立门，但本次没有进入 WMP-8，也没有提交或推送伪 GREEN。
+
+用户随后明确授权按真实部署边界解决该缺口：不受信任同进程 Python 模块不属于当前攻击面，应用代码和锁定依赖属于
+可信计算基；receipt 仅是不能跨进程、持久化或反序列化恢复的内部 capability。ADR-0008、weekly-monthly spec 与安全
+威胁模型已同步冻结该选择，且明确不声称抵御恶意同进程反射/monkeypatch。
+
+据此将 3 个超出威胁模型的 review RED 调整为可证明规则：无 mutable/weakref/identity issuer authority、拒绝外部
+dict/tuple receipt 形态，以及固定 canonical snapshot/当前 evidence/contract。调整后的关闭集合仍为 32 collected；
+连续两次均为 0 passed / 32 failed，失败仅因正式 enablement seam 尚不存在；完整节点顺序的 node-only SHA-256 为
+`c34e4e4ae7df9ef1dac2dfe3945bc11c97044e99d98682cd4565dd48b6dcef97`。此前一次遗漏 `PYTHONPATH=.` 的运行因无法
+导入顶层 `app` 无效，不计入门禁证据。
+
+最小实现后，reviewer 发现周/月 descriptor 错误声明了全部未来 capability。Main 先追加独立第 33 个 RED；连续两次
+均为 32 passed / 1 failed，失败仅为该 capability 集合，完整节点 node-only SHA-256 为
+`fe717069aa340bf9e3e9843955d3ee43784b9064330e612acc1f2665cc947d1c`，随后才把两类 descriptor 收窄为唯一
+`TemplateCapability.READ`。最终同一 33 节点连续两次均为 33 passed / 0 failed，节点集合与 hash 不变；WMP-6 +
+WMP-7 为 81 passed，完整 WMP 为 229 passed。独立只读 reviewer 最终 High/Medium/Low 为 0/0/0。
+
+模板中心已实施门为 239 passed；全目录 480 collected / 468 passed / 12 failed，其中 12 项仍是 README 已记录、未获
+授权的 T007–T009 backup/preview/registry future RED，本门未以越权实现消除它们。全库为 1162 passed / 1 skipped，
+Agent Foundation 为 261 passed；本次 4 个 Python 文件 Ruff 0.16.6 与 format、`git diff --check` 通过。完整历史树仍有
+既有 Ruff/format 债务，不能归入 WMP-7；本地 pip-audit 因 PyPI proxy 503 失败，须以 exact-SHA Quality 远端结果为准。
+
+本节在提交前只构成 local GREEN。最终 commit/push、exact-SHA Quality/CodeQL 和 Issue #56/#57 回写将在取得远端证据后
+补入；在此之前不得把本段外推为 CI/release/deploy 完成。
 
 ## 证据要求
 

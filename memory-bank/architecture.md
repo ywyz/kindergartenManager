@@ -476,3 +476,9 @@ LibreOffice 26.2.5.2 实开/导出，以及关闭的 `microsoft-word/ooxml-docx`
 同日后续独立 evidence refresh 为已提交的脱敏 week/month 候选追加 v2 seed/profile 与精确 hash、LibreOffice
 打开/导出证据；历史 T011-C v1 绑定不覆盖、不迁移。周/月类型继续 reserved/disabled。该门仅使模板资格足以支持
 后续另行申请 WMP-6 GREEN，不实现 WMP-6、T011-E/WMP-7、WMP-8 或 WMP-9；精确 closure 仍见 Issue #56。
+
+WMP-6 随后完成 fixed-pair receipt。WMP-7/T011-E 最终按真实部署事实冻结可信进程内 capability 边界：不受信任同进程
+Python 模块不属于攻击面，也不声称 private/closure/weakref/object identity 能抵御任意同进程代码。实现使用无状态
+receipt 完整性重算、canonical snapshot 与当前 v2 evidence/完整 contract 漂移校验，只启用 weekly/monthly 的 active
+opaque binding；无签名字段、数据库/Alembic、外部 issuer、CRUD 或 WMP-8。WMP-8 仍是 WMP-7
+解决后的下一道独立门，本轮不得进入。

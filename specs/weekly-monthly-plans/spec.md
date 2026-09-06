@@ -1,13 +1,13 @@
 # 周/月计划领域与 Word 导出契约
 
-- 状态：WMP-3/WMP-4/WMP-5 已实现；WMP-6 orchestration 独立稳定 RED；不授权 WMP-6 GREEN
+- 状态：WMP-3～WMP-7 已完成；下一道独立门为 WMP-8 formal exporter
 - 规划 Issue：[Issue #55](https://github.com/ywyz/kindergartenManager/issues/55)
 - 模板中心证据 Issue：[Issue #56](https://github.com/ywyz/kindergartenManager/issues/56)（保持 OPEN）
 - 依赖：ADR-0004、模板中心 ADR/第一期 spec、Issue #55 角色权限矩阵
 - 当前模板来源：templates/weekplan.docx、templates/monthplan.docx
 - 领域术语：周视角 = 每周活动计划；月视角 = 月活动计划（主题活动计划）
 
-本文件只冻结周/月计划的领域事实、聚合边界、导出输入输出和验收口径。它不创建数据库表、迁移、页面、审核工作流或模板 CRUD。WMP-6 稳定 RED 只验证下面约定的 orchestration 公开契约尚未存在；RED 提交后仍必须先完成独立 Review 和 exact-SHA 门禁，再由新的明确授权进入最小 GREEN。
+本文件只冻结周/月计划的领域事实、聚合边界、导出输入输出和验收口径。它不创建数据库表、迁移、页面、审核工作流或模板 CRUD。WMP-7 目标是只启用当前周/月候选到 ACTIVE opaque binding 的关闭消费边界；正式 render/parse 仍属于未来 WMP-8。
 
 ## 1. 目标和范围
 
@@ -588,12 +588,32 @@ WMP-0 Issue #55 权限矩阵 + 模板中心 ADR/spec 依赖确认
 WMP-3、WMP-4、WMP-5、WMP-6、WMP-8 是可分别 Review 的最小 GREEN；T011-C/T011-E 属模板中心边界。旧 T011-C
 通过、纯 mapping 通过或 WMP-6 RED 均不能推导当前脱敏模板已 qualified、active、正式业务导出或审核流完成。
 
-## 10. 下一步
+## 10. WMP-7 / T011-E 启用门
 
-1. 对 WMP-6 独立 RED 连续运行两次，记录 exact SHA、collected/passed/failed、失败节点集合和 node-only hash；由只读 reviewer
-   独立审查，Quality/CodeQL 通过并回写 Issue #56，Issue 保持 OPEN。
-2. 在任何 WMP-6 GREEN 之前，先用独立任务决定当前两个脱敏 hash 的 seed handle/profile 版本策略，并重新执行模板中心
-   candidate qualification。该门必须产生绑定新 hash 的新 evidence；不得覆写或冒充旧 T011-C 证据，也不得启用类型。
-3. 新 evidence 通过 Review 与 exact-SHA 门后，再请求独立 WMP-6 GREEN 授权；GREEN 只能实现第 8 节 seam，使本轮 46 个
-   synthetic fake-only RED 节点转绿，不得顺带实现 T011-E/WMP-7/WMP-8/WMP-9。
-4. WMP-6 GREEN 通过后，才分别规划 T011-E/WMP-7 active gate、WMP-8 active-only formal exporter 和 WMP-9 正式业务验收。
+WMP-7 的目标工厂接收 WMP-6 双成功路径签发的 receipt 和既有 TemplateExportPort。receipt 必须保持完整并匹配固定的
+weekly/monthly canonical snapshot；任意伪造、缺失或改写均须关闭拒绝。
+
+每一侧必须同时匹配当前 v2 seed handle、candidate SHA-256、profile ID/version、rendered/parse 摘要、Office evidence ID、
+LibreOffice 精确版本、兼容目标、fixture/checker，以及完整 candidate contract（contract/profile/placeholder version、
+renderer/parser、allowed parts、required anchors、tokens）。任一项缺失、漂移、过期、跨版本或交叉组合时整体 fail closed。
+
+目标门只接受 `weekly_activity_plan` 与 `monthly_theme_activity_plan`，并校验底层结果是同 tenant、同 document type、同当前
+hash/contract 的 `TemplateExportBindingKind.ACTIVE`。业务侧只能取得该 opaque binding；不会取得 registry/descriptor、
+路径、blob、URL、bucket、candidate/provider DTO 或 requested historical version。初始 registry 的五类历史 enabled 集合
+不被改写；WMP-7 不创建 active pointer/version，也不实现 CRUD、上传、回滚、fallback、自动重试或动态发现。
+
+本门明确采用可信进程内 capability 威胁模型：随精确 SHA 发布的应用代码和锁定依赖可信，外部输入不能执行任意 Python、
+反射或 monkeypatch；不受信任的同进程模块不属于攻击面。receipt 不是签名或跨进程 bearer credential，不得从 HTTP/DTO、
+数据库、消息或序列化值恢复，进程重启后必须重新执行 WMP-6。WMP-7 不得声称能抵御恶意同进程模块，也不得把 private、
+closure、weakref、对象 identity 或命名约定描述为安全边界。
+
+在该边界内，门禁必须无可变 issuer authority state，并确定性重算 receipt 批次/映射完整性、固定 canonical snapshot hash，
+再校验当前 profile/evidence/完整 contract 与 ACTIVE binding。外部错误类型、缺字段、篡改、过期、漂移、跨版本拼接及
+底层 binding 不一致一律失败关闭。该选择无需密钥托管/轮换、数据库字段或 Alembic；若未来引入不受信任进程内插件或
+跨进程/持久化 receipt，必须另立 signer/HSM/KMS ADR/spec/稳定 RED，不得沿用本门结论。
+
+## 11. 下一步
+
+WMP-7 设计缺口解决并独立通过后，下一道独立门为 WMP-8：只消费已经验证的 ACTIVE binding，冻结并实现
+`TemplateExportPort.resolve_active → render → parse` formal exporter。WMP-8 不重生历史版本，不实现 fallback、模板 CRUD、
+审核流、WMP-9 正式业务验收、统一文档中心、远程对象存储或 Agent 能力扩展。

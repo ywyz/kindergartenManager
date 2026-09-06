@@ -31,7 +31,7 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller
+          pip install pyinstaller==6.22.2
 
       - name: Build with PyInstaller (onedir)
         run: pyinstaller kindergartenManager.spec
@@ -90,7 +90,7 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller
+          pip install pyinstaller==6.22.2
 
       - name: Build with PyInstaller (onedir)
         run: pyinstaller kindergartenManager.spec

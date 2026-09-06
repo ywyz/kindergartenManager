@@ -1,6 +1,9 @@
 # 模板中心第一期
 
-本目录是模板基础设施的独立交付边界，状态为“稳定 RED + 双轴 Review Standards 0 / Spec 0”。权威内容见
+本目录是模板基础设施的独立交付边界。下述“一期五类 enabled、周/月 reserved”是 WMP-7 前的冻结基线；
+2026-09-06 的 WMP-7/T011-E 已在不改写该初始 registry 的前提下，用独立内部 registry 只启用 weekly/monthly，
+且对业务仅开放 ACTIVE opaque binding、descriptor 只声明 READ capability。T007–T009 的 12 个 future RED 仍未实施。
+权威内容见
 [`spec.md`](spec.md)；T001–T011 的依赖、验收和最小 GREEN 顺序在 `spec.md` §6，测试门禁见
 [`tests/README.md`](tests/README.md)。
 
@@ -15,7 +18,7 @@
 
 T011 另有一个仅供受控 seed/fixture 的周/月候选资格 job：它复用 T004 同一安全 validator，以及唯一
 `TemplateExportPort` 的 opaque binding/render/parse；macro、外链、坏 ZIP、结构/profile mismatch 或不完整 Office
-结果均 fail closed，不追加 passed evidence。它不提供 public projection、upload、preview、resolve_active、active、业务
+结果均 fail closed，不追加 passed evidence。T011-C 本身不提供 public projection、upload、preview、resolve_active、active、业务
 读写或正式下载。证据和周/月独立 spec/RED/Review 全部通过后，才发布 registry 新版本启用这两个 known 类型。
 
 一期不实现周/月业务模型、统一教学文档中心、审核流、GREEN 或迁移。`templates/weekplan.docx` 与
