@@ -95,8 +95,14 @@ def _fill_weekly(document: Document, plan: WeeklyActivityPlan) -> None:
             table.cell(0, offset).text = f"{day.weekday_cn}\n{day.day_date:%m月%d日}"
             table.cell(1, offset).text = day.morning_talk
             table.cell(2, offset).text = day.collective_activity
-            table.cell(3, offset).text = day.outdoor_game
-            table.cell(4, offset).text = day.area_game
+        # The released template merges each game row across all five weekdays.
+        # Write it once, retaining the day association and original body order.
+        table.cell(3, 2).text = "\n".join(
+            f"{day.weekday_cn}：{day.outdoor_game}" for day in plan.days
+        )
+        table.cell(4, 2).text = "\n".join(
+            f"{day.weekday_cn}：{day.area_game}" for day in plan.days
+        )
         for row, value in (
             (5, plan.weekly_focus),
             (6, plan.environment_creation),
