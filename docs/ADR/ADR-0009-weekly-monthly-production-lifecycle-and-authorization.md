@@ -3,16 +3,19 @@
 - 状态：**已接受**
 - 日期：2026-09-07
 - 起点：`main@0c39743ca4e5a36541347a48593f6206b56216bd`
+- 当前先决条件实现：`tested_code_sha=72d759fc128b013c2345bd609875bb3e3d623ef1`；精确证据见
+  `specs/wmp9-production-prerequisites/tests/README.md`
 - 关联：Issue #55/#56/#57、ADR-0003、ADR-0006、ADR-0007、ADR-0008
 
-> 负责人已于 2026-09-07 明确确认本 ADR、对应 spec 与 Alembic 提案；允许按冻结顺序实施 schema 与 production GREEN。
+> 负责人已于 2026-09-07 明确确认本 ADR、对应 spec 与 Alembic 提案；先决条件实现已按冻结顺序完成，
+> 但 WMP-9 最终业务/Office 验收、发布和生产部署仍未授权。
 
 ## 背景
 
-WMP-3–WMP-8 已提供关闭领域 DTO、授权端口、不可变读取、模板资格/启用门和 formal exporter，
-但当前没有周/月业务 ORM、production repository、`PlanAuthorizationPort` adapter、审核/删除事务、
-跨教师审计、正式 UI/application 入口或 released-template export adapter。测试 fake 或直接调用 service
-不能替代 WMP-9 正式业务验收。
+WMP-3–WMP-8 已提供关闭领域 DTO、授权端口、不可变读取、模板资格/启用门和 formal exporter。原始起点上没有
+周/月业务 ORM、production repository、`PlanAuthorizationPort` adapter、审核/删除事务、跨教师审计、正式
+UI/application 入口或 released-template export adapter；当前先决条件实现已补齐这些 production seam，但本地
+GREEN 仍不能替代 WMP-9 正式业务/Office 验收。
 
 ## 决策
 
@@ -43,7 +46,7 @@ WMP-3–WMP-8 已提供关闭领域 DTO、授权端口、不可变读取、模�
 - sys_admin：无日常 READ/REVIEW/EXPORT/DELETE。
 - break-glass：本门**永久拒绝**。未来如需工单、双重确认和最小范围能力，必须新 ADR/spec/RED。
 
-现有关闭 `PlanAction` 必须新增唯一 `PlanAction.ARCHIVE = "archive"`；归档也构造
+`PlanAction.ARCHIVE = "archive"` 已纳入关闭能力面；归档也构造
 `PlanAuthorizationRequest` 并经过唯一 `PlanAuthorizationPort`，不得另造授权判断。显式授权表
 `weekly_monthly_scope_grant` 以 `(tenant_id, grantee_user_id, teacher_user_id, class_id, action)` 唯一，
 不允许通配符；只允许 `read/review/export/archive`。撤销使用单调 revision，旧决策不可复用。
@@ -84,7 +87,7 @@ session SHA-256、reason code 与 UTC 时间；不记录姓名、业务正文、
 
 ### 6. 正式导出组合
 
-新增唯一 application composition：
+先决条件实现提供唯一 application composition：
 
 ```text
 trusted UI callback
@@ -107,16 +110,17 @@ plan/version/session/grant stamp 后解包 bytes；UI 不得自行 downcast。�
 
 ### 7. UI/application
 
-新增受保护周/月页面，提供当前范围列表、详情、合法状态动作、DRAFT 删除确认及单份正式导出。
+先决条件实现提供受保护周/月页面，提供当前范围列表、详情、合法状态动作、DRAFT 删除确认及单份正式导出。
 页面不持有 repository/session，不接受 caller 传入 tenant/owner/role/status。`app.main` 只注册该路由。
 批量、统一文档中心、审核工作台扩张和模板管理均不在本门。
 
 ## Alembic 方案（已确认）
 
-确认后才允许从 head `2b7f3d5e9c8a` 创建单一迁移，建立上述六张表：聚合根、不可变版本、周日、月栏目、
+已由 `3c9f4b2a7d1e` 从 head `2b7f3d5e9c8a` 创建单一迁移，建立上述六张表：聚合根、不可变版本、周日、月栏目、
 scope grant、audit（合计六张）。所有业务表含 tenant，必要处含 owner；建立 tenant+owner、tenant+teacher+class、
 tenant+kind+period、current version 和 grant lookup 索引。使用显式 check/unique/FK；BigInteger 在 SQLite 使用
-Integer variant。版本/audit 用 SQLite 与 MySQL trigger 阻止 UPDATE/DELETE；聚合根仅允许合法 CAS。
+Integer variant。版本/audit 用 SQLite 与 MySQL trigger 阻止 UPDATE/DELETE；聚合根仅允许合法 CAS。当前 head 为
+`3c9f4b2a7d1e`。
 
 upgrade 从空周/月数据开始，不回填 DailyPlan、不推断历史周/月、不改现有模板或 ExportRecord。
 downgrade 先移除 trigger，再按依赖逆序删除新表；不得修改既有表或业务数据。SQLite 与 MySQL 都必须执行

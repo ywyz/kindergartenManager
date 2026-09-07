@@ -3,9 +3,12 @@
 > 本账本建立于 2026-09-01，最近一次 R5-P 生产核验为 2026-09-02。每条完成声明只覆盖其明确
 > gate；历史 GREEN、方向文档、图谱结果、其他模块或其他 SHA 的结果均不得代替本轮证据。
 
-## 当前事实基线
+## R5-P 生产验收时的事实快照
 
-| 项目 | 当前事实 |
+> 下表中的 branch/release source、release tag、worktree 与 Alembic head 是 2026-09-02 R5-P 生产验收快照，
+> 不代表当前 checkout；当前分支状态以仓库根级 `CONTEXT.md` 与实时 git/Alembic 检查为准。
+
+| 项目 | R5-P 验收快照 |
 |---|---|
 | branch / release source | `main` / `f4687f05e8fdca5d22f5921922ec5c77a4d28bea` |
 | release tag | `v3.4.0-beta9`，annotated tag peeled commit、`main` 与 `origin/main` 均为 release source |

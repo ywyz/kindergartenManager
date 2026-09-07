@@ -1,6 +1,9 @@
 # 幼儿园教学管理系统架构文档（初始化）
 
 > **历史文档说明（2026-09-02）**：本文按开发阶段累积，包含已被后续可信登录恢复取代的单用户描述和旧迁移/测试数字。当前架构事实见 [`../CONTEXT.md`](../CONTEXT.md)、[`../docs/design/system-architecture.md`](../docs/design/system-architecture.md)、[`../docs/design/data-model.md`](../docs/design/data-model.md) 和 [`../docs/ADR/README.md`](../docs/ADR/README.md)。受控 Agent 的 F003-F009 已固定 GREEN；当前可信 UI session 与 W005/W006 逐次确认 WRITE 边界见 [`../docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md`](../docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md) 和 [`../specs/agent-write/spec.md`](../specs/agent-write/spec.md)。R5-R 的 `tested_code_sha=b329bf6cf4bbf5518390644b24908ce29bd16894` 保持 `LOCAL_GREEN` 历史结论；R5-P 已在 `v3.4.0-beta9@f4687f05e8fdca5d22f5921922ec5c77a4d28bea` 完成 Release/OCI 与生产故障回切、最终部署验收，精确证据只见 [`../specs/operations-r5/evidence-ledger.md`](../specs/operations-r5/evidence-ledger.md)。closure commit 仍须独立 reviewer 与自身 exact-SHA Quality，不授权跳过任何既有门禁。当前 Alembic head 为 `2b7f3d5e9c8a`；其前序 `e5f7a9c2d4b6` 是 W006 evidence schema revision。
+>
+> 当前工作树指针（2026-09-07）：Alembic head 为 `3c9f4b2a7d1e`；`2b7f3d5e9c8a` 为 token 撤销
+> `auth_epoch` revision，`3c9f4b2a7d1e` 为后续周/月计划生产先决条件 revision。
 
 ## 1. 历史阶段记录
 
@@ -58,6 +61,8 @@
 | `memory-bank/` | 项目文档（PRD、技术栈、实施计划、架构、进度），供开发者参考 |
 
 ### 关键约束速查
+> 本节记录历史阶段约束；现行约束以根目录 `AGENTS.md`、当前数据模型和 ADR 为准。
+
 - **数据隔离**：所有业务表必须包含 `tenant_id`、`user_id`、`created_at`、`updated_at`
 - **禁止**：`app/api/` 首期不实现；应用启动时不得 `create_all()`；service 层不直接发 HTTP 请求
 - **Python 包**：`alembic/`、`exports/`、`templates/`、`memory-bank/` 均非 Python 包（无 `__init__.py`）
@@ -484,8 +489,18 @@ opaque binding；无签名字段、数据库/Alembic、外部 issuer、CRUD 或 
 解决后的下一道独立门，本轮不得进入。
 
 2026-09-07：WMP-8 闭合后的首次 WMP-9 只读验收因正式业务生产 seam 缺失而 BLOCKED。负责人随后独立接受
-ADR-0009、`specs/wmp9-production-prerequisites/` 与六表 Alembic 方案，并授权最小 GREEN。该门新增周/月聚合根、
+ADR-0009、`specs/wmp9-production-prerequisites/` 与六表 Alembic 方案，并授权最小 GREEN；先决条件实现已在
+`tested_code_sha=72d759fc128b013c2345bd609875bb3e3d623ef1` 通过 prerequisite gate，迁移 head 为
+`3c9f4b2a7d1e`。该门新增周/月聚合根、
 不可变版本与有序正文、精确 scope grant、append-only 审计、唯一 `PlanAuthorizationPort` adapter、状态迁移与
 DRAFT 两步删除、可信 UI/application read/review/export/delete，以及固定 v2 released template 到 WMP-8 formal
 exporter 的唯一接线。sys_admin 与 break-glass 保持永久拒绝；无模板 CRUD、远程对象存储、历史重生、Issue #75、
 Agent 扩面、发布或生产部署。此实现只建立重新执行 WMP-9 的先决条件，不能替代正式权限矩阵与双平台 Office 验收。
+
+## 17. 云端在线唯一产品交付形态（2026-09-07）
+
+产品目标已由负责人明确收敛：KindergartenManager 只作为部署在云服务器上的在线 Web 系统交付，生产参考
+拓扑为 Caddy、NiceGUI 主应用和 MySQL 8，用户通过 HTTPS 浏览器访问。源码/SQLite 只用于开发、自动测试与
+隔离验收。仓库中的 Windows/Linux/PyInstaller/Debian 打包脚本和历史产物暂不删除，但属于遗留资产，不能
+作为当前产品、发布或验收目标。Microsoft Word 与 LibreOffice 继续作为云端系统导出 DOCX 的外部兼容性
+消费端，不运行系统本体。该决策由 ADR-0010 固定；删除遗留打包代码、发布或生产部署仍需独立授权。

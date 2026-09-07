@@ -1,6 +1,6 @@
 # KindergartenManager 安全威胁模型
 
-> 适用基线：当前本地账号/JWT/RBAC UI、可选 MySQL/Caddy、只读 `/api/v1`、AI/节假日外部接口和 Word/图片数据。
+> 适用基线：云端 Caddy/NiceGUI/MySQL 在线系统、账号/JWT/RBAC UI、只读 `/api/v1`、AI/节假日外部接口和 Word/图片数据。
 
 ## 1. 保护资产
 
@@ -25,7 +25,7 @@
   ├─ AI / Holiday 外部服务
   │    └─ Agent Provider（只返回文本/不受信 Tool call）
   │
-本机/容器
+云服务器/容器
   ├─ 应用进程与内存中的明文 Key
   ├─ Agent Runtime / Closed Tool Registry / 短期 Context
   ├─ SQLite/MySQL
@@ -34,8 +34,9 @@
   └─ exports / DOCX
 ```
 
-当前最大的边界事实：UI 已恢复本地账号登录、active 用户重读、JWT `jti` 会话与 RBAC，但这不能替代
-TLS、强密码、受控 Bootstrap/轮换和网络访问控制。桌面 frozen 模式只监听回环；源码和 Docker 模式可能对局域网/公网开放。
+当前最大的边界事实：UI 已恢复系统账号登录、active 用户重读、JWT `jti` 会话与 RBAC，但这不能替代
+HTTPS、强密码、受控 Bootstrap/轮换和网络访问控制。唯一产品交付形态是云端在线系统；本地源码运行只用于
+开发或隔离验收，遗留 desktop frozen 模式不构成受支持产品。
 
 ### 2.1 应用进程内代码边界
 
@@ -115,11 +116,11 @@ candidate hash、profile/version、qualification evidence 和完整 contract。r
 
 ### 4.9 供应链与发布
 
-- 威胁：宽松依赖解析、被篡改 Action/镜像、未验证安装包。
+- 威胁：宽松依赖解析、被篡改 Action/OCI 镜像或未经验证的云端部署输入。
 - 当前控制：`requirements.txt` 显式安全下限、`uv.lock` 精确快照、Dependabot、tag 构建、GitHub Release；
   2026-08-31 的当前锁刷新与历史告警映射见 [DEPENDENCIES.md](../DEPENDENCIES.md)；发布资产新增
   `docker-image.json` 和不可变引用条目，降低“同 tag 重映射”带来的回滚/审计偏移。
-- 必须补强：锁定依赖/哈希、常规质量 CI、Action 固定 SHA 或治理策略、产物校验值、目标平台安装验收。
+- 必须补强：锁定依赖/哈希、常规质量 CI、Action 固定 SHA 或治理策略、OCI 产物校验值和云端部署验收。
 
 ### 4.10 Agent prompt/Tool injection 与权限扩大（已实现，持续门禁）
 
@@ -144,7 +145,7 @@ candidate hash、profile/version、qualification evidence 和完整 contract。r
 - 威胁：教师切换日期/页面或修改内容后，迟到的 Agent 结果覆盖当前内容；模型递归 Tool loop 耗尽资源；
   DRAFT 隐式写入 preview、audit、版本或数据库。
 - 设计控制：Foundation 使用单 operation、串行 Tool call、次数/长度/超时/总时限；校验 operation/scope/fingerprint 并丢弃
-  迟到结果，`PlanPatch` 只在内存展示。W007 的本地应用层只允许当前页面一份 Patch 经逐次显式确认后写入，
+  迟到结果，`PlanPatch` 只在内存展示。W007 的应用服务层只允许当前页面一份 Patch 经逐次显式确认后写入，
   不改变 Provider/Tool 能力面。
 - 验证门禁：固定 Foundation/F009 证据覆盖 busy、取消、超时、超限、页面/日期切换和迟到响应；W007 另以
   session、plan id、revision、before hash、短事务 CAS、不可变审计和 commit-unknown 对账门禁保护，后续变更仍须重跑。
@@ -161,7 +162,7 @@ candidate hash、profile/version、qualification evidence 和完整 contract。r
 8. Agent Foundation 只装配 ADR-0005 的六个 READ/DRAFT Tool，未知和 WRITE Tool 始终拒绝。
 9. Agent Context 是当前 operation 的最小短期快照；不建立对话或向量记忆。
 10. Agent Foundation DRAFT 不修改 UI 正文或任何持久化状态；过期、取消和迟到结果必须丢弃。W007 的 WRITE
-    只由本地应用层显式确认流程执行，Provider/Tool 仍无 WRITE。
+    只由应用服务层显式确认流程执行，Provider/Tool 仍无 WRITE。
 
 ## 6. 生产前门禁
 
@@ -171,7 +172,7 @@ candidate hash、profile/version、qualification evidence 和完整 contract。r
 - [ ] AI/图片/Word 的敏感数据流完成评审。
 - [ ] API HMAC、TLS、Key 轮换和日志脱敏验证。
 - [ ] 依赖与容器扫描、常规质量 CI 通过。
-- [ ] Windows/Linux/Docker 目标部署分别验收。
+- [ ] 云端 OCI/Compose/Caddy/MySQL、HTTPS、浏览器访问和回滚分别验收；不再验收 Windows/Linux 本地应用。
 - [ ] 唯一发布元组 tag、source SHA、repository、双平台 OCI index digest、`docker-image.json` 与 Release body
   在 draft 中逐项收敛后才 publish；部署 helper 只切镜像，不执行 migration、不改 secrets、不删除卷。
 - [ ] 迁移后旧镜像在新 schema 上重新通过 readiness、登录和关键业务；不兼容时已有明确数据库恢复方案，

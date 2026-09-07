@@ -1,6 +1,6 @@
 # 模板中心第一期冻结规格
 
-- 状态：冻结稳定 RED；双轴 Review Standards 0 / Spec 0；不授权生产 GREEN、迁移、合并或发布
+- 状态：T003–T006、T011-C 与当前脱敏 v2 evidence 已完成；T011-E/WMP-7 的周/月独立门已通过；T007–T010 及其 future RED 仍未完成。本规格不授权模板中心生产 GREEN、迁移、合并或发布
 - 关联方向：[`docs/PRODUCT_DIRECTION.md`](../../docs/PRODUCT_DIRECTION.md) §3.1、§5
 - 前置门：Issue #55 的角色/跨教师读取/审核/导出/删除矩阵；[ADR-0008](../../docs/ADR/ADR-0008-word-template-authority-versioning-and-secure-storage.md)
   （取代或细化 [`ADR-0004`](../../docs/ADR/ADR-0004-ai-and-fixed-word-boundaries.md) 的固定模板权威来源子决策）

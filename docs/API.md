@@ -72,6 +72,7 @@ print(resp.json())
 | `401` | API Key 缺失/无效，或签名校验失败 |
 | `404` | 资源不存在（或跨租户访问被隔离） |
 | `422` | 查询参数校验失败（如 limit 越界） |
+| `503` | `/api/v1/readiness` 数据库连接或 schema revision 未就绪 |
 
 ---
 
@@ -166,7 +167,7 @@ GET /api/v1/daily-plans
 `revision` 是当前每日计划的非空正整数版本；它用于 UI/本地确认写入的乐观并发控制。API 本身仍是只读，
 调用方不能通过 API 修改 revision 或计划正文。
 
-### 2.3 按 ID 查询单条计划
+### 2.4 按 ID 查询单条计划
 
 ```
 GET /api/v1/daily-plans/{id}
@@ -174,7 +175,7 @@ GET /api/v1/daily-plans/{id}
 
 返回单个 `DailyPlan` 对象（字段同上 `items[]` 元素）。当 `id` 不存在或属于其他租户时返回 `404`。
 
-### 2.4 查询学期配置
+### 2.5 查询学期配置
 
 ```
 GET /api/v1/semesters
@@ -196,7 +197,7 @@ GET /api/v1/semesters
 ]
 ```
 
-### 2.5 查询班级配置
+### 2.6 查询班级配置
 
 ```
 GET /api/v1/classes
@@ -212,6 +213,7 @@ GET /api/v1/classes
     "user_id": 11,
     "grade": "小班",
     "class_name": "阳光班",
+    "teacher_name": "张老师",
     "indoor_areas": "积木区、阅读区",
     "outdoor_content": "攀爬、平衡"
   }

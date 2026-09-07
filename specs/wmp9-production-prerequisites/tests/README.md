@@ -145,5 +145,6 @@ weekly/monthly template connection to the WMP-8 exporter. Tests prove no `Export
 preview, export file, template asset, or unauthorized business mutation is written by export.
 No break-glass path exists; sys_admin daily teaching access remains denied.
 
-Windows Word and Linux LibreOffice formal business acceptance were deliberately not run.
+Windows Word and Linux LibreOffice external DOCX compatibility acceptance was deliberately not run. These clients do
+not host separate KindergartenManager applications; the product itself is the cloud-hosted online Web system.
 No release, image build, migration execution against production, or deployment was performed.

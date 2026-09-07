@@ -9,8 +9,10 @@
 日期：
 验收人：
 Git SHA / tag：
-构建来源：源码 / Windows installer / Windows portable / deb / Linux portable / Docker
-操作系统：
+构建来源：不可变 OCI 镜像 / 云端隔离验收环境 / 生产环境
+云服务器 OS / 架构：
+HTTPS 域名 / 证书状态：
+浏览器 / 版本：
 Python/应用版本：
 数据库：SQLite / MySQL（版本）
 AI：mock / 真实文本模型 / 真实视觉模型
@@ -19,8 +21,8 @@ Word：Microsoft Word / LibreOffice / 未执行
 
 ## 2. 启动与迁移
 
-- [ ] 全新数据目录启动，迁移到 `2b7f3d5e9c8a`，确认两张 Agent WRITE evidence 表及不可变 trigger 存在，
-  且 `user.auth_epoch` 默认 1、非空、拒绝非正数。
+- [ ] 全新数据目录启动，迁移到当前 head `3c9f4b2a7d1e`，确认两张 Agent WRITE evidence 表、WMP-9
+  production prerequisites 的六张表及不可变 trigger 存在，且 `user.auth_epoch` 默认 1、非空、拒绝非正数。
 - [ ] 空库不自动创建固定管理员；在应用主机显式 bootstrap 后才能登录。
 - [ ] `/` 跳转 `/login`；未登录不能进入 `/home`、`/settings` 等业务页，匿名 `/register` 不挂载。
 - [ ] 登录后 `/home`、`/settings` 可打开；旧 `/setup` 立即跳转 `/settings`。
@@ -100,8 +102,8 @@ Word：Microsoft Word / LibreOffice / 未执行
 
 ## 10. 安全与网络
 
-- [ ] frozen 桌面版只监听 `127.0.0.1`。
-- [ ] 源码/Docker 暴露范围符合验收环境，所有业务 UI 均经过登录与 callback-time 会话绑定。
+- [ ] 云端只通过预期 Caddy/HTTPS 入口提供服务，app/MySQL 管理端口不直接暴露公网。
+- [ ] 所有业务 UI 均经过登录与 callback-time 会话绑定。
 - [ ] `.env`、`.kindergarten_secrets`、数据库和 exports 权限合理。
 - [ ] Compose 已覆盖所有示例默认密码。
 - [ ] 上传、AI、导出异常不在 UI/日志显示密钥或 traceback。
@@ -178,23 +180,33 @@ Word：Microsoft Word / LibreOffice / 未执行
 > Foundation 零写入证据共用数据库、baseline 或结果。Provider/Tool 能力面仍保持四 READ + 两 DRAFT。
 
 - [ ] 只针对当前每日计划的一份 Patch 准备确认；页面重验当前 session、plan id、`revision` 和字段 before hash。
-- [ ] 确认采用只由本地应用层短事务执行：操作前版本、CAS `N→N+1`、最小不可变审计同一事务提交。
+- [ ] 确认采用只由应用服务层短事务执行：操作前版本、CAS `N→N+1`、最小不可变审计同一事务提交。
 - [ ] 过期、重复点击、session/目标/revision/before 不匹配和已知失败均关闭本次确认；不得自动重试或重放 Patch。
 - [ ] commit-unknown 只能人工只读对账，不能依据不确定结果再次采用。
 - [ ] 写入后的计划、revision、版本表和 audit 只作为 W007 证据；不得据此改写或推导 F009 零写入结果。
 
-## 13. 打包与升级
+## 13. 云端部署与升级
 
-每个平台独立记录：
+系统只验收云端在线交付；Windows/Linux 本地安装包不在当前产品矩阵。逐项记录：
 
-- [ ] 安装/解压、首次启动、浏览器打开。
-- [ ] 数据目录不位于只读安装目录。
-- [ ] 升级保留数据库、密钥、模板和导出访问。
-- [ ] 卸载不会静默删除业务数据，或已明确提示。
-- [ ] Windows Defender/权限提示与文档一致。
-- [ ] Docker 重建容器后 volume 数据保留。
+- [ ] OCI source SHA/digest、Release 元数据和实际运行镜像精确一致。
+- [ ] Caddy HTTPS、liveness、database readiness、登录和关键业务分别通过。
+- [ ] 升级/回滚保留数据库、密钥、模板、导出访问和服务器数据卷。
+- [ ] Docker 重建容器后 volume 数据保留，失败时按受控流程回滚。
+- [ ] Microsoft Word/LibreOffice 只验收下载 DOCX，不安装或运行本系统。
 
-## 14. 结果表
+## 14. WMP-9 正式业务与 Office 文档兼容性（尚未执行）
+
+WMP-9 production prerequisites 已建立必要的数据库、授权、工作流、应用和固定模板接线；它不等于正式
+业务验收通过。正式验收必须在隔离云端拓扑中完成 weekly/monthly 业务与权限矩阵，并分别用 Windows Word
+和 Linux LibreOffice 打开云端导出的 DOCX；两个外部消费端都不运行 KindergartenManager 本体。
+
+- [ ] 云端 weekly/monthly 正式入口、读取、审核、删除、导出和零未授权持久化验收通过。
+- [ ] Windows 11 + Microsoft Word for Microsoft 365 Current Channel 文档兼容性通过。
+- [ ] Linux + LibreOffice 24.2 或更高版本文档兼容性通过。
+- [ ] Issue #55/#56/#57、Review 0/0/0、最终 evidence-closure SHA 自身 Quality/CodeQL 均已回写核对。
+
+## 15. 结果表
 
 | 编号 | 场景 | 结果（通过/失败/未执行） | 证据 | 备注/Issue |
 |---|---|---|---|---|
@@ -207,7 +219,8 @@ Word：Microsoft Word / LibreOffice / 未执行
 | MT-007 | 课程审议 |  |  |  |
 | MT-008 | API |  |  |  |
 | MT-009 | 安全与网络 |  |  |  |
-| MT-010 | 平台打包/升级 |  |  |  |
+| MT-010 | 云端部署与升级 |  |  |  |
 | MT-011A | Agent 自动零持久化矩阵 | 通过 | `a50c6f6…`：Foundation `261 passed`；Quality `32808246590` | 全表/文件/UI/audit/DML-DDL 统一矩阵 |
 | MT-011B | Agent Linux 浏览器 mock | 通过 | `specs/agent-foundation/evidence/f009-linux-browser-mock.md` | `tested_code_sha=a50c6f6…`；snapshot `81601b80…` |
 | MT-011C | Agent 安全配置真实模型 | 通过 | `specs/agent-foundation/evidence/f009-real-model.md` | `tested_code_sha=a50c6f6…`；一次请求 SUCCEEDED；snapshot `bdb45487…` |
+| MT-012 | WMP-9 正式业务与 Office 文档兼容性 | 未执行 | `specs/wmp9-production-prerequisites/tests/README.md` | prerequisites 已通过；正式业务与两个外部 DOCX 消费端仍待独立验收 |

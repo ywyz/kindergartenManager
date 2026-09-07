@@ -27,13 +27,13 @@ Graphify clones into `~/.graphify/repos/<owner>/<repo>` and reuses existing clon
 
 **Multiple local subfolders (monorepo or multi-service layout):**
 
-The skill pipeline writes all intermediate and final outputs to `graphify-out/` in the current working directory. Running the skill on each subfolder separately will clobber the same output dir. Instead, use the CLI directly for each subfolder — it places `graphify-out/` *inside* the scanned path:
+Keep distinct output directories for separate subfolder graphs, then merge. The CLI defaults below put `graphify-out/` inside each scanned path:
 
 ```bash
 graphify extract ./core/     # → ./core/graphify-out/graph.json
 graphify extract ./service/  # → ./service/graphify-out/graph.json
 graphify extract ./platform/ # → ./platform/graphify-out/graph.json
-# Add --backend gemini|kimi|openai|deepseek|claude-cli depending on which API key you have set
+# Select the backend according to references/update.md and repository policy
 
 # Then merge at the project root:
 graphify merge-graphs \
@@ -43,4 +43,4 @@ graphify merge-graphs \
   --out graphify-out/graph.json
 ```
 
-Once `graphify-out/graph.json` exists, the fast path above takes over: any codebase question runs `graphify query` directly on the merged graph — no re-extraction, no size gate.
+Use the resulting graph for relevant cross-repository questions; follow `query.md` for bounded lookup and `update.md` for maintenance/backend policy.

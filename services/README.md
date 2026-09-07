@@ -1,6 +1,7 @@
 # `services/` 状态说明
 
-审查基线 `dev4.0@0657c3a` 与最近产品主线 `main@225fe139` 都没有独立微服务实现。本目录仅保留未来拆分的占位说明；当前 AI、Word 和节假日能力都在主应用 `app/integration/` 中运行，`docker-compose.yml` 也没有对应服务。
+当前代码和生产 Compose 都没有独立微服务实现。本目录仅保留未来拆分的占位说明；当前 AI、Word 和节假日
+能力都在主应用 `app/integration/` 中运行，`docker-compose.yml` 也没有对应服务。
 
 如果未来需要拆分，必须先完成独立 ADR 和可运行契约，至少回答：
 

@@ -1,14 +1,19 @@
 # KindergartenManager 产品与工程路线图
 
-> 当前快照：2026-09-06；已验证、发布并部署的基线为
-> `v3.4.0-beta10@6bbff57f0c410459bcdb3bdd86980013d4b6c80e`。Agent Foundation/WRITE 已在 `main` 合入；
+> 当前快照：2026-09-07；当前源码与生产部署分别核验，精确发布/部署历史见
+> `specs/operations-r5/evidence-ledger.md`。Agent Foundation/WRITE 已在 `main` 合入；
 > PR #53 已 no-ff 合并，Issue #52 已关闭；其历史 `v3.4.0-beta2` 证据不替代当前发布证据。
-> Agent WRITE 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
+> Agent WRITE 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的应用服务层 WRITE；
 > Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。精确 Review/CI/MySQL/Chrome lineage 仅以
 > `specs/agent-write/tests/README.md` 与 Issue #52 的 integration closure comment 为准。
 > 不得增加 Provider WRITE、
 > 自动重试、批量或跨页面采用、设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。
 > 完整 W007 lineage/evidence ledger 仅见 `specs/agent-write/tests/README.md`。
+> 产品交付形态已收敛为云服务器上的单一在线 Web 系统；Windows/Linux 桌面包不再属于路线图。
+> Office/LibreOffice 只承担导出文档兼容性验收，不是本地应用运行环境。见 ADR-0010。
+> WMP-9 production prerequisites implementation gate 在 `72d759f…` 通过，
+> 证据账本提交为 `f07971d…`；该账本及本次 docs-only 变更的自身 exact-SHA CI、
+> reviewer 和 Issue 回写仍须分别按当前提交回读，不能沿用 tested-code 或 release SHA。
 
 ## 1. 状态语义
 
@@ -30,7 +35,7 @@
 - 固定需求/spec 与非目标。
 - 与迁移、API、Word、AI 边界一致的实现。
 - 当前 SHA 的自动测试结果。
-- 需要时的 SQLite/MySQL、Windows/Linux、Word 和真实交互人工证据。
+- 需要时的 SQLite/MySQL、云端 HTTPS/浏览器、Word/LibreOffice 文档兼容性和真实交互人工证据。
 - 文档与代码一致性复核。
 - 若已发布：远端 ref、CI `headSha`、Release 资产可回读。
 
@@ -149,7 +154,7 @@ checkout 成功重建。
 
 当前执行边界：F009 已按稳定 RED、最小 GREEN、Review RED、固定 `tested_code_sha`、Linux Chrome mock、
 应用安全配置真实模型、独立 `evidence_closure_sha` 顺序闭合并合入 `main`。Issue 关闭、发布、Provider WRITE、
-长期记忆或产品多 Agent 仍未授权；本地应用层逐次确认 WRITE 由独立 R4B 边界治理。
+长期记忆或产品多 Agent 仍未授权；应用服务层逐次确认 WRITE 由独立 R4B 边界治理。
 
 ## 8. R4A：受控 Agent Foundation READ/DRAFT
 
@@ -248,26 +253,18 @@ Review/Quality/远端/Issue 证据见 Issue #48。
 
 [ADR-0006](ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md) 与
 [冻结规格](../specs/agent-write/spec.md)、[Issue #52](https://github.com/ywyz/kindergartenManager/issues/52)
-已确定：Provider 继续只有四 READ + 两 DRAFT；本地应用逐 Patch、逐次
+已确定：Provider 继续只有四 READ + 两 DRAFT；应用服务层逐 Patch、逐次
 确认，绑定 actor/jti、Patch/turn/target/revision/before/expiry/nonce；`apply` 在短事务内完成完整操作前版本、
 CAS `N→N+1`、最小不可变审计与同 commit，任何已知失败全回滚，commit unknown 只对账不重放。
 
 当前分支已恢复可信 UI session；`b7d9e1f3a5c2` 增加 `daily_plan.revision`，`c1a8e4f6b2d9` 修复
-SQLite `user.id` 自增，`e5f7a9c2d4b6` 增加且仅增加 14/17 列的两张 append-only evidence 表和
-SQLite/MySQL 四个 UPDATE/DELETE 拒绝 trigger；当前 head `2b7f3d5e9c8a` 为 `user` 增加正整数
-`auth_epoch`，密码变更会使旧 UI token 失效。W005 的 `ConfirmedDailyPlanWriteService` 契约/store 已在
-`e4a7f3c…` 取得 Review 0/0、精确 SHA CI、service 验收和 Issue 回写；W006 已实现 version→CAS→audit
-同事务、全回滚、commit-unknown 只读 reconcile，并在 Review 后固定两轮 finding RED。
-
-W006 已在 fixed SHA `253d37d92f2983ea55f688340078380d41c78fd4` 取得 Standards/Spec 0/0、本地
-WRITE `78 passed`、Foundation `261 passed`、ordinary `847 passed`、Linux service-boundary `10/10` PASS；
-Quality `32954156965` 精确匹配成功，Issue #52 comment `5423617401` 已回写且 Issue 保持 OPEN。
+SQLite `user.id` 自增，`e5f7a9c2d4b6` 增加两张 append-only evidence 表和 SQLite/MySQL 拒绝 trigger；
+`2b7f3d5e9c8a` 为 `user` 增加正整数 `auth_epoch`，密码变更会使旧 UI token 失效。WMP-9 prerequisite
+迁移 `3c9f4b2a7d1e` 以该 revision 为 parent，增加六张计划聚合、版本、周日、月栏目、scope grant 和 audit 表。
 
 W007/W008 的 Review、push、精确 SHA CI、MySQL、浏览器验收与 Issue 回写保持为独立门禁；完整
-RED/GREEN/Review/precheck SHA、计数和 node hash 统一记录在 `specs/agent-write/tests/README.md`。
-最终 PR #53 merge SHA 为 `ec592def`；merge-SHA Standards/Spec 均
-H0/M0/L0，Quality、CodeQL 与 Dependency Graph 精确 SHA 成功，Issue #52 已关闭。Provider/Tool
-能力面仍为四 READ + 两 DRAFT + 零 Provider WRITE。
+RED/GREEN/Review/precheck SHA、计数和 node hash 统一记录在 `specs/agent-write/tests/README.md`，
+本路线图不复制逐轮 SHA。Provider/Tool 能力面仍为四 READ + 两 DRAFT + 零 Provider WRITE。
 
 ## 10. R5：发布与运维复核
 
@@ -285,8 +282,8 @@ H0/M0/L0，Quality、CodeQL 与 Dependency Graph 精确 SHA 成功，Issue #52 �
 
 范围：
 
-- Windows 安装包/便携包、Debian 包、Docker 镜像分别验证。
-- 备份、恢复、升级、卸载和数据目录行为。
+- 云端 OCI 镜像、Compose/Caddy/MySQL、HTTPS、浏览器访问和不可变部署分别验证。
+- 备份、恢复、升级、回滚和服务器数据卷行为。
 - 固定 Word 模板在真实 Office/Word 中保真。
 - 真实 MySQL、AI、节假日接口的失败与降级。
 - Release SHA、资产、校验值、变更日志和回滚说明。
@@ -312,7 +309,7 @@ H0/M0/L0，Quality、CodeQL 与 Dependency Graph 精确 SHA 成功，Issue #52 �
 
 ## 11. R6：产品深化（模板、文档、审核与复用）
 
-状态：`串行交付中；WMP-9 production prerequisites 已实现，待独立 exact-SHA 闭合`（2026-09-07；模板中心
+状态：`串行交付中；WMP-9 production prerequisites 实现门 PASS，证据闭合待当前 SHA 回读`（2026-09-07；模板中心
 T006/T011-C、当前脱敏 v2 evidence、WMP-3～WMP-8 已按各自门完成；WMP-9 最终验收仍未执行）。完整方向与阶段依赖见
 [`docs/PRODUCT_DIRECTION.md`](PRODUCT_DIRECTION.md)，规划跟踪见
 [Issue #55](https://github.com/ywyz/kindergartenManager/issues/55)；二者均不构成实现授权。
@@ -326,14 +323,15 @@ Agent WRITE 的精确本地交付状态、Review 轮次、SHA 与测试证据仅
 2. ADR-0008 已接受，只取代/细化 ADR-0004 的固定模板权威来源子决策；ADR-0004 的 AI/教师采用边界继续有效。
 3. 模板中心第一期与周/月计划领域及导出契约已形成两个独立 spec/稳定 RED，并完成双轴 Review 0/0。
 4. 模板中心 T006、T011-C、当前脱敏 v2 evidence refresh、WMP-6 fixed-pair orchestration 与 WMP-7/T011-E
-   已于 2026-09-06 按独立门串行完成；WMP-8 已于 2026-09-07 完成本地门并随后完成 exact-SHA 闭合；
-   最终 exact-SHA 证据以本轮 Issue #56/#57 回写为准。
+   已于 2026-09-06 按独立门串行完成；WMP-8 已于 2026-09-07 完成本地门，最终 exact-SHA 证据以本轮
+   Issue #56/#57 回写为准。
    WMP-7 采用可信进程内 capability 边界，以无状态 receipt 完整性重算、
    canonical snapshot 和当前 v2 profile/evidence/完整 contract 绑定，只把 weekly/monthly 从 reserved 改为 enabled，
    对业务仅开放 active opaque binding；WMP-8 只以冻结 snapshot 消费该 binding，并闭合 render/parse artifact 身份。
    WMP-9 初次只读验收因缺少 production seam 按规则 BLOCKED；独立获批的 prerequisites 门仅实现 ADR-0009
    六表聚合、唯一授权 adapter、状态/删除/审计、可信 UI/application 与固定 released-template→WMP-8 接线。
-   该门闭合后才可另行申请重启 WMP-9 正式业务及 Windows Word/Linux LibreOffice 双平台验收；不得顺带实现
+   该门及其当前提交的 Review、Quality、CodeQL、Issue 证据闭合后，才可另行申请重启 WMP-9 云端正式业务验收及
+   Windows Word/Linux LibreOffice 外部文档兼容性验收；不得顺带实现
    模板 CRUD、fallback、远程对象存储、Issue #75 或 Agent 能力扩展，也不得发布/部署生产。
 5. 在模板版本可追溯后，先由
    [Issue #59](https://github.com/ywyz/kindergartenManager/issues/59) 冻结供应商中立的远程对象存储、稳定对象引用、

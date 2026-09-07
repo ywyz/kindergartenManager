@@ -87,6 +87,11 @@ mock 每份 DRAFT 仍恰有两个串行 Provider 请求；issue/apply/reconcile�
 
 ## 真实 MySQL 8
 
+本节下列 `current` 序列和 W008 结论是历史验收快照。该快照保留原文的“当前工作树 Alembic head：`2b7f3d5e9c8a`”
+状态，仅用于复现当时的固定 SHA；当前工作树唯一 Alembic head 已为
+`3c9f4b2a7d1e`，新增 WMP-9 production prerequisites 的六张表及其约束。需要验证当前迁移时，
+应以当前 checkout 的 `alembic heads` 和对应 release/验收账本为准。
+
 不得使用仓库 Compose 的持久 volume。只使用一次性、固定名称、loopback 端口与 tmpfs；启动前先确认同名
 容器和端口均为空。镜像 pull 是独立可见门，失败不自动重试。
 
@@ -158,7 +163,8 @@ W008_MYSQL_DATABASE_URL="$MYSQL_URL" \
 `.kindergarten_secrets.lock`；live helper 不读取该锁，且在任何 application import 前安装 file-free synthetic
 config，因此允许它存在，但仍拒绝 worktree 内任何 `.env` 或 `.kindergarten_secrets`。
 
-三个 `current` 必须依序为 `2b7f3d5e9c8a`、`a6c4d8e2f9b1`、`2b7f3d5e9c8a`。live helper 单次验证：
+在上述历史 W008 固定 SHA 中，三个 `current` 必须依序为 `2b7f3d5e9c8a`、`a6c4d8e2f9b1`、
+`2b7f3d5e9c8a`。live helper 单次验证：
 
 - 官方 MySQL major 8 与最终 exact head；`user.auth_epoch` 默认 1、非空且拒绝非正数；
 - 两张 evidence 表的 UPDATE/DELETE 四个 trigger 精确存在，四次真实 DML 均返回 errno 1644，且全行 digest

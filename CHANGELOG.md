@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+> 覆盖说明（2026-09-07）：本文件的历史版本条目目前更新至 `3.1.0-beta1`；仓库后续 beta 标签及近期模块门禁尚未在此逐项整理。
+> R5-P 发布/生产事实以 [`specs/operations-r5/evidence-ledger.md`](specs/operations-r5/evidence-ledger.md) 为准；Agent WRITE、
+> 周/月与模板中心的精确门禁状态分别以 [`specs/agent-write/tests/README.md`](specs/agent-write/tests/README.md)、
+> [`specs/weekly-monthly-plans/tasks/README.md`](specs/weekly-monthly-plans/tasks/README.md) 与
+> [`specs/template-center/tests/README.md`](specs/template-center/tests/README.md) 为准。本文件不把未核验的 Release Notes 写入 `Unreleased`。
+
 ### 安全（Security）
 
 - 将开发、Docker 和 GitHub Release 构建的 Python 运行时统一升级并固定到 3.14.7，

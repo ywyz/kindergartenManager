@@ -1,51 +1,20 @@
 # Repository Guidelines
 
-## Required Context & Knowledge Graphs
+## Context and workflow
 
-Before non-trivial work, read `CONTEXT.md`, `docs/ROADMAP.md`, the relevant ADR/design, and the affected code/tests. Treat current code, Alembic migrations, and reproducible test evidence as more authoritative than historical progress notes.
+Use the current code, Alembic migrations, and reproducible evidence over historical progress notes. Read the documents relevant to the task, not a fixed stack before every edit:
 
-For code discovery, prefer the `codebase-memory` graph in this order: `search_graph`, `trace_path`, `get_code_snippet`, `query_graph`, `get_architecture`. Fall back to text search for literals, configuration, non-code files, or insufficient graph results. Use `graphify-out/` for cross-code/document relationships; Graphify is auxiliary evidence and never replaces live code, specs, migrations, or acceptance results.
+- Current status or milestone decisions: `CONTEXT.md`, `docs/ROADMAP.md`.
+- Layer or schema changes: relevant ADR/design, `docs/design/system-architecture.md`, `docs/design/data-model.md`.
+- Product Agent changes: ADR-0005, ADR-0006, `docs/design/agent-runtime.md`, and the affected Foundation/WRITE spec and tests.
+- Deployment, migration or credential operations: `docs/DEPLOYMENT.md`, ADR-0007 and the applicable operations evidence ledger.
+- Other modules: their relevant spec, template, code and tests; consult `memory-bank/` for historical rationale when needed.
 
-### Local Search Tool Priority
+For unfamiliar code relationships, prefer Codebase Memory; CodeGraph is an alternative when it answers the question better or the first graph is insufficient. Use Graphify for cross-document/concept relationships or explicit graph work. Do not query all three for the same answer. Known paths, instructions, configuration and literals can be read/searched directly. Scope searches and retain normal ignore handling; use `rg`, `rg --files`/`fd`, or `ast-grep` as appropriate.
 
-When the knowledge graphs are not applicable or return insufficient results, choose the narrowest local search tool:
+Use repository skills in `.agents/skills/` when applicable; do not add duplicate `.codex/skills/` copies. Graph maintenance is a separate task, not a prerequisite for ordinary edits. When upgrading Graphify, keep global/repository skills and `.graphify_version` aligned with the installed version, preserve local customizations, and validate the changed skills. The semantic backend fallback and integrity rules live in `.agents/skills/graphify/references/update.md`.
 
-- Filename search: `fd`.
-- Text/content search: `rg` (ripgrep).
-- AST/structural search: `sg` (`ast-grep`), preferred for code-aware queries such as imports, call expressions, decorators, and syntax nodes. The upstream `sg` alias is deprecated, so examples use the unambiguous `ast-grep` command; if using `sg`, verify that `sg --version` reports ast-grep rather than the Linux group-switching utility.
-
-#### AST-grep Usage (Windows and POSIX)
-
-- Before running a complex pattern, announce the intent and show the exact command.
-- Quote patterns so the shell does not expand ast-grep metavariables. Single-quoted patterns with double-quoted source literals work in POSIX shells and PowerShell.
-- `--lang`/`-l` selects one language per invocation. For a mixed-language tree, omit it and let file extensions select the parser, or run one explicit language at a time.
-- Common read-only queries:
-  - Find Python `from` imports: `ast-grep -p 'from $MODULE import $$$NAMES' -l python app tests`.
-  - Find TypeScript default imports from `node:path`: `ast-grep -p 'import $NAME from "node:path"' -l ts src`.
-  - Find CommonJS requires of `node:path`: `ast-grep -p 'require("node:path")' -l js src`.
-- Search first and present any proposed replacement as a diff. Do not pass `--rewrite`/`-r` or otherwise apply a structural rewrite unless the user has approved that edit.
-
-#### Search Hygiene (`fd`/`rg`/`sg`)
-
-- Scope searches to relevant paths such as `app`, `tests`, or `docs` whenever possible.
-- Exclude bulky or generated folders: `.git`, `node_modules`, `coverage`, `out`, `dist`, `build`, `.venv`, and `graphify-out`.
-- Prefer normal ignore handling. `fd`, `rg`, and ast-grep respect ignore files by default; add targeted ignore patterns instead of disabling ignores.
-- Examples:
-  - `rg -n 'pattern' -g '!{.git,node_modules,coverage,out,dist,build,.venv,graphify-out}/**' app tests`.
-  - `fd --hidden --exclude .git --exclude node_modules --exclude coverage --exclude out --exclude dist --exclude build --exclude .venv --exclude graphify-out --type f '\.py$' app tests`.
-  - `ast-grep -p '$FUNC($$$ARGS)' -l python app tests`.
-
-Repository-scoped skills are versioned under `.agents/skills/`: use `.agents/skills/graphify/` and `.agents/skills/codebase-memory/` for work in this repository. Do not add duplicate `.codex/skills/` copies: Codex discovers repository skills from `.agents/skills/`, and same-name skills are not merged. After upgrading Graphify, refresh both the global installation and the repository copy, keep `.agents/skills/graphify/.graphify_version` aligned with `graphify --version`, and validate both local skills before delivery.
-
-### Graphify Backend and Agent Fallback
-
-For semantic extraction of active governance or architecture documents, and for LLM-backed community naming, use this fixed fallback chain:
-
-1. First use the configured OpenAI-compatible backend: `graphify extract . --backend openai`.
-2. If the OpenAI-compatible backend fails, retry with the configured DeepSeek backend: `graphify extract . --backend deepseek`.
-3. Only if both backends fail, delegate the same bounded Graphify extraction or naming task to the installed `luna_worker` sub-agent. Do not substitute an unspecified agent or skip DeepSeek.
-
-The fixed order is `OpenAI-compatible -> DeepSeek -> luna_worker`; stop at the first semantically valid result. Use `--mode deep` only when broader inferred-edge reconstruction is required, and retain the same fallback order. Apply the same order to `graphify label` and `graphify cluster-only`. A zero exit status alone is not success: verify that the output is parseable, covers the changed sources and target concepts, does not cause an unexplained graph shrink, and passes Graphify integrity diagnostics. Record the backend or sub-agent actually used and concise reasons for earlier failures, but never expose API keys, endpoint URLs, or other secrets. If all three paths fail, report Graphify as unavailable rather than using a stale graph as evidence for changed documents. Do not hand-edit generated graph files.
+Complete authorized local edits and relevant isolated verification without asking at every step. Do not turn a recommendation in a skill into an approval gate. Preserve explicit product/production gates below; if one blocks completion, identify the exact unresolved action and governing requirement.
 
 ## Project Structure & Module Organization
 
@@ -83,44 +52,25 @@ Use 4-space indentation, type hints for public functions, and small modules alig
 
 ## Testing Guidelines
 
-Tests use `pytest` with `pytest-asyncio`; `pytest.ini` sets `asyncio_mode = auto`. Add or update tests for every service change. Mock AI, Word export, network, and database boundaries where practical; repository tests may use SQLite fixtures from `tests/conftest.py`.
+Tests use `pytest` with `pytest-asyncio`; `pytest.ini` sets `asyncio_mode = auto`. For service behavior changes, add or update meaningful regression coverage. Choose checks for the changed behavior and risk; documentation or mechanical edits do not need tests that mirror their wording. Once relevant checks pass, broaden or repeat only for changes, failures or unresolved concerns. Spec-required RED/GREEN and acceptance gates remain mandatory for the work they govern.
+
+Use disposable databases and mock external AI/network boundaries for local tests where practical; do not assume every test is isolated or run real-model/production acceptance as routine verification. Fix failures caused by the requested change and rerun affected checks within the authorized scope.
 
 ## Controlled AI Agent Boundary
 
-The accepted Agent design is documented in `docs/ADR/ADR-0005-controlled-ai-agent-runtime.md` and
-`docs/design/agent-runtime.md`. F003 contracts/closed registry, F004 actor-scoped READ projections/frozen Context,
-and F005 canonical PlanPatch, F006 Provider port/bounded serial Runtime, F007 cancellation/timeout/stale-result handling,
-and F008 OpenAI-compatible adapter/six closed executors/application composition/daily-plan UI are fixed GREEN. F009 is
-also fixed GREEN: the zero-persistence full matrix, Linux browser mock, and real-model acceptance through secure
-application configuration all passed at `tested_code_sha=a50c6f6b9aa941996052c59a301a7a40bdbd706f`; closure SHA
-proof is recorded in Issue #48. Any later product/helper/test change invalidates those manual results. The Foundation is
-one application-layer Agent for the
-daily-plan page with exactly four READ tools and two DRAFT tools. DRAFT returns an in-memory, discardable `PlanPatch`
-and must not mutate UI body fields, database rows, versions, previews, audits, or exports.
+本节的 Agent、Provider 和 OpenAI-compatible Chat Completions adapter 专指幼儿园系统内部的 AI service。
+这些产品运行时约束不用于限定开发本项目的 Codex 模型、API 或开发工具；Codex 的项目级模型配置见
+`.codex/config.toml`。Codex 执行开发任务时仍须遵守本文的代码、安全与交付要求。
 
-Agent tools call narrow service projections and never expose repositories, SQLAlchemy sessions, ORM objects, files,
-URLs, shell/Python/SQL, MCP, plugins, or dynamic tool discovery. Context is rebuilt for each turn from trusted
-tenant/user and current scope, then discarded; do not persist conversations, threads, embeddings, summaries, profiles,
-tool results, patches, or provider-managed memory. WRITE, adoption/confirmation UI, long-term memory, new tools, and
-multi-agent workflows require a separate ADR/spec/Issue and stable RED; do not add placeholders for them in the
-Foundation.
+The product Agent has one bounded application Runtime on the daily-plan page, exactly four READ tools and two DRAFT tools, and the Chat Completions adapter defined by ADR-0005 and `docs/design/agent-runtime.md`. DRAFT produces an in-memory, discardable `PlanPatch`; it cannot mutate UI body fields, database rows, versions, previews, audits or exports.
 
-The separate WRITE boundary is frozen by
-`docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md` and `specs/agent-write/`. W005/W006 are closed.
-W007 current capability is limited to one current-page Patch applied by the local application only after explicit user
-confirmation; Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。不得增加 Provider WRITE、自动重试、批量或跨页面采用、
-设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。
+Tools call narrow actor-scoped service projections. They must not expose repositories, SQLAlchemy sessions, ORM objects, files, URLs, shell/Python/SQL, MCP, plugins or dynamic tool discovery. Rebuild Context from trusted tenant/user and current scope for each turn, then discard it. Do not persist conversations, threads, embeddings, summaries, profiles, tool results, patches or provider-managed memory.
 
-当前 W007 的精确本地交付状态、Review 轮次、SHA 与测试证据仅以
-`specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后作为外部证据；本文不复制逐轮事实。
-不得从局部 GREEN 推导 Standards/Spec 0/0、merge、Issue 关闭或 release。
+ADR-0006 and `specs/agent-write/` permit only one current-page Patch applied by the local application after explicit user confirmation, bound to the trusted session/actor, target, revision and patch. Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。不得增加 Provider WRITE、自动重试、批量或跨页面采用、设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。Capability expansion requires a separate ADR/spec/Issue and stable RED, not placeholders in the Foundation.
 
-F009 adds no Agent capability. Its automated baseline is taken after initialization/seed and dynamically reflects every
-actual database table, protected configuration/export artifacts, caller-owned UI body, the independent audit logger, and
-post-seed DML/DDL attempts. Manual mock and real-model evidence share a `tested_code_sha`; evidence and final graph updates
-form a separate `evidence_closure_sha` for final Review/Quality/Issue proof. On POSIX, `.kindergarten_secrets` must be
-owner-only before first read and from creation. Missing or unsafe real-model configuration must fail closed with zero
-requests; never export or inject a real key for acceptance.
+精确本地交付状态、Review 轮次、SHA 与测试证据仅以 `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后作为外部证据；本文不复制逐轮事实。Foundation acceptance details are in `specs/agent-foundation/`. Do not infer review 0/0, merge, Issue closure or release from local GREEN. Historical manual acceptance covers only its tested code; later product/helper/test changes require new applicable evidence. Manual mock and real-model acceptance share a `tested_code_sha`; evidence closure uses a separate `evidence_closure_sha`.
+
+For real-model acceptance, use only the supported application configuration/decryption flow. Missing or unsafe configuration must fail closed with zero requests; never export or inject a real key. On POSIX, `.kindergarten_secrets` must be owner-only from creation and before first read. Preserve the spec's post-seed zero-persistence matrix and independent audit/UI/config/export checks when changing the product Agent.
 
 ## Commit & Pull Request Guidelines
 
@@ -132,10 +82,15 @@ Business tables normally include `tenant_id`, `user_id`, `created_at`, and `upda
 
 ## Production Delivery and Credential Operations
 
+The only supported product delivery target is the cloud-hosted online Web system. Production uses the
+Caddy → application → MySQL topology and immutable OCI image references. Source/SQLite runs are for development,
+automated tests, and isolated acceptance only. Windows/Linux desktop installers and portable packages are legacy
+assets, not current product targets; do not expand, publish, or claim them as supported without a separate decision.
+Microsoft Word and LibreOffice remain external DOCX compatibility clients and do not host the application.
+
 Treat production delivery as separate, evidence-bound gates: immutable image metadata, deployment, liveness, database
 readiness, UI login, password rotation, old-session invalidation, rollback, and release-document convergence do not imply
-one another. `/api/v1/health` is liveness only; database readiness remains the independent Issue #54 until its contract
-is implemented and accepted.
+one another. `/api/v1/health` is liveness only; database readiness must be verified independently against its current contract and evidence.
 
 The current Aliyun production Bootstrap administrator password file is
 `/home/ecs-user/compose/kindergarten-production/secrets/bootstrap_admin_password`. It must remain owned by

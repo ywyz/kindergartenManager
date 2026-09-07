@@ -2,112 +2,40 @@
 
 ## 1. 使用前须知
 
-应用启动后进入 `/login`，业务页面按当前 active 用户隔离。全新空库不会匿名注册或自动创建默认管理员；
-首次管理员必须在应用主机上通过受控命令显式初始化。
+KindergartenManager 是部署在云服务器上的在线系统。用户无需安装 Windows 或 Linux 客户端，通过园所提供的
+HTTPS 地址进入 `/login`，业务页面按当前 active 用户隔离。全新环境不会匿名注册或自动创建默认管理员；
+首次管理员由受控运维人员在应用主机上初始化。
 
-- Windows/Linux 打包版默认用于本机使用。
-- 源码和 Docker 模式可能监听局域网；即使已有登录，也不要在未配置 TLS、强密码和网络访问控制时直接暴露公网。
+- 只使用园所确认的 HTTPS 域名，不通过来源不明的 IP、安装包或本机程序登录。
 - 系统可以不配置 AI 使用手工编辑/历史能力；AI 生成需要配置相应文本或视觉模型。
-- 幼儿姓名、图片和导出 Word 是敏感数据，请使用受控设备和目录。
+- 幼儿姓名、图片和下载的 Word/PDF 是敏感数据，请使用受控账号、设备和下载目录。
 
-## 2. 启动
+## 2. 访问与登录
 
-### 源码
+### 普通用户
 
-```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/python -m app.main
-```
+1. 在受支持浏览器中打开园所提供的 HTTPS 地址。
+2. 确认域名和证书正常，再输入系统账号与密码。
+3. 登录后进入首页；无权限页面会拒绝访问，不要反复尝试或共享账号。
+4. 完成工作后从侧边栏退出；共享设备还应关闭浏览器并清理下载文件。
 
-打开 `http://localhost:8080`。
+用户不需要运行源码、Docker、数据库迁移或管理员初始化命令。系统不再提供受支持的 Windows/Linux 本地应用。
 
-全新空库不会自动创建默认管理员。先在应用主机显式运行：
+### 运维人员：云端 Docker/Compose
 
-```bash
-.venv/bin/python -m app.jobs.bootstrap_admin --init
-```
-
-按安全提示提供首次管理员信息后，再从 `/login` 登录；仓库不再提供源码已知的默认密码。
-
-### Docker
+生产初始化、迁移、备份、发布和回滚必须按[生产部署指南](DEPLOYMENT.md)执行。先完成该指南规定的不可变
+镜像、备份证据、迁移和 readiness 门禁，再在运行中的 app 容器执行一次管理员初始化：
 
 ```bash
-cp .env.example .env
-# 填写已解析到本机的 CADDY_DOMAIN，并用密码管理器填写
-# MYSQL_ROOT_PASSWORD、MYSQL_PASSWORD，
-# 并固定 ENCRYPTION_KEY、JWT_SECRET；MySQL 密码使用十六进制随机值。
-docker compose up -d
 docker compose exec -e BOOTSTRAP_ADMIN_ALLOW_REMOTE=true app python -m app.jobs.bootstrap_admin --init
 ```
 
-这里的 `BOOTSTRAP_ADMIN_ALLOW_REMOTE` 只对该次交互初始化生效，不会注入常驻 app 容器；MySQL root
-凭据仍只属于 db 容器。初始化命令会交互读取管理员密码且不回显。Compose 会在缺少生产域名或数据库密码时失败关闭；域名必须
-先通过 DNS 解析到部署主机，并允许 Caddy 使用 80/443 端口自动申请和续期 HTTPS 证书。生产或共享环境
-还必须固定加密/JWT 密钥、保留 `app_data`、`db_data` 与 `exports` 卷，并限制 UI 的网络访问。
-
-生产环境可改用不可变镜像脚本：
-
-```bash
-python -m scripts.deploy --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
-  --backup-evidence /secure/path/backup-evidence.json \
-  --protected-image <当前不可变镜像ref> \
-  --acceptance-runner /secure/path/r5-acceptance-runner \
-  --health-url https://manager.ywyz.tech/api/v1/health \
-  --readiness-url https://manager.ywyz.tech/api/v1/readiness \
-  deploy ghcr.io/ywyz/kindergartenmanager@sha256:<64位digest>
-python -m scripts.deploy --service app --state-dir /var/lib/kindergarten-manager/deploy-state \
-  --backup-evidence /secure/path/backup-evidence.json \
-  --protected-image <当前不可变镜像ref> \
-  --acceptance-runner /secure/path/r5-acceptance-runner \
-  --health-url https://manager.ywyz.tech/api/v1/health \
-  --readiness-url https://manager.ywyz.tech/api/v1/readiness rollback
-```
-
-`--backup-evidence` 必须指向备份 producer 生成的 owner-only evidence；不要手工传入 database identity 或
-revision。producer 从实际配置数据库记录 identity/revision，`deploy.py` 在任何 Docker 变更或部署状态写入前
-自动复读当前配置数据库并精确核对两者，同时核对 `--protected-image` 与当前运行镜像的绑定。
-迁移前 evidence 只绑定迁移前的数据库 revision；迁移成功后 revision 改变，不能把原 evidence 跨迁移复用于
-deploy/rollback。R5-P 已有 stable RED 与自动候选，但隔离 MySQL/真实候选 OCI、生产窗口、生产验收和 Release
-closure 仍是独立门；不要把本页通用命令或 dry-run 当成这些门已经通过。
-
-`deploy.py` 要求 liveness、database readiness、登录与关键业务门依次通过后才更新部署状态；这些门互不替代。
-它仍不证明数据库 restore 已发生；真实 MySQL 故障/恢复矩阵见 [Issue #54](https://github.com/ywyz/kindergartenManager/issues/54)。
+`BOOTSTRAP_ADMIN_ALLOW_REMOTE` 只对这次交互初始化生效，不会注入常驻 app 容器；MySQL root 凭据仍只属于
+db 容器。初始化命令交互读取管理员密码且不回显。生产 Compose 必须保留 `app_data`、`db_data` 和
+`exports` 卷（以及 Caddy 证书状态卷），并限制 UI 网络访问；不要把通用命令或 dry-run 当作生产门禁已经通过。
 
 生产管理员密码文件属于运维机密，不是普通用户配置。当前 Aliyun 路径、权限要求、轮换验收与清理规则只在
 [生产部署指南](DEPLOYMENT.md#4-bootstrap-管理员生产凭据)维护；不要在用户手册、Issue 或聊天中记录密码值。
-
-### Windows/Linux 安装包
-
-从与目标版本 tag 对应的 GitHub Release 获取。首次运行可能需要允许防火墙/Defender 提示；应核对发布来源和版本。
-
-Windows 安装版在安装结束时先不要启动应用；若已自动启动请关闭，再在 PowerShell 中运行（便携包则在解压目录运行同名程序）：
-
-```powershell
-cd "$env:ProgramFiles\KindergartenManager"
-.\KindergartenManager.exe --init
-```
-
-Linux 便携包在解压目录运行：
-
-```bash
-./KindergartenManager --init
-```
-
-Debian 安装版需要先停服务，再复用 systemd 的受保护配置运行同一个初始化入口：
-
-```bash
-sudo systemctl stop kindergarten-manager
-sudo systemd-run --wait --pty --collect \
-  --property=User=kindergarten-manager \
-  --property=EnvironmentFile=/etc/kindergarten-manager/env \
-  --property=WorkingDirectory=/var/lib/kindergarten-manager \
-  /opt/kindergarten-manager/KindergartenManager --init
-sudo systemctl start kindergarten-manager
-```
-
-以上初始化方式都交互读取密码，不要把管理员密码写入 URL、命令参数、脚本或聊天记录。完成后从
-`http://localhost:8080/login` 登录。
 
 ## 3. 首次配置
 
@@ -189,16 +117,11 @@ AI 或节假日接口失败时，保留已输入内容，按提示重试或继�
 4. 保存并导出固定模板。
 5. 历史区支持查看、重新导出和删除。
 
-## 9. 数据位置与备份
+## 9. 下载与数据保护
 
-- 源码/开发模式未设置 `DATABASE_URL` 时，使用启动工作目录下的 `kindergarten.db`；打包模式使用系统用户数据
-  目录（Windows `%LOCALAPPDATA%\KindergartenManager`，Linux `~/.local/share/KindergartenManager` 或
-  `$XDG_DATA_HOME/KindergartenManager`，macOS `~/Library/Application Support/KindergartenManager`）。
-- 自动生成的 `ENCRYPTION_KEY`/`JWT_SECRET` 位于同一数据根下 owner-only 的 `.kindergarten_secrets`。
-- Word 位于运行时导出目录。
-- Docker 数据位于命名 volume。
-
-备份应同时覆盖数据库、密钥和必要导出。应用运行中不要直接复制 SQLite 文件作为唯一备份；在正式备份流程建立前，先停止应用或使用 SQLite 一致快照工具。
+- 业务数据、密钥和服务端导出由云端运维边界管理，普通用户不接触数据库、容器卷或服务器目录。
+- Word/PDF 下载到用户设备后由下载者负责保护；不应保存到公共电脑、公共网盘或无访问控制的聊天群。
+- 不要把浏览器缓存或下载文件当作系统备份。生产备份、恢复和保留策略由受控运维流程执行。
 
 ## 10. 常见问题
 
@@ -226,7 +149,7 @@ AI 或节假日接口失败时，保留已输入内容，按提示重试或继�
 ## 11. 反馈问题时提供
 
 - 应用版本/tag 和 Git SHA（如可见）。
-- 操作系统、安装方式、数据库类型。
+- 浏览器及版本、客户端操作系统；如属于运维问题，再提供脱敏的云端部署版本和数据库类型。
 - 复现步骤、期望和实际结果。
 - 已脱敏的日志片段和截图。
 - 不要发送真实 API Key、数据库密码或不必要的幼儿隐私数据。

@@ -34,8 +34,8 @@ uv pip check
 .venv/bin/python -m app.main
 ```
 
-默认访问 `http://localhost:8080`。未设置 `DATABASE_URL` 时，源码/容器模式使用当前工作目录中的 SQLite；
-打包模式使用平台用户数据目录。
+默认访问 `http://localhost:8080`。开发源码未设置 `DATABASE_URL` 时使用当前工作目录中的 SQLite；云端
+Compose 必须显式连接 MySQL 8，并以 `KINDERGARTEN_DATA_DIR=/data` 承载运行期数据。
 
 ### 2.1 依赖安全基线
 
@@ -92,8 +92,9 @@ API 身份独立：`X-Api-Key` 映射到 tenant；配置 `API_SIGNING_SECRET` �
 
 ## 5. 数据库与迁移
 
-当前工作树 Alembic head：`2b7f3d5e9c8a`。前序 `e5f7a9c2d4b6` 创建 W006 的两张 append-only
-evidence 表及 SQLite/MySQL 不可变 trigger；当前 revision 为 `user` 增加正整数 `auth_epoch`。
+当前工作树 Alembic head：`3c9f4b2a7d1e`。前序 `e5f7a9c2d4b6` 创建 W006 的两张 append-only
+evidence 表及 SQLite/MySQL 不可变 trigger，`2b7f3d5e9c8a` 为 `user` 增加正整数 `auth_epoch`；当前 head
+增加 WMP-9 production prerequisites 的六张表及其约束。
 人工迁移验收不得停在任一前序 revision。
 
 ```bash
@@ -127,8 +128,8 @@ evidence 表及 SQLite/MySQL 不可变 trigger；当前 revision 为 `user` 增�
 ### 6.1 日常模型配置复用
 
 API 地址、模型名和 AI Key 应在登录后的 `/settings` 保存；它们按 tenant + user 写入 `ai_api_key`，
-其中 Key 只保存 Fernet 密文。重复使用同一源码工作区时，保留启动工作目录中的 `kindergarten.db` 与
-owner-only `.kindergarten_secrets` 即可复用；打包版两者位于平台用户数据目录。
+其中 Key 只保存 Fernet 密文。重复使用同一开发源码工作区时，保留启动工作目录中的 `kindergarten.db` 与
+owner-only `.kindergarten_secrets` 即可复用；云端生产使用 MySQL，并应显式固定加密/JWT 密钥。
 
 若经常新建 worktree，使用仓库外的专用非生产 SQLite，并从权限受限的外部环境文件向启动 shell 提供
 稳定的 `DATABASE_URL`、`ENCRYPTION_KEY` 和 `JWT_SECRET`；AI Key 本身不要放入该文件或仓库 `.env`，仍只在
@@ -152,7 +153,7 @@ F005 Patch。F007 已固定 GREEN，Runtime 还使用完整冻结 stamp 做精�
 Provider、单 Tool 和总 operation，在每个终态重新检查 UTC TTL/current-context，并在吞取消 port 真正排空前
 保持 busy、丢弃迟到正文/Patch/异常。F008 已固定具体 OpenAI-compatible adapter、六路静态 executor、
 应用级单 coordinator/controller、日期/current-fingerprint 失效和每日计划只读建议面板；Foundation 不持久化，
-Provider/Tool 仍无 WRITE。W007 的本地应用层逐次确认写入由 ADR-0006 约束。F009 已在 `tested_code_sha=a50c6f6…` 完成自动矩阵、Linux Chrome mock
+Provider/Tool 仍无 WRITE。W007 的应用服务层逐次确认写入由 ADR-0006 约束。F009 已在 `tested_code_sha=a50c6f6…` 完成自动矩阵、Linux Chrome mock
 和应用安全配置真实模型验收；closure SHA 的 Review/Quality/Issue 证据见 Issue #48。
 
 ```text
@@ -233,7 +234,7 @@ F009 开发与验收硬约束：
 - SQLite 与 MySQL。
 - 真实 AI 与 mock AI。
 - Word/Office 模板保真。
-- Windows 安装包、Linux 包、Docker。
+- 云端 OCI 镜像、Compose/Caddy/MySQL、HTTPS 与浏览器；Windows/Linux 本地包不再属于产品交付目标。
 
 ## 11. 图谱
 
@@ -250,7 +251,7 @@ F009 开发与验收硬约束：
 4. 用历史测试数字代替当前执行。
 5. 只按资源 ID 更新/删除，不带 tenant/user。
 6. 在大型 NiceGUI 页面继续堆业务规则。
-7. 把 Linux CI 或 DOCX XML 测试当作 Windows/Word 人工通过。
+7. 把 CI 或 DOCX XML 测试当作云端业务或 Word/LibreOffice 外部兼容性人工通过。
 8. 把功能分支上的 F009 验收误写成已合并/已发布，或为了快速接入让 Provider 直连 Repository/动态 Tool。
 9. 在 Agent Foundation 中预留 WRITE、“始终允许”、持久化对话或 MCP/插件入口。
 

@@ -2,6 +2,10 @@
 
 本文件聚焦生产部署收敛：Docker 镜像不可变发布、部署/回滚流程、备份与恢复边界。
 
+KindergartenManager 的唯一产品交付形态是云服务器上的在线 Web 系统，参考拓扑为
+`Internet → Caddy → NiceGUI app → MySQL 8`。Windows/Linux 本地安装包和便携包不再属于生产交付；
+Microsoft Word/LibreOffice 仅作为下载 DOCX 的外部兼容性消费端。
+
 ## 1. 发布镜像的不可变引用
 
 R5-P 只接受一个闭合发布元组：
@@ -209,18 +213,15 @@ liveness、readiness、登录和关键业务。四类门彼此独立，不能互
 4. 若旧镜像不兼容新 schema，停止并执行已冻结的数据库恢复方案；不得自动 downgrade
 5. 仅在恢复门全部通过后确认 deployment state 保持动作前值；Release 仍保持 draft/未 closure
 
-## 6. 近期发布事实（历史不追溯）
+## 6. 发布与生产事实的权威来源
 
-以下是当前仓库最近一次已发布事实，仅作当前手工核对，不代表新的 digest 自动化行为已经用于该历史发布：
+发布与生产状态会随 Release 和部署变化，本文件不复制易过时的 tag、SHA 或 digest。最近一次 R5-P 生产闭环的
+精确 release/source/OCI/部署证据见 [`specs/operations-r5/evidence-ledger.md`](../specs/operations-r5/evidence-ledger.md)。
+仓库中的发布标签与后续文档提交不等于生产已部署；部署记录必须以该账本和现场回读为准。
 
-- Release tag：`v3.4.0-beta2`
-- 合并 SHA：`ec592def71658a5036359e7c79e35c9b6b0ab99b`
-- 工作流运行：`33312637621`
-- OCI index digest：`sha256:872e9854fcdf62df1f510e4b825ccb4a25022e1b06383672f0712cf9c6ba7246`
-- 已部署到 `manager.ywyz.tech` 的 linux/amd64 manifest：`sha256:be4ee7e841621f6c9ec7142ec15271a37573a5587658e61c7329a7059f7a4b2c`
-
-当前生产因既有私有 GHCR 代理路径固定到了 `linux/amd64` manifest；这是可回读的历史现状。新发布工作流构建
-`linux/amd64` 与 `linux/arm64` 的 OCI index，通用部署/回滚记录应固定 index digest，不能把两种 digest 混写。
+`.github/workflows/release.yml` 仍会在 `v*` tag 上构建并上传遗留 Windows/Linux 桌面产物；这与 ADR-0010
+的云端唯一产品交付决策不一致。下次发布前必须完成单独的 workflow 收敛，在此之前桌面 Release 结果不得作为
+受支持产品交付证据。
 
 ## 7. 与其他文档的入口
 

@@ -4,26 +4,15 @@ applyTo: "app/integration/ai_client/**,app/service/**"
 
 # AI 接口调用约定
 
-## 接口标准
+## 适用范围与接口
 
-使用 OpenAI 兼容 Chat Completions 接口（`/v1/chat/completions`），通过 `httpx` 发送请求，`tenacity` 负责重试。
+本文件约束幼儿园系统内部的 AI service，不约束开发工具 Codex 的模型或 API。
+AI 调用经 `app/integration/ai_client/`，service 层不直接发送 HTTP；保留各用例的输入、输出与错误契约。
 
-## 强制要求
-
-1. **统一入口**：所有 AI 调用必须通过 `app/integration/ai_client/`，禁止在 service 层直接发 HTTP 请求
-2. **超时设置**：每次调用必须设置 `timeout`（建议 60 秒）
-3. **重试策略**：使用 tenacity 指数退避，最多重试 3 次
-
-```python
-from tenacity import retry, stop_after_attempt, wait_exponential
-
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-async def call_ai(messages: list[dict], schema: dict) -> dict:
-    ...
-```
-
-4. **结构化输出**：请求必须携带 JSON schema 约束（`response_format` 或 system prompt 强制 JSON），解析失败时抛出业务异常并记录完整原始响应到日志
-5. **API Key 安全**：从数据库读取时先解密，解密后的明文只在内存中使用，禁止打印到日志
+- 常规文本/视觉客户端使用现有 OpenAI-compatible Chat Completions/httpx 集成；是否重试、次数和超时按具体客户端契约，不能一律增加重试。
+- `app/service/agent/` 与 `agent_provider.py` 受 ADR-0005、`docs/design/agent-runtime.md` 和 Foundation tests 约束：一次 Provider 调用只发一次请求、不自动重试，超时/取消由 Runtime 控制。
+- JSON 用例保留其结构化输出校验，纯文本和 Tool 用例保留各自响应格式；解析失败返回净化的业务异常。
+- Key 短命解密并仅在内存使用。日志不得记录原始请求/响应、system Context、Tool 参数、凭据或敏感业务正文；Agent 诊断只使用契约允许的阶段/原因枚举与状态码。
 
 ## 教案拆分输出 Schema
 
@@ -39,7 +28,7 @@ async def call_ai(messages: list[dict], schema: dict) -> dict:
 
 ## 年龄适配改写
 
-- 改写后必须同时保存原文（`process_original`）与改写文（`process_adapted`）
+- 每日计划改写后必须同时保存原文（`activity_process_original`）与改写文（`activity_process_adapted`）
 - 两者均入库，供后续导出时差异标红使用
 
 ## 一日活动生成输入上下文

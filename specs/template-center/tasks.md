@@ -4,8 +4,8 @@
 > 仅以内部 registry 启用 weekly/monthly 的 READ descriptor，并向业务开放 ACTIVE opaque binding。
 > T007–T010 及其既有 future RED 不因该门自动完成。
 
-本表是 [`spec.md`](spec.md) §6 的可执行索引。所有状态初始为“待前置门/稳定 RED”；完成文档与 RED
-不等于允许实现 GREEN。
+本表是 [`spec.md`](spec.md) §6 的可执行索引。“待前置门/稳定 RED”是原始冻结表的初始状态；当前补充已在顶部标明，
+完成文档与 RED 不等于允许实现 GREEN。
 
 | ID | 任务 | 前置 | 通过证据 | 最小 GREEN 边界 |
 |---|---|---|---|---|
@@ -19,7 +19,7 @@
 | T008 | synthetic preview 与 export parser port | T006/T007 | synthetic-only、零持久化、版本 hash 追踪、无 fallback | 不改业务字段 |
 | T009 | backup/isolated restore | R5-R、T006 | owner-only artifact、manifest、篡改/路径/tenant/hash 原子失败 | 不运行生产恢复 |
 | T010 | 五类 exporter 分开接线 | T008/T009 | 每类独立 RED/GREEN、Word/LibreOffice 人工验收 | 一次只接一类 |
-| T011 | 周/月 reserved candidate qualification 与 enablement gate | T010；两个独立周/月 spec/RED/Review | 受控 seed/fixture；同一安全 validator 拒绝 macro/external-rel/bad-ZIP/structure-profile mismatch；T011-C 要求 LibreOffice 精确版本、`microsoft-word/ooxml-docx` 兼容目标和 evidence ID 完整；全部通过后发布 registry v+1 启用七类 | 内部窄 job；服务器不运行 Word；无 public projection/upload/preview/resolve_active、active、业务读写或正式下载 |
+| T011 | 周/月 reserved candidate qualification 与 enablement gate | T010；两个独立周/月 spec/RED/Review | 受控 seed/fixture；同一安全 validator 拒绝 macro/external-rel/bad-ZIP/structure-profile mismatch；T011-C 要求 LibreOffice 精确版本、`microsoft-word/ooxml-docx` 兼容目标和 evidence ID 完整；全部通过后由独立内部 registry/contract 版本仅启用 weekly/monthly，初始五类 registry 不改写 | 内部窄 job；服务器不运行 Word；无 public projection/upload/preview/resolve_active、active、业务读写或正式下载 |
 
 ## 状态纪律
 
@@ -29,5 +29,6 @@
 - T011 的 candidate qualification 不是正式 Preview：只能消费受控 seed/fixture、复用 T004 安全 validator，并在
   synthetic render/parse 后检查 Office status、LibreOffice 精确版本、关闭的 Word OOXML 兼容目标和 evidence ID；任何前置、安全或 Office
   失败都不能追加 passed evidence、创建 version/active/ExportRecord 或业务读写。只有周/月模型、字段映射、Word
-  解析和人工验收标准及该 evidence 全部通过后，才可发布新 registry/contract 版本启用两个 reserved 类型。
+ 解析和人工验收标准及该 evidence 全部通过后，才可由独立内部 registry/contract 版本启用两个 reserved 类型；初始五类
+  registry 不改写。
 - 任一局部 GREEN 不代表 Standards/Spec 0/0、固定 SHA、merge、Issue 关闭或 release。

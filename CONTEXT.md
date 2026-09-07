@@ -1,27 +1,25 @@
 # KindergartenManager 项目上下文
 
-> 状态快照：2026-09-06；已验证、发布并部署的源码基线：`main@6bbff57f0c410459bcdb3bdd86980013d4b6c80e`。
-> `v3.4.0-beta10` 已从该 SHA 发布为 prerelease；Release、OCI 和生产闭环的精确事实只见
-> `specs/operations-r5/evidence-ledger.md`。evidence closure commit 的 SHA 必须在提交后回读并由自身
-> exact-SHA Quality 固定，不能预填或沿用 release source SHA。
-> Agent 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
+> 状态快照：2026-09-07。当前源码与生产部署分别核验；Release、OCI 和生产闭环的精确历史事实见
+> `specs/operations-r5/evidence-ledger.md`，不能由仓库标签或后续源码提交推断现场版本。
+> 新 evidence closure SHA 必须在提交后取得，并回读自身 exact-SHA CI；不能沿用历史结果。
+> Agent 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的应用服务层 WRITE；
 > Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。精确 lineage 与测试证据仅以
 > `specs/agent-write/tests/README.md` 为准；本文不复制逐轮事实。
 > 不得增加 Provider WRITE、自动重试、批量或跨页面采用、
 > 设置/文件/Word/删除/创建写入、长期 Patch 持久化、新 Tool 或多 Agent。完整 W007 证据仅见
 > `specs/agent-write/tests/README.md`。
+> 当前唯一产品交付形态是部署在云服务器上的在线 Web 系统；Windows/Linux 独立本地应用已退出产品路线。
+> Word/LibreOffice 只作为导出文档消费端，见 ADR-0010。
+> WMP-9 production prerequisites 的 tested-code SHA 为 `72d759f…`，
+> 其证据账本提交为 `f07971d…`；本次文档/文档契约测试/开发配置变更形成的新
+> closure SHA 及其自身 CI 必须在提交后重新回读，不能沿用上述 SHA。
 
-## 1. 固定阅读顺序
+## 1. 按任务读取上下文
 
-开始设计或实现前，按以下顺序阅读：
-
-1. `AGENTS.md`：仓库级开发约束。
-2. `CONTEXT.md`：当前事实、边界、风险与下一道门禁。
-3. `docs/ROADMAP.md`：里程碑、状态语义和出口条件。
-4. `docs/ADR/README.md` 及相关 ADR：已经确认的架构决策。
-5. `docs/design/system-architecture.md`、`docs/design/data-model.md`。
-6. 对应业务模块的 `memory-bank/<module>/design.md`、`test-plan.md`。
-7. 实际代码、Alembic 迁移与测试。若文档冲突，以代码和可复现证据为准，并在同一变更中修正文档。
+`AGENTS.md` 给出项目约束和文档入口。本文件用于核对当前状态；里程碑决策查 `docs/ROADMAP.md`，
+架构/Schema 变更查相关 ADR 与设计，业务行为变更查对应 spec、代码和测试。`memory-bank/` 用于追溯历史理由。
+无需为局部修正通读全部文档或重建全仓库地图；已有上下文足够时直接继续，发现矛盾再查权威来源。
 
 ## 2. 事实来源优先级
 
@@ -38,9 +36,11 @@
 
 ## 3. 当前产品定位
 
-KindergartenManager 是一个 Python 3.14.7、NiceGUI 前后端一体化的幼儿园教学管理应用。
-当前 `main@ec592def` 已包含 Agent Foundation 与 Agent WRITE 的 merge ancestry。
-本工作树保持可打包、可本地运行、也可用 Docker 部署的模块化单体定位，主要能力包括：
+KindergartenManager 是一个 Python 3.14.7、NiceGUI 前后端一体化、部署在云服务器上的在线幼儿园教学管理系统。
+主线已包含 Agent Foundation、Agent WRITE 及 WMP-9 production prerequisites；各门的精确 tested-code、closure
+和 CI 事实分别以对应 evidence ledger 为准。
+唯一产品交付形态是通过 HTTPS 访问的云端模块化单体；本地源码/SQLite 只用于开发与隔离测试，遗留桌面
+打包资产不构成受支持产品。主要能力包括：
 
 - 每日活动计划：日期/学期、教案拆分、年龄适配、活动生成、差异比对、Word 导出。
 - 游戏观察：图片、视觉 AI、观察记录、历史与 Word 导出。
@@ -83,9 +83,11 @@ UI 登录用户与 API 的租户服务主体仍是两个不同边界，不得混
 
 ## 5. 当前数据与部署边界
 
-- 默认数据库：用户可写数据目录中的 SQLite `kindergarten.db`。
-- 可选数据库：通过 `DATABASE_URL` 使用 MySQL 8。
-- Schema 变更：只允许 Alembic；本工作树迁移 head 为 `2b7f3d5e9c8a`。其中
+- 开发/自动测试数据库：隔离 SQLite `kindergarten.db`。
+- 云端生产数据库：通过 `DATABASE_URL` 使用 MySQL 8。
+- Schema 变更：只允许 Alembic；当前迁移 head 为 `3c9f4b2a7d1e`，其 parent 为 `2b7f3d5e9c8a`。
+  `3c9f4b2a7d1e` 增加 WMP-9 production prerequisites 的六张聚合、版本、周日、月栏目、scope grant 和 audit 表。
+  其中
   `b7d9e1f3a5c2` 增加 `daily_plan.revision`，`c1a8e4f6b2d9` 修复 SQLite `user.id` 必须使用精确
   `INTEGER PRIMARY KEY` 才能自动生成 ID 的兼容性缺陷；`e5f7a9c2d4b6` 增加 W006 的两张 append-only
   evidence 表及 SQLite/MySQL UPDATE/DELETE 拒绝 trigger；新 head 为 `user` 增加正整数 `auth_epoch`，
@@ -93,7 +95,8 @@ UI 登录用户与 API 的租户服务主体仍是两个不同边界，不得混
 - 应用与 Bootstrap 启动不执行 Alembic。schema 变更只允许由 `app.jobs.migrate_database` 显式执行，且必须先消费绑定当前受保护镜像、未过期、artifact hash 可复算并已完成隔离恢复验证的 owner-only 备份证据；见 ADR-0007。
 - AI Key 使用 Fernet 在应用层加密；明文只能短暂存在于内存，不得写日志或文档。
 - 图片默认使用 MySQL/SQLite BLOB 抽象；导出文件写入运行时导出目录。
-- PyInstaller、Debian 和 Docker 发布流程存在，但本快照没有重新完成各平台人工安装验收。
+- Docker/OCI 是当前产品发布路径。PyInstaller、Windows/Linux portable 与 Debian 桌面式打包属于遗留资产，
+  不再进入产品发布或人工安装验收。
 
 ## 6. 当前模块状态
 
@@ -106,21 +109,21 @@ UI 登录用户与 API 的租户服务主体仍是两个不同边界，不得混
 | 课程审议 | 已实现 | 2026-06-28 曾记录 529 passed | 主流程通过 | `main` 的最新提交记录了该验收 |
 | 对外只读 API | 已实现 | 本审查基线全量回归覆盖 API auth/routes | 未记录外部调用方验收 | 面向未来其他系统集成；生产应启用 HMAC 并轮换 Key |
 
-上表只区分“当前代码存在”“本审查基线自动证据”与“历史人工证据”。本次全量回归和全新 SQLite 迁移只证明当前 Linux 本地环境，不替代 Windows、Word、MySQL 或真实 AI 人工验收。
+上表只区分“当前代码存在”“本审查基线自动证据”与“历史人工证据”。本次全量回归和全新 SQLite 迁移只证明
+开发/隔离环境，不替代云端 HTTPS/浏览器、MySQL、真实 AI 或 Word/LibreOffice 文档兼容性人工验收。
 
 ## 7. 分支与仓库状态
 
-- 当前 main 为 `ec592def`；远端 `feat/agent-write` 为其第二父
-  `0249b4ea3d1d0a23a1e79eed065d5e844fa31d92`，merge tree 与第二父一致，保留 RED/GREEN ancestry。
-- Agent WRITE 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
+- 当前分支为 `main`；WMP-9 prerequisites 的实现门已在 `72d759f…` 通过，证据账本位于
+  `f07971d…`。本次 docs-only 变更的最终提交 SHA 尚未形成，提交后必须单独回读并记录。
+- Agent WRITE 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的应用服务层 WRITE；
   Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确本地交付状态、Review 轮次、
   SHA 与测试证据仅以 `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后作为外部证据；
   本文不复制逐轮事实。
-- F009 产品验收仍只绑定 `tested_code_sha=a50c6f6b9aa941996052c59a301a7a40bdbd706f`，closure 证据绑定
-  `0ec2e944…`，详见 Issue #48；后续产品/helper/test 变化不能由该历史人工证据覆盖。
-- PR #53 已于 2026-08-30 no-ff 合并；merge-SHA Review 为 Standards/Spec H0/M0/L0，Quality、CodeQL、
-  Dependency Graph 均在精确 merge SHA 成功。Issue #52 已关闭；Issue #48 仍保持 OPEN。
-- `v3.4.0-beta2` 已发布，Release workflow run `33312637621` 为 success 且 `headSha` 精确等于 merge SHA。
+- PR #53 已于 2026-08-30 no-ff 合并，Issue #52 已关闭；W007/W008 的 Review、SHA、CI 与人工证据
+  只以 `specs/agent-write/tests/README.md` 及对应 Issue 回写为准，本文不复制逐轮 SHA。
+- F009 的历史产品验收与 closure 证据只以 `specs/agent-foundation/evidence/` 及 Issue #48 为准；
+  后续产品/helper/test 变化不能由历史人工证据覆盖。
 
 ## 8. 已确认的下一能力：受控 AI Agent
 
@@ -203,7 +206,7 @@ Agent 专用窄 Service 投影和 F008 的具体 adapter/executor/composition/UI
 [ADR-0006](docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md)、独立 spec 与已关闭的
 [Issue #52](https://github.com/ywyz/kindergartenManager/issues/52) 已冻结并闭合 Agent WRITE 边界。W005 已实现
 `confirmed_write` 的三个公开入口与短命一次性 confirmation store；W006 已实现完整操作前版本、最小不可变
-审计、单次 revision CAS、同事务 commit 与只读 reconcile。W007 只在本地应用层向当前页面的一份 Patch
+审计、单次 revision CAS、同事务 commit 与只读 reconcile。W007 只在应用服务层向当前页面的一份 Patch
 提供逐次显式确认，不改变 Provider/Tool 的 READ/DRAFT 能力面，也不开放自动重试、批量/跨页面采用或长期
 Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/README.md` 为准。
 
@@ -213,7 +216,7 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
 2. **事务边界覆盖未完**：一对一倾听和游戏观察的聚合保存/覆盖已由 service/use-case 持有 Unit of Work，并有失败注入回滚测试；其他页面直连 repository 的写流程仍应逐项审计，不能由本次修复外推为全仓库已原子化。
 3. **投影边界需持续守卫**：API 列表显式使用 tenant 投影，UI 详情和子表使用 tenant + user 投影并已有跨 tenant/user 负向测试；新增查询仍必须选择并测试正确投影。
 4. **类型债务**：Ruff 已清零，但当前 Pyright 仍报告既有第三方类型与结构问题，尚未建立可执行的类型门禁。
-5. **发布证据漂移**：Linux 本地结果不能代替 Windows 安装、浏览器打开、模板 Word 保真和真实 AI/MySQL 验收。
+5. **发布证据漂移**：本地开发结果不能代替云端不可变镜像、HTTPS/浏览器、模板 Office 保真和真实 AI/MySQL 验收。
 6. **R5-P 生产门已闭合，evidence commit CI 仍是最后独立门**：`v3.4.0-beta9` 的 tag/source/repository、
    双平台 OCI index、`docker-image.json` 与 Release body 已收敛；`340d23d…` 的隔离 migration→failure→rollback
    与 2026-09-02 的生产新鲜备份、beta9 故障注入→beta5 回切、最终 beta9 双探针/登录/业务验收分别 PASS。
@@ -228,29 +231,18 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
 
 当前共同下一步是：
 
-1. R5-P 生产闭环已经完成；下一道门是聚焦 evidence closure commit、独立 reviewer 和该 commit 自身的 exact-SHA
-   Quality success。Issue #54 仍保持 OPEN，`/api/v1/health` 继续只表示进程/HTTP 存活。
-2. 应用与 Bootstrap 启动均不执行 Alembic；迁移只由已验证备份门后的显式 job 执行。R5-P 候选新增关闭的
-   migration receipt 与迁移后失败回切协调 seam；镜像 rollback 不恢复 schema/data，且不得自动 downgrade。
-3. 当前生产固定 `v3.4.0-beta9` immutable OCI index；故障回切后最终 beta9 的 liveness、readiness、登录和
-   九项业务矩阵已经通过。source Quality、Release Build、生产验收与 closure Quality 互不替代；closure SHA
-   只在提交后形成。生产管理员密码轮换与旧会话失效是 2026-08-31 的另一条独立证据。
-4. R5-R 的隔离真实 MySQL 与 Linux python-docx 恢复矩阵已通过；Windows Word、生产恢复和其他业务模块人工
-   回归仍是独立工作，不与 Agent、liveness 或部署脚本结果互相替代。
-5. Issue #56 的模板中心 T006、T011-C、当前脱敏 v2 evidence refresh、WMP-6 fixed-pair orchestration、
-   WMP-7/T011-E 与 WMP-8 formal exporter 已分别完成。WMP-7 明确采用可信进程内 capability 边界，不声称抵御恶意同进程
-   反射/monkeypatch；它以无状态 verifier 重算 receipt，并绑定 canonical snapshot、当前 v2 evidence/完整 contract，
-   只为 weekly/monthly 提供 active opaque binding。WMP-8 只消费该 binding，按 `resolve_active → render → parse`
-   串行执行，并把 await 前冻结的 payload、rendered artifact 与 parser report 哈希闭合；未新增数据库/Alembic、CRUD、
-   持久化、Agent 能力或 WMP-9。WMP-7 最终 33 节点连续两次全绿，
-   只读 Review 0/0/0。测试代码 `87088e51969964f07a6f50b4fc8345b070c73af3` 已 push，且该 exact SHA 的
-   Quality `34037552898` 与 CodeQL `34037552662` 均成功；Issue #56/#57 在 docs closure SHA 自身 CI 后回写。
-   WMP-8 最终 43 节点连续两次全绿且只读 Review 0/0/0；最终 exact-SHA Quality/CodeQL 与 Issue 回写以
-   Issue #56/#57 的外部证据为准。WMP-9 首次正式验收已按缺少生产 repository/authorization/workflow/UI
-   与 exporter composition 标记 BLOCKED；随后获批的独立 production-prerequisites 门只补齐 ADR-0009 的六表
-   Alembic、不可变版本/CAS、唯一授权 adapter、状态/删除/append-only audit、可信 UI application 与固定发布模板
-   到 WMP-8 exporter 的接线。该 prerequisite 不等于 WMP-9 PASS，未执行 Windows Word/Linux LibreOffice 正式验收，
-   也不授权发布或生产部署；其 exact-SHA 证据以 Issue #55/#56/#57 的后续回写为准。
+1. 完成本次文档修正与已有文档契约测试/开发配置的提交，核对当前提交上的文档回归和 exact-SHA
+   Quality/CodeQL。未通过的检查须如实保留为阻塞项，不能借用历史 GREEN。
+2. prerequisites 的实现与历史证据已经闭合；WMP-9 正式验收仍未执行。按
+   `specs/wmp9-production-prerequisites/tasks/WMP-9-formal-acceptance-prompt.md` 核验起始 SHA 与适用回归门后，
+   在隔离云端环境验证正式业务、权限、审计和零未授权持久化，并分别完成 Windows Word 与 Linux LibreOffice
+   的外部 DOCX 兼容性验收。prerequisites PASS 不等于 WMP-9 PASS，也不授权生产发布或部署。
+3. 下次发布前独立收敛仍会构建/上传桌面产物的 `release.yml`，使实现符合 ADR-0010。不得把这项工作混入
+   WMP-9 业务验收，或在 docs-only 修改中宣称工作流已停用。
+4. Issue #54 的 R5 历史生产、迁移和恢复事实以 `specs/operations-r5/evidence-ledger.md` 为准。
+   新部署仍须分别核验 liveness、readiness、登录、业务、备份和回滚；历史生产结果不证明当前源码已部署。
+5. 后续产品方向与依赖以 `docs/PRODUCT_DIRECTION.md` 为准；模板 CRUD、远程对象存储、统一文档中心、
+   Issue #75 和 Agent 能力扩展继续按各自独立门推进，不因本次文档检查获得实现授权。
 
 ## 11. 更新规则
 

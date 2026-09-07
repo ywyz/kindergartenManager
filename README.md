@@ -1,8 +1,12 @@
 # KindergartenManager 幼儿园教学管理系统
 
-KindergartenManager 是一个 Python 3.14.7 / NiceGUI 教学管理应用。当前主线是模块化单体：默认使用本地 SQLite，也可连接 MySQL；支持文本/视觉 AI、固定 Word 模板导出，以及按租户隔离的只读 REST API。
+KindergartenManager 是一个部署在云服务器上的在线幼儿园教学管理系统，用户通过浏览器访问。当前主线是
+Python 3.14.7 / NiceGUI 模块化单体，生产参考拓扑使用 Caddy、主应用和 MySQL 8；系统支持文本/视觉 AI、
+固定 Word 模板导出，以及按租户隔离的只读 REST API。
 
-> 当前身份边界：UI 使用本地账号登录、JWT 与 RBAC，并按 tenant/user 隔离；匿名注册不挂载，空库也不会自动创建默认管理员。PyInstaller 模式只监听本机；源码或 Docker 模式对外提供服务时仍必须配置 TLS、强密码与网络访问控制。
+> 当前产品交付边界：只提供云端在线 Web 系统，不再把 Windows/Linux 安装包或便携包作为独立产品。
+> UI 使用系统账号、JWT 与 RBAC，并按 tenant/user 隔离；匿名注册不挂载，空库不会自动创建默认管理员。
+> 生产必须使用 HTTPS、强密码、网络访问控制、MySQL、备份恢复和不可变镜像门禁。
 
 ## 当前能力
 
@@ -35,12 +39,15 @@ KindergartenManager 是一个 Python 3.14.7 / NiceGUI 教学管理应用。当�
 0 个 Provider WRITE；每轮上下文按可信 tenant/user 与当前页面重建并在轮后丢弃，不保存对话、线程、
 embedding、工具结果或长期记忆。DRAFT 只返回内存 `PlanPatch`。
 
-当前 WRITE 边界仅允许本地应用在用户逐 Patch 显式确认后，把一个当前页面 Patch 原子应用到现有记录；
+当前 WRITE 边界仅允许应用服务层在用户逐 Patch 显式确认后，把一个当前页面 Patch 原子应用到现有记录；
 Provider WRITE、自动重试、批量/跨页面采用、新 Tool、多 Agent 和长期 Patch 持久化均不在当前能力内。
 详见 [ADR-0005](docs/ADR/ADR-0005-controlled-ai-agent-runtime.md) 与
 [ADR-0006](docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md)。
 
-## 快速开始
+## 本地开发与测试
+
+以下命令只用于开发、自动测试或隔离验收，不是面向用户的本地应用安装方式。正式用户应访问由园所提供的
+HTTPS 在线地址。
 
 ```bash
 python3.14 -m venv .venv
@@ -56,10 +63,10 @@ python3.14 -m venv .venv
 revision 变化时不得直接使用上述简化命令；完整的 draft Release、OCI/source revision、migration receipt 与
 post-migration acceptance 参数见 [部署指南](docs/DEPLOYMENT.md)。
 
-浏览器访问 `http://localhost:8080`。首次运行会：
+开发浏览器访问 `http://localhost:8080`。首次运行会：
 
 1. 解析 `.env` 与环境变量。
-2. 在未设置 `DATABASE_URL` 时，源码模式默认为当前工作目录中的 SQLite；打包模式才使用平台用户数据目录。
+2. 在未设置 `DATABASE_URL` 时，开发/测试模式使用当前工作目录中的 SQLite；生产必须显式连接 MySQL 8。
 3. 应用启动不执行迁移；迁移只由已验证备份门保护的显式命令执行。
 4. 不自动创建默认管理员；管理员由上述受控命令交互初始化。
 5. 进入 `/login`，认证成功后再访问业务页面。
@@ -79,8 +86,9 @@ post-migration acceptance 参数见 [部署指南](docs/DEPLOYMENT.md)。
   --protected-image no-running-image
 ```
 
-当前工作树 Alembic head：`2b7f3d5e9c8a`。该 revision 为用户增加正整数
-`auth_epoch`；改密或管理员重置会原子递增该值，从而使此前签发的 UI token 失效。
+当前工作树 Alembic head：`3c9f4b2a7d1e`。前序 `2b7f3d5e9c8a` 为用户增加正整数
+`auth_epoch`；当前 head 增加 WMP-9 production prerequisites 的六张表及其约束。改密或管理员重置会原子
+递增 `auth_epoch`，从而使此前签发的 UI token 失效。
 
 仓库历史曾记录多次通过结果，但这些数字属于对应旧 SHA。本 README 不把历史数字当作当前验证；交付时应记录本次命令、SHA、平台和结果。
 
@@ -88,7 +96,7 @@ post-migration acceptance 参数见 [部署指南](docs/DEPLOYMENT.md)。
 
 | 变量 | 默认/边界 |
 |---|---|
-| `DATABASE_URL` | 留空使用 SQLite；MySQL 例：`mysql+aiomysql://...` |
+| `DATABASE_URL` | 开发/测试留空使用 SQLite；云端生产必须显式配置 MySQL 8 |
 | `KINDERGARTEN_DATA_DIR` | 可选绝对路径；显式部署时统一承载 SQLite、密钥和运行期 `.env` |
 | `ENCRYPTION_KEY` | 留空自动生成并持久化；服务器应显式提供 |
 | `JWT_SECRET` | 留空自动生成；当前主要用于 NiceGUI storage secret |
@@ -102,18 +110,18 @@ post-migration acceptance 参数见 [部署指南](docs/DEPLOYMENT.md)。
 
 不要提交 `.env`、`.kindergarten_secrets`、数据库、真实照片、导出文件或密钥。
 
-## 部署方式
+## 云端部署
 
-### Windows / Linux 打包版
-
-Tag 发布工作流可构建 Windows 安装包/便携包、Debian 包/Linux 便携包。发布资产是否可用必须以对应 tag/SHA 的工作流和目标平台人工验收为准。
+唯一产品交付目标是云服务器上的在线 Web 系统。Windows/Linux 桌面安装包、便携包和 Debian 本地应用已退出
+产品路线；仓库中仍存在的打包脚本或历史 Release 资产不代表当前受支持交付。源码和 SQLite 仅用于开发、
+测试与隔离验收。
 
 Docker 发布与生产部署已改为收敛到不可变镜像引用；`docker-image.json` 会随 release 附件上传，并在 release body 中写入
 `tag`、`source SHA`、`OCI index digest`、`repository@sha256`。`/api/v1/health` 仍只表示进程存活；
 `/api/v1/readiness` 独立检查数据库连接与 schema revision。Issue #54 的真实 MySQL 故障/恢复验收仍未由本地实现替代。生产密码文件、轮换门禁、
 部署状态与回滚边界见 [生产部署指南](docs/DEPLOYMENT.md)。
 
-### Docker
+### Docker/Compose 参考拓扑
 
 ```bash
 cp .env.example .env
@@ -210,4 +218,4 @@ NiceGUI UI / FastAPI-style API
 
 ## 当前开发门禁
 
-聚合保存的首批原子性修复、tenant/user 投影区分、设置页 AI adapter、启动迁移 fail-closed 和常规质量 CI 已通过本地自动验证。大型页面用例仍需渐进抽离；READ/DRAFT Agent Foundation 必须在独立分支固定 spec/Issue/稳定 RED 后才能开始 GREEN，不能把 ADR、设计文档或保留分支自动视为主线已交付。
+聚合保存的首批原子性修复、tenant/user 投影区分、设置页 AI adapter、启动迁移 fail-closed 和常规质量 CI 已通过本地自动验证。READ/DRAFT Agent Foundation 已进入主线，其当前能力、测试 SHA 与独立证据以 [`specs/agent-write/tests/README.md`](specs/agent-write/tests/README.md) 为准；后续 Agent 能力扩展仍必须先固定新的 spec/Issue 和稳定 RED，再按对应门禁实现，不能把 ADR 或设计文档自动视为授权。

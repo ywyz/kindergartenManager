@@ -16,10 +16,13 @@
 | 文档/图片 | python-docx、Pillow、lxml | 锁文件与 requirements |
 | 质量 | pytest、pytest-asyncio；Ruff `0.16.6`、pip-audit `2.10.1` | `pyproject.toml`、`quality.yml` |
 | 容器发布 | Docker、Compose v2、Buildx；CI 构建 `linux/amd64` 与 `linux/arm64` | `release.yml` |
-| 桌面发布 | PyInstaller；Windows 另需 Inno Setup 6，Linux 另需 gcc、dpkg-dev | Release workflow、打包脚本 |
+| 遗留桌面打包 | PyInstaller/Inno Setup/dpkg 脚本可能仍存在，但不再属于产品交付目标 | ADR-0010、历史 workflow |
 
 CI 与本机检查当前均使用 Ruff `0.16.6`；最终状态需在变更提交后回读 exact-SHA Quality。CI、Docker 和 Release 仍通过
 `requirements.txt` 安装，未直接消费 `uv.lock`；这也是待单独收敛的可复现性差异。
+
+当前 `release.yml` 的 `v*` tag 流程仍会构建并上传遗留 Windows/Linux 桌面产物，虽然它们已经退出产品交付目标；
+下次发布前需由独立 workflow 变更移除这些步骤和面向用户的安装说明。
 
 ### 1.1 2026-08-31 官方最新版、本机状态与阻塞项
 

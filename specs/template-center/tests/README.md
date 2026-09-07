@@ -76,7 +76,7 @@ T011-C 的自动实现候选 `tested_code_sha=301c2d5f2b247cb5544783f2494de97366
 
 最终 evidence closure SHA、exact-SHA Quality/CodeQL 与 Issue 回写以 Issue #56 为外部证据；该门不关闭 Issue。
 
-## 2026-09-06 WMP-6 前置治理说明
+## 2026-09-06 WMP-6 前置治理说明（WMP-7 前历史时点）
 
 上述 T011-C 是已经完成的模板中心单候选 qualification，不能再以 `WMP-6 / T011-C` 别名重新宣称。它的
 evidence 只绑定当时未跟踪的原始 weekplan/monthplan hash。后续 WMP-6 是独立的周/月应用层 orchestration：只会严格
@@ -94,7 +94,7 @@ export port。
 GREEN 前必须由另一个明确授权的模板中心证据门决定新 seed/profile 版本并对这两个精确 hash 重新 qualification；在此之前
 保持 reserved/disabled，不执行 T011-E，不创建 active pointer、TemplateVersion、ExportRecord 或正式下载。
 
-## 2026-09-06 当前脱敏候选 qualification evidence refresh
+## 2026-09-06 脱敏候选 qualification evidence refresh（WMP-7 前历史记录）
 
 本门从已完整验证并推送的 `f752eb6713954e6081965c02e62394505304ce6f` 开始，仅追加当前脱敏候选的
 关闭 profile/evidence，不覆盖上节历史 T011-C：
@@ -122,6 +122,6 @@ contracts、export/parse 与 Office 完整性判断均未复制或改写。refre
 | `candidate-refresh-20260906-monthly-v2-lo-26.2.5.2` | `f2e5dbe2a468dd15c55cdd6b70c5e15fe63048a3708b151732e208703b0d11f4` | `27042d45f6193468d4292911ddae1fe0586e0188ee4a1b33df0abc1ea2070f9e` / `2c97f5602d9afbd45b240871a5f5b1ea789cccabcc566378c776f1c2b63829a4` | `751044a51d81ebb6ecb07e2c09dbbe376897f7636682744907b9f50c7e40a19b` / 1 |
 
 临时 DOCX/PDF 已清除；证据只保留关闭摘要，不保留正文或路径。独立只读 reviewer 对代码、Standards、Spec、
-scope-creep 的 H/M/L 均为 0/0/0。周/月两类型仍为 reserved/disabled；本门没有 WMP-6 GREEN、T011-E、active
+scope-creep 的 H/M/L 均为 0/0/0。截至本节 evidence refresh 时，周/月两类型仍为 reserved/disabled；本门没有 WMP-6 GREEN、T011-E、active
 pointer、TemplateVersion、ExportRecord、正式下载或业务写入。最终 exact-SHA Quality/CodeQL 和 evidence closure
 以 Issue #56 的追加评论为准，Issue 保持 OPEN。

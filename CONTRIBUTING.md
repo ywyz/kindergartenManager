@@ -65,7 +65,8 @@
 - API：鉴权失败、租户越权、签名时间窗、分页和 schema 测试。
 - AI：mock 网络、超时、重试、无效 JSON、密钥不泄漏测试。
 - Word：模板结构测试和真实 Office/Word 人工核对。
-- 打包：目标系统安装、启动、数据目录、迁移和卸载/升级人工验收。
+- 云端交付：OCI 镜像、Caddy/HTTPS、数据目录、迁移、备份恢复和回滚人工验收；Word/LibreOffice 只验收下载的
+  DOCX，不安装或运行本系统。
 
 ### 受控 Agent 变更的额外规则
 
@@ -80,7 +81,8 @@
 - 增加 WRITE、新 Tool、长期记忆、多 Agent、MCP/插件、文件或 URL 能力都必须单独 ADR/spec/Issue 和 RED，
   不得作为“实现细节”扩入。
 
-历史测试数不能代替当前执行结果。Linux/CI 也不能代替 Windows 或 Word 人工证据。
+历史测试数不能代替当前执行结果。CI 或 Linux 开发环境也不能代替云端业务和 Windows Word/LibreOffice
+外部 DOCX 兼容性人工证据。
 
 ## 7. 提交与 Review
 

@@ -2,7 +2,7 @@
 
 > 文档审查基线为 2026-08-31 当前 `main`；Agent Foundation 与 Agent WRITE
 > W005-W008 已通过 PR #53 合入，Issue #52 已关闭。
-> W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
+> W007 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的应用服务层 WRITE；
 > Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确本地交付状态、Review 轮次、
 > SHA 与测试证据仅以 `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后作为外部证据，现已关闭；
 > 本文不复制逐轮事实。
@@ -12,17 +12,17 @@
 
 ## 1. 架构目标
 
-- 在单个 Python 进程中提供 NiceGUI 页面、只读 API 和业务能力。
-- 默认 SQLite 零配置运行，同时保留 MySQL 部署能力。
+- 以云服务器上的单一在线 Web 系统向用户交付 NiceGUI 页面、只读 API 和业务能力。
+- 生产参考拓扑使用 MySQL 8；SQLite 只保留给开发、自动测试和隔离验收。
 - 通过 UI、service、repository、integration 和 core 分层控制变化。
 - 所有持久化业务操作保留租户/用户边界。
 - AI、节假日、图片和 Word 都经过明确适配器，不散落原始外部调用。
-- 保留桌面打包与服务器部署，但分别验证，不混用证据。
+- 不提供 Windows/Linux 独立本地应用；浏览器访问、云端部署和 Office 文档消费端证据不得混用。
 
 ## 2. 逻辑视图
 
 ```text
-浏览器 / 桌面启动浏览器
+用户浏览器（HTTPS）
         │
         ▼
 NiceGUI 页面与组件  ───────────────┐
@@ -65,7 +65,7 @@ Python、SQL、MCP 或动态插件。完整契约见 [Agent Runtime 设计](agen
 
 ## 3. 运行视图
 
-### 3.1 源码/本地模式
+### 3.1 开发/隔离测试模式
 
 ```text
 python -m app.main
@@ -76,16 +76,16 @@ python -m app.main
   └─ NiceGUI 监听 0.0.0.0:PORT
 ```
 
-源码模式默认数据库位于当前工作目录；打包模式才使用操作系统用户数据目录。源码模式监听 `0.0.0.0`，
-因此在不可信网络中运行时必须通过主机防火墙、反向代理或显式网络隔离控制访问。
+开发源码模式默认数据库位于当前工作目录，只用于受控开发或隔离验收。它监听 `0.0.0.0`，因此必须通过
+主机防火墙或显式网络隔离阻止非预期访问，不能作为面向用户的部署方式。
 
-### 3.2 PyInstaller 模式
+### 3.2 遗留打包代码（非产品目标）
 
-- 检测 `sys.frozen` 后监听 `127.0.0.1` 并自动打开浏览器。
-- 模板、Alembic 配置和迁移脚本随包提供。
-- SQLite、密钥、日志和导出必须落在用户可写数据目录，不依赖安装目录可写。
+- 仓库仍可能包含 PyInstaller、Windows/Linux portable 或 Debian 打包代码和历史 workflow。
+- 这些资产不再属于受支持产品交付或验收矩阵；不得在介绍、Release 或测试结论中宣称存在桌面版产品。
+- 删除遗留资产需要独立清理任务；在删除前，相关代码不得削弱云端构建、依赖或安全门禁。
 
-### 3.3 Docker 模式
+### 3.3 云端 Docker/Compose 参考模式
 
 当前 Compose 拓扑：
 
@@ -137,6 +137,7 @@ app/jobs        ─┘
 - `/one-on-one-listening`
 - `/homemade-teaching`
 - `/course-review-activity`
+- `/weekly-monthly-plans`
 
 除 `/login` 与根跳转外，业务页面在页面入口通过可信 session seam 失败关闭；
 `/user-admin` 还使用数据库权威角色做 `sys_admin` 限制。中间件只负责根路径兼容跳转，
@@ -298,9 +299,9 @@ AI Key 不应写入 `.env`、仓库或测试日志；数据库密文与原 `ENCR
 - Agent Foundation：契约/Schema、未知和 WRITE Tool 拒绝、tenant/user 裁剪、有界 loop、取消/超时/迟到丢弃，
   并证明所有路径零业务持久化。
 - Agent WRITE：W005-W008 的公共 seam、绑定、原子事务、finding 矩阵、UI 和人工门已在历史固定 SHA 闭合；
-  当前只允许每日计划当前页面的一份 Patch 经显式确认后由本地应用层采用。固定 SHA 复审与交付证据的精确状态及详细
+  当前只允许每日计划当前页面的一份 Patch 经显式确认后由应用服务层采用。固定 SHA 复审与交付证据的精确状态及详细
   lineage 仅见 `specs/agent-write/tests/README.md`。
-- Word/打包：目标平台人工验收。
+- Word/Office：云端应用生成 DOCX；Microsoft Word 与 LibreOffice 仅作为外部文档兼容性客户端分别验收。
 
 codebase-memory/Graphify 只能发现结构、热点和文档关系，不替代这些测试。
 UI session/revision/W005-W008 已完成各自的 finding RED、最小修复、本地 GREEN、fixed-SHA 双轴复审、push、

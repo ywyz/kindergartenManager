@@ -1,7 +1,7 @@
 # KindergartenManager 数据模型
 
-> 文档审查基线：2026-08-31 当前 `main`；当前 Alembic head：`2b7f3d5e9c8a`。
-> W005-W008 已闭合。当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的本地应用层 WRITE；
+> 文档审查基线：2026-09-07 当前工作树；当前 Alembic head：`3c9f4b2a7d1e`。
+> W005-W008 已闭合。当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的应用服务层 WRITE；
 > Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确本地交付状态、Review 轮次、
 > SHA 与测试证据仅以 `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后作为外部证据，现已关闭；
 > 本文不复制逐轮事实。
@@ -13,8 +13,10 @@
 
 - 所有 schema 变化通过 Alembic。
 - 主键使用 `BIGINT`，SQLite 下变体为 `INTEGER` 以支持自增。
-- 所有 18 个 ORM 表均有 `tenant_id`。
-- 除 `user` 与租户级参考表 `indicator_catalog` 外，其余 16 个 ORM 表均有 `user_id`。
+- 所有 24 个 ORM 表均有 `tenant_id`。
+- 除 `user` 与租户级参考表 `indicator_catalog` 外，其余 ORM 表按模型定义记录用户归属、创建者或聚合关联；
+  周/月聚合使用 `owner_user_id`、`teacher_id`、`created_by`、`grantee_user_id` 或 `actor_id` 等明确命名，
+  周/月正文子表通过 `tenant_id` + `version_id` 继承版本及聚合根的作用域，不统一使用 `user_id`。
 - 可变业务表通常同时包含 `created_at` 和 `updated_at`；`export_records` 与两张 W006 evidence 表是明确的
   append-only/历史例外，只记录 `created_at`。
 - 历史导出所需的年级、班级、教师等采用快照字段，避免设置变更改写历史。
@@ -42,6 +44,12 @@
 | `homemade_teaching_toy` | 自制教玩具方案 | tenant + user |
 | `course_review_activity` | 课程审议输入、调整和修订稿 | tenant + user |
 | `export_records` | 各业务 Word 导出路径和逻辑关联 | tenant + user |
+| `weekly_monthly_plan` | 周/月计划聚合根和当前版本指针 | tenant + owner/teacher |
+| `weekly_monthly_plan_version` | 周/月计划不可变版本和快照 | tenant + creator |
+| `weekly_activity_plan_day` | 周计划五个有序工作日 | tenant + version |
+| `monthly_theme_activity_item` | 月计划有序栏目项 | tenant + version |
+| `weekly_monthly_scope_grant` | 精确教师/班级范围授权 | tenant + grantee |
+| `weekly_monthly_audit_event` | 无正文周/月生命周期审计 | tenant + actor |
 
 ## 3. 关系视图
 
@@ -62,7 +70,13 @@ tenant
      │   ├─ listening_image       │
      │   └─ listening_indicator_result ── indicator_catalog
      ├─ homemade_teaching_toy     │
-     └─ course_review_activity ───┘
+     ├─ course_review_activity    │
+     └─ weekly_monthly_plan ──────┘
+         ├─ weekly_monthly_plan_version
+         │   ├─ weekly_activity_plan_day
+         │   └─ monthly_theme_activity_item
+         ├─ weekly_monthly_scope_grant
+         └─ weekly_monthly_audit_event
 ```
 
 线条表示业务逻辑关系，不代表数据库中一定存在 `FOREIGN KEY`。
@@ -212,10 +226,11 @@ Repository 必须满足：
 
 ## 13. Agent Foundation 与确认写入的数据边界
 
-当前有 18 张 ORM 业务表。`b7d9e1f3a5c2` 为 `daily_plan` 增加 revision，`c1a8e4f6b2d9` 修复
+当前有 24 张 ORM 业务表。`b7d9e1f3a5c2` 为 `daily_plan` 增加 revision，`c1a8e4f6b2d9` 修复
 SQLite `user.id` 自增类型，`e5f7a9c2d4b6` 只增加
 `daily_plan_operation_version` 与 `agent_write_audit` 两张 W006 evidence 表及其不可变 trigger。
-当前 head `2b7f3d5e9c8a` 只为既有 `user` 表增加 token 撤销所需的 `auth_epoch`。
+`2b7f3d5e9c8a` 为既有 `user` 表增加 token 撤销所需的 `auth_epoch`；当前 head
+`3c9f4b2a7d1e` 再增加周/月计划生产先决条件的六张表。
 [ADR-0005](../ADR/ADR-0005-controlled-ai-agent-runtime.md) 确定 Agent Foundation 的零 Agent 持久化边界，该 Foundation 已合入
 `main`；`ca3b7bd…` 仅保留为历史 Foundation merge 证据，不作为当前主线 SHA。
 
@@ -250,8 +265,8 @@ F009 自动矩阵曾在其固定 `tested_code_sha` 动态反射包含 Alembic �
 ## 14. 迁移链
 
 当前单线迁移从空 smoke revision 开始，依次覆盖用户、设置、AI、每日计划、提示词、导出、游戏观察、
-一对一倾听、自制教玩具、课程审议、Agent WRITE evidence 与 token 撤销 epoch；当前工作树 head 为
-`2b7f3d5e9c8a`。
+一对一倾听、自制教玩具、课程审议、Agent WRITE evidence、token 撤销 epoch 与周/月计划生产先决条件；当前
+工作树 head 为 `3c9f4b2a7d1e`。
 `b7d9e1f3a5c2` 以 `a6c4d8e2f9b1` 为 down revision，为 `daily_plan` 增加带服务器默认 1 和正数约束的
 `revision`；现有行回填为 1，并建立 SQLite/MySQL trigger 强制 INSERT 从 1 开始、UPDATE 必须有业务内容
 变化且恰好 `OLD + 1`；downgrade 先移除 trigger，再移除约束与列。
@@ -270,12 +285,16 @@ W008 固定 SHA 的独立人工门闭合。
 `auth_epoch`。既有用户回填为 1；密码变更通过租户限定的单条 UPDATE 原子递增该值。downgrade 移除约束与列，
 但不删除用户行。
 
+`3c9f4b2a7d1e` 以 `2b7f3d5e9c8a` 为 down revision，新增周/月计划聚合根、不可变版本、五个有序周日、月栏目、
+精确 scope grant 与无正文 append-only audit 六张表；SQLite/MySQL 均有租户复合约束、UTF-8 byte limit、CAS
+和不可变 trigger。该迁移不回填既有 DailyPlan，不修改现有模板或 `export_records`。
+
 验证要求：
 
 - 全新 SQLite：upgrade head。
 - 已有支持版本：upgrade head，并验证数据保留。
 - MySQL 专属 enum/BLOB/alter 行为：真实 MySQL 验证。
-- PyInstaller：迁移路径和应用数据库路径必须解析到同一个文件。
+- 遗留 PyInstaller 路径若继续运行测试：迁移路径和应用数据库路径必须解析到同一个文件；桌面包不属于当前产品交付。
 - 禁止通过编辑旧迁移伪造新 head；已发布 schema 用新 revision 演进。
 
 ## 15. 已知模型债务

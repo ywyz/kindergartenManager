@@ -397,7 +397,7 @@ build_export_filename(snapshot, binding) 必须使用快照值、当前 active b
 
 ## 7. 模板基线和 Word 验收
 
-### 7.1 历史 T011-C 证据与当前脱敏基线
+### 7.1 历史 T011-C 证据与脱敏候选基线（WMP-7 前历史时点）
 
 模板中心 T011-C 已独立完成；它不是 WMP-6 的别名。Issue #56 记录的 evidence closure SHA
 `9e4708bd9c96c2fba9c7c58c1c8e264f814479c7` 只绑定当时未跟踪的原始候选字节：
@@ -418,6 +418,9 @@ build_export_filename(snapshot, binding) 必须使用快照值、当前 active b
 两份当前文件都没有可消费的占位符 marker。旧 candidate profile 的 seed hash 与当前字节不一致，因而任何把旧 T011-C
 evidence 关联到当前脱敏文件的尝试都必须 fail closed。是否新建 seed/profile 版本并重新执行模板中心 candidate
 qualification，是 WMP-6 GREEN 之前的独立决策和证据门；本轮不修改模板中心 registry，也不重新宣称 T011-C。
+
+> 本节的“当前”仅指上述历史基线时点。随后 v2 evidence refresh、WMP-6、WMP-7 与 WMP-8 的状态见本文件顶部、
+> 第 10/11 节及 [`tasks/README.md`](tasks/README.md)；本节的旧 hash 与停止状态只作历史证据，不覆盖后续记录。
 
 ### 7.2 自动验收
 
@@ -569,6 +572,9 @@ T011-E、WMP-7、WMP-8、WMP-9、路径/blob/URL/任意 bytes、模板 CRUD、fa
 真实凭据、模板读取、数据库或临时实现来制造 RED。连续两次运行必须得到相同 collected/passed/failed 分布、失败节点集合
 和 node-only hash。
 
+以下顺序保留门禁执行时的历史记录；当前 WMP-6～WMP-8 状态见本文件顶部、第 10/11 节及
+[`tasks/README.md`](tasks/README.md)。
+
 门禁顺序固定为：
 
 ~~~text
@@ -579,15 +585,15 @@ WMP-0 Issue #55 权限矩阵 + 模板中心 ADR/spec 依赖确认
   → WMP-4 领域 service/repository 读取与不可变 snapshot（经 AuthorizationPort）
   → WMP-5 纯 token/payload mapping profile 与 filename GREEN（不读模板、不接模板端口）
   → T011-C 模板中心 candidate qualification（已独立完成；不是 WMP-6）
-  → 当前脱敏 candidate 的新 hash/profile/evidence 独立门（尚未授权或完成）
-  → WMP-6 周/月 qualification orchestration：固定 weekly → monthly、聚合 receipt（当前仅 RED）
+  → 当前脱敏 candidate 的新 hash/profile/evidence 独立门（历史记录中尚未授权或完成）
+  → WMP-6 周/月 qualification orchestration：固定 weekly → monthly、聚合 receipt（历史记录中仅 RED）
   → WMP-7/T011-E 模板中心启用两个周/月 document type（只开放 active opaque binding）
   → WMP-8 formal exporter：TemplateExportPort.resolve_active → render → parse
   → WMP-9 正式业务 Word/LibreOffice + Issue #55 跨教师读取/审核/导出/删除验收（各有独立证据）
 ~~~
 
-WMP-3、WMP-4、WMP-5、WMP-6、WMP-8 是可分别 Review 的最小 GREEN；T011-C/T011-E 属模板中心边界。旧 T011-C
-通过、纯 mapping 通过或 WMP-6 RED 均不能推导当前脱敏模板已 qualified、active、正式业务导出或审核流完成。
+WMP-3、WMP-4、WMP-5、WMP-6、WMP-8 是可分别 Review 的最小 GREEN；T011-C/T011-E 属模板中心边界。历史记录中的旧
+T011-C 通过、纯 mapping 通过或 WMP-6 RED 均不能推导当时的脱敏模板已 qualified、active、正式业务导出或审核流完成。
 
 ## 10. WMP-7 / T011-E 启用门
 

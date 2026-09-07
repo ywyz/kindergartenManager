@@ -9,11 +9,11 @@
 | W000 | 读取 main、Issue #48、现有 ADR/design、代码/迁移/测试与图谱，固定事实基线 | 无 | 完成（`main@ca3b7bd…`） |
 | W001 | 恢复 JWT `jti` + active DB 重读的 `TrustedUiSession`，移除固定 actor/固定密码 bootstrap | W000 | 完成并随 W004/W005 进入分支与精确 SHA CI；最终浏览器矩阵仍属 W008 |
 | W002 | 为 `daily_plan` 增加正整数单调 revision、迁移、CAS 并发与回滚测试 | W001 | 完成；revision migration `b7d9e1f3a5c2`，`c1a8e4f6b2d9` 另修 SQLite user ID |
-| W003 | 新建 ADR-0006、Agent WRITE spec/tasks 与一个保持 OPEN 的 GitHub Issue | W000 | 完成（Issue #52 OPEN） |
+| W003 | 新建 ADR-0006、Agent WRITE spec/tasks 与一个保持 OPEN 的 GitHub Issue | W000 | 完成（Issue #52 已创建，后由 W009 关闭） |
 | W004 | 建立逐次绑定、revision/before、操作前版本、短事务、不可变审计、全回滚与 commit-unknown 稳定 RED | W001-W003 | 完成：59 clean；连续两次均 `1 passed, 58 failed`，node-only SHA-256 均为 `fe346fa3…` |
 | W005 | 实现 `confirmed_write` 契约与短命一次性 confirmation store | W004 固定 RED + 明确 GREEN 授权 | 完成：fixed SHA `e4a7f3c…`，Review 0/0、本地/CI/service 验收与 Issue 回写均闭合 |
 | W006 | 实现 `daily_plan_operation_version`、`agent_write_audit`、DB immutability trigger 与原子 CAS 写事务 | W005 GREEN + Review | 完成：fixed SHA `253d37d…`，Review 0/0、本地/CI、Linux service-boundary 10/10 与 Issue 回写均闭合 |
-| W007 | 在每日计划页增加逐 Patch 确认/过期/失败/对账 UI，保持 Provider READ/DRAFT | W006 GREEN + Review | 完成；精确闭合证据见 canonical ledger，Issue #52 仅记录已回写外部门 |
+| W007 | 在每日计划页增加逐 Patch 确认/过期/失败/对账 UI，保持 Provider READ/DRAFT | W006 GREEN + Review | 完成；精确闭合证据见 canonical ledger，Issue #52 已回写对应外部门 |
 | W008 | 最终固定 SHA 双轴 Review、本地全量、精确 CI、人工故障验收与 Issue 证据；如有改动则 finding RED/修正并全部重跑 | W007 GREEN/Review/commit/push/CI/人工验收/Issue 全部门禁闭合 | 完成；精确闭合状态见 canonical ledger，全部门按序完成后才进入 W009 |
 | W009 | merge、Issue 关闭与发布 | W008 全门禁闭合 + 单独授权 | 完成；PR #53 no-ff merge、merge-SHA Review/CI、Issue #52 关闭与 `v3.4.0-beta2` 发布证据见 canonical ledger |
 
@@ -76,12 +76,11 @@ SHA、计数与 node hash 只记录在 `specs/agent-write/tests/README.md`。
 4. 固定同一 `tested_code_sha` 做 Linux 浏览器可见验收：逐 Patch 确认、双击、过期、错误会话、并发旧版本、
    各事务故障全回滚和 commit-unknown 对账。只用合成业务数据和安全应用配置，不记录 Key/endpoint/正文。
 5. 脱敏证据回写 OPEN Issue；Review 0/0、CI success 与人工 PASS 互不替代。
-6. W008 的停止条件是固定 SHA 的全部证据闭合；默认不 merge、不关闭 Issue、不 release。
+6. W008 当时的停止条件是固定 SHA 的全部证据闭合；历史上默认不 merge、不关闭 Issue、不 release，后续 W009 已完成这些独立门。
 
-## 当前长 goal（已授权，仍按逐门顺序执行）
+## 历史长 goal（已完成门禁的原始计划）
 
-**Agent WRITE 最小 GREEN 到固定 SHA 验收闭合**：在 W004 已稳定 RED 后，依序完成 W005-W008，但把
+本节保留 W004 时的原始计划。**Agent WRITE 最小 GREEN 到固定 SHA 验收闭合**：在 W004 已稳定 RED 后，依序完成 W005-W008，但把
 W005/W006/W007 的 GREEN、每轮 Review/finding RED、commit、push、CI、人工验收和 Issue 回写保留为可见的
 独立门禁；禁止 Provider WRITE、自动重试、批量/跨页面采用、设置/文件/Word/删除/创建写入和长期 Patch
-持久化。建议终点是同一固定 SHA 上 Standards/Spec 0/0、本地/CI GREEN、Linux 可见故障矩阵 PASS 且
-Issue 证据齐全；默认停在 merge/关闭 Issue/release 之前。
+持久化。该计划的交付事实与 W007/W008/W009 当前状态以 canonical ledger 为准；新增变更须重新绑定适用门禁。

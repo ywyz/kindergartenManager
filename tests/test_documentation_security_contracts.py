@@ -3,7 +3,6 @@
 import re
 from pathlib import Path
 
-
 _ROOT = Path(__file__).parents[1]
 
 
@@ -47,26 +46,20 @@ def test_release_notes_windows_packaged_env_file_is_data_path() -> None:
     assert "MySQL 模式" in workflow
 
 
-def test_debian_init_instructions_run_as_the_service_user() -> None:
-    """Every published Debian init command must preserve the service identity."""
-    missing_user_property: list[str] = []
-    for relative_path in ("docs/USER_MANUAL.md", ".github/workflows/release.yml"):
-        document = (_ROOT / relative_path).read_text(encoding="utf-8")
-        command = re.search(
-            r"sudo systemd-run\b(?:(?!\n```).)*?--init",
-            document,
-            flags=re.DOTALL,
-        )
-        if (
-            command is None
-            or "--property=User=kindergarten-manager" not in command.group(0)
-        ):
-            missing_user_property.append(relative_path)
-
-    assert not missing_user_property, (
-        "Debian systemd-run --init must set the service user in: "
-        + ", ".join(missing_user_property)
+def test_legacy_debian_release_init_preserves_service_identity() -> None:
+    """Legacy packaging may remain, but it is not a user-facing product path."""
+    workflow = (_ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    command = re.search(
+        r"sudo systemd-run\b(?:(?!\n```).)*?--init",
+        workflow,
+        flags=re.DOTALL,
     )
+    assert command is not None
+    assert "--property=User=kindergarten-manager" in command.group(0)
+
+    manual = (_ROOT / "docs/USER_MANUAL.md").read_text(encoding="utf-8")
+    assert "sudo systemd-run" not in manual
+    assert "Windows/Linux 本地应用" in manual
 
 
 def test_debian_postinstall_does_not_advertise_anonymous_admin_setup() -> None:
@@ -78,13 +71,34 @@ def test_debian_postinstall_does_not_advertise_anonymous_admin_setup() -> None:
     assert "KindergartenManager --init" in postinstall
 
 
-def test_user_manual_describes_current_explicit_bootstrap_boundary() -> None:
+def test_user_manual_describes_cloud_online_access_boundary() -> None:
     manual = (_ROOT / "docs/USER_MANUAL.md").read_text(encoding="utf-8")
 
     assert "该改动尚未提交、\n发布" not in manual
-    assert "KindergartenManager.exe --init" in manual
-    assert "KindergartenManager --init" in manual
-    assert "python -m app.jobs.bootstrap_admin --init" in manual
+    assert "部署在云服务器上的在线系统" in manual
+    assert "园所提供的 HTTPS 地址" in manual
+    assert "KindergartenManager.exe --init" not in manual
+    assert "./KindergartenManager --init" not in manual
+    assert "普通用户不接触数据库、容器卷或服务器目录" in manual
+
+
+def test_current_product_docs_define_cloud_online_only_delivery() -> None:
+    required = {
+        "README.md": "唯一产品交付目标是云服务器上的在线 Web 系统",
+        "CONTEXT.md": "当前唯一产品交付形态是部署在云服务器上的在线 Web 系统",
+        "docs/PRODUCT_DIRECTION.md": "不再规划或\n> 验收独立 Windows/Linux 本地应用",
+        "docs/design/system-architecture.md": "不提供 Windows/Linux 独立本地应用",
+        "docs/ADR/ADR-0010-cloud-hosted-online-only-product-delivery.md": (
+            "Microsoft Word 和 LibreOffice 只作为云端系统导出 DOCX 的外部消费端"
+        ),
+    }
+    missing = [
+        relative_path
+        for relative_path, expected in required.items()
+        if expected not in (_ROOT / relative_path).read_text(encoding="utf-8")
+    ]
+
+    assert not missing, f"cloud-online-only product boundary missing from: {missing}"
 
 
 def test_readme_matches_current_login_agent_and_deployment_boundaries() -> None:
@@ -93,7 +107,7 @@ def test_readme_matches_current_login_agent_and_deployment_boundaries() -> None:
     assert "没有有效登录保护" not in readme
     assert "受控 AI Agent（尚未实现）" not in readme
     assert "创建固定的默认管理员记录" not in readme
-    assert "当前工作树 Alembic head：`2b7f3d5e9c8a`" in readme
+    assert "当前工作树 Alembic head：`3c9f4b2a7d1e`" in readme
     assert "python -m app.jobs.bootstrap_admin --init" in readme
     assert "4 个 READ Tool、2 个 DRAFT Tool" in readme
     assert "Provider WRITE" in readme
@@ -142,7 +156,7 @@ def test_sqlite_environment_comment_names_the_application_data_directory() -> No
 
 def test_current_migration_head_is_consistent_across_operator_docs() -> None:
     """Developer and manual migration checks must reach every current table/trigger."""
-    expected_head = "`2b7f3d5e9c8a`"
+    expected_head = "`3c9f4b2a7d1e`"
     missing = [
         relative_path
         for relative_path in (
@@ -162,14 +176,14 @@ def test_current_migration_head_is_consistent_across_operator_docs() -> None:
     assert not missing, f"current Alembic head missing from: {missing}"
 
 
-def test_all_authoritative_docs_distinguish_source_and_packaged_data_dirs() -> None:
-    """Every operator entry point must describe the same runtime path behavior."""
+def test_authoritative_docs_distinguish_development_and_cloud_databases() -> None:
+    """Local SQLite is non-product; cloud production uses explicit MySQL."""
     required = {
-        "README.md": "源码模式默认为当前工作目录",
+        "README.md": "开发/测试模式使用当前工作目录中的 SQLite",
         "docs/ADR/ADR-0003-sqlite-default-mysql-optional-alembic.md": (
-            "源码模式使用当前工作目录"
+            "云端生产配置使用 MySQL 8"
         ),
-        "docs/design/system-architecture.md": ("源码模式的自动密钥写入当前工作目录"),
+        "docs/design/system-architecture.md": ("生产参考拓扑使用 MySQL 8"),
     }
     missing = [
         relative_path
@@ -177,7 +191,7 @@ def test_all_authoritative_docs_distinguish_source_and_packaged_data_dirs() -> N
         if expected not in (_ROOT / relative_path).read_text(encoding="utf-8")
     ]
 
-    assert not missing, f"source/package data directory split missing from: {missing}"
+    assert not missing, f"development/cloud database split missing from: {missing}"
 
 
 def test_developer_status_points_to_the_canonical_agent_write_ledger() -> None:
