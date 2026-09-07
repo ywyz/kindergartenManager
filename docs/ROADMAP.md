@@ -1,5 +1,10 @@
 # KindergartenManager 产品与工程路线图
 
+> 2026-09-08 在线部署准备：用户指定 `ssh aliyun`，Office 客户端人工测试延期至其 Windows 机器。
+> 发布流程已在独立工作区移除桌面构建/上传，仅保留双平台 OCI 镜像及 draft Release 验证。
+> 现网 beta10 与最新主线分别核验；修改工作流不等于新版本已部署，也不代表 WMP-9 业务验收闭合。
+
+
 > 当前快照：2026-09-07；当前源码与生产部署分别核验，精确发布/部署历史见
 > `specs/operations-r5/evidence-ledger.md`。Agent Foundation/WRITE 已在 `main` 合入；
 > PR #53 已 no-ff 合并，Issue #52 已关闭；其历史 `v3.4.0-beta2` 证据不替代当前发布证据。

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import urllib.error
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 import pytest
 import yaml
@@ -20,7 +20,7 @@ def test_release_api_read_retries_transient_failure(
     sleeps: list[int] = []
 
     class Response:
-        def __enter__(self) -> "Response":
+        def __enter__(self) -> Self:
             return self
 
         def __exit__(self, *args: object) -> None:
@@ -792,3 +792,13 @@ def test_release_convergence_rejects_missing_platform() -> None:
             media_type=MEDIA_TYPE,
             platforms=["linux/amd64"],
         )
+
+
+def test_release_builds_only_cloud_image_and_uploads_only_descriptor() -> None:
+    jobs = _workflow()["jobs"]
+    assert set(jobs) == {"build-docker", "create-release", "verify-release"}
+    assert jobs["create-release"]["needs"] == ["build-docker"]
+    steps = jobs["create-release"]["steps"]
+    assert not any("download-artifact" in step.get("uses", "") for step in steps)
+    uploads = [step for step in steps if "upload-artifact" in step.get("uses", "")]
+    assert [step["with"]["name"] for step in uploads] == ["docker-image"]

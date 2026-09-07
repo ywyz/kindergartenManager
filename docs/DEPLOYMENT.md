@@ -219,9 +219,10 @@ liveness、readiness、登录和关键业务。四类门彼此独立，不能互
 精确 release/source/OCI/部署证据见 [`specs/operations-r5/evidence-ledger.md`](../specs/operations-r5/evidence-ledger.md)。
 仓库中的发布标签与后续文档提交不等于生产已部署；部署记录必须以该账本和现场回读为准。
 
-`.github/workflows/release.yml` 仍会在 `v*` tag 上构建并上传遗留 Windows/Linux 桌面产物；这与 ADR-0010
-的云端唯一产品交付决策不一致。下次发布前必须完成单独的 workflow 收敛，在此之前桌面 Release 结果不得作为
-受支持产品交付证据。
+`.github/workflows/release.yml` 现仅构建双平台 Docker 镜像，上传 `docker-image.json` 并验证 draft Release
+元数据。桌面构建、上传及安装说明已从发布流程移除；历史打包代码仍保留。该工作流修正不代表新镜像已构建
+或部署，生产事实仍须现场回读。Office 客户端人工兼容性检查按 2026-09-08 用户安排延期至 Windows 机器，
+不得预填 PASS；备份、迁移、登录和业务验收仍独立执行。
 
 ## 7. 与其他文档的入口
 

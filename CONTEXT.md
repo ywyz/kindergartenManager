@@ -237,8 +237,8 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
    `specs/wmp9-production-prerequisites/tasks/WMP-9-formal-acceptance-prompt.md` 核验起始 SHA 与适用回归门后，
    在隔离云端环境验证正式业务、权限、审计和零未授权持久化，并分别完成 Windows Word 与 Linux LibreOffice
    的外部 DOCX 兼容性验收。prerequisites PASS 不等于 WMP-9 PASS，也不授权生产发布或部署。
-3. 下次发布前独立收敛仍会构建/上传桌面产物的 `release.yml`，使实现符合 ADR-0010。不得把这项工作混入
-   WMP-9 业务验收，或在 docs-only 修改中宣称工作流已停用。
+3. 2026-09-08 独立部署准备已将 `release.yml` 收敛为仅云端 Docker 发布，见 ADR-0010。
+   工作流变更仍需自身 CI、不可变镜像和现场部署证据；不构成 WMP-9 业务验收 PASS。
 4. Issue #54 的 R5 历史生产、迁移和恢复事实以 `specs/operations-r5/evidence-ledger.md` 为准。
    新部署仍须分别核验 liveness、readiness、登录、业务、备份和回滚；历史生产结果不证明当前源码已部署。
 5. 后续产品方向与依赖以 `docs/PRODUCT_DIRECTION.md` 为准；模板 CRUD、远程对象存储、统一文档中心、

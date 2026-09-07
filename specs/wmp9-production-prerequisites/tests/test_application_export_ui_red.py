@@ -14,7 +14,7 @@ import ast
 import inspect
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, is_dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from hashlib import sha256
 from importlib import import_module
 from io import BytesIO
@@ -98,6 +98,7 @@ def _load_adapter():
 
 
 def _ui_session(user_id: int, *, tenant_id: int = 501, role: str = "teacher"):
+    issued_at = datetime.now(UTC)
     return TrustedUiSession(
         session_id=UUID("00000000-0000-0000-0000-000000000951"),
         tenant_id=tenant_id,
@@ -105,8 +106,8 @@ def _ui_session(user_id: int, *, tenant_id: int = 501, role: str = "teacher"):
         role=role,
         username=f"synthetic-{user_id}",
         display_name=None,
-        issued_at_utc=datetime(2026, 9, 7, 9, 0, tzinfo=UTC),
-        expires_at_utc=datetime(2026, 9, 7, 18, 0, tzinfo=UTC),
+        issued_at_utc=issued_at,
+        expires_at_utc=issued_at + timedelta(hours=9),
     )
 
 
