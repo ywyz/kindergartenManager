@@ -11,7 +11,6 @@ from inspect import iscoroutinefunction, signature
 
 import pytest
 
-
 MODULE_NAME = "app.service.weekly_monthly_plans.contracts"
 
 
@@ -163,6 +162,7 @@ def test_plan_action_exposes_only_policy_actions():
         "review",
         "export",
         "delete",
+        "archive",
     ]
 
 

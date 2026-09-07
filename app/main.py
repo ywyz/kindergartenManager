@@ -1,3 +1,4 @@
+# ruff: noqa: I001 - page imports are kept as explicit route registrations
 """应用入口。
 
 运行方式：
@@ -30,12 +31,16 @@ from app.ui.pages import homemade_teaching  # noqa: F401
 from app.ui.pages import course_review_activity  # noqa: F401
 from app.ui.pages import setup  # noqa: F401
 from app.ui.pages import user_admin  # noqa: F401
+from app.ui.pages import weekly_monthly_plans  # noqa: F401
 
 from app.api import create_api_router
 from app.auth.middleware import AuthMiddleware
 from app.core.bootstrap import run_bootstrap
 from app.core.config import settings
 from app.core.logging import get_logger
+from app.service.weekly_monthly_plans.production_composition import (
+    configure_weekly_monthly_production,
+)
 
 logger = get_logger("app.main")
 
@@ -55,6 +60,7 @@ def _on_global_exception(exc: Exception) -> None:
 def main() -> None:
     # 认证模式不自动创建固定管理员；首次安装/旧版恢复走显式初始化。
     app.on_startup(run_bootstrap)
+    app.on_startup(configure_weekly_monthly_production)
 
     # 全局异常日志
     app.on_exception(_on_global_exception)

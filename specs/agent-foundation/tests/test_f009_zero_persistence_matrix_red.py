@@ -1,22 +1,21 @@
 """F009 RED: public end-to-end zero-persistence matrix for the Agent Foundation."""
 
 import asyncio
-from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta, timezone
 import hashlib
 import logging
-from pathlib import Path
 import re
 import stat
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
+from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from alembic import command
-from alembic.config import Config
 import httpx
 import pytest
 import pytest_asyncio
+from alembic.config import Config
 from sqlalchemy import MetaData, Table, event, inspect, select
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -26,6 +25,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 import app.core.models  # noqa: F401 - register the complete application schema
+from alembic import command
 from app.core.audit import log_audit
 from app.core.config import settings
 from app.core.crypto import encrypt
@@ -52,7 +52,6 @@ from app.service.agent.runtime import (
     ProviderTurnResult,
     RuntimeLimits,
 )
-
 
 PLAN_DATE = date(2026, 9, 7)
 OTHER_DATE = date(2026, 9, 8)
@@ -88,6 +87,16 @@ AUTHORIZED_AGENT_WRITE_EVIDENCE_TABLES = frozenset(
     {
         "daily_plan_operation_version",
         "agent_write_audit",
+    }
+)
+AUTHORIZED_NON_AGENT_BUSINESS_TABLES = frozenset(
+    {
+        "weekly_monthly_plan",
+        "weekly_monthly_plan_version",
+        "weekly_activity_plan_day",
+        "monthly_theme_activity_item",
+        "weekly_monthly_scope_grant",
+        "weekly_monthly_audit_event",
     }
 )
 
@@ -1155,7 +1164,7 @@ async def test_coordinator_public_runtime_limits_bound_each_timeout_without_effe
 async def test_ttl_expiry_discards_late_provider_output_without_effects(
     effect_environment: EffectEnvironment,
 ):
-    started_at = datetime(2026, 9, 7, 9, 0, tzinfo=timezone.utc)
+    started_at = datetime(2026, 9, 7, 9, 0, tzinfo=UTC)
     clock = MutableClock(started_at)
     provider = BlockingProvider(asyncio.Event(), asyncio.Event())
     _, controller = _controller(effect_environment, provider, clock=clock)
@@ -1283,7 +1292,7 @@ async def test_disconnect_reconnect_and_close_restore_no_connection_memory(
     blocking = BlockingProvider(
         asyncio.Event(), asyncio.Event(), content="fresh after reconnect"
     )
-    coordinator, controller = _controller(effect_environment, blocking)
+    _coordinator, controller = _controller(effect_environment, blocking)
     controller.scope_changed(PLAN_DATE)
 
     async def operation():
@@ -1374,7 +1383,9 @@ async def test_restart_after_draft_has_fresh_ids_history_and_no_agent_schema(
     assert AUTHORIZED_AGENT_WRITE_EVIDENCE_TABLES <= names
     assert not any(
         _is_forbidden_agent_schema_name(name)
-        for name in names - AUTHORIZED_AGENT_WRITE_EVIDENCE_TABLES
+        for name in names
+        - AUTHORIZED_AGENT_WRITE_EVIDENCE_TABLES
+        - AUTHORIZED_NON_AGENT_BUSINESS_TABLES
     )
     rows_by_table = {
         table_name: rows for table_name, _columns, rows in snapshot.database

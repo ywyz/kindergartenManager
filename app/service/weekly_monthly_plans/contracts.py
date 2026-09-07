@@ -30,6 +30,7 @@ class PlanAction(str, Enum):
     REVIEW = "review"
     EXPORT = "export"
     DELETE = "delete"
+    ARCHIVE = "archive"
 
 
 def _require_positive_int(value: object, field_name: str) -> None:

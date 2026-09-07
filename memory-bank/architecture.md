@@ -482,3 +482,10 @@ Python 模块不属于攻击面，也不声称 private/closure/weakref/object id
 receipt 完整性重算、canonical snapshot 与当前 v2 evidence/完整 contract 漂移校验，只启用 weekly/monthly 的 active
 opaque binding；无签名字段、数据库/Alembic、外部 issuer、CRUD 或 WMP-8。WMP-8 仍是 WMP-7
 解决后的下一道独立门，本轮不得进入。
+
+2026-09-07：WMP-8 闭合后的首次 WMP-9 只读验收因正式业务生产 seam 缺失而 BLOCKED。负责人随后独立接受
+ADR-0009、`specs/wmp9-production-prerequisites/` 与六表 Alembic 方案，并授权最小 GREEN。该门新增周/月聚合根、
+不可变版本与有序正文、精确 scope grant、append-only 审计、唯一 `PlanAuthorizationPort` adapter、状态迁移与
+DRAFT 两步删除、可信 UI/application read/review/export/delete，以及固定 v2 released template 到 WMP-8 formal
+exporter 的唯一接线。sys_admin 与 break-glass 保持永久拒绝；无模板 CRUD、远程对象存储、历史重生、Issue #75、
+Agent 扩面、发布或生产部署。此实现只建立重新执行 WMP-9 的先决条件，不能替代正式权限矩阵与双平台 Office 验收。

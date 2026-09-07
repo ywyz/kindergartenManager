@@ -312,8 +312,8 @@ H0/M0/L0，Quality、CodeQL 与 Dependency Graph 精确 SHA 成功，Issue #52 �
 
 ## 11. R6：产品深化（模板、文档、审核与复用）
 
-状态：`串行交付中；WMP-9 为下一道独立门`（2026-09-07；模板中心 T006/T011-C、当前脱敏 v2 evidence、
-WMP-3～WMP-8 已按各自门完成；其余能力仍未授权）。完整方向与阶段依赖见
+状态：`串行交付中；WMP-9 production prerequisites 已实现，待独立 exact-SHA 闭合`（2026-09-07；模板中心
+T006/T011-C、当前脱敏 v2 evidence、WMP-3～WMP-8 已按各自门完成；WMP-9 最终验收仍未执行）。完整方向与阶段依赖见
 [`docs/PRODUCT_DIRECTION.md`](PRODUCT_DIRECTION.md)，规划跟踪见
 [Issue #55](https://github.com/ywyz/kindergartenManager/issues/55)；二者均不构成实现授权。
 
@@ -326,12 +326,15 @@ Agent WRITE 的精确本地交付状态、Review 轮次、SHA 与测试证据仅
 2. ADR-0008 已接受，只取代/细化 ADR-0004 的固定模板权威来源子决策；ADR-0004 的 AI/教师采用边界继续有效。
 3. 模板中心第一期与周/月计划领域及导出契约已形成两个独立 spec/稳定 RED，并完成双轴 Review 0/0。
 4. 模板中心 T006、T011-C、当前脱敏 v2 evidence refresh、WMP-6 fixed-pair orchestration 与 WMP-7/T011-E
-   已于 2026-09-06 按独立门串行完成；WMP-8 已于 2026-09-07 完成本地门，提交/推送与远端 CI 仍按本门证据独立闭合。
+   已于 2026-09-06 按独立门串行完成；WMP-8 已于 2026-09-07 完成本地门并随后完成 exact-SHA 闭合；
+   最终 exact-SHA 证据以本轮 Issue #56/#57 回写为准。
    WMP-7 采用可信进程内 capability 边界，以无状态 receipt 完整性重算、
    canonical snapshot 和当前 v2 profile/evidence/完整 contract 绑定，只把 weekly/monthly 从 reserved 改为 enabled，
    对业务仅开放 active opaque binding；WMP-8 只以冻结 snapshot 消费该 binding，并闭合 render/parse artifact 身份。
-   下一道独立门是 WMP-9 正式业务验收；不得顺带实现模板 CRUD、
-   fallback、远程对象存储或 Agent 能力扩展。最终 exact-SHA 证据以本轮 Issue #56/#57 回写为准。
+   WMP-9 初次只读验收因缺少 production seam 按规则 BLOCKED；独立获批的 prerequisites 门仅实现 ADR-0009
+   六表聚合、唯一授权 adapter、状态/删除/审计、可信 UI/application 与固定 released-template→WMP-8 接线。
+   该门闭合后才可另行申请重启 WMP-9 正式业务及 Windows Word/Linux LibreOffice 双平台验收；不得顺带实现
+   模板 CRUD、fallback、远程对象存储、Issue #75 或 Agent 能力扩展，也不得发布/部署生产。
 5. 在模板版本可追溯后，先由
    [Issue #59](https://github.com/ywyz/kindergartenManager/issues/59) 冻结供应商中立的远程对象存储、稳定对象引用、
    tenant/user 隔离、凭据、失败原子性及 MySQL BLOB/本地 exports 的可回滚迁移；再建设统一教学文档中心。
