@@ -323,8 +323,7 @@ Agent WRITE 的精确本地交付状态、Review 轮次、SHA 与测试证据仅
 2. ADR-0008 已接受，只取代/细化 ADR-0004 的固定模板权威来源子决策；ADR-0004 的 AI/教师采用边界继续有效。
 3. 模板中心第一期与周/月计划领域及导出契约已形成两个独立 spec/稳定 RED，并完成双轴 Review 0/0。
 4. 模板中心 T006、T011-C、当前脱敏 v2 evidence refresh、WMP-6 fixed-pair orchestration 与 WMP-7/T011-E
-   已于 2026-09-06 按独立门串行完成；WMP-8 已于 2026-09-07 完成本地门，最终 exact-SHA 证据以本轮
-   Issue #56/#57 回写为准。
+   已于 2026-09-06 按独立门串行完成；WMP-8 已于 2026-09-07 完成本地门，最终 exact-SHA 证据以本轮 Issue #56/#57 回写为准。
    WMP-7 采用可信进程内 capability 边界，以无状态 receipt 完整性重算、
    canonical snapshot 和当前 v2 profile/evidence/完整 contract 绑定，只把 weekly/monthly 从 reserved 改为 enabled，
    对业务仅开放 active opaque binding；WMP-8 只以冻结 snapshot 消费该 binding，并闭合 render/parse artifact 身份。
