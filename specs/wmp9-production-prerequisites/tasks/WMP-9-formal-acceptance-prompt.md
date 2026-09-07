@@ -1,6 +1,11 @@
-# 下一门提示词：重新开始 WMP-9 云端正式业务与 Office 文档兼容性验收
+# 下一门提示词：继续 WMP-9 分阶段验收与云端准备
 
 ```text
+先读取 specs/wmp9-production-prerequisites/evidence/formal-acceptance-local-20260907.md。
+本轮用户授权 localhost + LibreOffice 阶段，云端与 Windows Word 延期；先完成可执行的
+本地剩余矩阵，不得因延期跳过本地工作。headless PDF 不等于可见打开/警告/打印 UI PASS。
+阶段记录不是 WMP-9 closure；01bf6349a7c6f5268eba4425212f546874d651b0 只是上一轮 acceptance start。
+
 以上一门已回读的 WMP-9 production prerequisites evidence-closure 提交
 `f07971d6624d7e9c032f21fe94a7415a55b0786c` 为基线。该门的 tested-code SHA 是
 `72d759fc128b013c2345bd609875bb3e3d623ef1`；两者不能互相替代。
@@ -13,14 +18,20 @@
 liveness URL 而失败；cc3ebf8 已补回 liveness/readiness 说明，没有修改该失败测试。
 这些结果仅证明基线的自动检查通过，不是 WMP-9 正式业务或 Office 验收证据。
 
-本门只执行 WMP-9 云端在线正式业务、权限、审计、零未授权持久化和 Office 文档兼容性验收；
+本门执行 WMP-9 分阶段业务、权限、审计、零未授权持久化和 Office 文档兼容性验收；
 不得实施 WMP-10、模板 CRUD、统一文档中心、远程对象存储、历史模板重生、
 Issue #75 或其它已登记产品功能，也不得借验收修改 schema、Alembic、模板、
 依赖或安全契约。
 
 开始前更新 origin/main 的远端引用，读取完整 HEAD 并记录为 acceptance_start_sha；不得把
 它预填为包含本提示词的未知提交 SHA。要求执行工作区 clean、HEAD 与 origin/main 一致，且
-HEAD 等于上述 cc3ebf8 基线或是其后代。若是后代，cc3ebf8..HEAD 的差异只能包含本提示词
+HEAD 等于新适用基线 bd2457a9df4a720b169268ec30976db666ab6713 或是其后代。
+明确例外链：cc3ebf8..01bf634 仅提示词；01bf634..44f676c97f18f607ecb85a20d9bbf2237cde4b38
+仅 docs/ROADMAP.md 的指定断行合并（失败测试未改）；44f676c..bd2457a 仅
+released_weekly_monthly_word_port.py 的 merged game rows 修复与对应新增 3 节点回归测试。
+两次修复均经稳定 RED、确认失败、最小修复、回归和只读复审，已建立各自新基线，
+不得以旧 cc3ebf8 白名单自动覆盖。bd2457a 自身 Quality 34132227138 / CodeQL 34132225804
+均 success 且 headSha 精确匹配。若是后代，bd2457a..HEAD 的差异只能包含本提示词
 和 WMP-9 脱敏证据 Markdown；任何产品、测试、配置、模板或依赖变化均须重新建立适用基线。
 无论 HEAD 是否等于基线，都要回读 acceptance_start_sha 自身的 Quality/CodeQL success 与
 精确 headSha；基线 CI 不能覆盖后续提示词提交。原工作区若有查询缓存或其它未提交修改，
@@ -40,8 +51,21 @@ prerequisite 两个 SHA 各自 Quality/CodeQL 均与 Issue #55/#56/#57 回写一
 KindergartenManager 本地应用、便携包或 Debian 桌面包。源码/SQLite 只可用于自动回归和隔离诊断，不能
 冒充正式业务入口。Microsoft Word 与 LibreOffice 仅作为云端系统导出 DOCX 的外部消费端，不运行本系统。
 
+本地阶段使用重新创建的独占临时 MySQL 8、合成数据、受保护 UI/application 入口；
+应用仅绑定回环，数据库不发布端口，不复用未知 localhost 服务、旧数据库或已清理的临时凭据。
+数据准备独立记录，不可调用内部 exporter/fake/binding 替代业务入口。已归档的 bd2457a 四份
+原始 DOCX 与 headless PDF 不可覆盖；仅文档后代不要求重取。代码变更或切换正式云端环境时，
+再通过该环境受保护入口重取四份原始 DOCX，完成适用的 LibreOffice 检查。可见界面不可用则单项 BLOCKED，
+允许以诚实的分阶段记录结束，云端与 Word 保持延期。
+
+恢复云端前，必须取得明确指定的隔离服务器、HTTPS 域名、受控连接与凭据引用，以及
+Windows 11 + Word Microsoft 365 Current Channel 和 Linux + LibreOffice ≥24.2 的访问方式。
+缺资源时仅提出最小准备方案并 BLOCKED；不得自行创建付费资源、进行未授权访问或探测生产凭据。
+
 正式业务验收使用隔离、脱敏、与生产拓扑等价的云端验收环境：Caddy/HTTPS → NiceGUI app → MySQL 8。
-初始 WMP-9 tested-code SHA 使用 acceptance_start_sha；若验收中获准修复导致代码改变，记录新的
+bd2457a9df4a720b169268ec30976db666ab6713 是当前 runtime tested-code；后续仅提示词/证据
+Markdown 后代的 acceptance_start_sha 须单独核验双 CI，但不替代 runtime tested-code，
+也不要求因此重跑既有 runtime 证据。若验收中获准修复导致代码改变，记录新的
 tested-code SHA 并重跑受影响证据，不得混用修改前后的结果。记录不可变镜像引用、服务器 OS/架构、
 域名证书状态、数据库版本/Alembic revision（当前应为 `3c9f4b2a7d1e`）、浏览器
 及版本；验证 liveness、database readiness、登录和 weekly/monthly 业务入口彼此独立。不得使用生产正文、
