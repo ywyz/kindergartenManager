@@ -34,6 +34,11 @@ docker compose exec -e BOOTSTRAP_ADMIN_ALLOW_REMOTE=true app python -m app.jobs.
 db 容器。初始化命令交互读取管理员密码且不回显。生产 Compose 必须保留 `app_data`、`db_data` 和
 `exports` 卷（以及 Caddy 证书状态卷），并限制 UI 网络访问；不要把通用命令或 dry-run 当作生产门禁已经通过。
 
+执行部署指南中的部署/回滚命令时，必须显式指定经 Caddy 可达的探针，例如
+`--health-url https://manager.ywyz.tech/api/v1/health` 和
+`--readiness-url https://manager.ywyz.tech/api/v1/readiness`，其他环境替换为对应的 HTTPS 域名。
+生产 app 容器不直接映射主机端口；liveness 只证明进程/HTTP 存活，不能替代数据库 readiness。
+
 生产管理员密码文件属于运维机密，不是普通用户配置。当前 Aliyun 路径、权限要求、轮换验收与清理规则只在
 [生产部署指南](DEPLOYMENT.md#4-bootstrap-管理员生产凭据)维护；不要在用户手册、Issue 或聊天中记录密码值。
 
