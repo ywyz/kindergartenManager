@@ -28,38 +28,28 @@ def test_release_instructions_use_explicit_admin_bootstrap() -> None:
 
     assert "访问 http://localhost:8080/setup 创建管理员账号" not in workflow
     assert "# http://localhost:8080/setup" not in workflow
-    assert "KindergartenManager.exe --init" in workflow
-    assert "KindergartenManager --init" in workflow
-    assert "python -m app.jobs.bootstrap_admin --init" in workflow
-    assert "http://localhost:8080/login" in workflow
+    assert "受控 Bootstrap job" in workflow
+    assert "[部署指南](docs/DEPLOYMENT.md)" in workflow
+    assert "docker compose exec" not in workflow
     assert "cp .env.example .env" in workflow
-    assert "-v kg-data:/data" in workflow
-    assert "-v kg-data:/app" not in workflow
+    assert "显式数据库迁移" in workflow
+    assert "/api/v1/health" in workflow
+    assert "/api/v1/readiness" in workflow
 
 
-def test_release_notes_windows_packaged_env_file_is_data_path() -> None:
-    """Packaged Windows release notes must target a user-data .env path."""
+def test_release_notes_offer_cloud_delivery_only() -> None:
     workflow = (_ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
-
-    assert "在安装目录创建 `.env`" not in workflow
-    assert "%LOCALAPPDATA%\\KindergartenManager\\.env" in workflow
-    assert "MySQL 模式" in workflow
-
-
-def test_legacy_debian_release_init_preserves_service_identity() -> None:
-    """Legacy packaging may remain, but it is not a user-facing product path."""
-    workflow = (_ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
-    command = re.search(
-        r"sudo systemd-run\b(?:(?!\n```).)*?--init",
-        workflow,
-        flags=re.DOTALL,
-    )
-    assert command is not None
-    assert "--property=User=kindergarten-manager" in command.group(0)
-
-    manual = (_ROOT / "docs/USER_MANUAL.md").read_text(encoding="utf-8")
-    assert "sudo systemd-run" not in manual
-    assert "Windows/Linux 本地应用" in manual
+    for legacy in (
+        "KindergartenManager.exe",
+        "sudo systemd-run",
+        "%LOCALAPPDATA%",
+        "windows-portable",
+        "linux-portable",
+        "内嵌 SQLite",
+    ):
+        assert legacy not in workflow
+    assert "云端 HTTPS" in workflow
+    assert "Microsoft Word 和 LibreOffice" in workflow
 
 
 def test_debian_postinstall_does_not_advertise_anonymous_admin_setup() -> None:
@@ -230,7 +220,6 @@ def test_compose_bootstrap_docs_use_an_explicit_one_shot_remote_override() -> No
         for relative_path in (
             "README.md",
             "docs/USER_MANUAL.md",
-            ".github/workflows/release.yml",
         )
         if required_command not in (_ROOT / relative_path).read_text(encoding="utf-8")
     ]

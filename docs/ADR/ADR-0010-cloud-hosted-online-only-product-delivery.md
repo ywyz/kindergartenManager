@@ -32,10 +32,9 @@ Caddy、主应用、MySQL、不可变 OCI 镜像、HTTPS、readiness、备份和
 
 ## 当前实现差距
 
-截至 2026-09-07，`.github/workflows/release.yml` 的 `v*` tag 触发器仍会运行
-`build-windows`/`build-linux`，并把桌面安装包、便携包和对应安装说明写入 Release。它与本 ADR 的产品决策
-不一致，属于尚待单独收敛的发布工作流遗留；下次发布前必须停用这些构建/上传步骤并移除面向用户的桌面说明。
-在该工作流变更完成前，相关桌面产物或 Release 运行结果不能作为当前受支持产品交付证据。
+2026-09-08 的独立部署准备变更已将 `.github/workflows/release.yml` 收敛为 Docker 双平台构建、
+仅上传镜像 descriptor 和 draft Release 验证，移除桌面构建、上传与面向用户的安装说明。
+历史打包代码仍保留；工作流本地验证不代表远端镜像、发布或生产部署已经完成。
 
 ## 后果
 
