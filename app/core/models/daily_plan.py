@@ -80,6 +80,7 @@ class DailyPlan(Base):
     class_name: Mapped[str] = mapped_column(String(32), nullable=False, default="")
 
     # 教案拆分字段
+    activity_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     activity_goal: Mapped[str | None] = mapped_column(Text, nullable=True)
     activity_prep: Mapped[str | None] = mapped_column(Text, nullable=True)
     activity_key: Mapped[str | None] = mapped_column(Text, nullable=True)

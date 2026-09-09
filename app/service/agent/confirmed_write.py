@@ -40,7 +40,7 @@ from app.ui.auth_context import TrustedUiSession
 _DEFAULT_CONFIRMATION_TTL = timedelta(minutes=5)
 _DEFAULT_STORE_CAPACITY = 1_024
 _AUDIT_ACTION = "daily_plan.apply_confirmed_patch"
-_DAILY_PLAN_SNAPSHOT_FIELDS = frozenset(
+_DAILY_PLAN_SNAPSHOT_V1_FIELDS = frozenset(
     {
         "id",
         "tenant_id",
@@ -240,6 +240,8 @@ def _snapshot_datetime(value: object) -> str:
 
 def _daily_plan_snapshot(plan: DailyPlan) -> tuple[str, str]:
     snapshot = {
+        "snapshot_schema_version": 2,
+        "activity_name": plan.activity_name,
         "id": plan.id,
         "tenant_id": plan.tenant_id,
         "user_id": plan.user_id,
@@ -890,7 +892,7 @@ class ConfirmedDailyPlanWriteService:
             snapshot = json.loads(version.snapshot_json)
             if (
                 type(snapshot) is not dict
-                or set(snapshot) != _DAILY_PLAN_SNAPSHOT_FIELDS
+                or not _snapshot_schema_valid(snapshot)
                 or canonical_json(snapshot) != version.snapshot_json
                 or snapshot["id"] != record.daily_plan_id
                 or snapshot["tenant_id"] != record.tenant_id
@@ -1027,3 +1029,25 @@ class ConfirmedDailyPlanWriteService:
         if record.state is _ConfirmationState.FAILED:
             _reject("confirmation_consumed")
         _reject("confirmation_not_applied")
+
+
+def _snapshot_schema_valid(snapshot: dict) -> bool:
+    if "snapshot_schema_version" not in snapshot:
+        return set(snapshot) == _DAILY_PLAN_SNAPSHOT_V1_FIELDS
+    if (
+        type(snapshot["snapshot_schema_version"]) is not int
+        or snapshot["snapshot_schema_version"] != 2
+    ):
+        return False
+    if set(snapshot) != _DAILY_PLAN_SNAPSHOT_V1_FIELDS | {
+        "snapshot_schema_version",
+        "activity_name",
+    }:
+        return False
+    from app.core.activity_name import validate_activity_name
+
+    try:
+        validate_activity_name(snapshot["activity_name"])
+    except ValueError:
+        return False
+    return True

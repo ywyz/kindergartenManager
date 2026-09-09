@@ -183,6 +183,8 @@ async def test_success_persists_one_scoped_before_version_and_one_minimal_audit(
     assert version["before_revision"] == 1
     assert json.loads(version["field_paths_json"]) == ["activity_goal"]
     expected_snapshot = {
+        "snapshot_schema_version": 2,
+        "activity_name": None,
         "activity_difficult": None,
         "activity_goal": BEFORE_GOAL,
         "activity_key": None,

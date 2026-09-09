@@ -1246,6 +1246,7 @@ def test_daily_plan_target_tracks_every_editable_form_control_generation() -> No
     assert "form_generation=form_generation.capture()" in current
     for control in (
         "raw_text_area",
+        "name_input",
         "goal_area",
         "prep_area",
         "key_area",

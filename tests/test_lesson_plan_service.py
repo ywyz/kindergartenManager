@@ -90,6 +90,7 @@ def _make_mock_ai_key(
 async def test_process_lesson_plan_success():
     """完整流程返回 LessonPlanResult，包含所有字段。"""
     split_resp = {
+        "activity_name": "数数",
         "activity_goal": "学会数数",
         "activity_prep": "积木",
         "activity_key": "数量对应",
@@ -120,11 +121,13 @@ async def test_process_lesson_plan_success():
             session=mock_session,
             tenant_id=1,
             user_id=1,
-            raw_text="完整教案文本内容",
+            raw_text="活动名称：数数\n活动目标：学会数数",
             grade="小班",
             _ai_client=ai_client,
         )
 
+    assert result.activity_name == "数数"
+    assert result.activity_name_hint == ""
     assert isinstance(result, LessonPlanResult)
     assert result.activity_goal == "学会数数"
     assert result.activity_prep == "积木"
@@ -144,6 +147,7 @@ async def test_process_lesson_plan_diff_reflects_changes():
     adapted_process = "第一步：出示积木。第二步：和小朋友一起数积木，教师引导。第三步：总结。"
 
     split_resp = {
+        "activity_name": "",
         "activity_goal": "目标",
         "activity_prep": "准备",
         "activity_key": "重点",
@@ -214,6 +218,7 @@ async def test_process_lesson_plan_no_ai_key_raises_config_error():
 async def test_process_lesson_plan_uses_db_prompt_when_available():
     """DB 中存在激活提示词时，服务层应使用 DB 中的内容，而非内置默认。"""
     split_resp = {
+        "activity_name": "",
         "activity_goal": "目标",
         "activity_prep": "准备",
         "activity_key": "重点",
@@ -282,6 +287,7 @@ async def test_process_lesson_plan_uses_db_prompt_when_available():
 async def test_process_lesson_plan_uses_default_when_no_db_prompt():
     """DB 中无激活提示词时，服务层应传 None 给客户端（客户端自行使用内置默认）。"""
     split_resp = {
+        "activity_name": "",
         "activity_goal": "目标",
         "activity_prep": "准备",
         "activity_key": "重点",

@@ -6,11 +6,13 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
 
+from app.core.activity_name import validate_activity_name
 from app.core.models.daily_plan import DailyPlan
 
 
 _EDITABLE_FIELDS = frozenset(
     {
+        "activity_name",
         "activity_goal",
         "activity_prep",
         "activity_key",
@@ -57,6 +59,8 @@ async def save_daily_plan(
     Returns:
         保存后的 DailyPlan 实例。
     """
+    if "activity_name" in kwargs:
+        validate_activity_name(kwargs["activity_name"])
     forbidden_fields = set(kwargs) - _EDITABLE_FIELDS
     if forbidden_fields:
         names = ", ".join(sorted(forbidden_fields))

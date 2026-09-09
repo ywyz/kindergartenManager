@@ -68,6 +68,7 @@ class _DailyPlanSavePayload(TypedDict):
     class_name: str
     expected_plan_id: int | None
     expected_revision: int | None
+    activity_name: object
     activity_goal: object
     activity_prep: object
     activity_key: object
@@ -229,6 +230,7 @@ async def daily_plan_page() -> None:
 
             agent_panel.plan_changed(target.selected_date)
             form_generation.advance()
+            name_input.value = authoritative.activity_name
             goal_area.value = authoritative.activity_goal
             prep_area.value = authoritative.activity_prep
             key_area.value = authoritative.activity_key
@@ -353,6 +355,7 @@ async def daily_plan_page() -> None:
 
                     # 回填表单
                     form_generation.advance()
+                    name_input.value = result.activity_name
                     goal_area.value = result.activity_goal
                     prep_area.value = result.activity_prep
                     key_area.value = result.activity_key
@@ -366,6 +369,11 @@ async def daily_plan_page() -> None:
 
                     split_msg.classes(add="text-green-600")
                     split_msg.text = "✅ AI 拆分完成，已自动回填以下字段"
+                    if result.activity_name_hint:
+                        split_msg.classes(
+                            remove="text-green-600", add="text-orange-500"
+                        )
+                        split_msg.text = result.activity_name_hint
 
                 except ConfigError:
                     if await _require_live_session() is None:
@@ -421,6 +429,13 @@ async def daily_plan_page() -> None:
         with ui.card().classes("w-full"):
             ui.label("拆分结果").classes("text-base font-bold text-blue-700 mb-2")
 
+            name_input = ui.input(
+                label="集体活动名称", placeholder="原教案无明确名称时请手动填写"
+            ).classes("w-full")
+            name_input.on_value_change(form_generation.advance)
+            ui.label("名称可留空；最多256 UTF-8字节，中文通常最多85字").classes(
+                "text-sm text-gray-500"
+            )
             goal_area = (
                 ui.textarea(label="活动目标").classes("w-full").props("rows=3 autogrow")
             )
@@ -885,6 +900,7 @@ async def daily_plan_page() -> None:
                     "class_name": str(state["class_name"] or ""),
                     "expected_plan_id": target.plan_id,
                     "expected_revision": target.revision,
+                    "activity_name": name_input.value or None,
                     "activity_goal": goal_area.value,
                     "activity_prep": prep_area.value,
                     "activity_key": key_area.value,
@@ -970,6 +986,7 @@ async def daily_plan_page() -> None:
                         save_msg.text = "✅ 草稿已删除"
                         # 清空表单
                         for area in (
+                            name_input,
                             goal_area,
                             prep_area,
                             key_area,
@@ -1465,6 +1482,7 @@ async def daily_plan_page() -> None:
 
     def _clear_plan_body() -> None:
         """Clear caller-owned fields immediately when the selected scope changes."""
+        name_input.value = ""
         goal_area.value = ""
         prep_area.value = ""
         key_area.value = ""
@@ -1508,6 +1526,7 @@ async def daily_plan_page() -> None:
             return
 
         form_generation.advance()
+        name_input.value = plan.activity_name or ""
         goal_area.value = plan.activity_goal or ""
         prep_area.value = plan.activity_prep or ""
         key_area.value = plan.activity_key or ""

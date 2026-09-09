@@ -136,8 +136,8 @@ _TASK_CONFIG = {
 # 每种任务类型的输出格式要求（展示在编辑器上方）
 _TASK_SCHEMA: dict[str, str] = {
     "split": (
-        "输出 JSON，必须包含以下 5 个字段（key 名称不可修改）：\n"
-        '{"activity_goal": "...", "activity_prep": "...", '
+        "输出 JSON，必须包含以下 6 个字段（key 名称不可修改）：\n"
+        '{"activity_name": "原文明确名称，缺失为空，最多256 UTF-8字节", "activity_goal": "...", "activity_prep": "...", '
         '"activity_key": "...", "activity_difficult": "...", "activity_process": "..."}'
     ),
     "adapt": (
@@ -168,7 +168,7 @@ _TASK_SCHEMA: dict[str, str] = {
     ),
     "course_review_activity": (
         "输出 JSON，必须包含以下字段（key 名称不可修改）：\n"
-        '{"activity_goal": "...", "activity_prep": "...", "activity_process": "...", '
+        '{"activity_name": "原文明确名称，缺失为空，最多256 UTF-8字节", "activity_goal": "...", "activity_prep": "...", "activity_process": "...", '
         '"goal_adjusted": true, "goal_adjustment": "...", '
         '"activity_goal_revised": "...", "prep_adjusted": false, '
         '"prep_adjustment": "", "activity_prep_revised": "...", '
@@ -443,8 +443,13 @@ async def _build_task_panel(
 
             test_msg = ui.label("").classes("text-sm")
 
-            # 输出区域（split 显示 5 个字段，其余显示原始文本）
+            # 输出区域（split 显示 6 个字段，其余显示原始文本）
             if task_type == "split":
+                test_name_out = (
+                    ui.input(label="集体活动名称（缺失时请手填）")
+                    .classes("w-full")
+                    .props("readonly")
+                )
                 test_goal_out = (
                     ui.textarea(label="活动目标")
                     .classes("w-full")
@@ -535,6 +540,7 @@ async def _build_task_panel(
                             or generation != test_generation[0]
                         ):
                             return
+                        test_name_out.value = result.get("activity_name", "")
                         test_goal_out.value = result.get("activity_goal", "")
                         test_prep_out.value = result.get("activity_prep", "")
                         test_key_out.value = result.get("activity_key", "")

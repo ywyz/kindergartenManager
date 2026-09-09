@@ -44,8 +44,9 @@ def _make_client(content: dict | str, status_code: int = 200) -> httpx.AsyncClie
 
 @pytest.mark.asyncio
 async def test_split_lesson_plan_success():
-    """正常响应时，返回包含全部 5 个键的 dict。"""
+    """正常响应时，返回包含全部 6 个键的 dict。"""
     expected = {
+        "activity_name": "",
         "activity_goal": "培养幼儿数数能力",
         "activity_prep": "积木、数字卡片",
         "activity_key": "1到10的数数",
@@ -59,7 +60,7 @@ async def test_split_lesson_plan_success():
         api_key="sk-test",
         _client=client,
     )
-    assert set(result.keys()) == set(_REQUIRED_KEYS)
+    assert set(result.keys()) == set(_REQUIRED_KEYS) | {"activity_name"}
     assert result["activity_goal"] == expected["activity_goal"]
     assert result["activity_process"] == expected["activity_process"]
 
@@ -76,7 +77,7 @@ async def test_split_lesson_plan_custom_system_prompt():
         system_prompt="自定义提示词，请输出 JSON",
         _client=client,
     )
-    assert set(result.keys()) == set(_REQUIRED_KEYS)
+    assert set(result.keys()) == set(_REQUIRED_KEYS) | {"activity_name"}
 
 
 # -------------------------------------------------------------------
@@ -120,8 +121,9 @@ async def test_split_lesson_plan_empty_result_raises_parse_error():
 
 @pytest.mark.asyncio
 async def test_split_lesson_plan_filters_extra_keys():
-    """AI 返回额外字段时，只保留 5 个必要键。"""
+    """AI 返回额外字段时，只保留 6 个结构化键。"""
     full_with_extra = {k: "内容" for k in _REQUIRED_KEYS}
+    full_with_extra["activity_name"] = ""
     full_with_extra["extra_field"] = "不应该出现"
     client = _make_client(full_with_extra)
 
@@ -132,4 +134,4 @@ async def test_split_lesson_plan_filters_extra_keys():
         _client=client,
     )
     assert "extra_field" not in result
-    assert set(result.keys()) == set(_REQUIRED_KEYS)
+    assert set(result.keys()) == set(_REQUIRED_KEYS) | {"activity_name"}

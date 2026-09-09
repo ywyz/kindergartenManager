@@ -31,6 +31,7 @@ class ConfirmedDailyPlanProjection:
     indoor_area: str = field(repr=False)
     outdoor_activity: str = field(repr=False)
     daily_reflection: str = field(repr=False)
+    activity_name: str = field(default="", repr=False)
 
 
 class ConfirmedDailyPlanReloadMismatch(RuntimeError):
@@ -81,6 +82,7 @@ async def read_confirmed_daily_plan(
             plan_id=plan.id,
             plan_date=plan.plan_date,
             revision=plan.revision,
+            activity_name=plan.activity_name or "",
             activity_goal=plan.activity_goal or "",
             activity_prep=plan.activity_prep or "",
             activity_key=plan.activity_key or "",

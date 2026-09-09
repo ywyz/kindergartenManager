@@ -27,6 +27,7 @@
 
 若模板文件缺失，降级为从零构建一张简化表格（_export_from_scratch）。
 """
+
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -102,7 +103,7 @@ def _parse_fields(text: str | None) -> dict[str, str]:
         for label in _KNOWN_LABELS:
             if line.startswith(label + "：") or line.startswith(label + ":"):
                 matched = label
-                rest = line[len(label) + 1:].strip()
+                rest = line[len(label) + 1 :].strip()
                 break
         if matched:
             current = matched
@@ -118,7 +119,9 @@ def _reset_cell(cell) -> None:
         para._element.getparent().remove(para._element)
 
 
-def _fill_fields_cell(cell, items: list[tuple[str, str]]) -> None:
+def _fill_fields_cell(
+    cell, items: list[tuple[str, str]], *, preserve_whitespace: bool = False
+) -> None:
     """以 "标签：内容" 形式填充单元格，多个标签各占独立段落。
 
     Args:
@@ -127,7 +130,9 @@ def _fill_fields_cell(cell, items: list[tuple[str, str]]) -> None:
     """
     _reset_cell(cell)
     for label, value in items:
-        value = (value or "").strip()
+        value = value or ""
+        if not preserve_whitespace:
+            value = value.strip()
         lines = value.split("\n") if value else [""]
         para = cell.add_paragraph()
         _set_font(para.add_run(f"{label}："), bold=True)
@@ -183,7 +188,9 @@ def _fill_process_cell(
             _set_font(para.add_run(extra))
 
 
-def _fill_template(doc: Document, daily_plan: DailyPlan, diff_result: list[dict]) -> None:
+def _fill_template(
+    doc: Document, daily_plan: DailyPlan, diff_result: list[dict]
+) -> None:
     """按模板既有单元格结构填充各字段。"""
     table = doc.tables[0]
     rows = table.rows
@@ -237,6 +244,11 @@ def _fill_template(doc: Document, daily_plan: DailyPlan, diff_result: list[dict]
     _fill_fields_cell(rcell(5), [("问题设计", questions or "")])
 
     # ── R6~R11：集体活动
+    _fill_fields_cell(
+        rcell(6),
+        [("活动主题", daily_plan.activity_name or "")],
+        preserve_whitespace=True,
+    )
     _fill_fields_cell(rcell(7), [("活动目标", daily_plan.activity_goal or "")])
     _fill_fields_cell(rcell(8), [("活动准备", daily_plan.activity_prep or "")])
     _fill_fields_cell(rcell(9), [("活动重点", daily_plan.activity_key or "")])
@@ -347,6 +359,7 @@ def _build_collective_cell(
         return cell.add_paragraph()
 
     for label, value in [
+        ("活动主题", daily_plan.activity_name),
         ("活动目标", daily_plan.activity_goal),
         ("活动准备", daily_plan.activity_prep),
         ("活动重点", daily_plan.activity_key),
@@ -433,6 +446,7 @@ def _export_from_scratch(daily_plan: DailyPlan, diff_result: list[dict]) -> byte
 # 批量导出：将多天计划合并为单个 Word 文档
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def export_batch_daily_plans(
     plans_with_diffs: list[tuple[DailyPlan, list[dict]]],
 ) -> bytes:
@@ -474,7 +488,10 @@ def export_batch_daily_plans(
             except Exception as exc:  # noqa: BLE001
                 logger.warning(
                     "批量导出：模板填充失败，降级从零构建",
-                    extra={"plan_date": str(plan.plan_date), "error": f"{type(exc).__name__}: {exc}"},
+                    extra={
+                        "plan_date": str(plan.plan_date),
+                        "error": f"{type(exc).__name__}: {exc}",
+                    },
                 )
         # 降级：_export_from_scratch 返回 bytes，重新解析为 Document
         scratch_bytes = _export_from_scratch(plan, diff)
