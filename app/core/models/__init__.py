@@ -54,3 +54,5 @@ __all__ = [
     "WeeklyMonthlyPlanVersion",
     "WeeklyMonthlyScopeGrant",
 ]
+
+from app.core.models import academic_identity  # noqa: F401

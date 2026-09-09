@@ -7,6 +7,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     Enum,
+    Index,
     Integer,
     String,
     UniqueConstraint,
@@ -29,6 +30,7 @@ class User(Base):
     __table_args__ = (
         # 同一 tenant_id 下 username 唯一
         UniqueConstraint("tenant_id", "username", name="uq_user_tenant_username"),
+        Index("uq_user_tenant_id", "tenant_id", "id", unique=True),
     )
 
     # BigInteger().with_variant(Integer, "sqlite") 解决 SQLite 测试时自增兼容问题
