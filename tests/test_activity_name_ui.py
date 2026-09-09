@@ -146,3 +146,14 @@ async def test_missing_name_split_prompts_hand_entry_and_stale_page_rejected(
     await s["_do_split"](object(), (object(), "旧页面文本", "中班"))
     assert s["name_input"].value == "教师原输入"
     assert s["process_lesson_plan"].await_count == 1
+
+
+def test_prompt_management_course_review_output_stays_on_its_own_contract():
+    import json
+
+    from app.integration.ai_client.course_review_activity_client import _REQUIRED_KEYS
+    from app.ui.pages.prompt_mgmt import _TASK_SCHEMA
+
+    displayed = _TASK_SCHEMA["course_review_activity"]
+    example = json.loads(displayed[displayed.index("{") : displayed.rindex("}") + 1])
+    assert set(example) == set(_REQUIRED_KEYS)

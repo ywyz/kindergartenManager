@@ -168,7 +168,7 @@ _TASK_SCHEMA: dict[str, str] = {
     ),
     "course_review_activity": (
         "输出 JSON，必须包含以下字段（key 名称不可修改）：\n"
-        '{"activity_name": "原文明确名称，缺失为空，最多256 UTF-8字节", "activity_goal": "...", "activity_prep": "...", "activity_process": "...", '
+        '{"activity_goal": "...", "activity_prep": "...", "activity_process": "...", '
         '"goal_adjusted": true, "goal_adjustment": "...", '
         '"activity_goal_revised": "...", "prep_adjusted": false, '
         '"prep_adjustment": "", "activity_prep_revised": "...", '
