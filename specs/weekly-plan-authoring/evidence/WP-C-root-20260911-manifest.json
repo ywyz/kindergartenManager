@@ -182,6 +182,10 @@
     "/home/ywyz/code/km-wpc-root-evidence-20260911/issue-77-comment.md": {
       "bytes": 5878,
       "sha256": "df928ac07f3081f419c5044da72573d9956cf45c5b258e677805a646acbe95d5"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/issue-77-readback.json": {
+      "bytes": 6089,
+      "sha256": "6e283a30fb6270ee70370d36fe5cc675df6d2e7d5d213450e802ffacf157de58"
     }
   },
   "code_hashes": {
@@ -203,5 +207,10 @@
   "sqlite_only_cases_in_mysql_command": 3,
   "new_root_and_migration_cases": 53,
   "remote_ci": null,
-  "mysql_container_removed": true
+  "mysql_container_removed": true,
+  "issue_77_readback": {
+    "comment_id": 5626894121,
+    "body_exact": true,
+    "state": "open"
+  }
 }
