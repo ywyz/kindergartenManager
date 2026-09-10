@@ -54,6 +54,10 @@
       "bytes": 5739,
       "sha256": "9d0938078f7d78dd14a440f7d2359b130235dfaeac90042b1aca0be9df5ea858"
     },
+    "issue-77-readback.json": {
+      "bytes": 7361,
+      "sha256": "d837c0a286a771b16daa9a9efdd7f6731fe07704bd14bf75825d7a72bda986cc"
+    },
     "mysql-expanded.log": {
       "bytes": 100,
       "sha256": "1a2ef9a41997d8cbcb6ab4eac7bc7356fc7feaf99e768acd05d7a1028eba204e"

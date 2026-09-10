@@ -107,3 +107,9 @@ MySQL专属容器`km-wpc-auth-mysql-20260911`，镜像
 DailyPlan仍创建者写，整周授权不能放宽逐日取源。WP-D/E/F及月计划/cohort/Agent/正式模板/云端保持范围外。
 
 #77回写由本轮最后步骤单独读回绑定，不关闭#77/#57/#75；没有push、PR、发布或部署。
+
+## #77 最后回写读回
+
+已追加[本轮评论](https://github.com/ywyz/kindergartenManager/issues/77#issuecomment-5626564361)，
+API读回正文与提交的body-file逐字一致，Issue状态仍OPEN。未写#75/#57、未关闭Issue。
+实际tested_code_sha仍59677fc656bab152485c0355f3470f5763951888，后续仅文档提交，无push或新CI。
