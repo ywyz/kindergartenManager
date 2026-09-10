@@ -1,6 +1,6 @@
 """Tenant-filtered identity persistence; called only inside the application lock scope."""
 
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import UTC, date, datetime
 from typing import Any
 from uuid import uuid4
@@ -20,10 +20,21 @@ from app.service.academic_identity.contracts import (
     IdentityStamp,
     SemesterInput,
 )
+from app.service.shared_weekly.contracts import SharedWeekScope
 
 
 def utcnow() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
+
+
+@dataclass(frozen=True, slots=True)
+class SharedIdentityContext:
+    class_semester: RowMapping
+    semester: RowMapping
+    year: RowMapping
+    other_semesters: tuple[RowMapping, ...]
+    assignments: tuple[RowMapping, ...]
+    auth_epoch: int
 
 
 class IdentityRepository:
@@ -241,3 +252,72 @@ class IdentityRepository:
             raise IdentityRejected("membership_stale")
         await self.bump_membership(row["class_instance_id"], row["semester_id"])
         return IdentityStamp(assignment_id, expected_revision + 1)
+
+    async def shared_week_context(
+        self, scope: SharedWeekScope, user_id: int
+    ) -> SharedIdentityContext:
+        """Internal projection. Application already holds the actor User lock."""
+        guard = await self.require(
+            "class_semester",
+            lock=True,
+            class_instance_id=scope.class_instance_id,
+            semester_id=scope.semester_id,
+        )
+        cls = await self.require(
+            "class_instance",
+            id=scope.class_instance_id,
+            academic_year_id=guard["academic_year_id"],
+        )
+        semester = await self.require(
+            "semester", id=scope.semester_id, academic_year_id=cls["academic_year_id"]
+        )
+        year = await self.require("academic_year", id=cls["academic_year_id"])
+        table = TABLES["teacher_class_assignment"]
+        assignments = (
+            (
+                await self.session.execute(
+                    select(table)
+                    .where(
+                        table.c.tenant_id == self.tenant_id,
+                        table.c.user_id == user_id,
+                        table.c.class_instance_id == scope.class_instance_id,
+                        table.c.semester_id == scope.semester_id,
+                    )
+                    .order_by(table.c.id)
+                    .with_for_update()
+                )
+            )
+            .mappings()
+            .all()
+        )
+        sem = TABLES["semester"]
+        link = TABLES["class_semester"]
+        others = (
+            (
+                await self.session.execute(
+                    select(sem)
+                    .join(
+                        link,
+                        (link.c.tenant_id == sem.c.tenant_id)
+                        & (link.c.semester_id == sem.c.id),
+                    )
+                    .where(
+                        sem.c.tenant_id == self.tenant_id,
+                        link.c.class_instance_id == scope.class_instance_id,
+                        sem.c.id != scope.semester_id,
+                    )
+                )
+            )
+            .mappings()
+            .all()
+        )
+        epoch = (
+            await self.session.execute(
+                select(User.auth_epoch).where(
+                    User.tenant_id == self.tenant_id, User.id == user_id
+                )
+            )
+        ).scalar_one()
+        return SharedIdentityContext(
+            guard, semester, year, tuple(others), tuple(assignments), epoch
+        )

@@ -188,6 +188,69 @@ class DatabasePlanAuthorizationAdapter(PlanAuthorizationPort):
             return _allow("explicit_scope_grant")
         return _deny("action_not_permitted_for_other_owner")
 
+    async def _authorize_shared_week(self, actor, scope, action, previous, repository):
+        # This is called only by the shared application after session/User locks.
+        # Legacy caller DTOs and owner grants cannot select this branch.
+        from datetime import UTC, datetime
+        from hashlib import sha256
+
+        from app.service.academic_identity.contracts import IdentityRejected
+        from app.service.shared_weekly.contracts import (
+            SharedAuthorizationAssessment,
+            SharedAuthorizationStamp,
+        )
+        from app.service.shared_weekly.teaching_facts import resolve_teaching_facts
+
+        if actor.role not in {"teacher", "teaching_admin"}:
+            raise IdentityRejected("scope_denied")
+        context = await repository.shared_week_context(scope, actor.user_id)
+        facts = resolve_teaching_facts(actor.tenant_id, scope, context)
+        now = datetime.now(UTC).replace(tzinfo=None)
+        active = tuple(
+            row
+            for row in context.assignments
+            if row["revoked_at"] is None
+            and row["valid_from"] <= now < row["valid_until"]
+        )
+        if any(
+            not facts.semester_start
+            <= row["scope_start_date"]
+            <= row["scope_end_date"]
+            <= facts.semester_end
+            for row in active
+        ):
+            raise IdentityRejected("scope_denied")
+        matches = tuple(
+            (row["id"], row["revision"])
+            for row in active
+            if any(
+                row["scope_start_date"] <= day <= row["scope_end_date"]
+                for day in facts.teaching_days
+            )
+        )
+        if not matches:
+            raise IdentityRejected("scope_denied")
+        stamp = SharedAuthorizationStamp(
+            actor.tenant_id,
+            actor.user_id,
+            sha256(str(actor.session_id).encode()).hexdigest(),
+            context.auth_epoch,
+            scope,
+            context.class_semester["membership_revision"],
+            context.class_semester["revision"],
+            matches,
+            facts.fingerprint,
+        )
+        if previous is not None:
+            if previous.facts_fingerprint != stamp.facts_fingerprint:
+                raise IdentityRejected("calendar_stale")
+            if previous != stamp:
+                raise IdentityRejected("membership_stale")
+        assessment = SharedAuthorizationAssessment(
+            "shared_weekly_v1", action, facts, stamp
+        )
+        return assessment
+
     @staticmethod
     def _authorize_owner(
         request: PlanAuthorizationRequest, status: str

@@ -55,3 +55,6 @@ pytest>=8.0.0
 pytest-asyncio>=0.23.0
 aiosqlite>=0.20.0
 markdown-it-py>=4.2.0,<5.0.0
+
+# 服务端共享周计划授权所需法定日历（独立于旧holiday API降级）
+chinesecalendar==1.11.0

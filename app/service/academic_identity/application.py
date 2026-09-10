@@ -77,7 +77,10 @@ class IdentityApplication:
                     raise IdentityRejected("session_invalid")
                 repository = IdentityRepository(session, current.tenant_id)
                 yield repository, current
-                if self._token_source() != token:
+                # Time can advance during awaited fact reads, even with User locked.
+                session.expire_all()
+                final = await resolve_current_ui_session(session, token)
+                if final != current or self._token_source() != token:
                     raise IdentityRejected("session_invalid")
                 await session.commit()
         except SQLAlchemyError:

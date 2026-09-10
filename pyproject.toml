@@ -29,6 +29,7 @@ dependencies = [
     "lxml",
     "urllib3",
     "idna",
+    "chinesecalendar==1.11.0",
 ]
 
 [dependency-groups]
