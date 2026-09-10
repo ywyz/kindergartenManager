@@ -1,0 +1,6 @@
+# WP-A manifests bind exact bytes, including historical text evidence.
+specs/weekly-plan-authoring/** -text
+CONTEXT.md -text
+docs/ROADMAP.md -text
+docs/ADR/ADR-0011-shared-weekly-authoring-and-source-snapshots.md -text
+memory-bank/architecture.md -text

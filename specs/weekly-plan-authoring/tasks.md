@@ -1,7 +1,8 @@
+> 2026-09-10 最终收口口径：WP-A 实现基线、契约与最短完整 Word 五／六列单页可行性完成；long 三份仍为两页。共享业务实现、正式模板资格、缩减流程和产品/云端验收属于后续门。最终独立复审、提交与 exact-SHA CI 的关闭绑定见[收口账本](evidence/WP-A-closure-20260910.md)及其 Issue 回写；未完成 CI 时不得据此宣布正式关闭。
+
 # 周计划实现顺序与验收矩阵
 
-状态：2026-09-09阶段调整后，WP-A仍被目标Office单页证据阻塞（本机实际SimSun已验证，Windows Word仍缺）；新共享可执行RED已移至WP-C首门。已建立隔离基线、契约与当前行为差距RED。依据 [产品规格](spec.md)，仅覆盖周计划与必要依赖。
-WP-A总门尚未完成；WP-B已完成本地名称最小实现与专项验证（见[evidence/WP-B-20260910.md](evidence/WP-B-20260910.md)），WP-C～WP-F未实施；实际证据只见[本门账本](evidence/WP-A-20260908.md)。
+状态：2026-09-10用户确认Word为主要格式验收客户端、LibreOffice仅备用打开。WP-A最短完整五/六列Word单页可行性及原生观察证据已补齐；LibreOffice格式差异不再阻塞。实际结果见[Word账本](evidence/WP-A-Windows-20260910.md)，long三份单页FAIL保留。其他产品门与CI/云端独立，不因本次通过。
 
 任务入口：[Issue #77](https://github.com/ywyz/kindergartenManager/issues/77)。
 先执行 [WP-A 提示词](WP-A-prompt.md)，本门不顺带实施 WP-B～WP-F。
@@ -11,12 +12,12 @@ WP-A总门尚未完成；WP-B已完成本地名称最小实现与专项验证（
 - [x] 核实最新源码和已有周导出修复，建立独立工作区，核对未提交规格hash。
 - [x] 编写限定于新周计划的后继 ADR 初稿，明确替代 ADR-0009 的个人归属、固定五天和审核产品规则。
 - [x] 编写班级成员、共享唯一键、旧数据显式关联、源 revision、候选失效与 Alembic 提案（尚未执行迁移）。
-- [ ] 用最短完整合成内容验证五／六列 A4、12 pt、20 pt 的排版可行性，确认所有必需条目有容纳空间。
+- [x] 最短完整五／六列在实测Microsoft Word中满足A4、宋体12pt、固定20pt及全部必需条目容纳；9份输入、PDF及原生预览证据见Word账本，long失败不隐藏。
 - [x] 首批当前行为差距探针连续两次16 collected / 12 failed / 4 baseline passed。
 - [x] 冻结新共享行为场景、授权条件、输入输出/失败语义与断言；2026-09-09用户同意将依赖新共享接口的可执行RED移至WP-C首门，未宣称已执行。
 - [x] 三子代理调研与首轮 reviewer 独立只读复审完成；H/M/L=2/2/0，见[复审记录](evidence/review.md)。
 - [x] 2026-09-09三处字体安装及本机真实SimSun候选诊断：short/compact各1页，long各2页；独立证据复核完成，见[新账本](evidence/WP-A-fonts-20260909.md)。
-- [ ] 补齐Windows Word/目标Office单页排版证据；不得外推当前bundled alpha客户端结果，WP-A总门仍BLOCKED。
+- [x] 补齐实测Windows Word单页可行性、字体、原生打开与全部预览、独立Review；2026-09-10用户将LibreOffice调整为备用打开，不再要求其格式通过。不外推其他Word版本或正式产品。
 
 详见[ADR-0011](../../docs/ADR/ADR-0011-shared-weekly-authoring-and-source-snapshots.md)、
 [迁移提案](migration-proposal.md)、[日历契约](calendar-contract.md)。模板不可行时保留具体证据，不能暗改格式或数量。
@@ -91,7 +92,7 @@ WP-A总门尚未完成；WP-B已完成本地名称最小实现与专项验证（
 
 按改动范围运行专项用例和迁移检查，再执行项目要求的回归和独立复审。
 云端测试记录实际运行代码 SHA、不可变镜像、数据库 revision 与 exact-SHA CI。
-Windows Word 和 Linux LibreOffice 分别验收，缺失环境记 BLOCKED；不得把源码测试或页数估算当作云端／Office PASS。
+Microsoft Word系列为主要格式验收客户端，按实际测试产品/版本记录；LibreOffice仅备用打开，不再要求其格式/分页通过。不得把源码测试、页数估算或本轮合成候选当作正式产品/云端PASS。
 实现、测试站部署、正式验收和生产发布分别交付，不由完成前一项推断后一项完成。
 
 ## 2026-09-10 WP-C 身份子步实证

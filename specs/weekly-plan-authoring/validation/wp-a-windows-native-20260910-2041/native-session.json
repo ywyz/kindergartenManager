@@ -1,0 +1,18 @@
+{
+  "recorded_at_utc": "2026-09-10T12:55:07.002123+00:00",
+  "tool": "computer-use 26.903.71938 @oai/sky via node_repl",
+  "prior_failure": "26.825.32147 native named pipe os error 2; preserved in prior report",
+  "recovery": "supported runtime reinitialization succeeded; root cause not established",
+  "proxy_settings_changed": false,
+  "input_handling": "9 byte-identical readonly copies; no edits/save/print; task-only documents and blank closed",
+  "preview_zoom_percent": 81,
+  "open_zoom_percent": 100,
+  "printer": "Brother DCP-T725DW Printer; ready; one page per sheet",
+  "automatic_repair_compatibility_warning_observed": false,
+  "font_substitution_fully_ruled_out": false,
+  "screenshots": 21,
+  "preview_pages": 12,
+  "long_single_page_status": "FAIL",
+  "fixture_verifier": "uv run --no-project --python 3.14 python specs/weekly-plan-authoring/validation/verify_wp_a_bundle.py: Verified 37 files",
+  "template_sha256": "f6c17c137f04e29a68524ed400eb395984e93a16c234a065b5794d9f49a9347b"
+}

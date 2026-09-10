@@ -1,0 +1,274 @@
+{
+  "sample": "saturday-compact-candidate.docx",
+  "input_sha256": "4286ee43ced4a9043231264851c75cb9b1ddf76594294f23a3ac9f85066b69b3",
+  "page_geometry": {
+    "w": "11906",
+    "h": "16838"
+  },
+  "margins": {
+    "top": "284",
+    "right": "720",
+    "bottom": "284",
+    "left": "720",
+    "header": "0",
+    "footer": "0",
+    "gutter": "0"
+  },
+  "tables": 1,
+  "rows": 9,
+  "grid": [
+    933,
+    920,
+    1435,
+    1435,
+    1435,
+    1436,
+    1436,
+    1436
+  ],
+  "grid_total": 10466,
+  "table_width": {
+    "w": "10466",
+    "type": "dxa"
+  },
+  "title_alignment": {
+    "val": "center"
+  },
+  "nonempty_run_formats": {
+    "{\"bold\": true, \"font\": {\"ascii\": \"宋体\", \"eastAsia\": \"宋体\", \"hAnsi\": \"宋体\"}, \"size\": {\"val\": \"32\"}}": 1,
+    "{\"bold\": false, \"font\": {\"ascii\": \"宋体\", \"eastAsia\": \"宋体\", \"hAnsi\": \"宋体\"}, \"size\": {\"val\": \"24\"}}": 27,
+    "{\"bold\": false, \"font\": {\"ascii\": \"宋体\", \"cs\": \"宋体\", \"eastAsia\": \"宋体\", \"hAnsi\": \"宋体\", \"hint\": \"eastAsia\"}, \"size\": {\"val\": \"24\"}}": 21
+  },
+  "nonempty_paragraph_spacing": {
+    "{\"after\": \"0\", \"before\": \"0\", \"line\": \"400\", \"lineRule\": \"exact\"}": 49
+  },
+  "cells": [
+    [
+      [
+        "第2周"
+      ],
+      [
+        ""
+      ],
+      [
+        "周一",
+        "09月07日"
+      ],
+      [
+        "周二",
+        "09月08日"
+      ],
+      [
+        "周三",
+        "09月09日"
+      ],
+      [
+        "周四",
+        "09月10日"
+      ],
+      [
+        "周五",
+        "09月11日"
+      ],
+      [
+        "周六",
+        "09月12日"
+      ]
+    ],
+    [
+      [
+        "学习",
+        "活动"
+      ],
+      [
+        "晨间",
+        "谈话"
+      ],
+      [
+        "观察树叶并说颜色和形状。"
+      ],
+      [
+        "观察树叶并说颜色和形状。"
+      ],
+      [
+        "观察树叶并说颜色和形状。"
+      ],
+      [
+        "观察树叶并说颜色和形状。"
+      ],
+      [
+        "观察树叶并说颜色和形状。"
+      ],
+      [
+        "观察树叶并说颜色和形状。"
+      ]
+    ],
+    [
+      [
+        ""
+      ],
+      [
+        "集体",
+        "活动"
+      ],
+      [
+        "春天颜色观察与同伴分享。"
+      ],
+      [
+        "春天颜色观察与同伴分享。"
+      ],
+      [
+        "春天颜色观察与同伴分享。"
+      ],
+      [
+        "春天颜色观察与同伴分享。"
+      ],
+      [
+        "春天颜色观察与同伴分享。"
+      ],
+      [
+        "春天颜色观察与同伴分享。"
+      ]
+    ],
+    [
+      [
+        "游戏",
+        "活动"
+      ],
+      [
+        "户外",
+        "游戏"
+      ],
+      [
+        "体能大循环",
+        "集体游戏：1.《接力跑》（目标：①奔跑。②合作。③守规。）",
+        "2.《投沙包》（目标：①投掷。②瞄准。③轮流。）",
+        "自主游戏：《小车道》（目标：①规划。②等待。③分享。）"
+      ]
+    ],
+    [
+      [
+        ""
+      ],
+      [
+        "区域",
+        "游戏"
+      ],
+      [
+        "1.户外游戏 2.区域游戏 3.专用室",
+        "本周重点指导区域：建构区",
+        "目标：",
+        "1.搭建并说明。",
+        "2.协商合作。",
+        "3.记录分享。",
+        "材料：积木、纸筒、图卡。",
+        "指导：",
+        "1.示范提问。",
+        "2.鼓励调整。",
+        "3.交流整理。"
+      ]
+    ],
+    [
+      [
+        "本周",
+        "重点"
+      ],
+      [
+        "1.倾听并表达观察。",
+        "2.协商轮流合作。",
+        "3.记录发现过程。"
+      ]
+    ],
+    [
+      [
+        "环境",
+        "创设"
+      ],
+      [
+        "1.主题墙更新。",
+        "2.图书角添材料。",
+        "3.建构区留空间。"
+      ]
+    ],
+    [
+      [
+        "生活",
+        "习惯",
+        "培养"
+      ],
+      [
+        "1.洗手按步骤。",
+        "2.进餐细嚼慢咽。",
+        "3.整理材料归位。"
+      ]
+    ],
+    [
+      [
+        "家园",
+        "共育"
+      ],
+      [
+        "请家长和幼儿散步观察植物，说说颜色、形状和变化并带图分享。"
+      ]
+    ]
+  ],
+  "fixed_counts": {
+    "physical_cycle": true,
+    "collective_games": 2,
+    "autonomous_games": 1,
+    "three_goals_each": true,
+    "area_focus": 1,
+    "area_goals": 3,
+    "area_guidance": 3,
+    "materials": true,
+    "weekly_focus": 3,
+    "environment": 3,
+    "habits": 3,
+    "home_school_paragraphs": 1
+  },
+  "pdf_pages": 1,
+  "pages": [
+    {
+      "page": 1,
+      "size_points": [
+        595.303955078125,
+        841.8897705078125
+      ],
+      "fonts": [
+        {
+          "xref": 232,
+          "basefont": "BAAAAA+SimSun",
+          "type": "TrueType",
+          "embedded_bytes": 7500
+        },
+        {
+          "xref": 237,
+          "basefont": "CAAAAA+SimSun",
+          "type": "TrueType",
+          "embedded_bytes": 59032
+        }
+      ],
+      "non_simsun_spans": [],
+      "visible_font_sizes": [
+        [
+          "SimSun",
+          12.0
+        ],
+        [
+          "SimSun",
+          16.0
+        ]
+      ],
+      "text_bbox": [
+        217.5,
+        18.4632568359375,
+        378.0,
+        35.2757568359375
+      ]
+    }
+  ],
+  "nonwhitespace_character_multiset_equal": true,
+  "missing_characters": {},
+  "extra_characters": {},
+  "text_comparison_limit": "Whitespace/layout wrap excluded; multiset alone cannot prove order or clipping. Native warning and print preview not observed."
+}

@@ -1,0 +1,98 @@
+"""Read-only fixture/PDF diagnostics; writes only new files beside this script."""
+from collections import Counter
+from datetime import datetime, timezone
+import hashlib
+import json
+from pathlib import Path
+import re
+from zipfile import ZipFile
+import xml.etree.ElementTree as ET
+
+import pymupdf
+from fontTools.ttLib import TTCollection
+
+ROOT = Path(__file__).resolve().parent
+REPO = ROOT.parents[3]
+BUNDLE = ROOT.parent / 'wp-a-simsun-20260909'
+NS = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+W = '{' + NS['w'] + '}'
+
+def attrs(e):
+    return {k.removeprefix(W): v for k, v in e.attrib.items()} if e is not None else {}
+
+def paragraphs(e):
+    result = []
+    for p in e.findall('w:p', NS):
+        text = ''.join(('\n' if x.tag == W+'br' else x.text or '') for x in p.iter() if x.tag in (W+'t',W+'br'))
+        result.extend(text.split('\n'))
+    return result
+
+def compact(s):
+    return re.sub(r'\s+', '', s)
+
+reports = []
+for source in sorted((BUNDLE / 'samples').glob('*.docx')):
+    out = ROOT / source.stem
+    with ZipFile(source) as z:
+        doc = ET.fromstring(z.read('word/document.xml'))
+    table = doc.find('.//w:tbl', NS)
+    rows = table.findall('w:tr', NS)
+    cells = [[paragraphs(c) for c in row.findall('w:tc', NS)] for row in rows]
+    grid = [int(e.get(W+'w')) for e in table.findall('w:tblGrid/w:gridCol', NS)]
+    run_formats = Counter()
+    paragraph_formats = Counter()
+    for p in doc.findall('.//w:p', NS):
+        if ''.join(p.itertext()).strip():
+            paragraph_formats[json.dumps(attrs(p.find('w:pPr/w:spacing', NS)),sort_keys=True)] += 1
+        for r in p.findall('w:r', NS):
+            if ''.join(r.itertext()).strip():
+                run_formats[json.dumps({'font': attrs(r.find('w:rPr/w:rFonts',NS)), 'size':attrs(r.find('w:rPr/w:sz',NS)), 'bold':r.find('w:rPr/w:b',NS) is not None},ensure_ascii=False,sort_keys=True)] += 1
+    pdf = pymupdf.open(out / (source.stem+'.pdf'))
+    pages = []
+    pdf_text = ''
+    for index, page in enumerate(pdf):
+        text = page.get_text()
+        pdf_text += text
+        fonts = []
+        for font in page.get_fonts(full=True):
+            xref = font[0]
+            extracted = pdf.extract_font(xref)
+            fonts.append({'xref':xref,'basefont':font[3],'type':font[2],'embedded_bytes':len(extracted[3])})
+        spans = [s for b in page.get_text('dict')['blocks'] if 'lines' in b for l in b['lines'] for s in l['spans']]
+        pages.append({'page':index+1,'size_points':list(page.rect)[2:], 'fonts':fonts,
+                      'non_simsun_spans':[{'text':s['text'],'font':s['font'],'size':s['size'],'bbox':s['bbox']} for s in spans if 'SimSun' not in s['font']],
+                      'visible_font_sizes':sorted(set((s['font'], round(s['size'],3)) for s in spans if s['text'].strip())),
+                      'text_bbox':list(page.get_bboxlog()[0][1]) if page.get_bboxlog() else None})
+        (out / f'page-{index+1}.txt').write_text(text,encoding='utf-8')
+    original_text = ''.join(doc.itertext())
+    a,b = Counter(compact(original_text)),Counter(compact(pdf_text))
+    outdoor = cells[3][-1]
+    area = cells[4][-1]
+    fixed = {'physical_cycle':outdoor[0]=='体能大循环',
+             'collective_games':len([x for x in outdoor if x.startswith(('集体游戏：1.','2.《'))]),
+             'autonomous_games':len([x for x in outdoor if x.startswith('自主游戏：')]),
+             'three_goals_each':all(all(mark in p for mark in '①②③') for p in outdoor[1:]),
+             'area_focus':len([x for x in area if x.startswith('本周重点指导区域：')]),
+             'area_goals':len(area[area.index('目标：')+1:next(i for i,s in enumerate(area) if s.startswith('材料：'))]),
+             'area_guidance':len(area[area.index('指导：')+1:]),
+             'materials':any(s.startswith('材料：') and len(s)>3 for s in area),
+             'weekly_focus':len(cells[5][-1]),'environment':len(cells[6][-1]),
+             'habits':len(cells[7][-1]),'home_school_paragraphs':len(cells[8][-1])}
+    report = {'sample':source.name,'input_sha256':hashlib.sha256(source.read_bytes()).hexdigest(),
+              'page_geometry':attrs(doc.find('.//w:pgSz',NS)), 'margins':attrs(doc.find('.//w:pgMar',NS)),
+              'tables':len(doc.findall('.//w:tbl',NS)),'rows':len(rows),'grid':grid,'grid_total':sum(grid),
+              'table_width':attrs(table.find('w:tblPr/w:tblW',NS)),
+              'title_alignment':attrs(doc.find('w:body/w:p/w:pPr/w:jc',NS)),
+              'nonempty_run_formats':dict(run_formats),'nonempty_paragraph_spacing':dict(paragraph_formats),
+              'cells':cells,'fixed_counts':fixed,'pdf_pages':len(pdf),'pages':pages,
+              'nonwhitespace_character_multiset_equal':a==b,'missing_characters':dict(a-b),'extra_characters':dict(b-a),
+              'text_comparison_limit':'Whitespace/layout wrap excluded; multiset alone cannot prove order or clipping. Native warning and print preview not observed.'}
+    (out/'inspection.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+    reports.append(report)
+font_path = Path('C:/Windows/Fonts/simsun.ttc')
+font_info = {'path':str(font_path),'bytes':font_path.stat().st_size,'sha256':hashlib.sha256(font_path.read_bytes()).hexdigest(),
+             'faces':[{'family':f['name'].getDebugName(1),'version':f['name'].getDebugName(5),'font_revision':f['head'].fontRevision} for f in TTCollection(font_path).fonts]}
+(ROOT/'font.json').write_text(json.dumps(font_info,ensure_ascii=False,indent=2),encoding='utf-8')
+(ROOT/'inspection.json').write_text(json.dumps({'at_utc':datetime.now(timezone.utc).isoformat(),'pymupdf':pymupdf.VersionBind,'samples':reports},ensure_ascii=False,indent=2),encoding='utf-8')
+for r in reports:
+    print(json.dumps({'sample':r['sample'],'pages':r['pdf_pages'],'text_equal':r['nonwhitespace_character_multiset_equal'],'fixed_counts':r['fixed_counts'],'visible_fonts':[p['visible_font_sizes'] for p in r['pages']]},ensure_ascii=False))

@@ -1,0 +1,17 @@
+{
+  "recorded_at": "2026-09-10T21:10:32.2553650+08:00",
+  "os": {
+    "Caption": "Microsoft Windows 11 专业版",
+    "Version": "10.0.26200",
+    "BuildNumber": "26200",
+    "OSArchitecture": "64 位"
+  },
+  "culture": "zh-CN",
+  "system_locale": "zh-CN",
+  "timezone": "China Standard Time",
+  "default_printer": {
+    "Name": "Brother DCP-T725DW Printer",
+    "DriverName": "Brother DCP-T725DW Printer"
+  },
+  "libreoffice_binary": "26.8.0.3"
+}

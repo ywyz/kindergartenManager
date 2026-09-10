@@ -1,0 +1,149 @@
+[
+  {
+    "sample": "normal-five-short",
+    "stage": "open",
+    "observed_at_utc": "2026-09-10T12:44:06.464Z",
+    "window_title": "normal-five-short  -  只读 - Word",
+    "screenshot": "normal-five-short-open.png"
+  },
+  {
+    "sample": "normal-five-short",
+    "stage": "preview-page-1",
+    "observed_at_utc": "2026-09-10T12:44:28.430Z",
+    "window_title": "normal-five-short  -  只读 - Word",
+    "screenshot": "normal-five-short-preview-page-1.png"
+  },
+  {
+    "sample": "normal-five-long",
+    "stage": "open",
+    "observed_at_utc": "2026-09-10T12:45:14.685Z",
+    "window_title": "normal-five-long  -  只读 - Word",
+    "screenshot": "normal-five-long-open.png"
+  },
+  {
+    "sample": "normal-five-long",
+    "stage": "preview-page-1",
+    "observed_at_utc": "2026-09-10T12:45:23.233Z",
+    "window_title": "normal-five-long  -  只读 - Word",
+    "screenshot": "normal-five-long-preview-page-1.png"
+  },
+  {
+    "sample": "normal-five-long",
+    "stage": "preview-page-2",
+    "observed_at_utc": "2026-09-10T12:45:31.420Z",
+    "window_title": "normal-five-long  -  只读 - Word",
+    "screenshot": "normal-five-long-preview-page-2.png"
+  },
+  {
+    "sample": "normal-compact-candidate",
+    "stage": "open",
+    "observed_at_utc": "2026-09-10T12:46:04.745Z",
+    "window_title": "normal-compact-candidate  -  只读 - Word",
+    "screenshot": "normal-compact-candidate-open.png"
+  },
+  {
+    "sample": "normal-compact-candidate",
+    "stage": "preview-page-1",
+    "observed_at_utc": "2026-09-10T12:46:14.431Z",
+    "window_title": "normal-compact-candidate  -  只读 - Word",
+    "screenshot": "normal-compact-candidate-preview-page-1.png"
+  },
+  {
+    "sample": "preceding-sunday-six-short",
+    "stage": "open",
+    "observed_at_utc": "2026-09-10T12:46:38.330Z",
+    "window_title": "preceding-sunday-six-short  -  只读 - Word",
+    "screenshot": "preceding-sunday-six-short-open.png"
+  },
+  {
+    "sample": "preceding-sunday-six-short",
+    "stage": "preview-page-1",
+    "observed_at_utc": "2026-09-10T12:46:48.562Z",
+    "window_title": "preceding-sunday-six-short  -  只读 - Word",
+    "screenshot": "preceding-sunday-six-short-preview-page-1.png"
+  },
+  {
+    "sample": "preceding-sunday-six-long",
+    "stage": "open",
+    "observed_at_utc": "2026-09-10T12:47:08.895Z",
+    "window_title": "preceding-sunday-six-long  -  只读 - Word",
+    "screenshot": "preceding-sunday-six-long-open.png"
+  },
+  {
+    "sample": "preceding-sunday-six-long",
+    "stage": "preview-page-1",
+    "observed_at_utc": "2026-09-10T12:47:17.247Z",
+    "window_title": "preceding-sunday-six-long  -  只读 - Word",
+    "screenshot": "preceding-sunday-six-long-preview-page-1.png"
+  },
+  {
+    "sample": "preceding-sunday-six-long",
+    "stage": "preview-page-2",
+    "observed_at_utc": "2026-09-10T12:47:27.452Z",
+    "window_title": "preceding-sunday-six-long  -  只读 - Word",
+    "screenshot": "preceding-sunday-six-long-preview-page-2.png"
+  },
+  {
+    "sample": "sunday-compact-candidate",
+    "stage": "open",
+    "observed_at_utc": "2026-09-10T12:47:52.809Z",
+    "window_title": "sunday-compact-candidate  -  只读 - Word",
+    "screenshot": "sunday-compact-candidate-open.png"
+  },
+  {
+    "sample": "sunday-compact-candidate",
+    "stage": "preview-page-1",
+    "observed_at_utc": "2026-09-10T12:48:00.741Z",
+    "window_title": "sunday-compact-candidate  -  只读 - Word",
+    "screenshot": "sunday-compact-candidate-preview-page-1.png"
+  },
+  {
+    "sample": "saturday-six-short",
+    "stage": "open",
+    "observed_at_utc": "2026-09-10T12:48:21.345Z",
+    "window_title": "saturday-six-short  -  只读 - Word",
+    "screenshot": "saturday-six-short-open.png"
+  },
+  {
+    "sample": "saturday-six-short",
+    "stage": "preview-page-1",
+    "observed_at_utc": "2026-09-10T12:48:34.394Z",
+    "window_title": "saturday-six-short  -  只读 - Word",
+    "screenshot": "saturday-six-short-preview-page-1.png"
+  },
+  {
+    "sample": "saturday-six-long",
+    "stage": "open",
+    "observed_at_utc": "2026-09-10T12:49:04.312Z",
+    "window_title": "saturday-six-long  -  只读 - Word",
+    "screenshot": "saturday-six-long-open.png"
+  },
+  {
+    "sample": "saturday-six-long",
+    "stage": "preview-page-1",
+    "observed_at_utc": "2026-09-10T12:49:15.447Z",
+    "window_title": "saturday-six-long  -  只读 - Word",
+    "screenshot": "saturday-six-long-preview-page-1.png"
+  },
+  {
+    "sample": "saturday-six-long",
+    "stage": "preview-page-2",
+    "observed_at_utc": "2026-09-10T12:49:24.717Z",
+    "window_title": "saturday-six-long  -  只读 - Word",
+    "screenshot": "saturday-six-long-preview-page-2.png"
+  },
+  {
+    "sample": "saturday-compact-candidate",
+    "stage": "open",
+    "observed_at_utc": "2026-09-10T12:51:48.478Z",
+    "window_title": "saturday-compact-candidate  -  只读 - Word",
+    "screenshot": "saturday-compact-candidate-open.png"
+  },
+  {
+    "sample": "saturday-compact-candidate",
+    "stage": "preview-page-1",
+    "observed_at_utc": "2026-09-10T12:51:58.253Z",
+    "window_title": "saturday-compact-candidate  -  只读 - Word",
+    "screenshot": "saturday-compact-candidate-preview-page-1.png"
+  }
+]

@@ -1,3 +1,5 @@
+> 2026-09-10 当前口径：下方保留交接时原提示词，旧“WP-A Office缺项”已由 Word 实测和用户客户端范围决定替代，不再是推进本小步的阻塞。WP-A 最短完整五／六列可行性完成，long 三份两页保留失败；正式关闭绑定见[收口账本](evidence/WP-A-closure-20260910.md)。既有身份代码已随 handoff 分支公开，启动下一步仍须实时核实 HEAD/远端/工作区，不能沿用历史“未公开”判断。下一产品步骤仅为共享授权及权威实际教学日事实的小步，逐项先 RED 后 GREEN；此指针不构成本轮实施授权。
+
 请继续 kindergartenManager Issue #77 的 WP-C 首门，下一小步仅做新shared_weekly_v1的真实授权政策seam；不要一次实现共享/来源全部功能。
 
 先实时读取#77/#75及回写、AGENTS.md、ADR-0011、weekly-plan-authoring的spec/tasks/migration-proposal/service-contract/calendar-contract、WP-B与WP-C-20260910.md和WP-C独立Review。核实本地提交00afdc878b306475508c777997956cdf4638dbef、origin/main、未提交文档、Alembic head是否仍7c91e2a4b610。提交尚未公开时只列本地路径，不伪造blob/CI链接。

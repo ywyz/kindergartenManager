@@ -1,0 +1,18 @@
+Creator:         Microsoft® Word 适用于 Microsoft 365
+Producer:        Microsoft® Word 适用于 Microsoft 365
+CreationDate:    Thu Sep 10 12:09:41 2026 �й���׼ʱ��
+ModDate:         Thu Sep 10 12:09:41 2026 �й���׼ʱ��
+Custom Metadata: no
+Metadata Stream: yes
+Tagged:          yes
+UserProperties:  no
+Suspects:        no
+Form:            none
+JavaScript:      no
+Pages:           1
+Encrypted:       no
+Page size:       595.32 x 841.92 pts (A4)
+Page rot:        0
+File size:       90196 bytes
+Optimized:       no
+PDF version:     1.7

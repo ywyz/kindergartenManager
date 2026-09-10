@@ -1,0 +1,30 @@
+{
+  "sample": "normal-five-short.docx",
+  "started_at": "2026-09-10T12:09:38.3272883+08:00",
+  "input_sha256": "7eca517011011b5cb7c3b74d38756fdfef6da5f2a7df44503bceefdbd07593c9",
+  "word_pages": 1,
+  "compatibility_mode": 15,
+  "read_only": true,
+  "zoom_percent": 100,
+  "view_type": 3,
+  "geometry_points": {
+    "width": 595.3,
+    "height": 841.9,
+    "left": 36.0,
+    "right": 36.0,
+    "top": 14.2,
+    "bottom": 14.2,
+    "orientation": 0,
+    "paper_size": 7
+  },
+  "tables": 1,
+  "rows": 9,
+  "requested_body_font": "",
+  "body_size_pt": 9999999.0,
+  "body_line_spacing_pt": 9999999.0,
+  "body_line_spacing_rule": 9999999,
+  "pdf_sha256": "c16f4900aede3905e451d32e7e6c9dd60363008a1923a7e43101ee4f13d9f7e8",
+  "com_export": "SUCCESS; native warning/preview observation still missing",
+  "input_sha256_after": "7eca517011011b5cb7c3b74d38756fdfef6da5f2a7df44503bceefdbd07593c9",
+  "finished_at": "2026-09-10T12:09:39.4983726+08:00"
+}
