@@ -8,6 +8,7 @@ from app.service.academic_identity.contracts import IdentityRejected, positive
 
 
 class SharedAction(str, Enum):
+    CREATE = "create"
     READ = "read"
     EDIT = "edit"
     EXPORT = "export"

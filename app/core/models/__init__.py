@@ -55,4 +55,7 @@ __all__ = [
     "WeeklyMonthlyScopeGrant",
 ]
 
-from app.core.models import academic_identity  # noqa: F401
+from app.core.models import (
+    academic_identity,  # noqa: F401
+    shared_weekly,  # noqa: F401
+)

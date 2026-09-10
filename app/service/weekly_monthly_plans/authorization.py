@@ -246,6 +246,8 @@ class DatabasePlanAuthorizationAdapter(PlanAuthorizationPort):
                 raise IdentityRejected("calendar_stale")
             if previous != stamp:
                 raise IdentityRejected("membership_stale")
+        if action.value not in {"create", "read", "edit", "export"}:
+            raise IdentityRejected("shared_action_not_enabled")
         assessment = SharedAuthorizationAssessment(
             "shared_weekly_v1", action, facts, stamp
         )

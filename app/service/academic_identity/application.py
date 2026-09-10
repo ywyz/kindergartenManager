@@ -1,5 +1,6 @@
 """Session-bound identity management. No page-provided actor or teaching body."""
 
+from asyncio import CancelledError
 from contextlib import asynccontextmanager
 from hashlib import sha256
 
@@ -28,7 +29,7 @@ class IdentityApplication:
         self._token_source = token_source
 
     @asynccontextmanager
-    async def transaction(self, expected, target_ids=()):
+    async def transaction(self, expected, target_ids=(), *, commit_unknown=False):
         if type(expected) is not TrustedUiSession:
             raise IdentityRejected("session_invalid")
         token = self._token_source()
@@ -82,7 +83,12 @@ class IdentityApplication:
                 final = await resolve_current_ui_session(session, token)
                 if final != current or self._token_source() != token:
                     raise IdentityRejected("session_invalid")
-                await session.commit()
+                try:
+                    await session.commit()
+                except (SQLAlchemyError, CancelledError):
+                    if commit_unknown:
+                        raise IdentityRejected("commit_unknown") from None
+                    raise
         except SQLAlchemyError:
             raise IdentityRejected("identity_conflict") from None
 
