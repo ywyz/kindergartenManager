@@ -12,6 +12,10 @@
 
 ## 1. 架构目标
 
+2026-09-08 的[周计划填写与班级协作方案](../../specs/weekly-plan-authoring/spec.md)处于需求确认、待实施阶段。
+其班级授权取数、共享保存和草稿导出需要后继业务契约；本文件后续章节仍描述已有系统。
+周计划分项 AI 生成使用应用业务服务，不据此扩大每日计划产品 Agent 的 Tool 能力。
+
 - 以云服务器上的单一在线 Web 系统向用户交付 NiceGUI 页面、只读 API 和业务能力。
 - 生产参考拓扑使用 MySQL 8；SQLite 只保留给开发、自动测试和隔离验收。
 - 通过 UI、service、repository、integration 和 core 分层控制变化。
@@ -324,3 +328,18 @@ CI、人工验收、Issue 回写和 no-ff merge；旧 F009 人工结果没有被
 - Agent WRITE 的可信 actor、`daily_plan.revision`、逐次确认、操作前版本、短事务、不可变审计与全回滚已在
   W005-W008 闭合并通过 PR #53 合入；精确交付门和完整历史以
   `specs/agent-write/tests/README.md` 为准，后续改动不能沿用历史证据跳门。
+
+## 新周计划WP-A设计指针
+
+[ADR-0011](../ADR/ADR-0011-shared-weekly-authoring-and-source-snapshots.md)拟新增显式shared_weekly_v1分支，
+复用受信session与唯一policy/application边界；AI按钮窄服务不增加产品Agent工具。
+[日历契约](../../specs/weekly-plan-authoring/calendar-contract.md)与[证据](../../specs/weekly-plan-authoring/evidence/WP-A-20260908.md)
+尚不构成运行架构GREEN；legacy周/月和其它模块沿现有规则。
+
+### 2026-09-10 WP-C身份子步（本地，非全门通过）
+
+在隔离worktree实现最小权威学年/学期/班级/assignment、独立manager资格与session绑定管理事务；
+本地代码`00afdc878b306475508c777997956cdf4638dbef`，Alembic新增`7c91e2a4b610`派生`6a8d2c4e9f10`，
+只验一次性SQLite和专属MySQL。共享授权/根/CAS/来源仍未实现；不扩旧周/月或源写权限。
+精确证据与未执行项见隔离worktree的`specs/weekly-plan-authoring/evidence/WP-C-20260910.md`，
+下一提示词`specs/weekly-plan-authoring/WP-C-next-prompt.md`。未公开提交，无CI/云端/Office/部署结论；WP-A仍缺目标Office。

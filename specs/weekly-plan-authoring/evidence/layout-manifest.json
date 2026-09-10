@@ -1,0 +1,1165 @@
+{
+  "generated_at_utc": "2026-09-08T14:08:10.019140+00:00",
+  "scope": "synthetic WP-A layout feasibility evidence; never formal export or qualification evidence",
+  "source_template": {
+    "path": "/home/ywyz/code/km-wpa-20260908/templates/weekplan.docx",
+    "sha256": "f6c17c137f04e29a68524ed400eb395984e93a16c234a065b5794d9f49a9347b",
+    "task_local_copy": "/tmp/km-wpa-layout-20260908/weekplan.docx",
+    "task_local_copy_sha256": "f6c17c137f04e29a68524ed400eb395984e93a16c234a065b5794d9f49a9347b"
+  },
+  "runtime": {
+    "python": "/home/ywyz/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "python_version": "Python 3.12.14",
+    "renderer": "/home/ywyz/.codex/plugins/cache/openai-primary-runtime/documents/26.904.11930/skills/documents/render_docx.py",
+    "soffice": "/home/ywyz/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+    "soffice_version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+    "pdfinfo": "/home/ywyz/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/pdfinfo",
+    "pdffonts": "/usr/bin/pdffonts",
+    "pdffonts_role": "post-render diagnostic only; not a DOCX renderer",
+    "loader_tool": "load_workspace_dependencies unavailable in exposed tool surface; bundled paths used explicitly",
+    "microsoft_word": null,
+    "reproducible_render_commands": [
+      "/home/ywyz/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 /home/ywyz/.codex/plugins/cache/openai-primary-runtime/documents/26.904.11930/skills/documents/render_docx.py /tmp/km-wpa-layout-20260908/normal-five-short.docx --output_dir /tmp/km-wpa-layout-20260908/render-final-normal-five-short --emit_pdf --verbose",
+      "/home/ywyz/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 /home/ywyz/.codex/plugins/cache/openai-primary-runtime/documents/26.904.11930/skills/documents/render_docx.py /tmp/km-wpa-layout-20260908/normal-five-long.docx --output_dir /tmp/km-wpa-layout-20260908/render-final-normal-five-long --emit_pdf --verbose",
+      "/home/ywyz/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 /home/ywyz/.codex/plugins/cache/openai-primary-runtime/documents/26.904.11930/skills/documents/render_docx.py /tmp/km-wpa-layout-20260908/preceding-sunday-six-short.docx --output_dir /tmp/km-wpa-layout-20260908/render-final-preceding-sunday-six-short --emit_pdf --verbose",
+      "/home/ywyz/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 /home/ywyz/.codex/plugins/cache/openai-primary-runtime/documents/26.904.11930/skills/documents/render_docx.py /tmp/km-wpa-layout-20260908/preceding-sunday-six-long.docx --output_dir /tmp/km-wpa-layout-20260908/render-final-preceding-sunday-six-long --emit_pdf --verbose",
+      "/home/ywyz/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 /home/ywyz/.codex/plugins/cache/openai-primary-runtime/documents/26.904.11930/skills/documents/render_docx.py /tmp/km-wpa-layout-20260908/saturday-six-short.docx --output_dir /tmp/km-wpa-layout-20260908/render-final-saturday-six-short --emit_pdf --verbose",
+      "/home/ywyz/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 /home/ywyz/.codex/plugins/cache/openai-primary-runtime/documents/26.904.11930/skills/documents/render_docx.py /tmp/km-wpa-layout-20260908/saturday-six-long.docx --output_dir /tmp/km-wpa-layout-20260908/render-final-saturday-six-long --emit_pdf --verbose",
+      "/home/ywyz/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 /home/ywyz/.codex/plugins/cache/openai-primary-runtime/documents/26.904.11930/skills/documents/render_docx.py /tmp/km-wpa-layout-20260908/normal-compact-candidate.docx --output_dir /tmp/km-wpa-layout-20260908/render-normal-compact-candidate --emit_pdf --verbose",
+      "/home/ywyz/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 /home/ywyz/.codex/plugins/cache/openai-primary-runtime/documents/26.904.11930/skills/documents/render_docx.py /tmp/km-wpa-layout-20260908/sunday-compact-candidate.docx --output_dir /tmp/km-wpa-layout-20260908/render-sunday-compact-candidate --emit_pdf --verbose",
+      "/home/ywyz/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 /home/ywyz/.codex/plugins/cache/openai-primary-runtime/documents/26.904.11930/skills/documents/render_docx.py /tmp/km-wpa-layout-20260908/saturday-compact-candidate.docx --output_dir /tmp/km-wpa-layout-20260908/render-saturday-compact-candidate --emit_pdf --verbose"
+    ]
+  },
+  "scripts": {
+    "make_layout_samples.py": {
+      "path": "/tmp/km-wpa-layout-20260908/make_layout_samples.py",
+      "sha256": "3689a9cde8001240a1567ebe02cba35ce8d31b6877fac43e841299e65b77c2e7"
+    },
+    "make_compact_candidates.py": {
+      "path": "/tmp/km-wpa-layout-20260908/make_compact_candidates.py",
+      "sha256": "37c10714d19955463fb7a58da81c8916d030efff476e2ac3e9ff2770295af540"
+    },
+    "write_evidence_manifest.py": {
+      "path": "/tmp/km-wpa-layout-20260908/write_evidence_manifest.py",
+      "sha256": "6c3976306564668a33af3233abb62e32d4327a6e6a072c7175b522d0ab276bd1"
+    }
+  },
+  "render_disposition": {
+    "final_base_render_prefix": "render-final-*",
+    "compact_render_prefix": "render-*-compact-candidate",
+    "initial_render_status": "VOID: the six render-* base directories were produced before the normal five-day trailing-column correction and must not be used as evidence for the current DOCX hashes.",
+    "previous_overwidth_final_status": "SUPERSEDED: the render-final-* files from the prior over-width/missing-border iteration were overwritten after the grid and border correction; only the current hashes recorded below are valid.",
+    "initial_render_dirs": [
+      "/tmp/km-wpa-layout-20260908/render-normal-five-long",
+      "/tmp/km-wpa-layout-20260908/render-normal-five-short",
+      "/tmp/km-wpa-layout-20260908/render-preceding-sunday-six-long",
+      "/tmp/km-wpa-layout-20260908/render-preceding-sunday-six-short",
+      "/tmp/km-wpa-layout-20260908/render-saturday-six-long",
+      "/tmp/km-wpa-layout-20260908/render-saturday-six-short"
+    ]
+  },
+  "font_environment": {
+    "fc_match_simsun": "NotoSerifCJK-Regular.ttc: \"Noto Serif CJK SC\" \"Regular\"",
+    "fc_match_songti": "NotoSerifCJK-Regular.ttc: \"Noto Serif CJK SC\" \"Regular\"",
+    "note": "宋体/SimSun resolves to Noto Serif CJK SC in this container; this is not Songti evidence"
+  },
+  "documents": {
+    "normal-five-short": {
+      "path": "/tmp/km-wpa-layout-20260908/normal-five-short.docx",
+      "sha256": "23d49d44d1325fcc5cf3452b3f56c0305ca905eb7b3e521472ac281967375f49",
+      "bytes": 17897,
+      "table": [
+        {
+          "grid_twips": [
+            933,
+            920,
+            1722,
+            1722,
+            1723,
+            1723,
+            1723
+          ],
+          "rows": 9,
+          "physical_cells_per_row": [
+            7,
+            7,
+            7,
+            3,
+            3,
+            2,
+            2,
+            2,
+            2
+          ],
+          "spans": [
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              5
+            ],
+            [
+              1,
+              1,
+              5
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ]
+          ]
+        }
+      ],
+      "section": {
+        "page_width_twips": 11906,
+        "page_height_twips": 16838,
+        "margins_twips": {
+          "left": 720,
+          "right": 720,
+          "top": 284,
+          "bottom": 284
+        }
+      },
+      "table_text_chars_excluding_whitespace": 362
+    },
+    "normal-five-long": {
+      "path": "/tmp/km-wpa-layout-20260908/normal-five-long.docx",
+      "sha256": "b233f5236f094c116aaa6a6f64f978d37fd211bb504f7697be95b7b181d45eaa",
+      "bytes": 19348,
+      "table": [
+        {
+          "grid_twips": [
+            933,
+            920,
+            1722,
+            1722,
+            1723,
+            1723,
+            1723
+          ],
+          "rows": 9,
+          "physical_cells_per_row": [
+            7,
+            7,
+            7,
+            3,
+            3,
+            2,
+            2,
+            2,
+            2
+          ],
+          "spans": [
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              5
+            ],
+            [
+              1,
+              1,
+              5
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ]
+          ]
+        }
+      ],
+      "section": {
+        "page_width_twips": 11906,
+        "page_height_twips": 16838,
+        "margins_twips": {
+          "left": 720,
+          "right": 720,
+          "top": 284,
+          "bottom": 284
+        }
+      },
+      "table_text_chars_excluding_whitespace": 1407
+    },
+    "preceding-sunday-six-short": {
+      "path": "/tmp/km-wpa-layout-20260908/preceding-sunday-six-short.docx",
+      "sha256": "8e6a1eab161812e9d4eded889a61b7a7d4c25a07f523274dd1e6ce5039e17442",
+      "bytes": 17941,
+      "table": [
+        {
+          "grid_twips": [
+            933,
+            920,
+            1435,
+            1435,
+            1435,
+            1436,
+            1436,
+            1436
+          ],
+          "rows": 9,
+          "physical_cells_per_row": [
+            8,
+            8,
+            8,
+            3,
+            3,
+            2,
+            2,
+            2,
+            2
+          ],
+          "spans": [
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              6
+            ],
+            [
+              1,
+              1,
+              6
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ]
+          ]
+        }
+      ],
+      "section": {
+        "page_width_twips": 11906,
+        "page_height_twips": 16838,
+        "margins_twips": {
+          "left": 720,
+          "right": 720,
+          "top": 284,
+          "bottom": 284
+        }
+      },
+      "table_text_chars_excluding_whitespace": 378
+    },
+    "preceding-sunday-six-long": {
+      "path": "/tmp/km-wpa-layout-20260908/preceding-sunday-six-long.docx",
+      "sha256": "8d5e1323fa72ec2e46b37b6cba9504e4bbcf576baefa8592cb087bb3cdb4b3aa",
+      "bytes": 19385,
+      "table": [
+        {
+          "grid_twips": [
+            933,
+            920,
+            1435,
+            1435,
+            1435,
+            1436,
+            1436,
+            1436
+          ],
+          "rows": 9,
+          "physical_cells_per_row": [
+            8,
+            8,
+            8,
+            3,
+            3,
+            2,
+            2,
+            2,
+            2
+          ],
+          "spans": [
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              6
+            ],
+            [
+              1,
+              1,
+              6
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ]
+          ]
+        }
+      ],
+      "section": {
+        "page_width_twips": 11906,
+        "page_height_twips": 16838,
+        "margins_twips": {
+          "left": 720,
+          "right": 720,
+          "top": 284,
+          "bottom": 284
+        }
+      },
+      "table_text_chars_excluding_whitespace": 1488
+    },
+    "saturday-six-short": {
+      "path": "/tmp/km-wpa-layout-20260908/saturday-six-short.docx",
+      "sha256": "647214502c6721f85896eaf7190941af505ea1e6d3914112e00cead82483c821",
+      "bytes": 17939,
+      "table": [
+        {
+          "grid_twips": [
+            933,
+            920,
+            1435,
+            1435,
+            1435,
+            1436,
+            1436,
+            1436
+          ],
+          "rows": 9,
+          "physical_cells_per_row": [
+            8,
+            8,
+            8,
+            3,
+            3,
+            2,
+            2,
+            2,
+            2
+          ],
+          "spans": [
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              6
+            ],
+            [
+              1,
+              1,
+              6
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ]
+          ]
+        }
+      ],
+      "section": {
+        "page_width_twips": 11906,
+        "page_height_twips": 16838,
+        "margins_twips": {
+          "left": 720,
+          "right": 720,
+          "top": 284,
+          "bottom": 284
+        }
+      },
+      "table_text_chars_excluding_whitespace": 378
+    },
+    "saturday-six-long": {
+      "path": "/tmp/km-wpa-layout-20260908/saturday-six-long.docx",
+      "sha256": "741c59b3090441095040f7b8692fc476db3dedb10c38f1032df247a5f9f3ff6e",
+      "bytes": 19383,
+      "table": [
+        {
+          "grid_twips": [
+            933,
+            920,
+            1435,
+            1435,
+            1435,
+            1436,
+            1436,
+            1436
+          ],
+          "rows": 9,
+          "physical_cells_per_row": [
+            8,
+            8,
+            8,
+            3,
+            3,
+            2,
+            2,
+            2,
+            2
+          ],
+          "spans": [
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              6
+            ],
+            [
+              1,
+              1,
+              6
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ]
+          ]
+        }
+      ],
+      "section": {
+        "page_width_twips": 11906,
+        "page_height_twips": 16838,
+        "margins_twips": {
+          "left": 720,
+          "right": 720,
+          "top": 284,
+          "bottom": 284
+        }
+      },
+      "table_text_chars_excluding_whitespace": 1488
+    },
+    "normal-compact-candidate": {
+      "path": "/tmp/km-wpa-layout-20260908/normal-compact-candidate.docx",
+      "sha256": "5d226d1d1a222b3e2726e0467dd52dbdebf63745b3e10632d73da812bc95acc8",
+      "bytes": 18008,
+      "table": [
+        {
+          "grid_twips": [
+            933,
+            920,
+            1722,
+            1722,
+            1723,
+            1723,
+            1723
+          ],
+          "rows": 9,
+          "physical_cells_per_row": [
+            7,
+            7,
+            7,
+            3,
+            3,
+            2,
+            2,
+            2,
+            2
+          ],
+          "spans": [
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              5
+            ],
+            [
+              1,
+              1,
+              5
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              6
+            ]
+          ]
+        }
+      ],
+      "section": {
+        "page_width_twips": 11906,
+        "page_height_twips": 16838,
+        "margins_twips": {
+          "left": 720,
+          "right": 720,
+          "top": 284,
+          "bottom": 284
+        }
+      },
+      "table_text_chars_excluding_whitespace": 491
+    },
+    "sunday-compact-candidate": {
+      "path": "/tmp/km-wpa-layout-20260908/sunday-compact-candidate.docx",
+      "sha256": "551670a33ed65b1b174274863001537fc7ff36fb612413b5d7b1131c0d48744f",
+      "bytes": 18041,
+      "table": [
+        {
+          "grid_twips": [
+            933,
+            920,
+            1435,
+            1435,
+            1435,
+            1436,
+            1436,
+            1436
+          ],
+          "rows": 9,
+          "physical_cells_per_row": [
+            8,
+            8,
+            8,
+            3,
+            3,
+            2,
+            2,
+            2,
+            2
+          ],
+          "spans": [
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              6
+            ],
+            [
+              1,
+              1,
+              6
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ]
+          ]
+        }
+      ],
+      "section": {
+        "page_width_twips": 11906,
+        "page_height_twips": 16838,
+        "margins_twips": {
+          "left": 720,
+          "right": 720,
+          "top": 284,
+          "bottom": 284
+        }
+      },
+      "table_text_chars_excluding_whitespace": 523
+    },
+    "saturday-compact-candidate": {
+      "path": "/tmp/km-wpa-layout-20260908/saturday-compact-candidate.docx",
+      "sha256": "d427447dc2d7de15ff9b1f433f97a9a9e6b5c6f9715f05d8cbde3e32aa4ad79e",
+      "bytes": 18039,
+      "table": [
+        {
+          "grid_twips": [
+            933,
+            920,
+            1435,
+            1435,
+            1435,
+            1436,
+            1436,
+            1436
+          ],
+          "rows": 9,
+          "physical_cells_per_row": [
+            8,
+            8,
+            8,
+            3,
+            3,
+            2,
+            2,
+            2,
+            2
+          ],
+          "spans": [
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              6
+            ],
+            [
+              1,
+              1,
+              6
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              1,
+              7
+            ]
+          ]
+        }
+      ],
+      "section": {
+        "page_width_twips": 11906,
+        "page_height_twips": 16838,
+        "margins_twips": {
+          "left": 720,
+          "right": 720,
+          "top": 284,
+          "bottom": 284
+        }
+      },
+      "table_text_chars_excluding_whitespace": 523
+    }
+  },
+  "renders": {
+    "normal-five-short": {
+      "directory": "/tmp/km-wpa-layout-20260908/render-final-normal-five-short",
+      "pdf": "/tmp/km-wpa-layout-20260908/render-final-normal-five-short/normal-five-short.pdf",
+      "pdf_sha256": "42c274fb13171889b8a647f9fe20453a8c900231779fcb83b80394e72a615613",
+      "pdf_bytes": 92833,
+      "pages": 1,
+      "page_size": "595.304 x 841.89 pts (A4)",
+      "pdffonts_rows": [
+        "BAAAAA+NotoSerifCJKsc-Bold           Type 1            Builtin          yes yes yes    185  0",
+        "CAAAAA+NotoSerifCJKsc-Regular        Type 1            Builtin          yes yes yes    190  0"
+      ],
+      "pngs": [
+        {
+          "path": "/tmp/km-wpa-layout-20260908/render-final-normal-five-short/page-1.png",
+          "sha256": "71a2a6e6ecae8b5eeca0998baf2fdd1529ee538cf6be645cb1456a7245cc785c",
+          "bytes": 244848
+        }
+      ]
+    },
+    "normal-five-long": {
+      "directory": "/tmp/km-wpa-layout-20260908/render-final-normal-five-long",
+      "pdf": "/tmp/km-wpa-layout-20260908/render-final-normal-five-long/normal-five-long.pdf",
+      "pdf_sha256": "53a3693c71e2c43d10d9365e8a615dd25942ae99fab264ee38b4227beea7eee8",
+      "pdf_bytes": 178109,
+      "pages": 2,
+      "page_size": "595.304 x 841.89 pts (A4)",
+      "pdffonts_rows": [
+        "BAAAAA+NotoSerifCJKsc-Bold           Type 1            Builtin          yes yes yes    184  0",
+        "CAAAAA+NotoSerifCJKsc-Regular        Type 1            Builtin          yes yes yes    189  0",
+        "DAAAAA+NotoSerifCJKsc-Regular        Type 1            Builtin          yes yes yes    194  0"
+      ],
+      "pngs": [
+        {
+          "path": "/tmp/km-wpa-layout-20260908/render-final-normal-five-long/page-1.png",
+          "sha256": "969c8aeac10302e71ba73986fceb45adf9f6043f9423f64476f88a9b08a56231",
+          "bytes": 418618
+        },
+        {
+          "path": "/tmp/km-wpa-layout-20260908/render-final-normal-five-long/page-2.png",
+          "sha256": "fa271cf7dded5ffc35eb0f31e86f321b69a88a37bf579677ce7867fa70025c84",
+          "bytes": 377666
+        }
+      ]
+    },
+    "preceding-sunday-six-short": {
+      "directory": "/tmp/km-wpa-layout-20260908/render-final-preceding-sunday-six-short",
+      "pdf": "/tmp/km-wpa-layout-20260908/render-final-preceding-sunday-six-short/preceding-sunday-six-short.pdf",
+      "pdf_sha256": "a38701d6b1f8919b22b2c1533c507b8d64f1bf149794b0acc8a5390a5e7486b7",
+      "pdf_bytes": 94740,
+      "pages": 1,
+      "page_size": "595.304 x 841.89 pts (A4)",
+      "pdffonts_rows": [
+        "BAAAAA+NotoSerifCJKsc-Bold           Type 1            Builtin          yes yes yes    197  0",
+        "CAAAAA+NotoSerifCJKsc-Regular        Type 1            Builtin          yes yes yes    202  0"
+      ],
+      "pngs": [
+        {
+          "path": "/tmp/km-wpa-layout-20260908/render-final-preceding-sunday-six-short/page-1.png",
+          "sha256": "6ffae4af5709a008ac976809fe445c180e030ccf000c12246c903d79d84ff0d6",
+          "bytes": 246682
+        }
+      ]
+    },
+    "preceding-sunday-six-long": {
+      "directory": "/tmp/km-wpa-layout-20260908/render-final-preceding-sunday-six-long",
+      "pdf": "/tmp/km-wpa-layout-20260908/render-final-preceding-sunday-six-long/preceding-sunday-six-long.pdf",
+      "pdf_sha256": "b64844c2a43b84c9b6931d6bc2f9ac77259fca13f6a40a84a7dbcc84be517ec9",
+      "pdf_bytes": 180133,
+      "pages": 2,
+      "page_size": "595.304 x 841.89 pts (A4)",
+      "pdffonts_rows": [
+        "BAAAAA+NotoSerifCJKsc-Bold           Type 1            Builtin          yes yes yes    194  0",
+        "CAAAAA+NotoSerifCJKsc-Regular        Type 1            Builtin          yes yes yes    199  0",
+        "DAAAAA+NotoSerifCJKsc-Regular        Type 1            Builtin          yes yes yes    204  0"
+      ],
+      "pngs": [
+        {
+          "path": "/tmp/km-wpa-layout-20260908/render-final-preceding-sunday-six-long/page-1.png",
+          "sha256": "4c8f1e2cd209eafd4717528b50aa5302ab3d3ef7ab3911ca8228183ed01d4759",
+          "bytes": 379380
+        },
+        {
+          "path": "/tmp/km-wpa-layout-20260908/render-final-preceding-sunday-six-long/page-2.png",
+          "sha256": "1ac9eb361f027b08365a20f57aac832bc7a20d8ca7c98bac987ef633f3c42559",
+          "bytes": 422670
+        }
+      ]
+    },
+    "saturday-six-short": {
+      "directory": "/tmp/km-wpa-layout-20260908/render-final-saturday-six-short",
+      "pdf": "/tmp/km-wpa-layout-20260908/render-final-saturday-six-short/saturday-six-short.pdf",
+      "pdf_sha256": "76aad19cb8fc769f4e7c6ed6fd92d0a4b3f3f24378b3ed82c7e8e7f65df0d1bf",
+      "pdf_bytes": 94943,
+      "pages": 1,
+      "page_size": "595.304 x 841.89 pts (A4)",
+      "pdffonts_rows": [
+        "BAAAAA+NotoSerifCJKsc-Bold           Type 1            Builtin          yes yes yes    197  0",
+        "CAAAAA+NotoSerifCJKsc-Regular        Type 1            Builtin          yes yes yes    202  0"
+      ],
+      "pngs": [
+        {
+          "path": "/tmp/km-wpa-layout-20260908/render-final-saturday-six-short/page-1.png",
+          "sha256": "2ac777571135ad828d51ef3989274309d2b0617eefee134e8accdfa5e36fa1e3",
+          "bytes": 247559
+        }
+      ]
+    },
+    "saturday-six-long": {
+      "directory": "/tmp/km-wpa-layout-20260908/render-final-saturday-six-long",
+      "pdf": "/tmp/km-wpa-layout-20260908/render-final-saturday-six-long/saturday-six-long.pdf",
+      "pdf_sha256": "051238ee0a4b21b4d7d9fe0fc505b1a9c8dd60539397bb7d1d9d6a39c9ada0fe",
+      "pdf_bytes": 180338,
+      "pages": 2,
+      "page_size": "595.304 x 841.89 pts (A4)",
+      "pdffonts_rows": [
+        "BAAAAA+NotoSerifCJKsc-Bold           Type 1            Builtin          yes yes yes    194  0",
+        "CAAAAA+NotoSerifCJKsc-Regular        Type 1            Builtin          yes yes yes    199  0",
+        "DAAAAA+NotoSerifCJKsc-Regular        Type 1            Builtin          yes yes yes    204  0"
+      ],
+      "pngs": [
+        {
+          "path": "/tmp/km-wpa-layout-20260908/render-final-saturday-six-long/page-1.png",
+          "sha256": "c61bdaf9a5a084ee567b0b6bfc3bf9ad0990dac695db10521d50d43e28254c2c",
+          "bytes": 379817
+        },
+        {
+          "path": "/tmp/km-wpa-layout-20260908/render-final-saturday-six-long/page-2.png",
+          "sha256": "1ac9eb361f027b08365a20f57aac832bc7a20d8ca7c98bac987ef633f3c42559",
+          "bytes": 422670
+        }
+      ]
+    },
+    "normal-compact-candidate": {
+      "directory": "/tmp/km-wpa-layout-20260908/render-normal-compact-candidate",
+      "pdf": "/tmp/km-wpa-layout-20260908/render-normal-compact-candidate/normal-compact-candidate.pdf",
+      "pdf_sha256": "786dc27995496c48f17f4b22fed92738b65e960cd2b661d18330103d33357441",
+      "pdf_bytes": 102080,
+      "pages": 1,
+      "page_size": "595.304 x 841.89 pts (A4)",
+      "pdffonts_rows": [
+        "BAAAAA+NotoSerifCJKsc-Bold           Type 1            Builtin          yes yes yes    180  0",
+        "CAAAAA+NotoSerifCJKsc-Regular        Type 1            Builtin          yes yes yes    185  0"
+      ],
+      "pngs": [
+        {
+          "path": "/tmp/km-wpa-layout-20260908/render-normal-compact-candidate/page-1.png",
+          "sha256": "786ef7146de874890cc77b2097f787dbe7c3b9fb4bd752e88bcfe55c76212419",
+          "bytes": 295826
+        }
+      ]
+    },
+    "sunday-compact-candidate": {
+      "directory": "/tmp/km-wpa-layout-20260908/render-sunday-compact-candidate",
+      "pdf": "/tmp/km-wpa-layout-20260908/render-sunday-compact-candidate/sunday-compact-candidate.pdf",
+      "pdf_sha256": "ff15539ef802e1c68e6f1e39db2806b3e7bc1f6243d0b6e01f582fb777bcdbe6",
+      "pdf_bytes": 104532,
+      "pages": 2,
+      "page_size": "595.304 x 841.89 pts (A4)",
+      "pdffonts_rows": [
+        "BAAAAA+NotoSerifCJKsc-Bold           Type 1            Builtin          yes yes yes    194  0",
+        "CAAAAA+NotoSerifCJKsc-Regular        Type 1            Builtin          yes yes yes    199  0"
+      ],
+      "pngs": [
+        {
+          "path": "/tmp/km-wpa-layout-20260908/render-sunday-compact-candidate/page-1.png",
+          "sha256": "2dc1e34ec02b3508ae0247a6ad3263f0f5c4fa7166e18dc48619f45aaed6c3dc",
+          "bytes": 296651
+        },
+        {
+          "path": "/tmp/km-wpa-layout-20260908/render-sunday-compact-candidate/page-2.png",
+          "sha256": "c7110d01551f91dae4d521f4ce5db4de0004ee0fcda94a56fa290f6826861dcd",
+          "bytes": 14589
+        }
+      ]
+    },
+    "saturday-compact-candidate": {
+      "directory": "/tmp/km-wpa-layout-20260908/render-saturday-compact-candidate",
+      "pdf": "/tmp/km-wpa-layout-20260908/render-saturday-compact-candidate/saturday-compact-candidate.pdf",
+      "pdf_sha256": "3ef933a75ee3d7246f742e42414869afd6948ba4a1c0f979ab716deb92d4c839",
+      "pdf_bytes": 104725,
+      "pages": 2,
+      "page_size": "595.304 x 841.89 pts (A4)",
+      "pdffonts_rows": [
+        "BAAAAA+NotoSerifCJKsc-Bold           Type 1            Builtin          yes yes yes    194  0",
+        "CAAAAA+NotoSerifCJKsc-Regular        Type 1            Builtin          yes yes yes    199  0"
+      ],
+      "pngs": [
+        {
+          "path": "/tmp/km-wpa-layout-20260908/render-saturday-compact-candidate/page-1.png",
+          "sha256": "8aa659a8a178efdb80549aa00ca261bd7696803b606a16b2dd7aecbe39126e18",
+          "bytes": 297445
+        },
+        {
+          "path": "/tmp/km-wpa-layout-20260908/render-saturday-compact-candidate/page-2.png",
+          "sha256": "c7110d01551f91dae4d521f4ce5db4de0004ee0fcda94a56fa290f6826861dcd",
+          "bytes": 14589
+        }
+      ]
+    }
+  },
+  "budget_observation": {
+    "short_fixture_chars": "362 (normal five), 378 (each six-day)",
+    "long_fixture_chars": "1407 (normal five), 1488 (each six-day)",
+    "short_pages": "1 page for all three variants under bundled Linux renderer",
+    "long_pages": "2 pages for all three variants under bundled Linux renderer",
+    "compact_candidate": "normal 1 page; each six-day candidate 2 pages with only the home-school row continuing onto page 2",
+    "shrink_confirmation": "Keep exact 20pt/A4/Songti/counts; shorten candidate text in the daily cells and merged slots, then rerender every 5/6-day fixture under both Linux bundled LO and Windows Word. A one-page claim requires all pages free of clipping/overlap and fixed counts preserved; no automatic truncation or font/margin reduction."
+  }
+}

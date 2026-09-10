@@ -309,6 +309,13 @@ RED/GREEN/Review/precheck SHA、计数和 node hash 统一记录在 `specs/agent
 
 ## 11. R6：产品深化（模板、文档、审核与复用）
 
+2026-09-08 产品需求更新：优先实现[周计划填写与班级协作](../specs/weekly-plan-authoring/spec.md)。
+用户已确认同班共享、草稿导出、重复备课人工选取、来源快照、多教师姓名以及缩减确认；
+需要每日活动名称、权威班级成员、日历、提示词、五／六列单页导出的配套改动。
+目前仅形成[实施顺序与验收矩阵](../specs/weekly-plan-authoring/tasks.md)，不代表这些能力已落地。
+月计划新需求后置；原 WMP-9 的旧产品矩阵不能代替新周计划验收。
+班级身份依赖与 Issue #75 方向对齐，但不据此声称该 Issue 的完整历史／升班范围已实现。
+
 状态：`串行交付中；WMP-9 production prerequisites 实现门 PASS，证据闭合待当前 SHA 回读`（2026-09-07；模板中心
 T006/T011-C、当前脱敏 v2 evidence、WMP-3～WMP-8 已按各自门完成；WMP-9 最终验收仍未执行）。完整方向与阶段依赖见
 [`docs/PRODUCT_DIRECTION.md`](PRODUCT_DIRECTION.md)，规划跟踪见
@@ -382,3 +389,21 @@ Word/浏览器/SQLite/MySQL 人工验收。R6 的“规划”不得外推为已�
 - 历史通过但当前未复跑时写“历史完成”，不写“完成”。
 - 分支、身份模式、数据库或部署边界改变时同步 `CONTEXT.md` 与 ADR。
 - 不在 Roadmap 中用模糊的“基本完成”“应该可用”代替明确门禁。
+
+## 2026-09-08 WP-A工作记录
+
+#77 WP-A：适用基线 `8dcc83376577695b562529ec42adc6b48817f004`；后继ADR/迁移/日期设计与当前行为差距RED已建立，
+总门未完成，排版/Review与缺项详见[唯一账本](../specs/weekly-plan-authoring/evidence/WP-A-20260908.md)。
+WP-B～WP-F仍未实施；不改写旧WMP tested-code/closure/CI，不扩展月计划。
+
+2026-09-09用户批准WP-A/WP-C门调整：依赖新共享接口的可执行业务RED移至WP-C首门，先RED再GREEN；WP-A保留契约/断言与现有差距RED，仍被真实宋体/目标Office单页证据阻塞。未实施产品，工作SHA仍8dcc83376577695b562529ec42adc6b48817f004；详见specs/weekly-plan-authoring/tasks.md及本门账本。
+
+2026-09-09字体补充：用户授权的本机/两台SSH宿主宋体安装完成；实际SimSun bundled Linux候选short/compact各1页、long各2页，独立证据复核完成。Windows Word仍缺，WP-A未完成；实际基线仍8dcc83376577695b562529ec42adc6b48817f004，详见specs/weekly-plan-authoring/evidence/WP-A-fonts-20260909.md。无产品/容器/业务库改动。
+
+### 2026-09-10 WP-C身份子步（本地，非全门通过）
+
+在隔离worktree实现最小权威学年/学期/班级/assignment、独立manager资格与session绑定管理事务；
+本地代码`00afdc878b306475508c777997956cdf4638dbef`，Alembic新增`7c91e2a4b610`派生`6a8d2c4e9f10`，
+只验一次性SQLite和专属MySQL。共享授权/根/CAS/来源仍未实现；不扩旧周/月或源写权限。
+精确证据与未执行项见隔离worktree的`specs/weekly-plan-authoring/evidence/WP-C-20260910.md`，
+下一提示词`specs/weekly-plan-authoring/WP-C-next-prompt.md`。未公开提交，无CI/云端/Office/部署结论；WP-A仍缺目标Office。

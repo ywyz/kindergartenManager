@@ -1,5 +1,8 @@
 # KindergartenManager 数据模型
 
+2026-09-08 已确认、尚未实施的[周计划填写需求](../../specs/weekly-plan-authoring/spec.md)将涉及每日活动名称、
+权威班级成员、同班共享周聚合与来源 revision。下文表结构仍描述当前实现，不代表上述新模型已经迁移。
+
 > 文档审查基线：2026-09-07 当前工作树；当前 Alembic head：`3c9f4b2a7d1e`。
 > W005-W008 已闭合。当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的应用服务层 WRITE；
 > Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确本地交付状态、Review 轮次、
@@ -306,3 +309,17 @@ W008 固定 SHA 的独立人工门闭合。
 - 可信 UI session 已恢复并进入分支/远端 CI，但当前会话不落独立 server-side session 表，后续撤销/运维策略需以独立需求收紧。
 - W005-W008 已闭合逐次确认、操作前版本、不可变审计、原子 CAS、真实 MySQL 8 与固定 SHA 可见验收；
   精确门禁以 `specs/agent-write/tests/README.md` 为准，后续改动不得沿用历史证据。
+
+## 新周计划WP-A迁移提案
+
+[迁移设计](../../specs/weekly-plan-authoring/migration-proposal.md)拟分门增加activity_name、最小权威班级成员和独立共享聚合。
+包含tenant复合FK、教学周/日期唯一、不可变来源版本、CAS及旧数据显式映射；仅提案，未新增migration或变更当前schema。
+[WP-A账本](../../specs/weekly-plan-authoring/evidence/WP-A-20260908.md)区分旧基线通过、差距RED与未实现能力。
+
+### 2026-09-10 WP-C身份子步（本地，非全门通过）
+
+在隔离worktree实现最小权威学年/学期/班级/assignment、独立manager资格与session绑定管理事务；
+本地代码`00afdc878b306475508c777997956cdf4638dbef`，Alembic新增`7c91e2a4b610`派生`6a8d2c4e9f10`，
+只验一次性SQLite和专属MySQL。共享授权/根/CAS/来源仍未实现；不扩旧周/月或源写权限。
+精确证据与未执行项见隔离worktree的`specs/weekly-plan-authoring/evidence/WP-C-20260910.md`，
+下一提示词`specs/weekly-plan-authoring/WP-C-next-prompt.md`。未公开提交，无CI/云端/Office/部署结论；WP-A仍缺目标Office。
