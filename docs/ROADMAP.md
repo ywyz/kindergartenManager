@@ -1,3 +1,5 @@
+> 2026-09-11 当前周计划状态见[实时核对](../specs/weekly-plan-authoring/current-status.md)：WP-A 已限定关闭，WP-C 授权/事实子步已本地交付、身份基线已公开；下方旧阶段记录不作当前阻塞。
+
 # KindergartenManager 产品与工程路线图
 
 > 当前快照：2026-09-07；当前源码与生产部署分别核验，精确发布/部署历史见

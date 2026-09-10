@@ -1,0 +1,134 @@
+{
+  "local_evidence_root": "/home/ywyz/code/km-wpc-auth-evidence-20260911",
+  "tested_code_sha": "59677fc656bab152485c0355f3470f5763951888",
+  "files": {
+    "baseline-expired-fixture.log": {
+      "bytes": 1508,
+      "sha256": "4961a125c2bb64b216e3e6b247b007c2242db72327d8514efc3168e31c6b3e06"
+    },
+    "environment.json": {
+      "bytes": 430,
+      "sha256": "00931a6412f49b5649b0b5c500c43a7c7695dcb12a6417be7a613c7840a61c46"
+    },
+    "final-sha-compat.log": {
+      "bytes": 28546,
+      "sha256": "0dca452436fe52b87662f369877a3ff568a659e155ae8153f20b3ede2595fdac"
+    },
+    "final-sha-foundation.log": {
+      "bytes": 341,
+      "sha256": "d804708da86b22db89a3a44682dc2141ba59f1d4541727c0e0d4280fbf899d1e"
+    },
+    "final-sha-legacy.log": {
+      "bytes": 1840,
+      "sha256": "1342b3f0c0a35d349664b6a71641bd2d654a8e61e9b59a664ea8222e22905f7c"
+    },
+    "final-sha-mysql.log": {
+      "bytes": 100,
+      "sha256": "d374aef7f192b3910ac6aa972829716eedbcb651d84748e60e192fb48620fd0d"
+    },
+    "final-sha-tests.log": {
+      "bytes": 1483,
+      "sha256": "fea5392f4724ffebf5cf7aff4b1fa4bae27855059b6df0e5fba4d2a17895d95c"
+    },
+    "green-boundary.log": {
+      "bytes": 99,
+      "sha256": "66e35649982ffc4d65166a1a4c5bd345a7f55c8186d5c645be25efde0b4fdf48"
+    },
+    "green-initial.log": {
+      "bytes": 99,
+      "sha256": "99c2702cf144c4a83407c672aebedf7de9e66a0e16c2cb95e4f397ce2a63d468"
+    },
+    "green-integrity-expiry.log": {
+      "bytes": 99,
+      "sha256": "b94272ec7b6bf40f5dd660cde49d6d76e3d9ea3aa38c2c57a546a37d257724dc"
+    },
+    "issue-75-before.json": {
+      "bytes": 9141,
+      "sha256": "c77e48dd71dbf46257ef9df454fe9be9a1d86a7602acbda99cdf49943bb835c5"
+    },
+    "issue-77-before.json": {
+      "bytes": 48785,
+      "sha256": "9bc9d3f115b2f03f76292ee07cabb3a5e1ba944ca67f9307519dd5f00b126241"
+    },
+    "issue-77-comment.md": {
+      "bytes": 5739,
+      "sha256": "9d0938078f7d78dd14a440f7d2359b130235dfaeac90042b1aca0be9df5ea858"
+    },
+    "mysql-expanded.log": {
+      "bytes": 100,
+      "sha256": "1a2ef9a41997d8cbcb6ab4eac7bc7356fc7feaf99e768acd05d7a1028eba204e"
+    },
+    "mysql-initial.log": {
+      "bytes": 100,
+      "sha256": "547e8ee64ade8acfd75a9630b9ccf57f1e25a5411631b9cb495c5203056b86d8"
+    },
+    "new-dependency-audit.log": {
+      "bytes": 265,
+      "sha256": "79d30422388543b2563e1dde76bb7e7857d7ef0c6fdf05c8c71598633ca07e1e"
+    },
+    "new-dependency.txt": {
+      "bytes": 24,
+      "sha256": "f627a2ac3f5b2a4a9ed397b545b4c07531b1885c672171c36ed0067443352ecd"
+    },
+    "red-activation-1.log": {
+      "bytes": 13024,
+      "sha256": "b2d77fed42a5b2e04f18a85d636f2a7b6b5c1ec5ca85c196f5c234312f8cb583"
+    },
+    "red-activation-2.log": {
+      "bytes": 2584,
+      "sha256": "31670b055e786df781c447e52352ef39517d7d48b8c6dd8edd9225846ef23aa9"
+    },
+    "red-activation.json": {
+      "bytes": 35653,
+      "sha256": "c11695cbb2b601f0c5ca7624a9f81482e3b8488a446c18d7bcf38ea258224143"
+    },
+    "red-activation.tar.gz": {
+      "bytes": 522828,
+      "sha256": "1472483e74d685321fb031eb44e5f4a64dee83143bcd0beba7bc814b94536ca5"
+    },
+    "red-baseline-denials.log": {
+      "bytes": 114,
+      "sha256": "cf3b7f44ebf73d29a04c1d34868cad82b9874e23bd1ddafdf6cdcd71891131de"
+    },
+    "red-boundary-consistency-1.log": {
+      "bytes": 1243,
+      "sha256": "4cb83f44596e5f65c33aafa64ac4e3b21caccf45ef836a606d4649fb423e2917"
+    },
+    "red-boundary-consistency-2.log": {
+      "bytes": 1243,
+      "sha256": "8ced34ade98dfe9214a8b0da7f860e529585702f2ff3783aa3728c862c33310b"
+    },
+    "red-boundary-consistency.json": {
+      "bytes": 35653,
+      "sha256": "20d78b726b2386627aa09cd49c74b47988c3596f3288aece9225177b6e715c81"
+    },
+    "red-boundary-consistency.tar.gz": {
+      "bytes": 523502,
+      "sha256": "f576f18aa92b0b603a30bb7c3b34f9d79c3d4e1f9b3fa9b501b715af193ce2c7"
+    },
+    "red-integrity-expiry-1.log": {
+      "bytes": 1233,
+      "sha256": "8fdaaf3d1a535d0c0004937906d42c222486c211a28c0a7b36867ab78e6d93e5"
+    },
+    "red-integrity-expiry-2.log": {
+      "bytes": 1233,
+      "sha256": "23c577acc17795641bdec2b610796e909b5843d2785c584eeed8633c590974f1"
+    },
+    "red-integrity-expiry.json": {
+      "bytes": 35653,
+      "sha256": "a685b90b18dfae0c9e56182a5c0382a762ced71df249554207c7a92422449c18"
+    },
+    "red-integrity-expiry.tar.gz": {
+      "bytes": 523036,
+      "sha256": "5e450e493ac8d8e0d7f026ba85a9f1074baf71d72072a805732526b7528f31b8"
+    },
+    "snapshot.py": {
+      "bytes": 1023,
+      "sha256": "e33205e4bfbae91b791045daa43cfc8b19db22f9300ef62d309319fd723b4f01"
+    },
+    "sqlite-expanded.log": {
+      "bytes": 100,
+      "sha256": "0024bdc1d101d2597412ef722e39e00976234a1b493248ab604d7151d5258ea8"
+    }
+  }
+}

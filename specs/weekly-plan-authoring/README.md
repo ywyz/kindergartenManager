@@ -1,3 +1,5 @@
+> 当前入口（2026-09-11本地交付）：[状态与证据边界](current-status.md)；[下一根/版本/CAS子步](WP-C-root-next-prompt.md)。下方阶段快照按记录时点解释。
+
 > 2026-09-10 最终收口口径：WP-A 实现基线、契约与最短完整 Word 五／六列单页可行性完成；long 三份仍为两页。共享业务实现、正式模板资格、缩减流程和产品/云端验收属于后续门。最终独立复审、提交与 exact-SHA CI 的关闭绑定见[收口账本](evidence/WP-A-closure-20260910.md)及其 Issue 回写；未完成 CI 时不得据此宣布正式关闭。
 
 # 周计划阶段资料与Windows交接
@@ -7,7 +9,7 @@
 `00afdc878b306475508c777997956cdf4638dbef`，汇入最新WP-A/B/C未提交设计和交付资料。
 历史账本中“尚未提交/无可访问链接”描述当时状态，保留原文，不据本次同步改写历史证据或CI结论。
 
-**当前Windows任务入口：[WP-A-Windows-validation-prompt.md](WP-A-Windows-validation-prompt.md)。**
+**历史Windows交接任务入口：[WP-A-Windows-validation-prompt.md](WP-A-Windows-validation-prompt.md)。**
 
 - [可携带的九份合成样本及Linux参照](validation/wp-a-simsun-20260909/README.md)
 - [WP-A宋体/Office历史边界](evidence/WP-A-fonts-20260909.md)

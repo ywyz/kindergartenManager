@@ -1,3 +1,7 @@
+> 2026-09-11：此提示词的授权/事实子步已有[本地交付](evidence/WP-C-authorization-20260911.md)，当前下一门见[根/版本/CAS](WP-C-root-next-prompt.md)。下文为历史任务文本，不是新一轮执行入口。
+
+> 历史交接提示词，保留原文。当前入口已由[共享授权与权威教学日事实](WP-C-authorization-next-prompt.md)替代；身份代码已公开、WP-A 已限定关闭，见[当前状态](current-status.md)。
+
 # WP-C 下一门提示词：最小权威身份与共享行为 RED
 
 请推进 kindergartenManager Issue #77 的 WP-C 首道门。先实时读取 #77/#75 当前正文与回写、AGENTS.md、

@@ -1,3 +1,5 @@
+> 当前入口（2026-09-11本地交付）：[状态与证据边界](current-status.md)；[下一根/版本/CAS子步](WP-C-root-next-prompt.md)。下方阶段快照按记录时点解释。
+
 > 2026-09-10 最终收口口径：WP-A 实现基线、契约与最短完整 Word 五／六列单页可行性完成；long 三份仍为两页。共享业务实现、正式模板资格、缩减流程和产品/云端验收属于后续门。最终独立复审、提交与 exact-SHA CI 的关闭绑定见[收口账本](evidence/WP-A-closure-20260910.md)及其 Issue 回写；未完成 CI 时不得据此宣布正式关闭。
 
 # 周计划实现顺序与验收矩阵
@@ -5,7 +7,7 @@
 状态：2026-09-10用户确认Word为主要格式验收客户端、LibreOffice仅备用打开。WP-A最短完整五/六列Word单页可行性及原生观察证据已补齐；LibreOffice格式差异不再阻塞。实际结果见[Word账本](evidence/WP-A-Windows-20260910.md)，long三份单页FAIL保留。其他产品门与CI/云端独立，不因本次通过。
 
 任务入口：[Issue #77](https://github.com/ywyz/kindergartenManager/issues/77)。
-先执行 [WP-A 提示词](WP-A-prompt.md)，本门不顺带实施 WP-B～WP-F。
+WP-A 已限定关闭；授权/事实子步已本地交付；下一步仅执行 [根/版本/CAS](WP-C-root-next-prompt.md)。
 
 ## WP-A 实现基线与契约
 
@@ -98,5 +100,11 @@ Microsoft Word系列为主要格式验收客户端，按实际测试产品/版�
 ## 2026-09-10 WP-C 身份子步实证
 
 最小权威身份管理/显式资格/assignment与迁移已本地实现；见[evidence/WP-C-20260910.md](evidence/WP-C-20260910.md)。
-本地SHA `00afdc878b306475508c777997956cdf4638dbef`，未公开。共享授权、根/CAS、逐日来源、映射/快照仍缺真实seam，
+身份SHA `00afdc878b306475508c777997956cdf4638dbef` 已随 handoff 分支公开；原交付时“未公开”只作历史记录。共享授权、根/CAS、逐日来源、映射/快照仍缺真实seam，
 上方WP-C首门检查项不勾选。下一小步见[WP-C-next-prompt.md](WP-C-next-prompt.md)，WP-A/后续门边界保留。
+
+## 2026-09-11 WP-C 授权/事实子步（局部交付）
+
+[本轮账本](evidence/WP-C-authorization-20260911.md)分别记录真实业务双RED/最小GREEN、当前SHA、
+SQLite/MySQL、独立Review与旧兼容失败。上方完整WP-C首门仍不勾选；根/CAS/来源/映射/日期占用未实现。
+下一轮只做[根/版本/CAS](WP-C-root-next-prompt.md)。

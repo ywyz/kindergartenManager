@@ -1,3 +1,7 @@
+> 2026-09-11：此提示词的授权/事实子步已有[本地交付](evidence/WP-C-authorization-20260911.md)，当前下一门见[根/版本/CAS](WP-C-root-next-prompt.md)。下文为历史任务文本，不是新一轮执行入口。
+
+> 历史交接提示词，保留原文。当前入口已由[共享授权与权威教学日事实](WP-C-authorization-next-prompt.md)替代；身份代码已公开、WP-A 已限定关闭，见[当前状态](current-status.md)。
+
 > 2026-09-10 当前口径：下方保留交接时原提示词，旧“WP-A Office缺项”已由 Word 实测和用户客户端范围决定替代，不再是推进本小步的阻塞。WP-A 最短完整五／六列可行性完成，long 三份两页保留失败；正式关闭绑定见[收口账本](evidence/WP-A-closure-20260910.md)。既有身份代码已随 handoff 分支公开，启动下一步仍须实时核实 HEAD/远端/工作区，不能沿用历史“未公开”判断。下一产品步骤仅为共享授权及权威实际教学日事实的小步，逐项先 RED 后 GREEN；此指针不构成本轮实施授权。
 
 请继续 kindergartenManager Issue #77 的 WP-C 首门，下一小步仅做新shared_weekly_v1的真实授权政策seam；不要一次实现共享/来源全部功能。

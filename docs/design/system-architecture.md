@@ -1,3 +1,5 @@
+> 2026-09-11 当前周计划状态见[实时核对](../../specs/weekly-plan-authoring/current-status.md)：WP-A 已限定关闭，WP-C 授权/事实子步已本地交付、身份基线已公开；下方旧阶段记录不作当前阻塞。
+
 # KindergartenManager 系统架构设计
 
 > 文档审查基线为 2026-08-31 当前 `main`；Agent Foundation 与 Agent WRITE
@@ -336,7 +338,7 @@ CI、人工验收、Issue 回写和 no-ff merge；旧 F009 人工结果没有被
 [日历契约](../../specs/weekly-plan-authoring/calendar-contract.md)与[证据](../../specs/weekly-plan-authoring/evidence/WP-A-20260908.md)
 尚不构成运行架构GREEN；legacy周/月和其它模块沿现有规则。
 
-### 2026-09-10 WP-C身份子步（本地，非全门通过）
+### 2026-09-10 WP-C身份子步（当时本地交付快照，非全门通过）
 
 在隔离worktree实现最小权威学年/学期/班级/assignment、独立manager资格与session绑定管理事务；
 本地代码`00afdc878b306475508c777997956cdf4638dbef`，Alembic新增`7c91e2a4b610`派生`6a8d2c4e9f10`，

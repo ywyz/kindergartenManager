@@ -1,3 +1,5 @@
+> 2026-09-11 当前周计划状态见[实时核对](../../specs/weekly-plan-authoring/current-status.md)：WP-A 已限定关闭，WP-C 授权/事实子步已本地交付、身份基线已公开；下方旧阶段记录不作当前阻塞。
+
 # KindergartenManager 数据模型
 
 2026-09-08 已确认、尚未实施的[周计划填写需求](../../specs/weekly-plan-authoring/spec.md)将涉及每日活动名称、
@@ -316,7 +318,7 @@ W008 固定 SHA 的独立人工门闭合。
 包含tenant复合FK、教学周/日期唯一、不可变来源版本、CAS及旧数据显式映射；仅提案，未新增migration或变更当前schema。
 [WP-A账本](../../specs/weekly-plan-authoring/evidence/WP-A-20260908.md)区分旧基线通过、差距RED与未实现能力。
 
-### 2026-09-10 WP-C身份子步（本地，非全门通过）
+### 2026-09-10 WP-C身份子步（当时本地交付快照，非全门通过）
 
 在隔离worktree实现最小权威学年/学期/班级/assignment、独立manager资格与session绑定管理事务；
 本地代码`00afdc878b306475508c777997956cdf4638dbef`，Alembic新增`7c91e2a4b610`派生`6a8d2c4e9f10`，

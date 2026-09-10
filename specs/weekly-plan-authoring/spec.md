@@ -1,3 +1,5 @@
+> 当前入口（2026-09-11本地交付）：[状态与证据边界](current-status.md)；[下一根/版本/CAS子步](WP-C-root-next-prompt.md)。下方阶段快照按记录时点解释。
+
 > 2026-09-10 最终收口口径：WP-A 实现基线、契约与最短完整 Word 五／六列单页可行性完成；long 三份仍为两页。共享业务实现、正式模板资格、缩减流程和产品/云端验收属于后续门。最终独立复审、提交与 exact-SHA CI 的关闭绑定见[收口账本](evidence/WP-A-closure-20260910.md)及其 Issue 回写；未完成 CI 时不得据此宣布正式关闭。
 
 # 周计划填写与班级协作需求
@@ -6,12 +8,12 @@
 本次只推进周计划及其必要的每日计划字段、班级成员、提示词和导出依赖。月计划后续另行设计。
 
 实现跟踪：[Issue #77](https://github.com/ywyz/kindergartenManager/issues/77)；总项 #57/#55，
-权威班级成员依赖 #75，模板资格关联 #56。下一门执行提示词见 [WP-A 提示词](WP-A-prompt.md)。
+权威班级成员依赖 #75，模板资格关联 #56。下一产品子步见 [根/版本/CAS提示词](WP-C-root-next-prompt.md)。
 
 ## 1. 与现有实现的关系
 
 当前 `/weekly-monthly-plans` 是已有计划的读取、导出和状态操作入口，不具备本规格的填写流程。
-当前 `DailyPlan` 没有集体活动名称，`WeekPeriod` 固定周一至周日，`WeeklyActivityPlan.days` 固定五天；
+WP-A 最初源码快照中 `DailyPlan` 没有集体活动名称（WP-B 已新增，见本页后附交付指针），`WeekPeriod` 固定周一至周日，`WeeklyActivityPlan.days` 固定五天；
 数据库 `weekly_activity_plan_day` 的索引和星期也限制为 0–4。
 当前 `ClassConfig` 和 `SemesterConfig` 按用户保存，不能用名称相同推导跨账号授权。
 
