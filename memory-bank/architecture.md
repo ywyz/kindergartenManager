@@ -535,3 +535,9 @@ WP-A 实现基线、契约与最短完整 Word 五／六列单页可行性完成
 其格式失败及未执行 Linux 格式验证不再阻塞；空格无需宋体。历史 BLOCKED 和 Review 数字不改写。
 实际独立复审、证据持久化、closure SHA 与自身 CI 的绑定只见[收口账本](../specs/weekly-plan-authoring/evidence/WP-A-closure-20260910.md)及其 #77 回写；
 提交前不预写 CI 成功，未取得适用检查成功时不宣称正式关闭。下一产品步骤仅为 WP-C-next-prompt.md 的共享授权/权威教学日事实小步，本轮未执行。
+
+### 2026-09-11 WP-C根子步历史指针
+
+隔离本地实现最小主题共享根/不可变版本/CAS/日期占用，8d20f3b5c721派生7c91e2a4b610；
+精确SHA、双RED/初始覆盖、数据库及独立Review见specs/weekly-plan-authoring/evidence/WP-C-root-20260911.md。
+来源映射、WP-D/E/F与云端验收未实施，不把本地结果外推为完整产品GREEN。

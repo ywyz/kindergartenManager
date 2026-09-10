@@ -1,3 +1,5 @@
+> 2026-09-11 根子步本地交付：见[根账本](evidence/WP-C-root-20260911.md)及[冻结契约](WP-C-root-contract.md)；下一轮仅[显式来源映射](WP-C-mapping-next-prompt.md)。历史段落和未执行来源/产品门保持。
+
 > 2026-09-11当前实现补充：授权及最小教学日事实见[本轮冻结契约](WP-C-authorization-contract.md)与[交付账本](evidence/WP-C-authorization-20260911.md)。下方WP-A提案按当时时点保留；未实现的共享根/来源及WP-D/E仍不计通过。本步无新schema。
 
 # WP-A 新共享周计划窄服务契约

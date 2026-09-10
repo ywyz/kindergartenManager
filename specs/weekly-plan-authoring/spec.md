@@ -1,4 +1,6 @@
-> 当前入口（2026-09-11本地交付）：[状态与证据边界](current-status.md)；[下一根/版本/CAS子步](WP-C-root-next-prompt.md)。下方阶段快照按记录时点解释。
+> 2026-09-11 根子步本地交付：见[根账本](evidence/WP-C-root-20260911.md)及[冻结契约](WP-C-root-contract.md)；下一轮仅[显式来源映射](WP-C-mapping-next-prompt.md)。历史段落和未执行来源/产品门保持。
+
+> 当前入口（2026-09-11本地交付）：[状态与证据边界](current-status.md)；[下一显式来源映射子步](WP-C-mapping-next-prompt.md)。下方阶段快照按记录时点解释。
 
 > 2026-09-10 最终收口口径：WP-A 实现基线、契约与最短完整 Word 五／六列单页可行性完成；long 三份仍为两页。共享业务实现、正式模板资格、缩减流程和产品/云端验收属于后续门。最终独立复审、提交与 exact-SHA CI 的关闭绑定见[收口账本](evidence/WP-A-closure-20260910.md)及其 Issue 回写；未完成 CI 时不得据此宣布正式关闭。
 
@@ -8,7 +10,7 @@
 本次只推进周计划及其必要的每日计划字段、班级成员、提示词和导出依赖。月计划后续另行设计。
 
 实现跟踪：[Issue #77](https://github.com/ywyz/kindergartenManager/issues/77)；总项 #57/#55，
-权威班级成员依赖 #75，模板资格关联 #56。下一产品子步见 [根/版本/CAS提示词](WP-C-root-next-prompt.md)。
+权威班级成员依赖 #75，模板资格关联 #56。根/版本/CAS已本地交付；下一产品子步见[显式来源映射提示词](WP-C-mapping-next-prompt.md)。
 
 ## 1. 与现有实现的关系
 

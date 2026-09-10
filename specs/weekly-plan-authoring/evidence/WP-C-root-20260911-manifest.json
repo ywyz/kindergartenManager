@@ -1,0 +1,207 @@
+{
+  "tested_code_sha": "db9797afe25a5489c6366b23a19da6ec5f3036f0",
+  "parent_root_checkpoint": "0dedf64f3f4cfb08cbe6a5c2a93695c2684e31bd",
+  "source_head": "8d20f3b5c721",
+  "artifacts": {
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/create-red-1.log": {
+      "bytes": 23970,
+      "sha256": "05f41fcba7938d7be89feb0dbd9c45aebe054689823faa1a7b72f9342c4c06f5"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/create-red-2.log": {
+      "bytes": 23970,
+      "sha256": "e5465cab28d7f758706481bfedeb70f511eb058f35da6b480f742812746bd571"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/create-red-valid-1.log": {
+      "bytes": 8656,
+      "sha256": "fd2f3b37f0a5b283c99859cffb6405a1c4a823d134b44d5bfc0f6b1cc909c756"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/create-red-valid-2.log": {
+      "bytes": 8656,
+      "sha256": "cf66481d610a42e1e81b8bc290ec313e87dc4b34c75ba166e84bdb2cf18b4d4a"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/create-red-valid.json": {
+      "bytes": 153612,
+      "sha256": "3128ba353c36d3be17a56cdb3c4901877ec3e5b504fa8011691bf97879ecac7d"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/create-red-valid.tar.gz": {
+      "bytes": 24270849,
+      "sha256": "ef479814289fcf608064e622d9e308450d0348a4541bfec4071e00c9eedfeac4"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/create-red.json": {
+      "bytes": 153612,
+      "sha256": "7456734348fe40355d68b4d6daefd72aa354a11c20c356673cb1d6fd3612ca77"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/create-red.tar.gz": {
+      "bytes": 24270858,
+      "sha256": "cefe18e0199bb46b69879c147265fb66cbdf77e58850210b3599d6f74871acc5"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/entrance.json": {
+      "bytes": 152925,
+      "sha256": "37bca2b4313127eb1352945fa2221fb13f62270cd1de5b93ed779e0c0e02724b"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/entrance.tar.gz": {
+      "bytes": 24261728,
+      "sha256": "f24fc52b572e77cc6d1637b3ff3d103e923db37deb77d17d0f140af1a1ec9b8f"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/expanded-mysql.log": {
+      "bytes": 191,
+      "sha256": "4ffd25640fc2c8bf34b1e3af34e01a47c0a31e74ffe28df27cc606654f790abe"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/expanded-sqlite.log": {
+      "bytes": 100,
+      "sha256": "9014ac75ce2e92fb56a218a76dbcb0750ba1fdefd72a8e1111985065eab0907f"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/final-foundation.log": {
+      "bytes": 341,
+      "sha256": "8f9b10559bbe38b4fe754bdcd95282271888990c64e6693ff3c245ed6ae41966"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/final-legacy.log": {
+      "bytes": 6467,
+      "sha256": "55b482b1f85c1d2e4d6ad91a45d85a8e67d946fd9d86bf6aa5d9eeb7d8a838d5"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/final-mysql.log": {
+      "bytes": 191,
+      "sha256": "0b513b4e950b0e2abed4eeaa26c6622849f9f23c19194fa6359feaf1451ad3b1"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/final-tests.log": {
+      "bytes": 1564,
+      "sha256": "dd8378176a67ff4b728a9bfb114ec8759ea3188a783fff04e419d209fd25bcf8"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/foundation-guard-1.log": {
+      "bytes": 8122,
+      "sha256": "f8a02f7ef2eac993f104c4cd133f98603ce232a5a6a9479028862997ea9427f5"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/foundation-guard-2.log": {
+      "bytes": 8122,
+      "sha256": "b107d45dcb04a1a0ad820175823210ce88f205cd45a71421a1b5705b857abbe9"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/foundation-guard-before.json": {
+      "bytes": 153718,
+      "sha256": "e7d78af4bec4937717b0455286d545eb5f7cfed206fc7589e801ed6d4a9ee7e4"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/foundation-guard-before.tar.gz": {
+      "bytes": 24274083,
+      "sha256": "e7a8a0a9ecebaaa4689568a3457ebe806884788aadf194474571088da57a5755"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/foundation-guard-green.log": {
+      "bytes": 113,
+      "sha256": "8309f9365b66db649cd09b0c5a7eca71ace0b7bf37d56ff160d0ecfef529922e"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/foundation-version-before.json": {
+      "bytes": 153718,
+      "sha256": "c7f1d1a8dedd8381058d021d21ffe16b507d113dfa1105641f74a442c6b5e69d"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/foundation-version-before.tar.gz": {
+      "bytes": 24274222,
+      "sha256": "c2e463dcbfb0cf85ad2cf7d3628ca3bd3c5fb400d109a155041f0208fc7f52b2"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/foundation-version-red-1.log": {
+      "bytes": 8168,
+      "sha256": "2e814f98fe5ae00d4c5fb209aa7481fd097210d002d368cfa6c56bed3c7bd973"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/foundation-version-red-2.log": {
+      "bytes": 8168,
+      "sha256": "c528b03bef75151617e0de7fad4d604c1678f10d8778b4bbe29c8942b0246ad2"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/issues-before.json": {
+      "bytes": 63823,
+      "sha256": "1ce330342d1e021b3ccc0aa64a7fb552bd0406fda618fec3e99852bd369ef1be"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/make_migration.py": {
+      "bytes": 4534,
+      "sha256": "b383876809f6d1d7a87d93fbd4627a87a9252d4ec38d2fea0a78b70037c5c842"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/preservation-final.json": {
+      "bytes": 389,
+      "sha256": "1fbe130b0e36d161bbac44a4d144e037e4702db656427b0c1a151a76f16c7980"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/preserved.json": {
+      "bytes": 16285,
+      "sha256": "6bea2debce02ce50961c0ebe8b5218e2c433f2948faaee42cca4cc9f7e19ece1"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/root-green.log": {
+      "bytes": 99,
+      "sha256": "3ffe82ead82024c1338fafcdacc32bba7b6444e62fd46df8242bd69e7fc160b7"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/root-initial.log": {
+      "bytes": 9693,
+      "sha256": "8a141fa320f0e3fc72e5e1d1136ccab6ed86e7ff97b9615b49c5123544c1cdca"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/root-insert-red-1.log": {
+      "bytes": 4650,
+      "sha256": "e928e2e3c9d336efd0b6e5e9e6875e2426332c7a20cfeb8be9d1a2d3e7d60c9e"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/root-insert-red-2.log": {
+      "bytes": 4650,
+      "sha256": "47636783382df246b6df106e89ffdf9a2ebe9a5bb97e752d5fa9bcf5cc50bae2"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/root-insert-red.json": {
+      "bytes": 153612,
+      "sha256": "3d13691681e35df853cb9e7e7801650bcea44bd936d247a031bab34be1772a04"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/root-insert-red.tar.gz": {
+      "bytes": 24272411,
+      "sha256": "63782e21a5d9e37f63a219c6de377c01b23f3a56e88c1c77a6d005c59a31e20c"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/root-mysql-green.log": {
+      "bytes": 100,
+      "sha256": "d503ddf8f1d3ad71add5d1da5718be8b8e43ca62a044436ead5a0639cf302ad1"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/root-sqlite-53.log": {
+      "bytes": 100,
+      "sha256": "c226aeac2c3275c5d8bb1f022cbf1f541decbb8cf487d72059afb62463f77895"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/schema-mysql-red-1.log": {
+      "bytes": 9695,
+      "sha256": "9bedb1fb81c04b07a39c5d45747e5e558020abdf59203c02ed61a5b66d6c2eab"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/schema-mysql-red-2.log": {
+      "bytes": 9695,
+      "sha256": "556db6c5c57f79397da71bf57ced37872e9c41215aeaa23e0a6996a1767aef46"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/schema-red-1.log": {
+      "bytes": 9697,
+      "sha256": "6835a32964153e753e3a7d3b657e6c2a75005682cd5ef9e3e61029d254254080"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/schema-red-2.log": {
+      "bytes": 9697,
+      "sha256": "f38cbd3a111f328b802a39263f98a9070808ae443a8f598717ae1f9f77cf339f"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/schema-red.json": {
+      "bytes": 153612,
+      "sha256": "f82b37074fd7a23684b46852486acad2be3d71f99249e16f2197324a4e47f325"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/schema-red.tar.gz": {
+      "bytes": 24270848,
+      "sha256": "b2186faefbdb782765315d079d8cdff1248b59364500b465843bf3cca2120eca"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/snapshot.py": {
+      "bytes": 679,
+      "sha256": "14bf8ed69259713841232c87923590fedf0537877554ec89c4516a6ceb0b78c8"
+    },
+    "/home/ywyz/code/km-wpc-root-evidence-20260911/issue-77-comment.md": {
+      "bytes": 5878,
+      "sha256": "df928ac07f3081f419c5044da72573d9956cf45c5b258e677805a646acbe95d5"
+    }
+  },
+  "code_hashes": {
+    "alembic/versions/8d20f3b5c721_shared_weekly_roots.py": "8630f4e4a74c30ca41e9020f9d01709f6e2877803666a63125234e9f9b2e09e1",
+    "app/core/models/__init__.py": "17a138e97cf4fc48dbf8bc7a07ba20963264e042f04607055ca6e510bff72cc8",
+    "app/core/models/shared_weekly.py": "361aeae797d780ed944f9cdaf943164e7c7c6dbfaa3f7c10144b84dfc7b30e35",
+    "app/repository/shared_weekly_repository.py": "b5ed432b648748086f842a3e65f299d0189195498d50b312daca1b604502bb66",
+    "app/service/academic_identity/application.py": "ccfe5ae052b46e4aab6fab4d3485774bc6ec1bdeaa69ea7af2dc6746c93c1b8a",
+    "app/service/shared_weekly/contracts.py": "aedb247fafa545633781d1a16ccbaa21f9a22272027e9b9e5c1bcea7fc514b14",
+    "app/service/shared_weekly/root_application.py": "214f6f4dba0e560d2e23fde0940c30d639358f3651a498568df80e3a865bcd91",
+    "app/service/shared_weekly/root_contracts.py": "5eb78bc20f45d077801f7ed3b761e2513d870772985787cdb299f4d1d785eeb5",
+    "app/service/weekly_monthly_plans/authorization.py": "64a01da3342151163741e6dfa5c9ef5bf18ad3b85212ac1725b8432b8f41009e",
+    "specs/agent-foundation/tests/test_f009_zero_persistence_matrix_red.py": "152cb982479a9733b40c1011fa76910df836be2bf5cf236b3ec734277fd9ddb4",
+    "specs/weekly-plan-authoring/WP-C-root-contract.md": "a89b1064343a4b9839db953a7b27d236357150ad71a3f84863097c40dc0e1695",
+    "tests/test_wpc_root_migration.py": "319248c4868c8da65a7b2b6b0f2fb5564a30a4bc59967338eb69a91c8d54327b",
+    "tests/test_wpc_shared_root.py": "93543a2bcdb3c1b7b8ae21d41c001cb633ff95ac6a9cd005cf23fe70f4e68aa7"
+  },
+  "mysql_case_count": 117,
+  "sqlite_only_cases_in_mysql_command": 3,
+  "new_root_and_migration_cases": 53,
+  "remote_ci": null,
+  "mysql_container_removed": true
+}

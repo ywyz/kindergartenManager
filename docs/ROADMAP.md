@@ -1,3 +1,5 @@
+> 2026-09-11 根/版本/CAS本地交付：[证据与范围](../specs/weekly-plan-authoring/evidence/WP-C-root-20260911.md)。新迁移8d20f3b5c721；主题草稿非完整周正文/正式导出，来源映射仍待后续。
+
 > 2026-09-11 当前周计划状态见[实时核对](../specs/weekly-plan-authoring/current-status.md)：WP-A 已限定关闭，WP-C 授权/事实子步已本地交付、身份基线已公开；下方旧阶段记录不作当前阻塞。
 
 # KindergartenManager 产品与工程路线图
