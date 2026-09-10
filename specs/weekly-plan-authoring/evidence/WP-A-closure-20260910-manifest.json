@@ -4,8 +4,8 @@
   "evidence_closure_binding": "Final Issue #77 comment after commit and exact-SHA CI",
   "files": {
     ".gitattributes": {
-      "bytes": 253,
-      "sha256": "93b5c6aa01b6c68b048cdbe1b8821f46345c8a96b272b97fd38a200e523026b2"
+      "bytes": 329,
+      "sha256": "180e3690c9776a612bd5150346475e866276d204e18cd73a589446447b7f265a"
     },
     "CONTEXT.md": {
       "bytes": 26758,
@@ -23,6 +23,10 @@
       "bytes": 42819,
       "sha256": "deb6a3a23d2716469da769c4a3d5896974716d3667083d6ba5d9139a7575b593"
     },
+    "specs/agent-foundation/tests/test_f009_zero_persistence_matrix_red.py": {
+      "bytes": 48525,
+      "sha256": "c1944c98317803a0b507c95869f0c2cb0bca6005b1ea27f94d6e60c72d272811"
+    },
     "specs/weekly-plan-authoring/calendar-contract.md": {
       "bytes": 4796,
       "sha256": "88c75c9dd9f033479a87e5b18a3c387c9a2f1f51da22d1cc5a6d3c5fff8dff06"
@@ -35,13 +39,17 @@
       "bytes": 14965,
       "sha256": "22028e1b7b7f1d6f909a0a60bc766a937a4f01250e8a9010a11465fc62025c4b"
     },
+    "specs/weekly-plan-authoring/evidence/WP-A-closure-20260910-ci.md": {
+      "bytes": 2712,
+      "sha256": "f7871bec1c87678b428942ba2965d7fe40802a9ba5a34ace9768827e8143a482"
+    },
     "specs/weekly-plan-authoring/evidence/WP-A-closure-20260910-review.md": {
-      "bytes": 2769,
-      "sha256": "84cd3bcc240382ce62c9538d79822f589aea33e61122d99f506b8933e665b3f3"
+      "bytes": 3681,
+      "sha256": "f1ca7cd183083d6d775e2fef1e0272cbf52314a43c41510de00941dd9e191dbf"
     },
     "specs/weekly-plan-authoring/evidence/WP-A-closure-20260910.md": {
-      "bytes": 11231,
-      "sha256": "b0daf8251a56d07a55a53a3b4789ae9a071100f56f0f5e01760fcb01d6d1255a"
+      "bytes": 12110,
+      "sha256": "f4380055f4588de7a96fa0408798ed060f1f3d126faef28db7f6a3c381a5cdd4"
     },
     "specs/weekly-plan-authoring/evidence/WP-A-fonts-20260909.md": {
       "bytes": 6925,
@@ -142,6 +150,10 @@
     "specs/weekly-plan-authoring/validation/wp-a-client-policy-20260910-212412/review.md": {
       "bytes": 654,
       "sha256": "f98be1e76a243ae30ab09464b87d7b631111959398182b72524a73c2ad90be21"
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-closure-20260910/ci_guard_probe.py": {
+      "bytes": 1866,
+      "sha256": "44584cef0cdbb462a26683cd02c184c5b0cf25b48d0fc9eca7a6522096855909"
     },
     "specs/weekly-plan-authoring/validation/wp-a-closure-20260910/original-scripts/lo-inspect_outputs.py.txt": {
       "bytes": 6022,

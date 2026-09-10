@@ -91,6 +91,7 @@ AUTHORIZED_AGENT_WRITE_EVIDENCE_TABLES = frozenset(
 )
 AUTHORIZED_NON_AGENT_BUSINESS_TABLES = frozenset(
     {
+        "identity_audit",  # Existing WP-C identity_manage audit, not Agent state.
         "weekly_monthly_plan",
         "weekly_monthly_plan_version",
         "weekly_activity_plan_day",
@@ -1381,6 +1382,7 @@ async def test_restart_after_draft_has_fresh_ids_history_and_no_agent_schema(
     for term in FORBIDDEN_AGENT_SCHEMA_TERMS:
         assert _is_forbidden_agent_schema_name(f"foundation_{term}")
     assert AUTHORIZED_AGENT_WRITE_EVIDENCE_TABLES <= names
+    assert "identity_audit" in names
     assert not any(
         _is_forbidden_agent_schema_name(name)
         for name in names
@@ -1390,6 +1392,7 @@ async def test_restart_after_draft_has_fresh_ids_history_and_no_agent_schema(
     rows_by_table = {
         table_name: rows for table_name, _columns, rows in snapshot.database
     }
+    assert rows_by_table["identity_audit"] == ()
     assert all(
         rows_by_table[table_name] == ()
         for table_name in AUTHORIZED_AGENT_WRITE_EVIDENCE_TABLES

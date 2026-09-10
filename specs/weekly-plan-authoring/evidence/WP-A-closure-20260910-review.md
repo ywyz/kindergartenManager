@@ -30,3 +30,13 @@ Reviewer 提醒 LibreOffice 报告“整体不关闭”及后续 Linux 诊断段
 Reviewer 支持：**WP-A 实质条件满足，实现基线、契约与最短完整 Word 五／六列单页可行性完成；三份 long 两页保留失败，
 后续共享业务、正式模板、缩减流程及产品/云端验收未完成。** 正式关闭以实际 closure SHA、其 exact-SHA CI 与 #77 阶段清单/评论读回为条件。
 无产品 Review 0/0 或提前 CI 成功结论；历史 R1 移交不是业务测试通过。
+
+## exact-SHA CI 暴露问题后的独立窄复核
+
+`bb84827` / run34488927576 的 Foundation 实际失败，详见[CI 补充](WP-A-closure-20260910-ci.md)。
+同一 reviewer 独立核对 CI、已有迁移/身份业务表及测试，随后再次核对 Main 的实际三行 diff：
+只在精确非 Agent 表集合增加 `identity_audit`，并断言存在/为空；禁止词/函数与全部副作用保护未改。
+reviewer 独立两次执行隔离名称探针均 exit0，Ruff 检查测试/探针通过，明确没有执行 DDL 或业务接口。
+最后结论：支持必要测试修正、无新阻止 finding，不放宽零持久化；若 Agent 改动 identity_audit，
+全库前后快照及新增空表断言仍会失败。没有在 CI 重跑之前声称 Foundation/Quality 已通过。
+完整 Foundation 和最后 closure SHA 仍须远端重新运行，结果只由 #77 最终回写绑定，不借用旧 SHA。

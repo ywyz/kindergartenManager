@@ -91,9 +91,17 @@ headSha 精确为 `eb3504383023eac6f6c93d8769b6d273a55abd7f`，Ruff changed Pyth
 `check=False` 保持原有手工检查 returncode 的行为。修正后 Ruff 通过；不以旧人工验收声称执行过新脚本，不重跑会写文件的渲染脚本。
 原记录与新脚本版本分别保留 hash，原始产物由旧脚本生成的事实不变。
 
-新 push 的 Quality 按既有 workflow 使用 before=handoff 的变更 Python 范围；成功也不表示上述历史65条已修复，
+首个收口提交的 Quality 按既有 workflow 使用 before=handoff 的变更 Python 范围；成功也不表示上述历史65条已修复，
 更不代表相对 main 的完整分支 lint/PR CI 成功。本轮不修改质量规则或排除列表。
 closure SHA 的远端运行必须另行读回；不能借用 handoff 或旧代码的测试结果。
+
+首个收口提交 `bb84827afb59f29575f93028f162c9adafe3e0e5` 已 push，Git对象442项核验通过，但
+[其自身 Quality](https://github.com/ywyz/kindergartenManager/actions/runs/34488927576) 最终为 failure：
+Test 1215 passed/1 skipped，Foundation 260 passed/1 failed。已有非 Agent 的 `identity_audit` 表命中 F009
+旧名称守卫。此提交不是最终 CI 关闭证据，不能把此前“待CI”的文字读成成功。
+经只读 reviewer 确认后仅修正测试的精确业务表枚举，并新增该表存在/为空断言；产品和 Office 样本无改动。
+完整原因、隔离探针与复审边界见[CI 补充](WP-A-closure-20260910-ci.md)。后继提交的 push before 为 `bb84827…`，
+其实际 closure SHA 和重新运行的完整 Foundation/Quality 结果仍由 #77 最终评论绑定；不继承前一 SHA 的任何成功状态。
 
 ## 独立复审及未执行边界
 
