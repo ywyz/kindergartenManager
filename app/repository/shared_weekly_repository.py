@@ -9,6 +9,10 @@ from app.core.models.shared_weekly import TABLES
 from app.core.models.source_mapping import TABLES as MAPPING_TABLES
 from app.core.models.weekly_sources import TABLES as SOURCE_TABLES
 from app.service.academic_identity.contracts import IdentityRejected
+from app.service.shared_weekly.authoring_contracts import (
+    WeeklyAuthoringDraft,
+    reference_for,
+)
 from app.service.shared_weekly.body_contracts import (
     SourceSnapshot,
     TargetPath,
@@ -170,8 +174,26 @@ class SharedWeeklyRepository:
         return await self.publish(root, assessment, draft, op)
 
     async def publish(self, root, assessment, draft, op):
-        if type(draft) not in (WeeklyThemeDraft, WeeklyCollaborationDraft):
+        if type(draft) not in (
+            WeeklyThemeDraft,
+            WeeklyCollaborationDraft,
+            WeeklyAuthoringDraft,
+        ):
             raise IdentityRejected("input_invalid")
+        if type(draft) is WeeklyAuthoringDraft and draft.archive:
+            if root["current_version"] is None:
+                raise IdentityRejected("source_unavailable")
+            previous = (await self.load(root, assessment)).body
+            prior_sources = (
+                previous.all_sources
+                if type(previous) is WeeklyAuthoringDraft
+                else previous.sources
+                if type(previous) is WeeklyCollaborationDraft
+                else ()
+            )
+            allowed = {reference_for(source) for source in prior_sources}
+            if any(reference_for(source) not in allowed for source in draft.archive):
+                raise IdentityRejected("source_unavailable")
         auth = assessment.stamp
         body, facts = draft.serialize(), facts_json(assessment.facts)
         number = root["revision"] + 1
@@ -194,7 +216,10 @@ class SharedWeeklyRepository:
             )
         )
         version_id = result.inserted_primary_key[0]
-        if type(draft) is WeeklyCollaborationDraft and draft.sources:
+        if (
+            type(draft) in (WeeklyCollaborationDraft, WeeklyAuthoringDraft)
+            and draft.sources
+        ):
             for source in draft.sources:
                 event = (
                     (
@@ -303,7 +328,7 @@ class SharedWeeklyRepository:
         ):
             raise IdentityRejected("content_invalid")
         body = parse_body(row["body_json"])
-        if type(body) is WeeklyCollaborationDraft:
+        if type(body) in (WeeklyCollaborationDraft, WeeklyAuthoringDraft):
             source_rows = tuple(
                 (
                     await self.session.execute(

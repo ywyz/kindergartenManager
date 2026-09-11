@@ -360,7 +360,7 @@ def test_people_migration_empty_roundtrip(migration_db):
             connection.execute(
                 sa.text("SELECT version_num FROM alembic_version")
             ).scalar_one()
-            == "b153c7e9f026"
+            == "c264d8fa1037"
         )
 
 

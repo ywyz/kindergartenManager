@@ -31,11 +31,12 @@ from app.integration.holiday_client.client import (
     is_holiday,
     is_near_holiday,
 )
+from app.service.academic_identity.contracts import IdentityRejected
 from app.service.date_service import (
     get_week_number,
     get_weekday_cn,
-    is_workday,
     is_within_semester,
+    is_workday,
 )
 
 
@@ -99,11 +100,13 @@ class DatePanel:
         semester_end: date_type | None = None,
         on_date_change=None,
         on_date_selected=None,
+        week_number_resolver=None,
     ) -> None:
         self.semester_start = semester_start
         self.semester_end = semester_end
         self.on_date_change = on_date_change
         self.on_date_selected = on_date_selected
+        self.week_number_resolver = week_number_resolver or get_week_number
         self.selected_date: date_type | None = None
         self._selection_guard = DateSelectionGuard()
 
@@ -125,19 +128,17 @@ class DatePanel:
                 ).classes("flex-1")
 
                 with self._date_input:
-                    with ui.menu().props("no-parent-event") as date_menu:
-                        with ui.date(
-                            on_change=lambda e: self._on_picker_change(e.value)
-                        ):
-                            with ui.row().classes("justify-end"):
-                                ui.button("确定", on_click=date_menu.close).props(
-                                    "flat"
-                                )
+                    with (
+                        ui.menu().props("no-parent-event") as date_menu,
+                        ui.date(on_change=lambda e: self._on_picker_change(e.value)),
+                        ui.row().classes("justify-end"),
+                    ):
+                        ui.button("确定", on_click=date_menu.close).props("flat")
                     ui.button(icon="event", on_click=date_menu.open).props("flat round")
 
                 ui.button(
                     "今天",
-                    on_click=lambda: self._set_date(date_type.today().isoformat()),
+                    on_click=lambda: self._set_date(date_type.today().isoformat()),  # noqa: DTZ011 — retain the existing local-calendar Today action
                 ).props("flat dense").classes("text-blue-600")
 
             # 周次/星期显示行
@@ -235,15 +236,24 @@ class DatePanel:
         week_info_parts = [weekday_cn]
 
         if self.semester_start:
-            week_num = get_week_number(self.semester_start, target)
+            try:
+                week_num = self.week_number_resolver(self.semester_start, target)
+            except IdentityRejected:
+                self._week_label.text = (
+                    "日历不可用，无法确认教学周；请检查学期和日历配置"
+                )
+                return
             if week_num >= 1:
                 week_info_parts.insert(0, f"第 {week_num} 周")
             else:
                 week_info_parts.append("（学期开始前）")
 
-        if self.semester_start and self.semester_end:
-            if not is_within_semester(self.semester_start, self.semester_end, target):
-                week_info_parts.append("⚠ 不在学期范围内")
+        if (
+            self.semester_start
+            and self.semester_end
+            and not is_within_semester(self.semester_start, self.semester_end, target)
+        ):
+            week_info_parts.append("⚠ 不在学期范围内")
 
         if not self._selection_guard.is_current(token):
             return

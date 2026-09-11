@@ -8,12 +8,43 @@
 - 所有查询携带 tenant_id + user_id 过滤，确保租户隔离。
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models.prompt_template import PromptTemplate
+from app.core.models.user import User
+
+
+async def _lock_weekly_actor(
+    session: AsyncSession, tenant_id: int, user_id: int, task_type: str
+) -> None:
+    if task_type not in {
+        "weekly_morning_talk",
+        "weekly_games",
+        "weekly_area",
+        "weekly_materials",
+        "weekly_focus",
+        "weekly_environment",
+        "weekly_habits",
+        "weekly_home",
+    }:
+        return
+    if session.bind.dialect.name == "sqlite" and not session.in_transaction():
+        await session.execute(text("BEGIN IMMEDIATE"))
+    actor = (
+        await session.execute(
+            select(User.id)
+            .where(
+                User.tenant_id == tenant_id,
+                User.id == user_id,
+            )
+            .with_for_update()
+        )
+    ).scalar_one_or_none()
+    if actor is None:
+        raise ValueError("prompt_actor_invalid")
 
 
 async def get_active_prompt(
@@ -63,7 +94,8 @@ async def save_new_version(
     Returns:
         新建的 PromptTemplate 记录，is_active=True，version 自动递增。
     """
-    now = datetime.now(timezone.utc)
+    await _lock_weekly_actor(session, tenant_id, user_id, task_type)
+    now = datetime.now(UTC)
 
     # 将同用户同任务类型的当前 active 记录设为 inactive
     await session.execute(
@@ -124,7 +156,8 @@ async def rollback_to_version(
     Raises:
         ValueError: 目标版本不存在。
     """
-    now = datetime.now(timezone.utc)
+    await _lock_weekly_actor(session, tenant_id, user_id, task_type)
+    now = datetime.now(UTC)
 
     # 先确认目标版本存在
     target_result = await session.execute(

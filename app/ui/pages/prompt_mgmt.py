@@ -54,6 +54,11 @@ from app.repository.prompt_repository import (
     rollback_to_version,
     save_new_version,
 )
+from app.service.shared_weekly.prompt_contracts import (
+    DEFAULT_PROMPTS,
+    SCHEMA_INSTRUCTION,
+    WEEKLY_LABELS,
+)
 from app.ui.auth_context import (
     TrustedUiSession,
     require_bound_ui_session,
@@ -133,6 +138,13 @@ _TASK_CONFIG = {
     },
 }
 
+_TASK_CONFIG.update(
+    {
+        task: {"label": label, "placeholder": DEFAULT_PROMPTS[task]}
+        for task, label in WEEKLY_LABELS.items()
+    }
+)
+
 # 每种任务类型的输出格式要求（展示在编辑器上方）
 _TASK_SCHEMA: dict[str, str] = {
     "split": (
@@ -176,6 +188,8 @@ _TASK_SCHEMA: dict[str, str] = {
         '"review_reason": "...", "revised_lesson_plan": "..."}'
     ),
 }
+
+_TASK_SCHEMA.update({task: SCHEMA_INSTRUCTION for task in WEEKLY_LABELS})
 
 # 测试区输入框提示文字
 _TEST_PLACEHOLDER: dict[str, str] = {
@@ -223,6 +237,7 @@ async def prompt_mgmt_page() -> None:
             tab_one_on_one_listening = ui.tab("一对一倾听")
             tab_homemade_teaching = ui.tab("自制教玩具")
             tab_course_review_activity = ui.tab("课程审议")
+            weekly_tabs = {task: ui.tab(label) for task, label in WEEKLY_LABELS.items()}
 
         with ui.tab_panels(tabs, value=tab_split).classes("w-full"):
             with ui.tab_panel(tab_split):
@@ -263,6 +278,10 @@ async def prompt_mgmt_page() -> None:
                 await _build_task_panel(
                     ui_session, require_live_session, "course_review_activity"
                 )
+
+            for task, tab in weekly_tabs.items():
+                with ui.tab_panel(tab):
+                    await _build_task_panel(ui_session, require_live_session, task)
 
 
 async def _build_task_panel(
@@ -375,7 +394,7 @@ async def _build_task_panel(
                     prompt_write_owner,
                 )
                 content_generation[0] += 1
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — sanitize errors at the existing UI boundary
                 if (
                     await require_live_session() is None
                     or generation != content_generation[0]
@@ -414,7 +433,16 @@ async def _build_task_panel(
             )
 
     # ── 在线测试 ──────────────────────────────────────────────────────────────
-    with ui.expansion("🧪 测试提示词效果", icon="science").classes("w-full mt-2"):
+    if task_type in WEEKLY_LABELS:
+        ui.label(
+            "周计划提示词请在已授权的周计划撰写操作中测试；需确认来源并按固定结构生成候选。保存或回滚提示词会使待采用候选失效。"
+        )
+
+    with ui.expansion("🧪 测试提示词效果", icon="science").classes(
+        "w-full mt-2"
+    ) as test_panel:
+        if task_type in WEEKLY_LABELS:
+            test_panel.set_visibility(False)
         with ui.column().classes("w-full gap-3 p-1"):
             test_input = (
                 ui.textarea(
@@ -487,6 +515,8 @@ async def _build_task_panel(
                 payload: _PromptTestPayload,
                 owner: object,
             ) -> None:
+                if task_type in WEEKLY_LABELS:
+                    return
                 current_prompt = payload.prompt
                 test_text = payload.test_text
                 test_grade = payload.grade
@@ -608,7 +638,7 @@ async def _build_task_panel(
                         return
                     test_msg.classes(replace="text-sm text-orange-500")
                     test_msg.set_text("⚠ AI 配置不可用，请检查模型配置")
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 — sanitize errors at the existing UI boundary
                     if (
                         await require_live_session() is None
                         or generation != test_generation[0]
@@ -741,7 +771,7 @@ def _render_history(
                                 prompt_write_owner,
                             )
                             content_generation[0] += 1
-                        except Exception as e:
+                        except Exception as e:  # noqa: BLE001 — sanitize errors at the existing UI boundary
                             if (
                                 await require_live_session() is None
                                 or generation != content_generation[0]

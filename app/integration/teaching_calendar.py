@@ -73,3 +73,43 @@ def load_calendar() -> CalendarData:
         return data
     except (ImportError, PackageNotFoundError, AttributeError, TypeError, ValueError):
         raise IdentityRejected("calendar_unavailable") from None
+
+
+HOLIDAY_NAMES = {
+    "New Year's Day": "元旦",
+    "Spring Festival": "春节",
+    "Tomb-sweeping Day": "清明节",
+    "Labour Day": "劳动节",
+    "Dragon Boat Festival": "端午节",
+    "National Day": "国庆节",
+    "Mid-autumn Festival": "中秋节",
+    "Anti-Fascist 70th Day": "抗战胜利纪念日",
+}
+
+
+def load_holiday_labels() -> tuple[tuple[date, str], ...]:
+    """Separate display data; existing v1 fact fingerprints remain unchanged."""
+    data = load_calendar()
+    try:
+        import chinese_calendar
+
+        label_payload = [
+            (day.isoformat(), name)
+            for day, name in sorted(chinese_calendar.holidays.items())
+        ]
+        if (
+            sha256(
+                json.dumps(label_payload, separators=(",", ":")).encode()
+            ).hexdigest()
+            != "3c57521e3ad7dc5a020bba101e0f748177a00a5366c0cdd45b67581d35c1983f"
+        ):
+            raise IdentityRejected("calendar_unavailable")
+        labels = tuple(
+            (day, HOLIDAY_NAMES[name])
+            for day, name in sorted(chinese_calendar.holidays.items())
+        )
+        if frozenset(day for day, _ in labels) != data.holidays:
+            raise IdentityRejected("calendar_unavailable")
+        return labels
+    except (ImportError, AttributeError, KeyError, TypeError, ValueError):
+        raise IdentityRejected("calendar_unavailable") from None

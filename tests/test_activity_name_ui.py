@@ -80,6 +80,8 @@ def handlers(session):
             "loaded_plan_id": None,
             "loaded_revision": None,
         },
+        # WP-D save guard reads the enclosing configured semester start.
+        sem_start=date(2026, 9, 1),
         selection_state={"current": selection},
         tenant_id=11,
         user_id=7,

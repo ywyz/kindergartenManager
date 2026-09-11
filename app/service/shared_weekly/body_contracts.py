@@ -516,6 +516,10 @@ def parse_body(value: str) -> WeeklyThemeDraft | WeeklyCollaborationDraft:
         return WeeklyThemeDraft.parse(value)
     if data["schema"] == BODY_SCHEMA:
         return WeeklyCollaborationDraft.parse(value)
+    if data["schema"] == "weekly-authoring.v3":
+        from app.service.shared_weekly.authoring_contracts import WeeklyAuthoringDraft
+
+        return WeeklyAuthoringDraft.parse(value)
     _reject()
 
 

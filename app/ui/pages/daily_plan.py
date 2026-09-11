@@ -16,8 +16,8 @@ from typing import TypedDict
 from nicegui import ui
 from sqlalchemy.orm.exc import StaleDataError
 
-from app.core.database import AsyncSessionLocal
 from app.core.audit import log_audit
+from app.core.database import AsyncSessionLocal
 from app.core.exceptions import AiCallError, AiParseError, ConfigError
 from app.integration.holiday_client.client import is_near_holiday
 from app.integration.word_export.exporter import (
@@ -33,16 +33,19 @@ from app.repository.daily_plan_repository import (
 )
 from app.repository.export_repository import save_export_record
 from app.repository.semester_repository import get_active_semester
-from app.service.date_service import get_week_number, get_weekday_cn
-from app.service.diff_service import compute_diff
-from app.service.generate_service import generate_activity_content
-from app.service.lesson_plan_service import process_lesson_plan
+from app.service.academic_identity.contracts import IdentityRejected
 from app.service.agent.composition import create_daily_plan_agent_controller
-from app.service.agent.confirmed_plan_read import read_confirmed_daily_plan
 from app.service.agent.confirmation_flow import (
     create_daily_plan_patch_confirmation_controller,
 )
+from app.service.agent.confirmed_plan_read import read_confirmed_daily_plan
 from app.service.agent.contracts import TrustedActor
+from app.service.date_service import get_daily_week_number as get_week_number
+from app.service.date_service import get_weekday_cn
+from app.service.diff_service import compute_diff
+from app.service.generate_service import generate_activity_content
+from app.service.lesson_plan_service import process_lesson_plan
+from app.ui.auth_context import require_bound_ui_session, require_current_ui_session
 from app.ui.components.agent_draft import render_daily_plan_agent_panel
 from app.ui.components.agent_write_confirmation import (
     DailyPlanPatchConfirmationPanel,
@@ -50,7 +53,6 @@ from app.ui.components.agent_write_confirmation import (
 )
 from app.ui.components.app_shell import render_shell
 from app.ui.components.date_panel import DatePanel, DateSelection
-from app.ui.auth_context import require_bound_ui_session, require_current_ui_session
 from app.ui.daily_plan_target import (
     DailyPlanUiTarget,
     UiGenerationGuard,
@@ -263,19 +265,28 @@ async def daily_plan_page() -> None:
             selected = selection.selected_date
             state["selected_date"] = selected
             if selected and sem_start:
-                state["week_number"] = get_week_number(sem_start, selected)
-                state["weekday_cn"] = get_weekday_cn(selected)
+                try:
+                    state["week_number"] = get_week_number(sem_start, selected, sem_end)
+                    state["weekday_cn"] = get_weekday_cn(selected)
+                except IdentityRejected:
+                    state["selected_date"] = None
+                    state["week_number"] = None
+                    state["weekday_cn"] = ""
             else:
                 state["week_number"] = None
                 state["weekday_cn"] = ""
             _clear_plan_body()
-            agent_panel.scope_changed(selected)
+            agent_panel.scope_changed(state["selected_date"])
 
         async def _on_date_change(selected: date | None) -> None:
             if await _require_live_session() is None:
                 return
             selection = selection_state["current"]
-            if selection is None or selection.selected_date != selected:
+            if (
+                selection is None
+                or selection.selected_date != selected
+                or state["selected_date"] != selected
+            ):
                 return
             await _load_draft(selected, selection)
 
@@ -284,6 +295,9 @@ async def daily_plan_page() -> None:
             semester_end=sem_end,
             on_date_change=_on_date_change,
             on_date_selected=_on_date_selected,
+            week_number_resolver=lambda start, target: get_week_number(
+                start, target, sem_end
+            ),
         )
         panel.render()
         patch_confirmation_panel = DailyPlanPatchConfirmationPanel(
@@ -396,7 +410,7 @@ async def daily_plan_page() -> None:
                         return
                     split_msg.classes(add="text-red-500")
                     split_msg.text = "❌ AI 返回内容解析失败，请稍后重试"
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 — sanitize errors at the existing UI boundary
                     if await _require_live_session() is None:
                         return
                     if not _is_current_plan_target(target):
@@ -516,7 +530,7 @@ async def daily_plan_page() -> None:
                 # 查询是否临近法定节假日（API 失败返回 None，静默忽略不阻断生成）
                 try:
                     near_holiday = await is_near_holiday(target.selected_date)
-                except Exception:
+                except Exception:  # noqa: BLE001 — sanitize errors at the existing UI boundary
                     near_holiday = None
                 if await _require_live_session() is None:
                     return
@@ -779,7 +793,7 @@ async def daily_plan_page() -> None:
                         return
                     daily_reflection_msg.classes(add="text-red-500")
                     daily_reflection_msg.text = "❌ AI 调用或解析失败，请稍后重试"
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 — sanitize errors at the existing UI boundary
                     if await _require_live_session() is None:
                         return
                     if not _is_current_plan_target(target):
@@ -846,14 +860,13 @@ async def daily_plan_page() -> None:
 
                 agent_panel.plan_changed(d)
                 try:
-                    async with AsyncSessionLocal() as session:
-                        async with session.begin():
-                            saved_plan = await save_daily_plan(
-                                session=session,
-                                tenant_id=tenant_id,
-                                user_id=user_id,
-                                **save_payload,
-                            )
+                    async with AsyncSessionLocal() as session, session.begin():
+                        saved_plan = await save_daily_plan(
+                            session=session,
+                            tenant_id=tenant_id,
+                            user_id=user_id,
+                            **save_payload,
+                        )
 
                     if await _require_live_session() is None:
                         return
@@ -870,7 +883,7 @@ async def daily_plan_page() -> None:
                         return
                     save_msg.classes(add="text-orange-500")
                     save_msg.text = "⚠ 计划已被其他页面更新，请重新选择日期加载最新版本"
-                except Exception:
+                except Exception:  # noqa: BLE001 — sanitize errors at the existing UI boundary
                     if await _require_live_session() is None:
                         return
                     if not _is_current_plan_target(target):
@@ -889,7 +902,9 @@ async def daily_plan_page() -> None:
                 _DailyPlanSavePayload | None,
             ]:
                 target = _capture_plan_target()
-                if target is None:
+                if target is None or (
+                    sem_start is not None and state["week_number"] is None
+                ):
                     return None, None
                 d = target.selected_date
                 save_payload: _DailyPlanSavePayload = {
@@ -966,15 +981,14 @@ async def daily_plan_page() -> None:
                         return
                     agent_panel.plan_changed(deleting_date)
                     try:
-                        async with AsyncSessionLocal() as session:
-                            async with session.begin():
-                                await delete_daily_plan(
-                                    session,
-                                    tenant_id=tenant_id,
-                                    user_id=user_id,
-                                    plan_id=deleting_plan_id,
-                                    expected_revision=deleting_revision,
-                                )
+                        async with AsyncSessionLocal() as session, session.begin():
+                            await delete_daily_plan(
+                                session,
+                                tenant_id=tenant_id,
+                                user_id=user_id,
+                                plan_id=deleting_plan_id,
+                                expected_revision=deleting_revision,
+                            )
                         if await _require_live_session() is None:
                             return
                         if not _is_current_plan_target(target):
@@ -1011,7 +1025,7 @@ async def daily_plan_page() -> None:
                             return
                         save_msg.classes(add="text-orange-500")
                         save_msg.text = "⚠ 计划已被其他页面更新，请重新加载后再删除"
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 — sanitize errors at the existing UI boundary
                         if await _require_live_session() is None:
                             return
                         if not _is_current_plan_target(target):
@@ -1091,16 +1105,15 @@ async def daily_plan_page() -> None:
                     file_path.write_bytes(doc_bytes)
 
                     # 写入导出记录
-                    async with AsyncSessionLocal() as session:
-                        async with session.begin():
-                            await save_export_record(
-                                session=session,
-                                tenant_id=tenant_id,
-                                user_id=user_id,
-                                daily_plan_id=plan.id,
-                                file_name=filename,
-                                file_path=str(file_path.resolve()),
-                            )
+                    async with AsyncSessionLocal() as session, session.begin():
+                        await save_export_record(
+                            session=session,
+                            tenant_id=tenant_id,
+                            user_id=user_id,
+                            daily_plan_id=plan.id,
+                            file_name=filename,
+                            file_path=str(file_path.resolve()),
+                        )
                     if await _require_live_session() is None:
                         return
                     if not _is_current_plan_target(target):
@@ -1119,7 +1132,7 @@ async def daily_plan_page() -> None:
                     export_msg.classes(add="text-green-600")
                     export_msg.text = f"✅ 已导出：{filename}"
 
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 — sanitize errors at the existing UI boundary
                     if await _require_live_session() is None:
                         return
                     if not _is_current_plan_target(target):
@@ -1277,16 +1290,15 @@ async def daily_plan_page() -> None:
                 file_path = exports_dir / filename
                 file_path.write_bytes(doc_bytes)
 
-                async with AsyncSessionLocal() as session:
-                    async with session.begin():
-                        await save_export_record(
-                            session=session,
-                            tenant_id=tenant_id,
-                            user_id=user_id,
-                            daily_plan_id=None,
-                            file_name=filename,
-                            file_path=str(file_path.resolve()),
-                        )
+                async with AsyncSessionLocal() as session, session.begin():
+                    await save_export_record(
+                        session=session,
+                        tenant_id=tenant_id,
+                        user_id=user_id,
+                        daily_plan_id=None,
+                        file_name=filename,
+                        file_path=str(file_path.resolve()),
+                    )
                 if await _require_live_session() is None:
                     return
                 if not batch_range_generation.is_current(
@@ -1311,7 +1323,7 @@ async def daily_plan_page() -> None:
                     f"（{start_date} ~ {end_date}）：{filename}"
                 )
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — sanitize errors at the existing UI boundary
                 if await _require_live_session() is None:
                     return
                 if not batch_range_generation.is_current(
@@ -1343,8 +1355,8 @@ async def daily_plan_page() -> None:
             date_parse_failed = False
             if start_str and end_str:
                 try:
-                    start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
-                    end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
+                    start_date = datetime.strptime(start_str, "%Y-%m-%d").date()  # noqa: DTZ007 — parse a calendar date, not an instant
+                    end_date = datetime.strptime(end_str, "%Y-%m-%d").date()  # noqa: DTZ007 — parse a calendar date, not an instant
                 except ValueError:
                     date_parse_failed = True
             return (
@@ -1394,83 +1406,80 @@ async def daily_plan_page() -> None:
                     ui.label("暂无历史记录").classes("text-gray-400 text-sm")
                 else:
                     for plan in plans:
-                        with ui.card().classes("w-full"):
-                            with ui.row().classes(
-                                "w-full justify-between items-center"
-                            ):
-                                ui.label(
-                                    f"{plan.plan_date}  第{plan.week_number}周 {plan.weekday_cn}  "
-                                    f"{plan.grade or ''} {plan.class_name or ''}"
-                                ).classes("text-sm text-gray-700")
+                        with (
+                            ui.card().classes("w-full"),
+                            ui.row().classes("w-full justify-between items-center"),
+                        ):
+                            ui.label(
+                                f"{plan.plan_date}  第{plan.week_number}周 {plan.weekday_cn}  "
+                                f"{plan.grade or ''} {plan.class_name or ''}"
+                            ).classes("text-sm text-gray-700")
 
-                                async def _delete_plan(p=plan) -> None:
-                                    selected_target = _capture_plan_target()
-                                    if selected_target is not None and (
-                                        selected_target.selected_date != p.plan_date
-                                        or selected_target.plan_id != p.id
-                                        or selected_target.revision != p.revision
-                                    ):
-                                        selected_target = None
+                            async def _delete_plan(p=plan) -> None:
+                                selected_target = _capture_plan_target()
+                                if selected_target is not None and (
+                                    selected_target.selected_date != p.plan_date
+                                    or selected_target.plan_id != p.id
+                                    or selected_target.revision != p.revision
+                                ):
+                                    selected_target = None
+                                if await _require_live_session() is None:
+                                    return
+                                with ui.dialog() as dlg, ui.card():
+                                    ui.label(
+                                        f"确定要删除「{p.plan_date}」的活动计划吗？删除后无法恢复。"
+                                    ).classes("text-base")
+                                    with ui.row().classes("gap-3 mt-3"):
+                                        ui.button(
+                                            "确认删除",
+                                            on_click=lambda: dlg.submit("yes"),
+                                        ).classes("bg-red-600 text-white")
+                                        ui.button(
+                                            "取消",
+                                            on_click=lambda: dlg.submit("no"),
+                                        )
+                                result = await dlg
+                                if result == "yes":
                                     if await _require_live_session() is None:
                                         return
-                                    with ui.dialog() as dlg, ui.card():
-                                        ui.label(
-                                            f"确定要删除「{p.plan_date}」的活动计划吗？删除后无法恢复。"
-                                        ).classes("text-base")
-                                        with ui.row().classes("gap-3 mt-3"):
-                                            ui.button(
-                                                "确认删除",
-                                                on_click=lambda: dlg.submit("yes"),
-                                            ).classes("bg-red-600 text-white")
-                                            ui.button(
-                                                "取消",
-                                                on_click=lambda: dlg.submit("no"),
+                                    agent_panel.plan_changed(p.plan_date)
+                                    try:
+                                        async with AsyncSessionLocal() as s, s.begin():
+                                            await delete_daily_plan(
+                                                s,
+                                                tenant_id=tenant_id,
+                                                user_id=user_id,
+                                                plan_id=p.id,
+                                                expected_revision=p.revision,
                                             )
-                                    result = await dlg
-                                    if result == "yes":
                                         if await _require_live_session() is None:
                                             return
-                                        agent_panel.plan_changed(p.plan_date)
-                                        try:
-                                            async with AsyncSessionLocal() as s:
-                                                async with s.begin():
-                                                    await delete_daily_plan(
-                                                        s,
-                                                        tenant_id=tenant_id,
-                                                        user_id=user_id,
-                                                        plan_id=p.id,
-                                                        expected_revision=p.revision,
-                                                    )
-                                            if await _require_live_session() is None:
-                                                return
-                                            if (
-                                                selected_target is not None
-                                                and _is_current_plan_target(
-                                                    selected_target
-                                                )
-                                            ):
-                                                state["loaded_plan_id"] = None
-                                                state["loaded_revision"] = None
-                                            await refresh_history()
-                                        except StaleDataError:
-                                            if await _require_live_session() is None:
-                                                return
-                                            ui.notify(
-                                                "计划已被其他页面更新，请刷新后再删除",
-                                                type="warning",
-                                            )
-                                        except Exception as ex:
-                                            if await _require_live_session() is None:
-                                                return
-                                            ui.notify(
-                                                f"删除失败：{type(ex).__name__}",
-                                                type="negative",
-                                            )
+                                        if (
+                                            selected_target is not None
+                                            and _is_current_plan_target(selected_target)
+                                        ):
+                                            state["loaded_plan_id"] = None
+                                            state["loaded_revision"] = None
+                                        await refresh_history()
+                                    except StaleDataError:
+                                        if await _require_live_session() is None:
+                                            return
+                                        ui.notify(
+                                            "计划已被其他页面更新，请刷新后再删除",
+                                            type="warning",
+                                        )
+                                    except Exception as ex:  # noqa: BLE001 — sanitize errors at the existing UI boundary
+                                        if await _require_live_session() is None:
+                                            return
+                                        ui.notify(
+                                            f"删除失败：{type(ex).__name__}",
+                                            type="negative",
+                                        )
 
-                                ui.button(
-                                    "删除", icon="delete", on_click=_delete_plan
-                                ).props("size=sm flat").classes("text-red-500")
-        except Exception:
+                            ui.button(
+                                "删除", icon="delete", on_click=_delete_plan
+                            ).props("size=sm flat").classes("text-red-500")
+        except Exception:  # noqa: BLE001 — sanitize errors at the existing UI boundary
             if await _require_live_session() is None:
                 return
             if not history_requests.is_current(request_generation):
@@ -1517,7 +1526,7 @@ async def daily_plan_page() -> None:
                 plan = await get_daily_plan_by_date(
                     session, tenant_id, user_id, selected
                 )
-        except Exception:
+        except Exception:  # noqa: BLE001 — sanitize errors at the existing UI boundary
             return
 
         if await _require_live_session() is None:

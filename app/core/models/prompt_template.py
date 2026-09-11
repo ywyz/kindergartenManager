@@ -11,7 +11,7 @@
 - homemade_teaching：自制教玩具
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import BigInteger, Boolean, DateTime, Enum, Index, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -24,7 +24,9 @@ class PromptTemplate(Base):
 
     __table_args__ = (
         # 联合索引：按 tenant_id + user_id + task_type 查询激活版本
-        Index("ix_prompt_template_tenant_user_task", "tenant_id", "user_id", "task_type"),
+        Index(
+            "ix_prompt_template_tenant_user_task", "tenant_id", "user_id", "task_type"
+        ),
     )
 
     id: Mapped[int] = mapped_column(
@@ -47,6 +49,14 @@ class PromptTemplate(Base):
             "one_on_one_listening",
             "homemade_teaching",
             "course_review_activity",
+            "weekly_morning_talk",
+            "weekly_games",
+            "weekly_area",
+            "weekly_materials",
+            "weekly_focus",
+            "weekly_environment",
+            "weekly_habits",
+            "weekly_home",
             name="prompt_task_type",
         ),
         nullable=False,
@@ -55,11 +65,11 @@ class PromptTemplate(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime, default=lambda: datetime.now(UTC), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
         nullable=False,
     )

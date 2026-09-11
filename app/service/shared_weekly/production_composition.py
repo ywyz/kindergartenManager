@@ -6,6 +6,7 @@ complete authoring UI is installed by this WP-C composition.
 
 from dataclasses import dataclass
 
+from app.service.shared_weekly.authoring_application import AuthoringApplication
 from app.service.shared_weekly.collaboration_application import CollaborationApplication
 from app.service.shared_weekly.mapping_application import SourceMappingApplication
 from app.service.shared_weekly.people_application import PeopleDefaultsApplication
@@ -16,6 +17,7 @@ class SharedWeeklyServices:
     weekly: CollaborationApplication
     mapping: SourceMappingApplication
     people: PeopleDefaultsApplication
+    authoring: AuthoringApplication
 
 
 _services: SharedWeeklyServices | None = None
@@ -31,6 +33,7 @@ def build_shared_weekly_production_application() -> SharedWeeklyServices:
         CollaborationApplication(AsyncSessionLocal, token_source),
         SourceMappingApplication(AsyncSessionLocal, token_source),
         PeopleDefaultsApplication(AsyncSessionLocal, token_source),
+        AuthoringApplication(AsyncSessionLocal, token_source),
     )
 
 

@@ -30,6 +30,8 @@ class CandidateStore:
         return key
 
     def take(self, owner, key):
+        if type(key) is not str:
+            raise IdentityRejected("candidate_unavailable")
         item = self._items.get(key)
         if item is None or item.owner != owner:
             raise IdentityRejected("candidate_unavailable")
