@@ -122,3 +122,5 @@ Main已将worker原始35份tar/log/报告逐字拷贝到外部`source/`并校验
 4. reimport revision下界：原两库probe复现过旧精确相等约束拒绝合法revision2，但不是完整native repository闭环修复前双RED。
 
 当前实现、完整应用闭环、两库回归和独立Review已交付；上述历史执行顺序无法由事后重新跑GREEN变成已满足。本轮不虚构全门PASS，不把过程缺口说成已解决，也不将它们误写成当前仍存在的已确认代码缺陷。#77保持OPEN；CI/云端/Word后续门仍各自待办。
+
+最终#77回写已读回并保持OPEN；正文与API响应hash及文档SHA见[回写读回记录](WP-C-complete-issue-readback-20260911.md)。主清单固定回写前证据，后续读回文件单独列hash。

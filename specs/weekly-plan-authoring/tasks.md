@@ -58,6 +58,7 @@ WP-A 已限定关闭；授权/事实与根/版本/CAS子步已本地交付；本
 - [x] 生产startup/composition可构造weekly/mapping/people服务。
 - [ ] 全部适用实现前双RED与独立finding记录完备：按[完整账本](evidence/WP-C-complete-20260911.md)逐项审计，初始覆盖不倒填RED。
 - [x] 最终冻结SHA的双库/常规/Foundation/兼容/lint与独立Review完成；数值/范围见完整账本。
+- [x] #77最终回写及读回完成，保留整门未通过状态；#78/#79需求Issue已创建读回，WP-D只交付提示词。
 - [ ] 全门过程证据完备：4类source修复前native双RED缺口保留；#77回写只报告实际状态，不宣布全门通过。
 
 旧首门通用“各行为都先RED”条目不整体勾选；本轮真实RED和初始通过覆盖分别记录。当前完成说明以[当前状态](current-status.md)为准，不用实现勾选替代全门通过。下方WP-D/E/F未实施。

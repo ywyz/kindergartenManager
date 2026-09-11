@@ -17,3 +17,5 @@ WP-C A–F应用路径已实现：权威身份/授权/事实与共享根复用�
 下一阶段仅已撰写[WP-D提示词](WP-D-next-prompt.md)，尚未执行。WP-D完整日期文案/固定结构/AI、WP-E模板资格/填写/缩减/最终导出、WP-F云端浏览器/Word产品验收均待办。Word主要、LibreOffice备用；long三份两页FAIL、compact仅合成候选的历史事实不变。未实施月计划、cohort、全部历史页面或产品Agent扩展。
 
 最终本地：tests **1430 passed/1 skipped**（skip为独立R5实库备份演练）；Foundation **261**；旧周/月兼容 **347**；Agent快照 **7**。WP-C集合**230 passed**：MySQL运行含211项MySQL、3项固定SQLite、16项无库；SQLite同集合包含在常规tests中。Reviewer两库专项各**27 passed**。Ruff0.16.6本轮46文件、format、diff及依赖一致性通过。无本轮远端CI；不以这些结果关闭整个#77产品门。
+
+最终[#77回写](https://github.com/ywyz/kindergartenManager/issues/77#issuecomment-5630591033)已逐字规范化读回且Issue仍OPEN；[读回证据](evidence/WP-C-complete-issue-readback-20260911.md)固定本地文档SHA及原始响应hash。
