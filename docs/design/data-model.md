@@ -1,4 +1,4 @@
-> 2026-09-11 根/版本/CAS本地交付：[证据与范围](../../specs/weekly-plan-authoring/evidence/WP-C-root-20260911.md)。新迁移8d20f3b5c721；主题草稿非完整周正文/正式导出，来源映射仍待后续。
+> 2026-09-11 WP-C完整协作实现已接入生产composition：显式映射、逐日选源、差异采用、CAS来源快照、检查/重导入及人员默认。迁移head为b153c7e9f026；最终验证及尚缺门以[当前状态](../../specs/weekly-plan-authoring/current-status.md)和[本轮账本](../../specs/weekly-plan-authoring/evidence/WP-C-complete-20260911.md)为准。下方旧阶段记录保留历史语境。
 
 > 2026-09-11 当前周计划状态见[实时核对](../../specs/weekly-plan-authoring/current-status.md)：WP-A 已限定关闭，WP-C 授权/事实子步已本地交付、身份基线已公开；下方旧阶段记录不作当前阻塞。
 
@@ -327,3 +327,9 @@ W008 固定 SHA 的独立人工门闭合。
 只验一次性SQLite和专属MySQL。共享授权/根/CAS/来源仍未实现；不扩旧周/月或源写权限。
 精确证据与未执行项见隔离worktree的`specs/weekly-plan-authoring/evidence/WP-C-20260910.md`，
 下一提示词`specs/weekly-plan-authoring/WP-C-next-prompt.md`。未公开提交，无CI/云端/Office/部署结论；WP-A仍缺目标Office。
+
+## 2026-09-11 WP-C协作数据模型
+
+从8d20f3b5c721依次迁移9e31a6c8d204→a042b6d8e915→b153c7e9f026。daily_plan_identity为显式来源当前指针，identity_mapping_event保留不可变映射基线；删除daily只清指针。shared_weekly_source按不可变version保存关闭字段路径、源身份/revision、mapping基线、原导入值/hash、采用hash与imported/manual来源方式，不随源删除。shared_weekly_source_audit用tenant/root/version复合FK保持归属。weekly_person_defaults为tenant/user/class的CAS设置，操作账只存revision/hash/outcome，不含姓名。weekly-collaboration.v2显式扩展主题、人员与按日来源片段，旧weekly-theme.v1历史不被打开或后台迁移改写。全部迁移仅在一次性库验证，未连接真实业务库。
+
+来源INSERT同时校验parent班级/学期与关闭目标日期路径；原导入基线可从predecessor来源完整沿用（采用hash/provenance允许手改），新基线则须匹配live DailyPlan和当前mapping的精确revision/字段值。源删除后仍允许已有基线在正常手工保存中延续，不能凭残留event新增伪造基线。

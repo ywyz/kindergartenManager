@@ -1,4 +1,4 @@
-> 2026-09-11 根/版本/CAS本地交付：[证据与范围](../specs/weekly-plan-authoring/evidence/WP-C-root-20260911.md)。新迁移8d20f3b5c721；主题草稿非完整周正文/正式导出，来源映射仍待后续。
+> 2026-09-11 WP-C完整协作实现已接入生产composition：显式映射、逐日选源、差异采用、CAS来源快照、检查/重导入及人员默认。迁移head为b153c7e9f026；最终验证及尚缺门以[当前状态](../specs/weekly-plan-authoring/current-status.md)和[本轮账本](../specs/weekly-plan-authoring/evidence/WP-C-complete-20260911.md)为准。下方旧阶段记录保留历史语境。
 
 > 2026-09-11 当前周计划状态见[实时核对](../specs/weekly-plan-authoring/current-status.md)：WP-A 已限定关闭，WP-C 授权/事实子步已本地交付、身份基线已公开；下方旧阶段记录不作当前阻塞。
 

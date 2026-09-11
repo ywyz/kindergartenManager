@@ -1,6 +1,6 @@
-> 2026-09-11 根子步本地交付：见[根账本](evidence/WP-C-root-20260911.md)及[冻结契约](WP-C-root-contract.md)；下一轮仅[显式来源映射](WP-C-mapping-next-prompt.md)。历史段落和未执行来源/产品门保持。
+> 2026-09-11 WP-C完整协作路径已实现；[关闭矩阵](WP-C-completion-contract.md)、[本轮证据](evidence/WP-C-complete-20260911.md)与[当前状态](current-status.md)说明实际覆盖和未完成门。历史阶段描述不代表当前实现缺项。
 
-> 当前入口（2026-09-11本地交付）：[状态与证据边界](current-status.md)；[下一显式来源映射子步](WP-C-mapping-next-prompt.md)。下方阶段快照按记录时点解释。
+> 当前入口（2026-09-11本地交付）：[状态与证据边界](current-status.md)；[WP-C本轮证据](evidence/WP-C-complete-20260911.md)。下方阶段快照按记录时点解释。
 
 > 2026-09-10 最终收口口径：WP-A 实现基线、契约与最短完整 Word 五／六列单页可行性完成；long 三份仍为两页。共享业务实现、正式模板资格、缩减流程和产品/云端验收属于后续门。最终独立复审、提交与 exact-SHA CI 的关闭绑定见[收口账本](evidence/WP-A-closure-20260910.md)及其 Issue 回写；未完成 CI 时不得据此宣布正式关闭。
 
@@ -9,7 +9,7 @@
 状态：2026-09-10用户确认Word为主要格式验收客户端、LibreOffice仅备用打开。WP-A最短完整五/六列Word单页可行性及原生观察证据已补齐；LibreOffice格式差异不再阻塞。实际结果见[Word账本](evidence/WP-A-Windows-20260910.md)，long三份单页FAIL保留。其他产品门与CI/云端独立，不因本次通过。
 
 任务入口：[Issue #77](https://github.com/ywyz/kindergartenManager/issues/77)。
-WP-A 已限定关闭；授权/事实与根/版本/CAS子步已本地交付；下一步仅执行[显式来源映射](WP-C-mapping-next-prompt.md)。
+WP-A 已限定关闭；授权/事实与根/版本/CAS子步已本地交付；本轮完整实现见[关闭矩阵](WP-C-completion-contract.md)。
 
 ## WP-A 实现基线与契约
 
@@ -47,13 +47,20 @@ WP-A 已限定关闭；授权/事实与根/版本/CAS子步已本地交付；下
 
 日期规范化、固定内容结构、AI和最终导出等WP-D/E专属行为，在各自实现门同样先RED再GREEN；不因本次调整免测或提前实现。
 
-### 后续实现
+### 本轮A–F实现与门状态
 
-- 管理员维护权威学期、班级和教师成员，提供现有账号和历史每日计划的显式关联。
-- 实现同班同周唯一聚合和共享 CAS 保存，教师／保育员默认值与共享快照分离。
-- 日级重复检测覆盖本人＋他人及多位他人；显示提醒、候选来源，用户选择后导入。
-- 持久化最小来源 revision 和字段关系；再次检查变更时只提示，不自动更新。
-- 在事务中核验 session、tenant、成员资格和共享版本；撤销成员后旧页面不能继续保存、导出或取数。
+- [x] A：复用权威身份、唯一数据库policy、教学日事实、共享唯一根/版本/CAS与operation对账；事务出口重验任职期限。
+- [x] B：manager身份窄preview→明确确认→映射CAS，重映射与不可变event/只读对账。
+- [x] C：逐日双方授权、必要字段投影、零/单/全部重复候选与精确人工选择；成功跨教师读取先审计。
+- [x] D：v2关闭正文、内存差异与明确采用、save前本次来源重验、不可变快照与原子双CAS。
+- [x] E：来源检查只提醒、统一unavailable；三值重导入差异、取消/采用/保存/重载与手改历史保留。
+- [x] F：tenant/user/class默认值CAS、首次初始化、重复创建不覆盖、共享显式人员修改与原operation stamp对账。
+- [x] 生产startup/composition可构造weekly/mapping/people服务。
+- [ ] 全部适用实现前双RED与独立finding记录完备：按[完整账本](evidence/WP-C-complete-20260911.md)逐项审计，初始覆盖不倒填RED。
+- [x] 最终冻结SHA的双库/常规/Foundation/兼容/lint与独立Review完成；数值/范围见完整账本。
+- [ ] 全门过程证据完备：4类source修复前native双RED缺口保留；#77回写只报告实际状态，不宣布全门通过。
+
+旧首门通用“各行为都先RED”条目不整体勾选；本轮真实RED和初始通过覆盖分别记录。当前完成说明以[当前状态](current-status.md)为准，不用实现勾选替代全门通过。下方WP-D/E/F未实施。
 
 ## WP-D 日期、结构化内容与提示词
 
@@ -109,4 +116,4 @@ Microsoft Word系列为主要格式验收客户端，按实际测试产品/版�
 
 [本轮账本](evidence/WP-C-authorization-20260911.md)分别记录真实业务双RED/最小GREEN、当前SHA、
 SQLite/MySQL、独立Review与旧兼容失败。上方完整WP-C首门仍不勾选；该授权子步交付时根/CAS/来源/映射/日期占用尚未实现。
-根/CAS和日期占用已在[后继根子步](evidence/WP-C-root-20260911.md)本地交付；当前下一轮仅[显式映射](WP-C-mapping-next-prompt.md)。
+根/CAS和日期占用已在[后继根子步](evidence/WP-C-root-20260911.md)本地交付；当时下一轮[完成WP-C全部剩余工作](WP-C-mapping-next-prompt.md)。

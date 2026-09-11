@@ -1,6 +1,6 @@
-> 2026-09-11 根子步本地交付：见[根账本](evidence/WP-C-root-20260911.md)及[冻结契约](WP-C-root-contract.md)；下一轮仅[显式来源映射](WP-C-mapping-next-prompt.md)。历史段落和未执行来源/产品门保持。
+> 2026-09-11 WP-C完整协作路径已实现；[关闭矩阵](WP-C-completion-contract.md)、[本轮证据](evidence/WP-C-complete-20260911.md)与[当前状态](current-status.md)说明实际覆盖和未完成门。历史阶段描述不代表当前实现缺项。
 
-> 当前入口（2026-09-11本地交付）：[状态与证据边界](current-status.md)；[下一显式来源映射子步](WP-C-mapping-next-prompt.md)。下方阶段快照按记录时点解释。
+> 当前入口（2026-09-11本地交付）：[状态与证据边界](current-status.md)；[WP-C本轮证据](evidence/WP-C-complete-20260911.md)。下方阶段快照按记录时点解释。
 
 > 2026-09-10 最终收口口径：WP-A 实现基线、契约与最短完整 Word 五／六列单页可行性完成；long 三份仍为两页。共享业务实现、正式模板资格、缩减流程和产品/云端验收属于后续门。最终独立复审、提交与 exact-SHA CI 的关闭绑定见[收口账本](evidence/WP-A-closure-20260910.md)及其 Issue 回写；未完成 CI 时不得据此宣布正式关闭。
 

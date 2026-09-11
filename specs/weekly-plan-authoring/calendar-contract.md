@@ -1,4 +1,4 @@
-> 2026-09-11 根子步本地交付：见[根账本](evidence/WP-C-root-20260911.md)及[冻结契约](WP-C-root-contract.md)；下一轮仅[显式来源映射](WP-C-mapping-next-prompt.md)。历史段落和未执行来源/产品门保持。
+> 2026-09-11 WP-C完整协作路径已实现；[关闭矩阵](WP-C-completion-contract.md)、[本轮证据](evidence/WP-C-complete-20260911.md)与[当前状态](current-status.md)说明实际覆盖和未完成门。历史阶段描述不代表当前实现缺项。
 
 > 2026-09-11当前实现补充：授权及最小教学日事实见[本轮冻结契约](WP-C-authorization-contract.md)与[交付账本](evidence/WP-C-authorization-20260911.md)。下方WP-A提案按当时时点保留；未实现的共享根/来源及WP-D/E仍不计通过。本步无新schema。
 

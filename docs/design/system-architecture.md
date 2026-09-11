@@ -1,4 +1,4 @@
-> 2026-09-11 根/版本/CAS本地交付：[证据与范围](../../specs/weekly-plan-authoring/evidence/WP-C-root-20260911.md)。新迁移8d20f3b5c721；主题草稿非完整周正文/正式导出，来源映射仍待后续。
+> 2026-09-11 WP-C完整协作实现已接入生产composition：显式映射、逐日选源、差异采用、CAS来源快照、检查/重导入及人员默认。迁移head为b153c7e9f026；最终验证及尚缺门以[当前状态](../../specs/weekly-plan-authoring/current-status.md)和[本轮账本](../../specs/weekly-plan-authoring/evidence/WP-C-complete-20260911.md)为准。下方旧阶段记录保留历史语境。
 
 > 2026-09-11 当前周计划状态见[实时核对](../../specs/weekly-plan-authoring/current-status.md)：WP-A 已限定关闭，WP-C 授权/事实子步已本地交付、身份基线已公开；下方旧阶段记录不作当前阻塞。
 
@@ -347,3 +347,7 @@ CI、人工验收、Issue 回写和 no-ff merge；旧 F009 人工结果没有被
 只验一次性SQLite和专属MySQL。共享授权/根/CAS/来源仍未实现；不扩旧周/月或源写权限。
 精确证据与未执行项见隔离worktree的`specs/weekly-plan-authoring/evidence/WP-C-20260910.md`，
 下一提示词`specs/weekly-plan-authoring/WP-C-next-prompt.md`。未公开提交，无CI/云端/Office/部署结论；WP-A仍缺目标Office。
+
+## 2026-09-11 WP-C完整协作应用接线
+
+app.main启动production_composition，注册weekly、mapping和people三个应用服务；每次调用从当前UI session取得actor，服务器候选仅保留有界、短期内存状态。共享来源操作遵循User升序→class_semester→assignment升序→root→DailyPlan升序，MySQL READ COMMITTED/SQLite BEGIN IMMEDIATE；事务发布前重新检查session及任职截止。来源选择/差异采用不持锁等待用户，也不保存正文；save_edit才原子发布版本、字段来源和审计。完整填写UI、AI与正式导出仍在后续门。

@@ -1,0 +1,976 @@
+{
+  "tested_code_sha": "6352bf60d59abc1bd836a476f0eb94e9f48fb479",
+  "evidence_root": "/home/ywyz/code/km-wpc-complete-evidence-20260911",
+  "role": "local synthetic SQLite/MySQL and isolated regression; no remote CI/cloud/Office",
+  "whole_wp_c_gate": "NOT_COMPLETE_prior_native_RED_evidence_gaps",
+  "artifact_scope": "Retained artifacts before final Issue 77 writeback; writeback readback recorded separately",
+  "artifact_count": 178,
+  "artifacts": [
+    {
+      "path": "agent-snapshot.log",
+      "bytes": 98,
+      "sha256": "1f60cdcbd90c0793d33f5dd51b837de4fe906697a747fef28aba5b71cf726f0a"
+    },
+    {
+      "path": "all-tests-first.log",
+      "bytes": 21225,
+      "sha256": "cb862891ac680dae6b3e5318a3a2662881ef6bdb5c1fc2bb657f0a264adc2a12"
+    },
+    {
+      "path": "annotate_public.py",
+      "bytes": 4553,
+      "sha256": "894fa275132107b7701c29eeb69c77e0765427a8ab48d82020ecf8aec30b6158"
+    },
+    {
+      "path": "check-audit-expiry-sqlite.log",
+      "bytes": 99,
+      "sha256": "82a092d4d79229971c09fdcbd54d822ee4821bb0968740b9c7089c28392134b4"
+    },
+    {
+      "path": "check_preservation.py",
+      "bytes": 1103,
+      "sha256": "3f6c2a1f847c4e8cac0754a9557f87ced0a65784375e5ba10e7e1302d405afbc"
+    },
+    {
+      "path": "close_docs.py",
+      "bytes": 8616,
+      "sha256": "e8c03e18d07fa3708074b5a89778e920acf39c32b6cc197ae35a0db776a365bb"
+    },
+    {
+      "path": "collaboration-extra-first.log",
+      "bytes": 10890,
+      "sha256": "fd37021460220267335c480240dbfb937a5f767bbbb1cdddf4f2d117646ae4ae"
+    },
+    {
+      "path": "collaboration-first-coverage.json",
+      "bytes": 157355,
+      "sha256": "5604cda43463521d9ba48906e84da7003155e0df0c3ccbc0d8fe99183439fa5f"
+    },
+    {
+      "path": "collaboration-first-coverage.tar.gz",
+      "bytes": 24321437,
+      "sha256": "14fa5c17a5dbbc80e8c306d75eeed41d3da4dd4a07faf42530881f960fdab197"
+    },
+    {
+      "path": "collaboration-first.log",
+      "bytes": 100,
+      "sha256": "2d65e1c39fbe26a456171e324462ae9dcf7660605b3894b5091774573f7e543c"
+    },
+    {
+      "path": "collaboration-mysql-first.log",
+      "bytes": 100,
+      "sha256": "8877cb9b196401afb713d4770e61414a692b2df0f8b6512b67083d863bb141f0"
+    },
+    {
+      "path": "collaboration-review-green-mysql.log",
+      "bytes": 100,
+      "sha256": "6a377c04535b469743b08a90729dee0065b83c8e41bcd52f45f08c423ef4feb0"
+    },
+    {
+      "path": "collaboration-review-green-sqlite.log",
+      "bytes": 100,
+      "sha256": "2671de1ab8f5fd0eeac873fb53561c4bf9bb35e86786effa61a613b4dc7353d4"
+    },
+    {
+      "path": "collect_wpc.py",
+      "bytes": 720,
+      "sha256": "2f89ce48774ece3ec278b834ab95138c2645d03c7df81f749a937c2a3c5606ec"
+    },
+    {
+      "path": "dependency-check.log",
+      "bytes": 66,
+      "sha256": "7482d07c74b7e23ecdff6c3658f5e47877a209fda8f9c216b2c19d586c7d276b"
+    },
+    {
+      "path": "expiry-check-green-mysql.log",
+      "bytes": 6653,
+      "sha256": "c92bf938ec8de23b4b28690aa3e165ce60c5becd97d03af91732848ab1cbc067"
+    },
+    {
+      "path": "expiry-check-green-sqlite.log",
+      "bytes": 98,
+      "sha256": "a85172db0a8ff2d7ec3f1827c30765731acfecd216da1bea5dfe145d74da22d2"
+    },
+    {
+      "path": "expiry-check-red-1.log",
+      "bytes": 33287,
+      "sha256": "3c2918a52f40d6150de2c26b79af3c09fdc3c8c110bd0cf6470d00a6d73c718b"
+    },
+    {
+      "path": "expiry-check-red-2.log",
+      "bytes": 33287,
+      "sha256": "b3b04e79bb7b7816cd3c649305b223a129fad86a08cf891d1d73844f18a3a7da"
+    },
+    {
+      "path": "expiry-check-red.json",
+      "bytes": 157655,
+      "sha256": "4614fd0397ca41706005723a1a0ca9d13171c9ee351ad9df2db1e447b92e4454"
+    },
+    {
+      "path": "expiry-check-red.tar.gz",
+      "bytes": 24327359,
+      "sha256": "ca69587b716f6bc05b9b66837d6371a02b275aff413db5042a569a6cedbed937"
+    },
+    {
+      "path": "feature-account.md",
+      "bytes": 997,
+      "sha256": "8d2f56260adf36a9653b6ce059dd68ae1e2f9fd441455b904be27edcef083b6e"
+    },
+    {
+      "path": "feature-prompts.md",
+      "bytes": 1150,
+      "sha256": "2198a5bdbdcd6df7c273dcc4d4fe97139d7f99c158010d48af63360f77e12d14"
+    },
+    {
+      "path": "final-agent.json",
+      "bytes": 469,
+      "sha256": "5354f0d8ed7d4a4e14a96a2ac31ffe06f919240615056faf0902eb1cf0cc3c9e"
+    },
+    {
+      "path": "final-agent.log",
+      "bytes": 98,
+      "sha256": "c05e01e792c272f80879dcb1fcb09b1190469be95e362caf3514dfd0d59a7e53"
+    },
+    {
+      "path": "final-alembic-heads.log",
+      "bytes": 20,
+      "sha256": "f78994349d00f5461bb5ff062f2736201f3dc92b51190f103a1ce879bb85c8e3"
+    },
+    {
+      "path": "final-code.json",
+      "bytes": 158512,
+      "sha256": "c41b72703ac43c7039a7b4ab55a40ea01ddffff795b16d04ba18cb49380220a7"
+    },
+    {
+      "path": "final-code.tar.gz",
+      "bytes": 24353965,
+      "sha256": "8951ab506c524bd2e6c66c1e493ca0927337355ecc59f545f3ebaed21c335a12"
+    },
+    {
+      "path": "final-foundation.json",
+      "bytes": 586,
+      "sha256": "e293e47d42ac8b178115d5f54d96200bbbf076dea77be138339c1877bad11260"
+    },
+    {
+      "path": "final-foundation.log",
+      "bytes": 351,
+      "sha256": "238b1d44227dc6859d697293e9fa542989d4a3a1281be071b40201810ce0a8e6"
+    },
+    {
+      "path": "final-legacy.json",
+      "bytes": 501,
+      "sha256": "70419afa85d37db084350cb3c55edca962d5d25e90e2829eb83260b46de0e6c3"
+    },
+    {
+      "path": "final-legacy.log",
+      "bytes": 420,
+      "sha256": "a9f114fa6dbb7c95b966a2f12b551e49f4a9df1acf36f468bd160e28e79ef53a"
+    },
+    {
+      "path": "final-lint-driver.log",
+      "bytes": 2001,
+      "sha256": "099634c000588963cf8d04bb82f6f796d7ebdd67a9ad89396e6629a95d469fa6"
+    },
+    {
+      "path": "final-lint.log",
+      "bytes": 8294,
+      "sha256": "ff926caca53afb1c38342885311fc3088c51684567f20a84587412fa8980f1f3"
+    },
+    {
+      "path": "final-mysql-container.txt",
+      "bytes": 241,
+      "sha256": "182cc353cac139c989f21de8edd287b3446c28822b547157db79b835aa8e57f8"
+    },
+    {
+      "path": "final-python-files.json",
+      "bytes": 2082,
+      "sha256": "7dd620b0b2a55f2535d17d0b20a22059dc9b402541912628430b7374849704cf"
+    },
+    {
+      "path": "final-tests.json",
+      "bytes": 437,
+      "sha256": "065d78d08616397250eda4f83044c9546ec9065b91ef44233e0bd9bc26cb3649"
+    },
+    {
+      "path": "final-tests.log",
+      "bytes": 2341,
+      "sha256": "e8a9c8cc504af51719f8cf15f4b37c12b8599670dca4a5d80d25372b0b92b469"
+    },
+    {
+      "path": "final-wpc-collection.log",
+      "bytes": 20539,
+      "sha256": "d898175de6cdaf75e96448b90efe45aeacac70b88082940fea27cd966aff9371"
+    },
+    {
+      "path": "final-wpc-mysql.json",
+      "bytes": 1027,
+      "sha256": "65bee18e9ddd86e1250f6474661f44d6ce23081326fed4ee4efa6794e661a56f"
+    },
+    {
+      "path": "final-wpc-mysql.log",
+      "bytes": 352,
+      "sha256": "fd70f70dbc6fd81dfcec458b268d75c2400a8b4d6fb4b3fe1064b92043350a9c"
+    },
+    {
+      "path": "final-wpc-nodes.json",
+      "bytes": 71264,
+      "sha256": "6ece804e60f6160d5338b2f865b9d22d8e234db4bfc17d5722fc33b6fea24d2f"
+    },
+    {
+      "path": "final_lint.py",
+      "bytes": 955,
+      "sha256": "3c9c30bc3f2a3aa6bf79161665b5eac385e1c03919e42dd8cec78ea788dc1e25"
+    },
+    {
+      "path": "foundation-all.log",
+      "bytes": 341,
+      "sha256": "be7dbdca03b4f81a5cfb1798f73a75b6e7b9545e96fd4a5368fc57d6b50362ee"
+    },
+    {
+      "path": "foundation-schema-green.log",
+      "bytes": 98,
+      "sha256": "c036b726f980bb166231094d3df058c3414e4c4d452940cb6ea6be9813c2b520"
+    },
+    {
+      "path": "foundation-schema-red-1.log",
+      "bytes": 8646,
+      "sha256": "74c181d46c34f42c049cba70ad7959b33776070871aa3e6fba9278b69b349bf3"
+    },
+    {
+      "path": "foundation-schema-red-2.log",
+      "bytes": 8646,
+      "sha256": "4ba62d4edf32926518382ffd4e8a6fbb98b9b8654d3fdc8a95c74ce0d55ebd8d"
+    },
+    {
+      "path": "foundation-schema-red.json",
+      "bytes": 157655,
+      "sha256": "4d867897605fc1dd129bcf4ac80a30c4d160ca8ec13d0d0d0e3c71c3eb9b8139"
+    },
+    {
+      "path": "foundation-schema-red.tar.gz",
+      "bytes": 24329355,
+      "sha256": "33d5f5fa33ea3cf8a4a31ef6a6dc11c89d01137d1ec5a297f94cd1e051d83ee7"
+    },
+    {
+      "path": "issue-75-start.json",
+      "bytes": 9192,
+      "sha256": "5070a78a314fd30a60616a6902bac1b6da526e7319c6fa8e3162b467a3bb1f64"
+    },
+    {
+      "path": "issue-77-before-final.json",
+      "bytes": 61159,
+      "sha256": "f05058cb0365989c64f7b296f1069e3ba6c230135c6ce317f3f8dd5dd3eb7ce7"
+    },
+    {
+      "path": "issue-77-start.json",
+      "bytes": 61192,
+      "sha256": "4d6a9941958145467001804027a2a44f65493fe7d7924b2e4f172caf7d571259"
+    },
+    {
+      "path": "issue-78-readback.json",
+      "bytes": 1096,
+      "sha256": "4b81177c8b48d99e3d37fc546d9f7d595da493bbc40851646ed65c35d4915b85"
+    },
+    {
+      "path": "issue-79-readback.json",
+      "bytes": 1249,
+      "sha256": "d67fb381dec22cb657dc92acc45f04f79aa81a4339cbb61165d3030340798277"
+    },
+    {
+      "path": "legacy-all.log",
+      "bytes": 420,
+      "sha256": "9bea4ebc72579a81972fe67c9428dc809542432689b09d76aa15dc987c8c50b0"
+    },
+    {
+      "path": "legacy-downgrade-red-1.log",
+      "bytes": 5453,
+      "sha256": "f57ad35b34f66d803d70f2cad6cacb10bf4bd49ad70a786854a96dbfff02cba9"
+    },
+    {
+      "path": "legacy-downgrade-red-2.log",
+      "bytes": 5453,
+      "sha256": "ef51028fee7bfebc96a5b8787b0644dd09f7121694ea55b0bb3915378dc3e907"
+    },
+    {
+      "path": "legacy-downgrade-red.json",
+      "bytes": 157655,
+      "sha256": "88b84b60a381b66583fe8502de4185f7ab0edfc1e3670b7f2060feb154a60728"
+    },
+    {
+      "path": "legacy-downgrade-red.tar.gz",
+      "bytes": 24328762,
+      "sha256": "a24ef68e03e49614023e68540d0bce988960751dbd44b2ee4b37b72257ea8d05"
+    },
+    {
+      "path": "main-format-initial.log",
+      "bytes": 45,
+      "sha256": "c71e2c1e1868e5ff884de281e05f2934d4ca3286f3b7483f8648aafaff1ddb30"
+    },
+    {
+      "path": "main-ruff-initial.log",
+      "bytes": 3735,
+      "sha256": "724bf6112cfbd6f6d2953147f52013de2a4a05e2b3b1fcbe070a0507c40e33dd"
+    },
+    {
+      "path": "mapping-delete-green.log",
+      "bytes": 98,
+      "sha256": "941fd927604956af95533710b95a4b5cfe32fe875376a69b8cd3d6db814e3c2b"
+    },
+    {
+      "path": "mapping-delete-red-1.log",
+      "bytes": 5769,
+      "sha256": "cf4a2c4f60de4a2984ea0228ff894b98fb156458d80c120f50ef60f3446b5d54"
+    },
+    {
+      "path": "mapping-delete-red-2.log",
+      "bytes": 5769,
+      "sha256": "597289f25ad9e06c1096c1b79edc39a40f81829bee7fb2d79a8662454d7ecb97"
+    },
+    {
+      "path": "mapping-delete-red.json",
+      "bytes": 155738,
+      "sha256": "46a2a91b678f4e0126bf610908f15009c3d32e175af5967496193608d3818d75"
+    },
+    {
+      "path": "mapping-delete-red.tar.gz",
+      "bytes": 24302017,
+      "sha256": "485878613577a43a976627e8dc2eecca9d0cfc3f8016d5c9428e8fd6d3844117"
+    },
+    {
+      "path": "mapping-first.log",
+      "bytes": 16153,
+      "sha256": "39342fa676ed080e0eb2109abe933136219df5547e910e9c1f510dd19275c95f"
+    },
+    {
+      "path": "mapping-forged-mysql-red-1.log",
+      "bytes": 10223,
+      "sha256": "d976fefc79595e230ad5068a5e7a616a9a985e6f3f05623afe774f437f3588a5"
+    },
+    {
+      "path": "mapping-forged-mysql-red-2.log",
+      "bytes": 10223,
+      "sha256": "852f445cf63fd1ae8e1920d58df59c893055abe6adc640fd321cdef6ff043393"
+    },
+    {
+      "path": "mapping-forged-red.json",
+      "bytes": 155962,
+      "sha256": "5dab372b1cc90473573fab6e6329de9f08b1e8a34b4f08bee9f094423a096ce1"
+    },
+    {
+      "path": "mapping-forged-red.tar.gz",
+      "bytes": 24306480,
+      "sha256": "fb7c676331b75cb5703ed99ab0ade6937bfabda9862a648e34827ec749fb9ad6"
+    },
+    {
+      "path": "mapping-forged-sqlite-red-1.log",
+      "bytes": 10225,
+      "sha256": "0f41983869aaf6dcc45c26f52e60002c0c4a7014fb432ba2bc29a0a2439a1fe4"
+    },
+    {
+      "path": "mapping-forged-sqlite-red-2.log",
+      "bytes": 10225,
+      "sha256": "9fccb00d1bc105ec2d3f443d6983076979543430a278b66df09e6e4b59c5f17d"
+    },
+    {
+      "path": "mapping-matrix/collaboration-matrix/mysql-combined.log",
+      "bytes": 100,
+      "sha256": "536db50d70f7f18844d2098b43753d0efa3561e3ae94e13bd41e5a29b4089ef2"
+    },
+    {
+      "path": "mapping-matrix/collaboration-matrix/mysql-first.log",
+      "bytes": 100,
+      "sha256": "015284fdb84a24e5abfce82d8603ad648864f49cfc9f403f64892fbb8db62ae9"
+    },
+    {
+      "path": "mapping-matrix/collaboration-matrix/mysql-repeat.log",
+      "bytes": 100,
+      "sha256": "9ce347a083cc0d9e09911a9ee338b88e05c6e55408f8de6a5115e5a3d48ae951"
+    },
+    {
+      "path": "mapping-matrix/collaboration-matrix/report.md",
+      "bytes": 1718,
+      "sha256": "6dd8d42af13264b1a9d47be158839fefad084ed15a2fde4056a78101a53b6d57"
+    },
+    {
+      "path": "mapping-matrix/collaboration-matrix/sqlite-combined.log",
+      "bytes": 100,
+      "sha256": "b44645c10ba54d1d97be6c4178738911bea04a72f035d6a885f80e3f83704df1"
+    },
+    {
+      "path": "mapping-matrix/collaboration-matrix/sqlite-first.log",
+      "bytes": 99,
+      "sha256": "cf5824cdae1b8c5c55bbca958d72d9ece94a0d3dfd5d1f19de8c81d5b01d1841"
+    },
+    {
+      "path": "mapping-matrix/collaboration-matrix/sqlite-repeat.log",
+      "bytes": 99,
+      "sha256": "0093adc82e509d0b88bf16edddf0c361ee680476b93922f7e30059158a81424a"
+    },
+    {
+      "path": "mapping-matrix/mysql-combined.log",
+      "bytes": 100,
+      "sha256": "e3490b0440e9f46b4d796509df0bebbb035b474765532a48af2f18f3859d12c1"
+    },
+    {
+      "path": "mapping-matrix/mysql-first.log",
+      "bytes": 100,
+      "sha256": "eec74cf785daf55ec809059f3588ddd8865263252d6b5471f3f8dec7ada31a8f"
+    },
+    {
+      "path": "mapping-matrix/mysql-repeat.log",
+      "bytes": 100,
+      "sha256": "0e98b08613f5aeff137eaacf66a7d9c6e6180c30cfb7cad0d3d67a31e0eeb1e5"
+    },
+    {
+      "path": "mapping-matrix/report.md",
+      "bytes": 2254,
+      "sha256": "177b5874635e74d266d1645a49383be643457b729251dc9f4b216348056c25e9"
+    },
+    {
+      "path": "mapping-matrix/source-migration/mysql-combined.log",
+      "bytes": 100,
+      "sha256": "17704a83ab45a4413ed76d9508f45673ef715c68a90b107eda1315137c9224e3"
+    },
+    {
+      "path": "mapping-matrix/source-migration/mysql-first.log",
+      "bytes": 98,
+      "sha256": "14f8511e7601649258044a5e46022298e2a6f6fb3e2b69d73aa63d369e3e0aa1"
+    },
+    {
+      "path": "mapping-matrix/source-migration/mysql-repeat.log",
+      "bytes": 98,
+      "sha256": "66a4569267d58c2b812b8e67e37dba19cca57c6333d4e45b3050fcd947b41136"
+    },
+    {
+      "path": "mapping-matrix/source-migration/report.md",
+      "bytes": 1461,
+      "sha256": "12afab2df788c52c0b38ac324f92cdde77491de871ca8c33cec23ed2b9fe2819"
+    },
+    {
+      "path": "mapping-matrix/source-migration/sqlite-combined.log",
+      "bytes": 99,
+      "sha256": "da0fe1ecc9408a59cf60676a798ceb10598ae1a79ddadb029023bee8772a91cf"
+    },
+    {
+      "path": "mapping-matrix/source-migration/sqlite-first.log",
+      "bytes": 98,
+      "sha256": "e8ce4a152f031c2cb5cf02b7baf4db71dcd331c098aa1a492db2a6c79b394608"
+    },
+    {
+      "path": "mapping-matrix/source-migration/sqlite-repeat.log",
+      "bytes": 98,
+      "sha256": "9c611d8a794be9613a15d73cdc2fc1a12426e659586778ab003c0cecf3cb26c0"
+    },
+    {
+      "path": "mapping-matrix/sqlite-combined.log",
+      "bytes": 100,
+      "sha256": "48433e5ac6431c35fb61c3f52bc1c0178effdb743ff1f3e10d5b204c27efffd0"
+    },
+    {
+      "path": "mapping-matrix/sqlite-first.log",
+      "bytes": 99,
+      "sha256": "0490b6e5d2e9189b0720eefc27c8a8b39c41337b14f821f0408428dba71a502e"
+    },
+    {
+      "path": "mapping-matrix/sqlite-repeat.log",
+      "bytes": 99,
+      "sha256": "55eb4b7cceedb2fb95d004988dc273ba28efe0cb96852746e9acd73214a85910"
+    },
+    {
+      "path": "mapping-mysql-first.log",
+      "bytes": 99,
+      "sha256": "3780e50aa7d46304ca007047e5c774fbe636ae2f9ed9ab48f49af483e0ef1a5a"
+    },
+    {
+      "path": "mapping-review-green-mysql.log",
+      "bytes": 100,
+      "sha256": "8ffbd1c05810c9ced64a1ae4be39654de7b2363ab24aa8a0e854a8038d9aa4bb"
+    },
+    {
+      "path": "mapping-review-green-sqlite.log",
+      "bytes": 99,
+      "sha256": "9f1d18322f4a7fcf63b22e200d9f3a5f13c37de137fc6e3e55000ccaabd70af8"
+    },
+    {
+      "path": "mapping-schema-green.log",
+      "bytes": 98,
+      "sha256": "f846ef4f29093638d9226f7e4a313def975d18b32ff0425cd659d1f6eea95ac1"
+    },
+    {
+      "path": "mapping-schema-red-1.log",
+      "bytes": 5057,
+      "sha256": "c30d4ac58dec94f02ed0794ec4e2cd9e72dad3ac8ea35106076330ea0d29af0d"
+    },
+    {
+      "path": "mapping-schema-red-2.log",
+      "bytes": 5057,
+      "sha256": "f86b5b7290f6222191a2f4beaf405306a54e106360e3ba585fcd106443e7c847"
+    },
+    {
+      "path": "mapping-schema-red-source.sha256",
+      "bytes": 64,
+      "sha256": "c12f0818ac244e61765e19314e79e3dfe512dad7f30bd9243a04989e133e4a3a"
+    },
+    {
+      "path": "mapping-schema-red-source.tar.gz",
+      "bytes": 24291078,
+      "sha256": "763b474954c78f15c9faa9d5c0d0ae9c2952278abe67d27c96e256792d9baa9e"
+    },
+    {
+      "path": "mapping-sqlite.log",
+      "bytes": 99,
+      "sha256": "d59be28b84a169bc126f3df4ce51f4d3d9e318a6f50f0bd126c616851304f9a3"
+    },
+    {
+      "path": "migration-compat-tests-green.log",
+      "bytes": 98,
+      "sha256": "a7c0d91f4653badedeec70ce7bc1ef8c3da8652e218da7c72d8e998852c64767"
+    },
+    {
+      "path": "migration-compat-tests-red-1.log",
+      "bytes": 19164,
+      "sha256": "a9dbf50f6df471eecc74cb032b3885cde2ee6dabf783a13668ff698aed96ada7"
+    },
+    {
+      "path": "migration-compat-tests-red-2.log",
+      "bytes": 19164,
+      "sha256": "a241ff38ad35a07b8017f8d8fa6d1b832c0fcf6fe3aec7a8e584a0e074040b28"
+    },
+    {
+      "path": "migration-compat-tests-red.json",
+      "bytes": 157789,
+      "sha256": "595faf334151437333a71213f3e8d5563fc58bfc2cc7636e28a2311c569b844b"
+    },
+    {
+      "path": "migration-compat-tests-red.tar.gz",
+      "bytes": 24332756,
+      "sha256": "98216e12b1469f2e9f5c3a6bfa64fbbff756e1e433c41ceaf666dbb71ff33e63"
+    },
+    {
+      "path": "mysql-cleanup.log",
+      "bytes": 31,
+      "sha256": "012f67dd3d95da26ddc10cf434616bfaeb5cbb25179cde4be8bd98f222b2d3d6"
+    },
+    {
+      "path": "people/SHA256SUMS",
+      "bytes": 911,
+      "sha256": "c86235da2d76d0c4931bc693161d4ab936413d6aeeceb9d125a37b1e9fe60bd2"
+    },
+    {
+      "path": "people/wp-c-people-collab-final-mysql-20260911.log",
+      "bytes": 98,
+      "sha256": "129d6bf5db5a76730f76f2745a6a72aa2915246d2366bdcaa01c99a0d9b8cc1b"
+    },
+    {
+      "path": "people/wp-c-people-collab-final-sqlite-20260911.log",
+      "bytes": 98,
+      "sha256": "c8195e475881a53aa3b3b955f23e19b19838d952648311a45cd875e464ca9720"
+    },
+    {
+      "path": "people/wp-c-people-final-mysql-20260911.log",
+      "bytes": 99,
+      "sha256": "421e38f21b97a7bce1ea3c5a168457c4787f3e068a47f086415cea7eefe6c70f"
+    },
+    {
+      "path": "people/wp-c-people-final-sqlite-20260911.log",
+      "bytes": 604,
+      "sha256": "73653e2ffb3d66115fa1c3757745627ed4abf48f51b5c1b08ddb5d83ec6fffad"
+    },
+    {
+      "path": "people/wp-c-people-pre-reconcile-20260911.tar",
+      "bytes": 51200,
+      "sha256": "073c8f9935c130b8e8a898e4769965fb0490e47167e09177f1fcb66ee92ce111"
+    },
+    {
+      "path": "people/wp-c-people-red-mysql-1.log",
+      "bytes": 8222,
+      "sha256": "356fe371b5a62d12cedeb9049bb53bd1603af9c3e0eba0255405c01160d33978"
+    },
+    {
+      "path": "people/wp-c-people-red-mysql-2.log",
+      "bytes": 8222,
+      "sha256": "f69c7cd868a658a1802cca25c12898bc32a3aa36eff5130b54885419dbfb7aea"
+    },
+    {
+      "path": "people/wp-c-people-red-sqlite-1.log",
+      "bytes": 8223,
+      "sha256": "87f201a3945af5f03bc9a123c5b3846e92e4fdedd8f29b1f3eaab15552432973"
+    },
+    {
+      "path": "people/wp-c-people-red-sqlite-2.log",
+      "bytes": 8223,
+      "sha256": "2a0e29eae3aad5e5469cee609a99fa39d1f5295fceac880de9668db1951cf875"
+    },
+    {
+      "path": "preservation-final.json",
+      "bytes": 17803,
+      "sha256": "70da580b3ea3a5329d17f461ff192c39def8f4ff03fee079b69495d520fdff5c"
+    },
+    {
+      "path": "preservation.json",
+      "bytes": 17520,
+      "sha256": "dd699ee7b2bc557bfd2c9120d60502c29e9efbb59ec9f4ccb83047eed5b50880"
+    },
+    {
+      "path": "restore_line_endings.py",
+      "bytes": 611,
+      "sha256": "ee91f30757e8a56a9320728524cf796625479897cc169f58b7dbb030f1805f4a"
+    },
+    {
+      "path": "reviewer/source-final-body-collaboration-mysql.log",
+      "bytes": 100,
+      "sha256": "3b9ffa4ba20c6c38c948cfba6ac0476756739b4279c3fb66bceaf312088db2e6"
+    },
+    {
+      "path": "reviewer/source-final-body-collaboration-sqlite.log",
+      "bytes": 100,
+      "sha256": "2b0e8933ecb21004d82a0e6c779b9fa92ebd80e429df42e15489ac9651312f90"
+    },
+    {
+      "path": "reviewer/source-final-diff-check.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "reviewer/source-final-head.txt",
+      "bytes": 41,
+      "sha256": "09c146d8093ea21be7577e2c803cb7ea6a9490a8b7d36416cabdbe8aaf191581"
+    },
+    {
+      "path": "reviewer/source-final-inputs.sha256",
+      "bytes": 614,
+      "sha256": "681f9a8bfc5e8399d8acbf40706086f541d52f9ae00ee390335f24e1f4104993"
+    },
+    {
+      "path": "run_final.py",
+      "bytes": 1839,
+      "sha256": "b0e887535f870fba9fa3ddbdd3a1b0ad18805b358de85bf25f266a9d4a3ac7cc"
+    },
+    {
+      "path": "session-baseline-red-1.log",
+      "bytes": 6135,
+      "sha256": "d643ed4f0f88a3701bd6cd8eedb9b27f78ece1d2696c7a65da00b55eda9ad8f5"
+    },
+    {
+      "path": "session-baseline-red-2.log",
+      "bytes": 6135,
+      "sha256": "a4596b879b138c75f68037e45fa1945c58215f277f999e8dd8393ce44465470b"
+    },
+    {
+      "path": "session-fixture-green.log",
+      "bytes": 98,
+      "sha256": "c46951216fb22cb70c4bbba01b026cd9532f4bdb3308e82f9390b88874bf801f"
+    },
+    {
+      "path": "snapshot.py",
+      "bytes": 650,
+      "sha256": "8f9b628cbfbfa6361dc4ccab268ef5ae2763e4d54fb6c3afcd40745fef6ce24e"
+    },
+    {
+      "path": "source/MAIN-ASSESSMENT.md",
+      "bytes": 935,
+      "sha256": "9cfdb1a03bb5ccd76a4593a721245adb71253369a3c64b5675708d495dcb9706"
+    },
+    {
+      "path": "source/SOURCE_EVIDENCE_HANDOFF.md",
+      "bytes": 5415,
+      "sha256": "54dc964183f8ca6093ae38c75e8e57e706dbab9e6a8f62af153c5b500327f444"
+    },
+    {
+      "path": "source/audit-graft-red-mysql-1.log",
+      "bytes": 568,
+      "sha256": "335607353f9da30b5786e89edeb248bb6f4e24c8de760a1aa28846fd520c431a"
+    },
+    {
+      "path": "source/audit-graft-red-mysql-2.log",
+      "bytes": 568,
+      "sha256": "335607353f9da30b5786e89edeb248bb6f4e24c8de760a1aa28846fd520c431a"
+    },
+    {
+      "path": "source/audit-graft-red-source.tar.gz",
+      "bytes": 3775,
+      "sha256": "21474ba2dfccbd52c9e2bbaa2136a04c5259355240a48f74189c860e33b2f462"
+    },
+    {
+      "path": "source/audit-graft-red-sqlite-1.log",
+      "bytes": 542,
+      "sha256": "80715bb36bdbfe925210bf140939d4d35a15aab202fbbfab913eaf4fa8f5b830"
+    },
+    {
+      "path": "source/audit-graft-red-sqlite-2.log",
+      "bytes": 542,
+      "sha256": "80715bb36bdbfe925210bf140939d4d35a15aab202fbbfab913eaf4fa8f5b830"
+    },
+    {
+      "path": "source/copied-artifacts.json",
+      "bytes": 3623,
+      "sha256": "991981f24b32a321e4e54ff5c5decad87588e3192aece141218a16550e5875b6"
+    },
+    {
+      "path": "source/forged-event-red-1.log",
+      "bytes": 517,
+      "sha256": "aeb394beb912181a46abe314f21ae9535377a35b4081f6b40317837b01722ae8"
+    },
+    {
+      "path": "source/forged-event-red-2.log",
+      "bytes": 517,
+      "sha256": "aeb394beb912181a46abe314f21ae9535377a35b4081f6b40317837b01722ae8"
+    },
+    {
+      "path": "source/forged-event-red-source.tar.gz",
+      "bytes": 6248,
+      "sha256": "f4e5afb49ff34dbfdaffdad8e8a0a9497261724cbb54eb4af007ddf14f7ec24d"
+    },
+    {
+      "path": "source/hash-nullable-red-1.log",
+      "bytes": 515,
+      "sha256": "d19e4dab27aa32e01a4c8c461f7b552a048e4b308bda2d2c6265098ac0c31756"
+    },
+    {
+      "path": "source/hash-nullable-red-2.log",
+      "bytes": 515,
+      "sha256": "d19e4dab27aa32e01a4c8c461f7b552a048e4b308bda2d2c6265098ac0c31756"
+    },
+    {
+      "path": "source/hash-nullable-red-source.tar.gz",
+      "bytes": 3045,
+      "sha256": "df6546a8736c977aa3a85312d892c06ac39221d2ef0d05e4d34fc01de2992705"
+    },
+    {
+      "path": "source/new-baseline-red-mysql-1.log",
+      "bytes": 18129,
+      "sha256": "93b0562bf155b8e3eb83375091e03a957c5f68a1e9128c5f68200cd512eba62c"
+    },
+    {
+      "path": "source/new-baseline-red-mysql-2.log",
+      "bytes": 18129,
+      "sha256": "01c77d512de59f9a22d64ded83fc8e1e82e0840d5588a7f1e8f71e15343a5746"
+    },
+    {
+      "path": "source/new-baseline-red-source.sha256",
+      "bytes": 145,
+      "sha256": "0ce149ebc6965211bdb817e639f12257b8e8f8f5cff1f4921812c7e06453e684"
+    },
+    {
+      "path": "source/new-baseline-red-source.tar.gz",
+      "bytes": 13342,
+      "sha256": "8263a1940378257a402cc9776c537bec778f26fca5ad0f952b94dec859c50353"
+    },
+    {
+      "path": "source/new-baseline-red-sqlite-1.log",
+      "bytes": 18105,
+      "sha256": "cc60c36ac81d119de1df96e974772c4a6a59ceec607e85f2fbc9d9277564ffe1"
+    },
+    {
+      "path": "source/new-baseline-red-sqlite-2.log",
+      "bytes": 18105,
+      "sha256": "c48bc6e9941ece90f5466ab69712893a662e4befe90239b4bab9394546636d90"
+    },
+    {
+      "path": "source/parent-scope-red-mysql-1.log",
+      "bytes": 11311,
+      "sha256": "4365fc99357d0f4be730d675723746cd8817926b114681208ff1517a66c1f3c5"
+    },
+    {
+      "path": "source/parent-scope-red-mysql-2.log",
+      "bytes": 11311,
+      "sha256": "ce2c3b77604ed60fbf1a38af62531fe821cfba69a0e8076217f415011edb7349"
+    },
+    {
+      "path": "source/parent-scope-red-source.sha256",
+      "bytes": 145,
+      "sha256": "3ea80b426cc8e325e4d1757a7194b46e6d80ffeb360462ed3018d292ecbef01b"
+    },
+    {
+      "path": "source/parent-scope-red-source.tar.gz",
+      "bytes": 12251,
+      "sha256": "63ca85613fed73eeba5cb9c0f7db9bc0f500c16a1c8341d67bda1e26bd910628"
+    },
+    {
+      "path": "source/parent-scope-red-sqlite-1.log",
+      "bytes": 11286,
+      "sha256": "e1f7939ccaab51dc824ed60702c76f19eb5de6eca6921d5af3d33acf17b33898"
+    },
+    {
+      "path": "source/parent-scope-red-sqlite-2.log",
+      "bytes": 11286,
+      "sha256": "f4ac16c950c94b8f7d2e9e1700109412781bc7195dea5e9e2066683ec4e69f36"
+    },
+    {
+      "path": "source/reimport-revision-red-mysql-1.log",
+      "bytes": 7392,
+      "sha256": "a7a587222c87762dee6487c632b77bb0d336a80530c4a6446d4bfc5e5ff3e8f8"
+    },
+    {
+      "path": "source/reimport-revision-red-mysql-2.log",
+      "bytes": 7392,
+      "sha256": "a7a587222c87762dee6487c632b77bb0d336a80530c4a6446d4bfc5e5ff3e8f8"
+    },
+    {
+      "path": "source/reimport-revision-red-source.tar.gz",
+      "bytes": 3861,
+      "sha256": "9fc29644746cd1231461c4b9bda7cfa32e796b1a806d797e4d7fe8ec2b45d7cd"
+    },
+    {
+      "path": "source/reimport-revision-red-sqlite-1.log",
+      "bytes": 4434,
+      "sha256": "1b82ab60161edc601fcd30e654cc4ffc05303967b3857450a73ddac6e79a92ee"
+    },
+    {
+      "path": "source/reimport-revision-red-sqlite-2.log",
+      "bytes": 4434,
+      "sha256": "1b82ab60161edc601fcd30e654cc4ffc05303967b3857450a73ddac6e79a92ee"
+    },
+    {
+      "path": "source/target-path-null-red-mysql-1.log",
+      "bytes": 12798,
+      "sha256": "572f9a435aec6195e7f86d57be21723dbf14911ba556dff4a7dd80142d9f9de2"
+    },
+    {
+      "path": "source/target-path-null-red-mysql-2.log",
+      "bytes": 12798,
+      "sha256": "bafa4e13df670af11d595a8b88b6dbfbed780ec218c3225ab9debd6989eb040f"
+    },
+    {
+      "path": "source/target-path-null-red-source.sha256",
+      "bytes": 149,
+      "sha256": "4214cab5cf854295b9eb0206b10c395b88f53200135f9790fe1b8942ec36eadb"
+    },
+    {
+      "path": "source/target-path-null-red-source.tar.gz",
+      "bytes": 12697,
+      "sha256": "4b3f45146ad67ecd7a2106908ecc951a98c61fcff233c13665cd2c0f7930cbc5"
+    },
+    {
+      "path": "source/target-path-null-red-sqlite-1.log",
+      "bytes": 12773,
+      "sha256": "141aae95ba1852b758511c765ccdac752a4b231f43ccb49e8272707f7b9b5cd6"
+    },
+    {
+      "path": "source/target-path-null-red-sqlite-2.log",
+      "bytes": 12773,
+      "sha256": "4b4e4033c11545f26a10f8cf58752afc4a4208b8dfe3359b8a4df6e5e14604fa"
+    },
+    {
+      "path": "source-final-smoke-mysql-aliasfix.log",
+      "bytes": 100,
+      "sha256": "66584659e8e83afee01c5448c8dfe8f4f9e928bf5bde89fc28c28d9d8990015a"
+    },
+    {
+      "path": "source-final-smoke-mysql.log",
+      "bytes": 606436,
+      "sha256": "464fbe98d76eba11e7f1fc4a93d7518b6872f090d2441f8071f5de481c538740"
+    },
+    {
+      "path": "source-final-smoke-sqlite.log",
+      "bytes": 100,
+      "sha256": "97737025fbbd2d821fc8874fc09a1d2cbe18829510b6a18e3c2e21e3eaebe257"
+    },
+    {
+      "path": "source_load/test_wpc_source_load.py.sha256",
+      "bytes": 96,
+      "sha256": "7b8d28e1b5ef72a9b4a60b9a286736a337bafd2080bb84758d92725338f76f62"
+    },
+    {
+      "path": "source_load/wp-c-source-load-mysql-20260911.log",
+      "bytes": 98,
+      "sha256": "47af64196504456ac19c1ecd192e933b5523870fb6d08b428a1bf8bcf73b570f"
+    },
+    {
+      "path": "source_load/wp-c-source-load-sqlite-20260911.log",
+      "bytes": 98,
+      "sha256": "fbe7f61d13a0aebf048eaadc1eda7c2d1283f3761254f635e8bcc4933c808ff2"
+    },
+    {
+      "path": "stable-lint-files.json",
+      "bytes": 1823,
+      "sha256": "f455f48c8b96a3f3ada5643fd384d0483d76e9759f2b62c1712f6c0dcd72d5a7"
+    },
+    {
+      "path": "update_docs.py",
+      "bytes": 4836,
+      "sha256": "691de5d339a4d25fcaa364072db239d5f95e8b52c0ded702138bfc491f241c56"
+    },
+    {
+      "path": "user-request.txt",
+      "bytes": 17241,
+      "sha256": "68ebb3675673287f1eafed3cbc34c0bc530fe5bc835190cf6d28cc7e81ddc014"
+    }
+  ],
+  "changed_python_sha256": {
+    "alembic/versions/9e31a6c8d204_daily_source_mapping.py": "dd323acb204c3557058a817831ccce77846e50861a1c19cd860e97a0a5efa99c",
+    "alembic/versions/a042b6d8e915_shared_weekly_sources.py": "2d5129b0d4eb428c4a4bb1973481d6b77d08fe9e45b1a2a5b8acd4ee3faaae29",
+    "alembic/versions/b153c7e9f026_weekly_people_defaults.py": "81c3cc26d9fdf8d8f3c9e2eb5c3a49f02c621159b82a3be3946ff058400e9171",
+    "app/core/database.py": "213ab6b1806c138e8c5bf1bf07b8430e318da7ad58700037da12d85985179695",
+    "app/core/models/__init__.py": "ec7e864ecb663cf85b414aa6e6cc42961b5eb7444f395f64ba4b9a8771647ed1",
+    "app/core/models/daily_plan.py": "17a7d215048960823a6bbac5ddd877855699be2ed431cce3931d8b18b87da989",
+    "app/core/models/source_mapping.py": "ed99c256ee95f15a06a9a8eaa8b7be80acc9879f62b9f14611c5ba11bb2b07d4",
+    "app/core/models/weekly_people.py": "287c5afdbe0f08725bf49688d4a43799a352aba20ac252c0684f94101131ea10",
+    "app/core/models/weekly_sources.py": "311417eedf527bc9c2dbdfd0b96ccdac5c424432ba6b24e4de22569646c17ef1",
+    "app/main.py": "56b5193c34cb0f4d63e4523ef4e2c00554932a28bc48cff22de52da3473f5c1c",
+    "app/repository/academic_identity_repository.py": "18a20efb1ac2b7525db0c6fad56169b3c41ed1371f4ccbde16a379e69b030402",
+    "app/repository/shared_weekly_repository.py": "3aa2dbac708a4216aabb0a182e931fb7cc8c59eb9b07aa1da23b9ea3a9b719cf",
+    "app/repository/source_mapping_repository.py": "b80d8107dfcc042cb47e1bc8794a5012e1331cb002d29141dc679a7f39c0e94c",
+    "app/repository/weekly_people_repository.py": "374143757470f5da66ed086ca9973aefa622195c2c47212218b741a752799dd4",
+    "app/repository/weekly_source_repository.py": "761f2237be386cf1a1db7863acb1a441196b454cdd0de10e5d993c476f96cabc",
+    "app/service/academic_identity/application.py": "ccd47f5b31f4b9541576a5616f0904161890a8193f9f90f840c5e9da3a00f0c9",
+    "app/service/shared_weekly/body_contracts.py": "db73f017d845ad245522290f51cb417ff7fe5ee1c1157675fd4296251aa8fd05",
+    "app/service/shared_weekly/candidates.py": "f6ace8b349d53735e57396cb805c7954be3d0f91e0affb3c415db86e7204e6d3",
+    "app/service/shared_weekly/collaboration_application.py": "d96c13dbfc0af9837229c878a29ed88442870672d9fc93c6f0531404fdfc5fb0",
+    "app/service/shared_weekly/editor_contracts.py": "51a2fab7d45a938cd0d5b213928a39ed82aece14c3075c02542ee65666a77c46",
+    "app/service/shared_weekly/mapping_application.py": "d9be36df10419daca3ccb96ccd0388609785554b1721620777ec7afabd47dcb8",
+    "app/service/shared_weekly/mapping_contracts.py": "04e9037b36f4296e4ec66bc0f8df09b469477b89dde119359b963a4e0cc03f21",
+    "app/service/shared_weekly/people_application.py": "5e7a7502b34e00f5de7a9e5729fcd7c08442cf65da11ee864642a29fc031fc9f",
+    "app/service/shared_weekly/people_contracts.py": "5b82d58474def21b5c019039aed24a0555e8b39f2289e3b292c5b0e169829a15",
+    "app/service/shared_weekly/production_composition.py": "c85f46a5b1353433bae78b3ba96dfcb444b65d1ebf2b9788c4c3db41739fb64f",
+    "app/service/shared_weekly/root_application.py": "1aeaf289ae169dff8c12a0ff895403e9e5c8a839bfb6c180ebea5e93a03a8985",
+    "app/service/shared_weekly/source_application.py": "3b67953486a7c3b2628d95341d12d358c68df8e045ee12b457116f1d148249cd",
+    "app/service/shared_weekly/source_contracts.py": "8433197fd1ef5e78bb23b7926bb4bb49cca72dfe95e6684722c8f456b6e7d36a",
+    "app/service/weekly_monthly_plans/authorization.py": "8d4f86aaba069a88ae3582d4b5e74e65e84d6618038549edb0a52bf78171fd2c",
+    "specs/agent-foundation/tests/test_f009_zero_persistence_matrix_red.py": "378473ad0a9f8e83e26fdcb25e0dfdeceaccd19a83e707ffdfe5aeae116e16ee",
+    "specs/wmp9-production-prerequisites/tests/test_application_export_ui_red.py": "111bd09d2a7845c01fc2bee63941c03a2acfce88f8cd925f73839de20659bf69",
+    "tests/test_activity_name_migration.py": "d1a0752ff99eec981e2784815ade5e160e185af80765b34c5a24be2e9c5f3f08",
+    "tests/test_wpc_body.py": "9b57cf91239ab7a7ad0e6013ba1b1436ecd73fd809ecb17ad62b098866309342",
+    "tests/test_wpc_collaboration.py": "7bea45e5f1ba89b5a59f76f9a67469c0fd7a4cb2d701a4dd6546efee89fe4804",
+    "tests/test_wpc_collaboration_matrix.py": "3429a3258741a022052adb7d08f29090a0ec8b6e6545adce6f48940c231c167b",
+    "tests/test_wpc_expiry.py": "ec8c925a4bc7d42c54864ebba70247b0ff7bc35d8049d7356838bc9d87d82414",
+    "tests/test_wpc_identity.py": "1effa2b8192292c6867889562489d1ace61de0ab94f467731da985bc56e5749a",
+    "tests/test_wpc_identity_migration.py": "4e380d011f29d3b226c158a8f692059ecffd4ee6617993cb61f1822bff19ed9d",
+    "tests/test_wpc_mapping.py": "2d589bd798598a07c77dcbfd3bcc09511799127f9f047c9e36c175dd691a981b",
+    "tests/test_wpc_mapping_matrix.py": "c8921e63380e2f6e86895dcc5a50a2262ad07a13a64c8af421192ed4c89bacbb",
+    "tests/test_wpc_mapping_migration.py": "b96d11f6494566dd3cd991259e0558e86d2730cc9b2b6dca67d3bf932dc9c6e5",
+    "tests/test_wpc_people.py": "6f16a8236277a4ed423c72c9b704babf26b7958197c3f57ea87d7ad993c67f72",
+    "tests/test_wpc_root_migration.py": "8558aca95f936b5da1fff41769d689d4af736d83dad494a4bf5fc57b39a54aa9",
+    "tests/test_wpc_source_load.py": "80984afe970e32e729577289c3fd9f3324443307b5b606859a66c28be82958b3",
+    "tests/test_wpc_source_migration.py": "097429140616e214f882f87f6555bb6e8a84c82feec80447a11c8a30a99ea017",
+    "tests/test_wpc_sources.py": "e9eef2c4df79d21bddab9af9f2de0e55a6bb3fb8b47ce55768540d1311ba0748"
+  },
+  "final_results": {
+    "main_tests": {
+      "passed": 1430,
+      "skipped": 1,
+      "skip": "R5 live isolated MySQL Compose backup drill requires R5_MYSQL_LIVE=1"
+    },
+    "main_foundation": 261,
+    "main_legacy": 347,
+    "main_agent_snapshot": 7,
+    "wpc_collection": {
+      "total": 230,
+      "mysql_fixture": 211,
+      "fixed_sqlite": 3,
+      "no_database": 16,
+      "sqlite_run": "Included in Main tests/ result; same collection, 214 SQLite +16 no database"
+    },
+    "reviewer_body_collaboration": {
+      "sqlite": 27,
+      "mysql": 27
+    },
+    "ruff": "0.16.6, 46 changed Python files only"
+  },
+  "limits": [
+    "Four prior-native-RED process gaps retained; diagnostic probes are not native business RED",
+    "No current remote CI/push/PR/merge/release/deployment/real migration",
+    "No WP-D/E/F implementation or cloud/Word acceptance in this round",
+    "Nine non-task worktrees match initial HEAD/unstaged/untracked hash inventory; initial inventory excluded staged-only file changes"
+  ]
+}

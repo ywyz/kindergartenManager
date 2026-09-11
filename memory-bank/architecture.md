@@ -541,3 +541,7 @@ WP-A 实现基线、契约与最短完整 Word 五／六列单页可行性完成
 隔离本地实现最小主题共享根/不可变版本/CAS/日期占用，8d20f3b5c721派生7c91e2a4b610；
 精确SHA、双RED/初始覆盖、数据库及独立Review见specs/weekly-plan-authoring/evidence/WP-C-root-20260911.md。
 来源映射、WP-D/E/F与云端验收未实施，不把本地结果外推为完整产品GREEN。
+
+### 2026-09-11 WP-C完整协作续作历史指针
+
+本地分支feat/wp-c-complete-20260911补齐映射→逐日选源→差异采用→CAS保存→检查/重导入及人员默认；正式状态与SHA/双库/Review/RED覆盖缺项只见specs/weekly-plan-authoring/evidence/WP-C-complete-20260911.md。未push/发布/部署，未实施WP-D/E/F。管理员/教师分离与全局提示词分别登记#78/#79。

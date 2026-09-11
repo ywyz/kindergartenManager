@@ -1,51 +1,182 @@
-# 再下一轮：WP-C 显式每日来源身份映射
+# 下一轮提示词：完成整个 WP-C 的剩余实现、验证与独立 Review
 
-请继续Issue #77 WP-C。先实时读#77/#75及相关回写、适用AGENTS、ADR-0011、weekly-plan-authoring
-spec/tasks/service/calendar/migration契约、授权/事实契约、根契约与本轮交付/Review和WP-A关闭/CI范围。
-本文件仅安排后续，根交付轮没有实现下列来源映射。
+请继续 Issue #77，完成 weekly-plan-authoring 中 WP-C「班级协作与来源」的全部剩余工作。
+这是一轮持续实施授权：从当前已交付的身份、授权/事实、共享根/版本/CAS继续，按依赖顺序分步推进，
+每个子步通过后自动进入下一子步，直至 WP-C 全部适用实现、隔离验证、独立 Review 和证据收口完成。
+不要只完成显式映射或来源投影就停下，也不要把剩余 WP-C 拆成若干“下次再授权”的提示词。
+仅有真实外部阻塞、无法自行解决的产品歧义或授权外的必要操作时才报告具体阻塞；不虚构完成。
 
-## 入场与保全
+本提示词取代上一版“仅显式来源映射、完成后停止”的执行边界；历史账本仍按当时时点解释。
+下列功能仍需真实实现。执行本提示词时应直接开展实施与验证，不要仅输出计划或询问是否开始。
 
-公开基线仍为718b26c4a8249080c3f262b66b7f397e08e11b9f（handoff分支，不是main）。
-根tested_code_sha为本地db9797afe25a5489c6366b23a19da6ec5f3036f0，工作区
-/home/ywyz/code/km-wpc-root-20260911，分支feat/wp-c-root-20260911。后继文档不替代tested_code_sha。
-实时核对HEAD、远端/祖先/app与Alembic差异、未提交材料和唯一head（本轮8d20f3b5c721），新建隔离worktree，
-保全主工作区及WP-A/B/C/授权/根全部材料。不自动清理用户文件、分支、容器或既有工作区。
-旧34490160211只绑定718b26c及当时范围，本轮无远端CI；旧WMP-9过期固定会话fixture失败保留，
-不把346 passed/1 failed写成兼容全GREEN。根的CAS/日期等初始通过断言不虚构成曾单独RED。
+## 一、必读材料与基线核对
 
-## 唯一实施范围
+先实时读取 #77/#75 最新正文及相关回写、适用 AGENTS.md、ADR-0011，以及 weekly-plan-authoring 的
+spec.md、tasks.md、service-contract.md、calendar-contract.md、migration-proposal.md、current-status.md；
+再读 WP-C 身份/授权/事实/根冻结契约、各子步交付与独立 Review、WP-B 活动名称兼容说明、WP-A 关闭及 CI 范围。
+以本提示词和用户最新指令决定执行范围，以当前代码/迁移/可复现证据判断已实现内容，不能沿用旧“尚未实现”描述。
 
-仅建立DailyPlan的管理员显式稳定身份映射及必要不可变映射事件；不自动展开全部来源功能。
-先冻结最小关闭preview/confirm输入输出、映射ID/revision、确认有效期/漂移及无正文审计格式。
-只用源精确ID/tenant/user/date/revision与权威class/semester，不通过班级名/别名/教师姓名自动授权或合并。
+已知基线（启动时必须重新核实）：
+- 公开候选为 handoff 分支 `718b26c4a8249080c3f262b66b7f397e08e11b9f`；它不是远端 main。
+- 授权 tested_code_sha 为 `59677fc656bab152485c0355f3470f5763951888`。
+- 根 tested_code_sha 为本地 `db9797afe25a5489c6366b23a19da6ec5f3036f0`。
+- 根工作区 `/home/ywyz/code/km-wpc-root-20260911`，分支 `feat/wp-c-root-20260911`；
+  根读回文档提交为 `33e90eb7af2ff8963391ddea8b07408b51187472`，本提示词可能仍有后继文档/未提交修改。
+- 根子步唯一 Alembic head 为 `8d20f3b5c721`，派生 `7c91e2a4b610`；后续迁移必须派生实时唯一 head。
 
-1. preview为受信当前身份manager授权的窄应用入口；只读取映射决策必需identity与显示信息，不给任意SQL/ORM，
-   不授身份manager整份教学正文权。确认绑定preview hash、精确源revision/原mapping revision/目标identity。
-2. confirm明确操作每个被选源；本步优先单条最小业务seam，不预建批量或全历史页面。
-   同一事务重验当前session/JTI/auth_epoch、manager能力、源tenant/creator/date/revision、真实目标学期/班级，
-   以及源教师当前有效assignment与精确来源日期。整周目标授权不能替代逐日来源授权。
-3. 建立复合tenant约束与mapping CAS、不可变mapping事件和无正文审计；重新映射递增mapping revision，
-   保留旧mapping ID/revision作为未来快照基线，操作不修改DailyPlan正文/创建者/正文revision。
-   精确映射语义、operation_id重复/未知提交只读对账必须按ADR，不盲目重放。
-4. 按User升序→class_semester→assignment升序→必要根/源DailyPlan锁顺序冻结正确锁集合；
-   MySQL READ COMMITTED，SQLite BEGIN IMMEDIATE。撤销、权限/identity/正文漂移后旧preview拒绝，零半提交。
-5. 未映射旧行继续保持旧个人语义，不偷偷分享；源DailyPlan写仍仅创建者。共享主题历史版本、日期占用
-   和旧周/月记录不因映射改动而变化，不自动把旧个人周根转共享。
+核对实际 HEAD、远端、祖先关系、代码差异、未提交文件和唯一 Alembic head，记录证据角色。
+保全主工作区、WP-A/B/C、授权/根、Windows材料及当前提示词修改，建立新的隔离 worktree；
+只复制本次必要的未提交文档并核对 hash，不覆盖或自动清理用户文件、分支或其他工作区。
+后继文档提交不替代 tested_code_sha。根本轮没有远端 CI；旧34490160211只绑定718b26c及当时范围。
+根阶段的1320/1、261、117 MySQL+3 SQLite、Reviewer结果仅作历史输入，不算本次代码的通过证据。
+旧兼容346 passed/1 failed中的9月7日固定会话fixture已在未改基线复现；如需完成适用兼容门，
+可仅在独立稳定复现后修正测试时钟/fixture，使其继续检验真实会话校验，不放宽产品session规则、skip或xfail。
+无法完成的门继续显式列出，不把历史已知失败称为全GREEN。
 
-不实现list_sources窄正文投影、重复候选选择、导入正文快照、来源检查/重导入、人员默认、UI、
-WP-D固定内容/AI、正式导出、模板hash/profile、月计划、cohort/升班或全部历史迁移。
+## 二、先冻结完整 WP-C 关闭矩阵，再逐步实现
 
-## 测试与交付
+将 tasks/spec/ADR 的 WP-C 要求逐条映射到真实 application、policy、repository、数据库约束及测试。
+区分已有可复用行为、待补行为、历史证据和 WP-D/E/F 范围；对已有实现做必要集成回归，不为补RED故意破坏代码。
+以下 A～F 都属于本次 WP-C 目标，必须全部处理；不能用一个窄子步的GREEN代替全门。
 
-在真实application/policy/repository和一次性数据库上，每个子步保存精确源码tar/hash后双RED，再最小GREEN；
-不以missing import、assert False、测试内假授权或旧探针替代。初始通过断言如实标注，不回填RED。
-新增迁移必须派生实时Alembic head，不改旧迁移，不连接真实库。SQLite+专属MySQL覆盖跨tenant复合FK、
-逐日成员校验、manager无正文权、映射唯一性/CAS、旧preview漂移/撤销、不可变事件、未知提交对账、
-旧源正文/revision与共享历史保留、非空downgrade拒绝、独立空库往返。
-只读reviewer独立审、不递归；finding先双RED再修，最后绑定实际代码SHA与每个实际测试范围，未执行项逐项列出。
+### A. 既有身份、共享授权与唯一根闭环
 
-结束于这一显式映射小步与Review，只撰写下一轮窄来源投影提示词，不继续全部来源功能。
-Word主要/LibreOffice备用、long三份两页FAIL、compact仅合成候选；正式资格、缩减、最终下载、
-云端/Word产品验收仍未完成。最终只回写#77并读回，不关闭#77/#57/#75，不push/PR/发布/真实迁移/部署。
-未公开代码只列本地路径，不伪造GitHub blob链接。
+复用并验证权威 academic_year/semester/class_instance/class_semester/assignment、唯一数据库policy、
+服务端教学日事实、共享唯一根、不可变版本、创建/保存CAS、日期占用、无正文审计和operation对账。
+整周目标权限要求当前有效assignment与至少一个实际教学日相交，零交集拒绝；
+这不授予整周每个来源日的访问权。平台管理员/identity manager不自动拥有教学正文权。
+旧个人周/月记录不自动迁移、合并或转换，源DailyPlan写仍仅创建者。
+根的contract/tenant/class/semester/anchor由持久化数据决定，caller不能切legacy绕过新政策。
+所有新读写必须在自己的适用事务中重新执行真实授权，不能消费旧authorize预检作为写许可。
+
+### B. 显式每日来源身份映射
+
+实现受信身份manager的最小preview→明确确认→映射保存及必要重映射流程，绑定精确源ID、tenant、
+creator、date、正文revision、旧mapping ID/revision和目标权威class/semester，禁止姓名/别名/同名自动映射。
+确认前后重验session/JTI/auth_epoch、manager能力、目标学期/班级、源身份，以及源教师当前assignment与精确日期。
+preview只暴露映射所需身份/显示字段，不借管理权读取完整教学正文。未映射旧记录保留原个人语义。
+映射使用复合tenant约束、CAS、不可变映射事件和无正文审计；重映射使旧候选失效，旧版本映射基线仍保留。
+映射不得修改DailyPlan正文、创建者或正文revision。冻结operation_id重复/未知提交只读对账行为。
+不实施真实历史库批量迁移或全部历史页面；单条闭环须可重复处理所有显式选择记录，不以空接口冒充完成。
+
+### C. 逐日窄来源投影与完整重复选择
+
+实现真实list_sources政策/仓储/应用入口，逐日重验调用者与源教师的当前授权、显式映射、tenant/class/semester、
+源实际日期、源revision及mapping revision；不以整周目标授权替代这些检查。
+只返回周计划必要字段：源标识/日期/展示教师、revision、晨谈、独立activity_name、周游戏所需教学片段。
+禁止返回ORM、完整DailyPlan、个人历史/反思、设置、密钥或不必要字段。旧NULL活动名称保持空，不臆造。
+
+零候选、单候选、多候选使用关闭DTO。本人+他人各一条、本人多条、他人多条均算重复；
+两条及以上必须返回“出现重复备课，请确认”和待选择状态，不预设chosen_id，不自动选本人/最新/列表第一条。
+非重复时落实本人优先、本人无记录时允许已授权同班来源的规则；不得据“本人优先”漏查重复。
+用户必须精确选择仍可见的候选；旧列表后的源/映射/成员变动须拒绝采用，不泄露不可见源的存在性差别。
+跨教师成功读取与检查必须在发布结果前写入无正文审计，拒绝不得留下success。
+
+### D. 导入候选、明确采用、不可变来源快照及CAS保存
+
+冻结可实际调用的关闭schema及字段白名单，扩展现有主题草稿以承载本门必要的人员、每日晨谈/活动名称、
+游戏来源片段和字段级来源信息。不能把真实来源塞进theme、任意dict、任意target_path或无业务意义的占位字段。
+游戏来源片段要有明确类型/来源字段及目标关系；不在本门实现WP-D的AI、最终整周游戏固定数量编排或假期文案。
+对新的body schema显式版本化，旧weekly-theme.v1的解析、hash、不可变版本与旧operation对账必须保持；
+旧格式进入新编辑状态须由明确应用流程转换，打开不得后台重写历史。
+
+导入是来源选择→原周/新源差异候选→明确采用，只修改内存草稿；持久化必须再经共享save/CAS。
+候选为服务端短期、一次性内存状态，绑定actor/JTI、target plan/current_version/revision、页面generation/edit_revision、
+成员/assignment、源ID/date/revision、mapping ID/revision、before hash及expiry；不接受caller重传正文伪造确认。
+等待用户确认时不持有数据库事务。取消、过期、会话/成员/来源/目标漂移均零采用、零隐式保存。
+应用返回供WP-E呈现的差异DTO并真实验证采用动作，本轮无需实现完整填写页面，也不能因此省掉确认契约。
+
+成功保存须在同一事务重验本次新导入/重导入的精确源及映射、目标当前授权与双CAS，
+发布新不可变版本、字段级快照、根指针/revision及成功无正文审计；失败/取消/冲突无半提交。
+每个来源字段保存source plan/user/date/revision、mapping ID/revision、source_field、关闭target_path、
+导入原值/hash、采用后值或对应hash、provenance。provenance必须与实际取得方式一致，本轮不生成AI来源。
+只保存所需片段，不复制整份教案；来源逻辑引用不因源删除级联丢失。
+普通手工编辑保留旧来源快照时，不因源后来变化而被迫重导入或禁止保存；不得把旧快照伪装成本次新导入。
+周编辑、采用和保存绝不反写源DailyPlan。
+
+### E. 来源检查、变化提醒与重导入闭环
+
+实现重开时适用的检查/显式check_sources：先逐源重新授权，再比较源revision和mapping基线，
+返回unchanged/changed/unavailable关闭状态；源已删、失去可见性或不可授权统一不可用，不泄露区别。
+变化只返回提醒/差异数据，不改当前手工值、旧来源快照、版本、正文或人员信息。
+源权限缩小不偷偷删除已存共享历史；读取旧周快照仍按周计划自身当前授权。
+
+重导入同时给出当前周值、原导入值、新源值，必须再次明确选择/确认，不能静默覆盖手改。
+复用一次性候选和保存前重验：重导入等待期间另一教师保存、源变更、重新映射、撤销、取消或超时均安全拒绝。
+重导入成功只新增周不可变版本及新来源基线，旧版本/旧hash/源正文完全保留。
+完成“保存→源变→检查仅提醒→取消不变→重新选择并确认→CAS保存→重载”的真实应用闭环。
+
+### F. 人员默认值与共享人员快照
+
+实现按tenant/user/class隔离的教师多人默认值与保育员默认值读/显式保存，关闭DTO、大小限制和CAS。
+默认值不是assignment，不因填写名字授予权限。新建只在授权后使用发起者的默认值初始化人员快照，
+允许明确编辑；第二教师重复创建不得覆盖已有正文/人员。
+打开、刷新、换教师、读取设置或修改个人默认值都不得改变已存在共享计划/旧版本的人员快照。
+保存共享人员修改仍走整周当前授权和同一个版本CAS；不新增绕过共享保存的正文写入口。
+完成默认设置、首次初始化、重复创建、另一教师打开、默认更新、共享显式修改与历史不变的集成测试。
+
+## 三、贯穿全门的安全与事务约束
+
+- 所有tenant/actor/role/assignment来自受信session和数据库；教学日与事实版本来自服务端。
+  当前授权不能由页面提交日期列表、角色或显示姓名替代；缺失/过期/矛盾日历、七列与跨学期日期冲突继续失败关闭。
+- 锁序保持User ID升序（actor及本次涉及的源教师）→class_semester→assignment ID升序→root→DailyPlan ID升序。
+  预读最小身份只为确定锁集合，取得锁后重读授权与身份，漂移拒绝；不得持锁后逆序追加User锁。
+  多目标守卫等必要排序先冻结，保持管理/撤销与业务一致；MySQL READ COMMITTED，SQLite BEGIN IMMEDIATE。
+- 撤销先提交则后续读/选/采用/保存/检查拒绝；业务先线性化则历史保留，撤销后不得继续发布旧页面结果。
+  任职重授新ID不能复活旧候选，session/JTI/auth_epoch变动及await期间失效亦拒绝。
+- 数据库保护版本/来源子行/映射事件/审计不可变、复合tenant归属、日期占用、唯一根和CAS原子性；
+  不只依赖Python frozen DTO。账号停用或源删除不级联删除历史审计/来源快照。
+- operation_id唯一，commit_unknown只能重新授权后只读对账，零隐式写重试。日志/普通审计无正文、姓名、
+  完整候选、Prompt、Key、URL或敏感异常。新增审计action/outcome须关闭、语义真实。
+
+## 四、迁移、双RED、回归与独立Review
+
+先冻结每个子步可调用输入/输出、拒绝语义、schema和真实业务断言；新增schema使用新Alembic revision，
+派生实时唯一head，不改已存在迁移，不连接真实库。新增表/字段必须服务于本次完整闭环，不能预建未来空壳。
+SQLite每连接启用FK；MySQL用专属回环/tmpfs或等效隔离合成库，不能用create_all代替迁移验证。
+
+各子步真实application/policy/repository准备后，在修改目标行为前保存精确源码tar/hash，连续两次复现业务RED，
+再最小GREEN。缺import、缺接口、assert False、测试内假授权器、环境错误或旧差距探针不算RED。
+已有实现/初次即通过的断言据实记覆盖；不得故意制造缺陷或倒填RED，也不得用这些覆盖替代仍缺的业务RED门。
+发现缺口时先补真实测试与所需生产seam再修，最终未完成的门逐项列出，不强行勾选。
+
+SQLite及专属MySQL分别验证A～F闭环和以下矩阵：
+1. 跨tenant/class/semester、同名不同班、无映射、无成员/零教学日、部分周目标与逐日源授权差别。
+2. manager与正文权分离、源创建者写、映射CAS/漂移/旧行保留、不可变事件及源revision不变。
+3. 零/一/多候选、本人与他人重复、精确选择、候选失效/取消/重放/过期及来源最小投影。
+4. 双创建不覆盖、双CAS一成一败、源/映射/目标变化与双向撤销竞争、会话失效、失败/取消无半提交。
+5. 导入/手改/provenance、普通保存不强迫重导入、检查仅提醒、不可用不泄露、重导入差异与历史完全保留。
+6. 人员默认隔离与CAS、新建初始化、既有共享人员不被打开/个人默认改写。
+7. 复合FK/唯一性、版本/来源/审计不可变、日期占用、operation重复/commit未知对账、旧schema快照兼容。
+8. 旧daily/个人周/月/已有共享版本保留、非空downgrade拒绝、独立空库upgrade/downgrade/upgrade。
+
+调用只读reviewer独立复审，不递归；可按独立范围审查以提高吞吐，但依赖子步仍串行通过后推进。
+review finding必须先双RED再最小修复；文档问题直接修正并读回，不为措辞编造业务测试。
+运行必要常规回归、Foundation、旧周/月/Agent快照兼容、Ruff/format/diff检查，按风险完成相关项目门。
+精确区分每条命令的SQLite/MySQL/skip、Main/Reviewer、tested_code_sha与文档SHA；不借旧CI/旧人工验收。
+检查通过后只为新修改/失败/未解问题重跑，不无意义循环扩大验证。
+
+## 五、完成标准与最终交付
+
+停止条件是WP-C整门已逐项处理，而不是A～F任一子步通过：
+- 全部WP-C应用/政策/仓储/schema路径可真实调用，含production composition，不能只有孤立helper或测试专用服务。
+- A～F各项有可复现业务覆盖与适用RED记录；完整“映射→逐日选源→差异采用→CAS保存→重载→变化检查→重导入”闭环通过。
+- 既有根/授权/身份与新来源/人员行为集成正确；数据库迁移/不可变性/权限/并发矩阵按两库分别完成。
+- 独立Review的阻止性finding关闭，实际严重度、覆盖和未执行项全部记录。
+- 本轮最终代码SHA、证据hash、文档入口与交付状态一致；任何必需门缺失，明确WP-C仍未完整通过及具体原因。
+  本地实现与本地验收完成不能伪称远端CI/发布/整个#77产品验收完成。
+
+同步CONTEXT/ROADMAP、相关ADR/design及weekly-plan-authoring当前入口/tasks；历史evidence、失败和用户材料保留。
+最终只回写#77并读回，在相应条件真实满足时更新WP-C完成说明；若仍缺适用CI等阶段门，保持该门待办并精确说明。
+不关闭#77/#57/#75，不创建PR、不push/合并/发布/部署；未公开提交只列本地路径，不伪造GitHub blob链接。
+保全其它工作区，不自动清理用户文件/分支。最后只撰写下一阶段WP-D提示词，不自动执行WP-D。
+
+## 六、仍属范围外
+
+本次“整个WP-C”包含上述全部协作、来源与人员服务闭环，不包含WP-D完整日期选择/假期文案、
+最终固定内容编排和AI，不包含WP-E完整填写UI、模板资格、单页检查、缩减和正式导出，
+也不包含WP-F云端浏览器/Word产品总验收。必要的应用确认DTO、日期授权事实、来源schema和保存契约仍须在WP-C完成，
+不能以UI/固定内容属于后续为由省略可调用的选择/确认/快照保存闭环。
+Word主要/LibreOffice备用、long三份两页FAIL、compact仅合成候选的历史范围不变；正式资格、缩减、
+最终下载、云端/Word产品验收仍未完成。不实施月计划、升班/cohort、全部历史页面、Agent扩展、
+模板hash/profile替换、真实业务迁移或部署。

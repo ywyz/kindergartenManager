@@ -1,4 +1,4 @@
-> 本提示词已于2026-09-11执行，实际范围/测试限制见[evidence/WP-C-root-20260911.md](evidence/WP-C-root-20260911.md)。下一轮仅[显式来源映射](WP-C-mapping-next-prompt.md)。
+> 本提示词已于2026-09-11执行，实际范围/测试限制见[evidence/WP-C-root-20260911.md](evidence/WP-C-root-20260911.md)。下一轮[完成WP-C全部剩余工作](WP-C-mapping-next-prompt.md)。
 
 # 下一轮提示词：WP-C 共享根、不可变版本与 CAS
 
