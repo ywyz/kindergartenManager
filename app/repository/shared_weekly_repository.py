@@ -1,11 +1,20 @@
 """Tenant scoped shared-root persistence, called inside the identity transaction."""
 
-from datetime import UTC, datetime
+import json
+from datetime import UTC, date, datetime
 
 from sqlalchemy import insert, select, update
 
 from app.core.models.shared_weekly import TABLES
+from app.core.models.source_mapping import TABLES as MAPPING_TABLES
+from app.core.models.weekly_sources import TABLES as SOURCE_TABLES
 from app.service.academic_identity.contracts import IdentityRejected
+from app.service.shared_weekly.body_contracts import (
+    SourceSnapshot,
+    TargetPath,
+    WeeklyCollaborationDraft,
+    parse_body,
+)
 from app.service.shared_weekly.contracts import SharedWeekScope
 from app.service.shared_weekly.root_contracts import (
     EditStamp,
@@ -21,6 +30,8 @@ from app.service.shared_weekly.root_contracts import (
 ROOT, VERSION, DATE, AUDIT = (
     TABLES["shared_weekly_" + x] for x in ("plan", "version", "date", "audit")
 )
+SOURCE = SOURCE_TABLES["shared_weekly_source"]
+MAPPING_EVENT = MAPPING_TABLES["identity_mapping_event"]
 
 
 class SharedWeeklyRepository:
@@ -159,6 +170,8 @@ class SharedWeeklyRepository:
         return await self.publish(root, assessment, draft, op)
 
     async def publish(self, root, assessment, draft, op):
+        if type(draft) not in (WeeklyThemeDraft, WeeklyCollaborationDraft):
+            raise IdentityRejected("input_invalid")
         auth = assessment.stamp
         body, facts = draft.serialize(), facts_json(assessment.facts)
         number = root["revision"] + 1
@@ -180,7 +193,68 @@ class SharedWeeklyRepository:
                 payload_sha256=payload_hash(body, facts),
             )
         )
-        stamp = PlanStamp(root["id"], result.inserted_primary_key[0], number)
+        version_id = result.inserted_primary_key[0]
+        if type(draft) is WeeklyCollaborationDraft and draft.sources:
+            for source in draft.sources:
+                event = (
+                    (
+                        await self.session.execute(
+                            select(MAPPING_EVENT).where(
+                                MAPPING_EVENT.c.tenant_id == self.tenant_id,
+                                MAPPING_EVENT.c.id == source.mapping_id,
+                                MAPPING_EVENT.c.revision == source.mapping_revision,
+                            )
+                        )
+                    )
+                    .mappings()
+                    .one_or_none()
+                )
+                if (
+                    event is None
+                    or (
+                        event["daily_plan_id"],
+                        event["source_user_id"],
+                        event["source_date"],
+                    )
+                    != (
+                        source.source_id,
+                        source.user_id,
+                        source.day,
+                    )
+                    or (
+                        event["class_instance_id"],
+                        event["semester_id"],
+                    )
+                    != (
+                        root["class_instance_id"],
+                        root["semester_id"],
+                    )
+                    or source.revision < event["source_revision"]
+                ):
+                    raise IdentityRejected("source_unavailable")
+            await self.session.execute(
+                insert(SOURCE),
+                [
+                    {
+                        "tenant_id": self.tenant_id,
+                        "version_id": version_id,
+                        "source_id": source.source_id,
+                        "source_user_id": source.user_id,
+                        "source_date": source.day,
+                        "source_revision": source.revision,
+                        "mapping_id": source.mapping_id,
+                        "mapping_revision": source.mapping_revision,
+                        "source_field": source.source_field,
+                        "target_path": source.target.serialize(),
+                        "imported_value": source.imported_value,
+                        "imported_hash": source.imported_hash,
+                        "adopted_hash": source.adopted_hash,
+                        "provenance": source.provenance,
+                    }
+                    for source in draft.sources
+                ],
+            )
+        stamp = PlanStamp(root["id"], version_id, number)
         await self.audit(
             stamp,
             assessment,
@@ -228,8 +302,83 @@ class SharedWeeklyRepository:
             != row["payload_sha256"]
         ):
             raise IdentityRejected("content_invalid")
+        body = parse_body(row["body_json"])
+        if type(body) is WeeklyCollaborationDraft:
+            source_rows = tuple(
+                (
+                    await self.session.execute(
+                        select(SOURCE)
+                        .where(
+                            SOURCE.c.tenant_id == self.tenant_id,
+                            SOURCE.c.version_id == row["id"],
+                        )
+                        .order_by(SOURCE.c.id)
+                    )
+                ).mappings()
+            )
+            children = tuple(_source_from_row(item) for item in source_rows)
+            # The body is part of the immutable payload and the child rows are
+            # the database provenance record.  A mismatch means corruption or
+            # an attempted forged source, so fail closed on load.
+            if tuple(sorted(children, key=_source_key)) != tuple(
+                sorted(body.sources, key=_source_key)
+            ):
+                raise IdentityRejected("content_invalid")
+        elif await _has_source_children(
+            self.session, SOURCE, self.tenant_id, row["id"]
+        ):
+            raise IdentityRejected("content_invalid")
         return LoadedWeek(
             EditStamp(self.stamp(root), assessment.stamp),
-            WeeklyThemeDraft.parse(row["body_json"]),
+            body,
             parse_facts(row["facts_json"]),
         )
+
+
+def _source_key(source: SourceSnapshot):
+    return (
+        source.target.day,
+        source.target.field,
+        source.source_id,
+        source.user_id,
+        source.day,
+        source.revision,
+        source.mapping_id,
+        source.mapping_revision,
+    )
+
+
+def _source_from_row(row) -> SourceSnapshot:
+    try:
+        target_value = json.loads(row["target_path"])
+        if type(target_value) is not dict or set(target_value) != {"day", "field"}:
+            raise ValueError
+        target = TargetPath(
+            date.fromisoformat(target_value["day"]), target_value["field"]
+        )
+        return SourceSnapshot(
+            source_id=row["source_id"],
+            source_user_id=row["source_user_id"],
+            source_date=row["source_date"],
+            source_revision=row["source_revision"],
+            mapping_id=row["mapping_id"],
+            mapping_revision=row["mapping_revision"],
+            source_field=row["source_field"],
+            target_path=target,
+            imported_value=row["imported_value"],
+            imported_hash=row["imported_hash"],
+            adopted_hash=row["adopted_hash"],
+            provenance=row["provenance"],
+        )
+    except (IdentityRejected, KeyError, TypeError, ValueError, json.JSONDecodeError):
+        raise IdentityRejected("content_invalid") from None
+
+
+async def _has_source_children(session, table, tenant_id, version_id) -> bool:
+    return (
+        await session.execute(
+            select(table.c.id)
+            .where(table.c.tenant_id == tenant_id, table.c.version_id == version_id)
+            .limit(1)
+        )
+    ).first() is not None

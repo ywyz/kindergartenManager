@@ -4,7 +4,8 @@
 包含教案拆分、年龄适配改写、一日活动生成等所有字段。
 """
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
+from typing import ClassVar
 
 from sqlalchemy import (
     BigInteger,
@@ -14,6 +15,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column
@@ -40,6 +42,7 @@ class DailyPlan(Base):
 
     __tablename__ = "daily_plan"
     __table_args__ = (
+        UniqueConstraint("tenant_id", "id", "user_id", name="uq_daily_identity_parent"),
         CheckConstraint("revision >= 1", name="ck_daily_plan_revision_positive"),
     )
 
@@ -58,7 +61,7 @@ class DailyPlan(Base):
         server_default="1",
     )
 
-    __mapper_args__ = {"version_id_col": _revision}
+    __mapper_args__: ClassVar[dict] = {"version_id_col": _revision}
 
     @hybrid_property
     def revision(self) -> int:
@@ -106,11 +109,11 @@ class DailyPlan(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
     )

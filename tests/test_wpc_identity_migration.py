@@ -44,7 +44,17 @@ def test_identity_data_preservation_fk_and_downgrade(tmp_path, monkeypatch):
     with sqlite3.connect(path) as conn:
         conn.execute("PRAGMA foreign_keys=ON")
         assert conn.execute("SELECT * FROM daily_plan").fetchall() == old
-        assert conn.execute("PRAGMA index_list(daily_plan)").fetchall() == old_indexes
+        current_indexes = conn.execute("PRAGMA index_list(daily_plan)").fetchall()
+        # WP-C adds one explicit composite parent key; all existing definitions stay.
+        assert {
+            r[1:]: r[1:] for r in current_indexes if r[1] != "uq_daily_identity_parent"
+        } == {r[1:]: r[1:] for r in old_indexes}
+        assert [
+            r[1:] for r in current_indexes if r[1] == "uq_daily_identity_parent"
+        ] == [("uq_daily_identity_parent", 1, "c", 0)]
+        assert [
+            r[2] for r in conn.execute("PRAGMA index_info(uq_daily_identity_parent)")
+        ] == ["tenant_id", "id", "user_id"]
         assert conn.execute(
             "SELECT COUNT(*) FROM teacher_class_assignment"
         ).fetchone() == (0,)

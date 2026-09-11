@@ -14,7 +14,7 @@ import ast
 import inspect
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, is_dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from hashlib import sha256
 from importlib import import_module
 from io import BytesIO
@@ -105,8 +105,8 @@ def _ui_session(user_id: int, *, tenant_id: int = 501, role: str = "teacher"):
         role=role,
         username=f"synthetic-{user_id}",
         display_name=None,
-        issued_at_utc=datetime(2026, 9, 7, 9, 0, tzinfo=UTC),
-        expires_at_utc=datetime(2026, 9, 7, 18, 0, tzinfo=UTC),
+        issued_at_utc=datetime.now(UTC) - timedelta(minutes=1),
+        expires_at_utc=datetime.now(UTC) + timedelta(hours=1),
     )
 
 

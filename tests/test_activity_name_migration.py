@@ -33,7 +33,17 @@ def test_upgrade_preserves_rows_and_guards_name(tmp_path, monkeypatch):
             == original
         )
         assert c.execute("SELECT activity_name FROM daily_plan").fetchone() == (None,)
-        assert c.execute("PRAGMA index_list(daily_plan)").fetchall() == indexes
+        current_indexes = c.execute("PRAGMA index_list(daily_plan)").fetchall()
+        # WP-C adds one explicit composite parent key; all existing definitions stay.
+        assert {
+            r[1:]: r[1:] for r in current_indexes if r[1] != "uq_daily_identity_parent"
+        } == {r[1:]: r[1:] for r in indexes}
+        assert [
+            r[1:] for r in current_indexes if r[1] == "uq_daily_identity_parent"
+        ] == [("uq_daily_identity_parent", 1, "c", 0)]
+        assert [
+            r[2] for r in c.execute("PRAGMA index_info(uq_daily_identity_parent)")
+        ] == ["tenant_id", "id", "user_id"]
         for sql, args in [
             ("UPDATE daily_plan SET activity_name='新名称'", ()),
             ("UPDATE daily_plan SET activity_name='新名称',revision=revision+2", ()),

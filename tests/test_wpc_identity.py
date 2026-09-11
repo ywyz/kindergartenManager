@@ -10,7 +10,7 @@ import pytest
 import pytest_asyncio
 from alembic.config import Config
 from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from alembic import command
 from app.auth.jwt import create_access_token
@@ -44,7 +44,9 @@ async def world(tmp_path, monkeypatch):
         url = f"mysql+aiomysql://root@127.0.0.1:{port}/{schema}"
     monkeypatch.setattr(settings, "DATABASE_URL", url)
     command.upgrade(Config("alembic.ini"), "head")
-    engine = create_async_engine(url)
+    from app.core.database import _build_engine
+
+    engine = _build_engine()
     factory = async_sessionmaker(engine, expire_on_commit=False)
     async with factory() as session:
         for uid, tenant, role in [

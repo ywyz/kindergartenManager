@@ -230,6 +230,13 @@ class DatabasePlanAuthorizationAdapter(PlanAuthorizationPort):
         )
         if not matches:
             raise IdentityRejected("scope_denied")
+        repository.authorization_deadlines.append(
+            min(
+                row["valid_until"]
+                for row in active
+                if (row["id"], row["revision"]) in matches
+            )
+        )
         stamp = SharedAuthorizationStamp(
             actor.tenant_id,
             actor.user_id,
@@ -252,6 +259,35 @@ class DatabasePlanAuthorizationAdapter(PlanAuthorizationPort):
             "shared_weekly_v1", action, facts, stamp
         )
         return assessment
+
+    async def _authorize_shared_source(
+        self, identity, actor, assessment, mapping, assignments
+    ):
+        """Both teachers must currently cover this exact authoritative teaching day."""
+        from app.repository.source_mapping_repository import SourceMappingRepository
+        from app.service.academic_identity.contracts import IdentityRejected
+
+        scope = assessment.stamp.scope
+        if (
+            mapping["tenant_id"] != actor.tenant_id
+            or mapping["class_instance_id"] != scope.class_instance_id
+            or mapping["semester_id"] != scope.semester_id
+            or mapping["source_date"] not in assessment.facts.teaching_days
+        ):
+            raise IdentityRejected("source_unavailable")
+        repo = SourceMappingRepository(identity.session, actor.tenant_id)
+        bindings = []
+        for uid in sorted({actor.user_id, mapping["source_user_id"]}):
+            binding = await repo.require_day_member(
+                identity,
+                uid,
+                scope.class_instance_id,
+                scope.semester_id,
+                mapping["source_date"],
+                assignments,
+            )
+            bindings.append((uid, binding))
+        return tuple(bindings)
 
     @staticmethod
     def _authorize_owner(

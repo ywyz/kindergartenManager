@@ -41,6 +41,7 @@ class IdentityRepository:
     def __init__(self, session: AsyncSession, tenant_id: int) -> None:
         self.session = session
         self.tenant_id = tenant_id
+        self.authorization_deadlines: list[datetime] = []
 
     async def row(
         self, name: str, *, lock: bool = False, **identity: Any

@@ -7,6 +7,7 @@ from uuid import uuid4
 import pytest
 import sqlalchemy as sa
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 
 from alembic import command
 from app.core.config import settings
@@ -46,7 +47,7 @@ def test_empty_root_roundtrip(migration_db):
             conn.execute(
                 sa.text("SELECT version_num FROM alembic_version")
             ).scalar_one()
-            == "8d20f3b5c721"
+            == ScriptDirectory.from_config(cfg).get_current_head()
         )
         assert (
             conn.execute(
@@ -126,5 +127,5 @@ def test_nonempty_audit_blocks_downgrade(migration_db):
             conn.execute(
                 sa.text("SELECT version_num FROM alembic_version")
             ).scalar_one()
-            == "8d20f3b5c721"
+            == "8d20f3b5c721"  # Empty successors are removed before the nonempty root refuses.
         )

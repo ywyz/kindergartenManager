@@ -112,6 +112,8 @@ class SharedWeeklyApplication:
                 raise IdentityRejected("plan_conflict")
             await repo.check_dates(root, assessment.facts)
             current = await repo.load(root, assessment)
+            if type(current.body) is not WeeklyThemeDraft:
+                raise IdentityRejected("content_invalid")
             if current.body == draft:
                 result = stamp.plan
                 await repo.audit(result, assessment, op, "save", "unchanged")

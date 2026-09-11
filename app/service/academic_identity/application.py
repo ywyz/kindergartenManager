@@ -2,6 +2,7 @@
 
 from asyncio import CancelledError
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from hashlib import sha256
 
 from sqlalchemy import select, text
@@ -83,6 +84,12 @@ class IdentityApplication:
                 final = await resolve_current_ui_session(session, token)
                 if final != current or self._token_source() != token:
                     raise IdentityRejected("session_invalid")
+                # User/guard/assignment locks prevent identity drift, but time can
+                # still expire a permission during an await. Check all permissions
+                # actually consumed by this transaction immediately before commit.
+                now = datetime.now(UTC).replace(tzinfo=None)
+                if any(now >= end for end in repository.authorization_deadlines):
+                    raise IdentityRejected("membership_stale")
                 try:
                     await session.commit()
                 except (SQLAlchemyError, CancelledError):
