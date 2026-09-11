@@ -57,6 +57,7 @@ class PromptTemplate(Base):
             "weekly_environment",
             "weekly_habits",
             "weekly_home",
+            "weekly_reduction",
             name="prompt_task_type",
         ),
         nullable=False,

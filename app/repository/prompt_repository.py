@@ -29,6 +29,7 @@ async def _lock_weekly_actor(
         "weekly_environment",
         "weekly_habits",
         "weekly_home",
+        "weekly_reduction",
     }:
         return
     if session.bind.dialect.name == "sqlite" and not session.in_transaction():

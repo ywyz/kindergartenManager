@@ -1,3 +1,4 @@
+# ruff: noqa: SIM117 - nested UI contexts mirror the visible dashboard structure
 """主页仪表盘（路由：/home）。
 
 显示欢迎信息、当前班级信息和快捷入口卡片。
@@ -47,6 +48,26 @@ async def home_page() -> None:
                 "text-sm font-semibold text-gray-400 uppercase tracking-wide"
             )
             with ui.row().classes("w-full gap-4 flex-wrap"):
+                if ui_session.role in {"teacher", "teaching_admin"}:
+                    with (
+                        ui.card()
+                        .classes(
+                            "flex-1 min-w-48 cursor-pointer hover:shadow-md transition-shadow"
+                        )
+                        .on("click", lambda: ui.navigate.to("/weekly-plan"))
+                    ):
+                        with ui.row().classes("items-center gap-3"):
+                            ui.icon("calendar_view_week").classes(
+                                "text-3xl text-blue-600"
+                            )
+                            with ui.column().classes("gap-0"):
+                                ui.label("每周工作计划").classes(
+                                    "font-semibold text-gray-800"
+                                )
+                                ui.label("同班共享 · 填写生成 · 单页导出").classes(
+                                    "text-xs text-gray-400"
+                                )
+
                 with (
                     ui.card()
                     .classes(

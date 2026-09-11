@@ -12,8 +12,8 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 from typing import Any
 
 from nicegui import ui
@@ -61,6 +61,14 @@ _ALL_MENU_ITEMS: list[dict] = [
         "icon": "edit_calendar",
         "route": "/daily-plan",
         "roles": None,
+    },
+    {
+        "group": "教学管理",
+        "key": "weekly-plan",
+        "label": "每周工作计划",
+        "icon": "calendar_view_week",
+        "route": "/weekly-plan",
+        "roles": {"teacher", "teaching_admin"},
     },
     {
         "group": "教学管理",

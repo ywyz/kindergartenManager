@@ -56,6 +56,7 @@ from app.repository.prompt_repository import (
 )
 from app.service.shared_weekly.prompt_contracts import (
     DEFAULT_PROMPTS,
+    REDUCTION_SCHEMA,
     SCHEMA_INSTRUCTION,
     WEEKLY_LABELS,
 )
@@ -190,6 +191,7 @@ _TASK_SCHEMA: dict[str, str] = {
 }
 
 _TASK_SCHEMA.update({task: SCHEMA_INSTRUCTION for task in WEEKLY_LABELS})
+_TASK_SCHEMA["weekly_reduction"] = REDUCTION_SCHEMA
 
 # 测试区输入框提示文字
 _TEST_PLACEHOLDER: dict[str, str] = {

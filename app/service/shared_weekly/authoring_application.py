@@ -125,6 +125,7 @@ class AuthoringApplication(CollaborationApplication):
         self._structure = CandidateStore()
         self._running = {}
         self._prompts = {}
+        self._reduction = None
 
     def _page(self, expected, page_id, page=None):
         if type(page_id) is not str:
@@ -151,6 +152,8 @@ class AuthoringApplication(CollaborationApplication):
                 for k, v in store._items.items()
                 if v.expires > now and v.value.page_id in live
             }
+        if self._reduction is not None:
+            self._reduction.cleanup()
 
     async def begin_authoring(
         self, expected: TrustedUiSession, plan_id: int
@@ -616,6 +619,8 @@ class AuthoringApplication(CollaborationApplication):
             )
 
     def _task_paths(self, body, task):
+        if task == "weekly_reduction":
+            raise IdentityRejected("reduction_check_required")
         if type(task) is not str or task not in DEFAULT_PROMPTS:
             raise IdentityRejected("prompt_invalid")
         prefixes = {
@@ -942,13 +947,30 @@ class AuthoringApplication(CollaborationApplication):
         operation_id: UUID,
     ) -> PlanStamp:
         try:
-            return await super().save_edit(expected, page_id, page, operation_id)
+            if self._reduction is None:
+                return await super().save_edit(expected, page_id, page, operation_id)
+            async with self._reduction.saving(expected, page_id, page):
+                result = await super().save_edit(expected, page_id, page, operation_id)
+                self._reduction.saved(expected, page_id, result)
+                return result
+        except IdentityRejected as exc:
+            if str(exc) == "commit_unknown" and self._reduction is not None:
+                self._reduction.unknown(expected, page_id, operation_id)
+            raise
         finally:
             if page_id not in self._pages._items:
                 self._prompts.pop(page_id, None)
                 self._cleanup()
 
+    async def reconcile(self, expected, scope, operation_id):
+        result = await super().reconcile(expected, scope, operation_id)
+        if self._reduction is not None:
+            self._reduction.reconciled(expected, scope, operation_id, result)
+        return result
+
     def discard_edit(self, expected: TrustedUiSession, page_id: str) -> None:
+        if self._reduction is not None:
+            self._reduction.discard(expected, page_id)
         self.cancel_generation(expected, page_id)
         super().discard_edit(expected, page_id)
         self._prompts.pop(page_id, None)

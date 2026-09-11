@@ -19,6 +19,9 @@ from app.service.weekly_monthly_plans.contracts import (
 )
 from app.service.weekly_monthly_plans.read_service import PlanAggregateSnapshot
 from app.ui.auth_context import require_bound_ui_session, require_current_ui_session
+from app.ui.pages import (
+    shared_weekly_plan,  # noqa: F401 - register teacher authoring route
+)
 
 # The process composition root may install the released WMP-8 application
 # service.  Until it does, this page remains fail-closed and never fabricates
@@ -104,6 +107,7 @@ async def weekly_monthly_plans_page() -> None:
         return
 
     ui.label("周/月计划").classes("text-2xl font-bold")
+    ui.link("填写 / 生成 / 保存 / 导出本周共享计划", "/weekly-plan").classes("text-lg")
     ui.label("请选择一个已授权的周计划或月计划进行查看与导出。").classes(
         "text-sm text-gray-600"
     )
