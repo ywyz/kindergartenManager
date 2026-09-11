@@ -103,6 +103,7 @@ async def test_rendered_teacher_page_opens_inputs_saves_and_imports(world, monke
     )
     widgets, buttons, labels = {}, {}, []
     downloads = []
+    clears = []
 
     class Widget:
         def __init__(self, *args, **kwargs):
@@ -136,7 +137,7 @@ async def test_rendered_teacher_page_opens_inputs_saves_and_imports(world, monke
             return self
 
         def clear(self):
-            pass
+            clears.append(self)
 
         def open(self):
             return self
@@ -204,6 +205,10 @@ async def test_rendered_teacher_page_opens_inputs_saves_and_imports(world, monke
     await buttons["比较导入差异"]()
     assert "明确采用" in buttons
     assert any(w.text.startswith("上次导入：") for w in labels)
+    assert any(w.text == "2026-09-09 · 晨谈主题" for w in labels), (
+        "import differences must locate a date and Chinese field label"
+    )
+    assert not any("TargetPath(" in w.text for w in labels)
     await buttons["明确采用"]()
     await buttons["保存草稿"]()
     loaded = await author.load(world[2][3], edit.target.plan.plan_id)
@@ -418,6 +423,55 @@ async def test_rendered_teacher_page_opens_inputs_saves_and_imports(world, monke
         edit_issues.append("adopt refresh overwrote late widget edit")
     author.adopt_generated = original_adopt
     assert edit_issues == [], edit_issues
+
+    original_last_editor = projection.last_editor
+    render_entered, render_release = asyncio.Event(), asyncio.Event()
+
+    async def held_last_editor(*args):
+        render_entered.set()
+        await render_release.wait()
+        return await original_last_editor(*args)
+
+    projection.last_editor = held_last_editor
+    refreshing = asyncio.create_task(buttons["保存草稿"]())
+    await asyncio.wait_for(render_entered.wait(), 3)
+    cleared_before = len(clears)
+    changed = widgets[page.slot_label("focus.0")][-1]
+    changed.value = "最后编辑者查询等待中手改"
+    changed.on_change()
+    render_release.set()
+    await refreshing
+    projection.last_editor = original_last_editor
+    assert (
+        widgets[page.slot_label("focus.0")][-1].value == "最后编辑者查询等待中手改"
+    ), "render must preserve edits made while header metadata was awaiting"
+    assert len(clears) == cleared_before, (
+        "stale render must not clear the live input container"
+    )
+
+    auth_entered, auth_release = asyncio.Event(), asyncio.Event()
+
+    async def held_auth(expected):
+        auth_entered.set()
+        await auth_release.wait()
+        return expected
+
+    monkeypatch.setattr(page, "require_bound_ui_session", held_auth)
+    authorizing = asyncio.create_task(buttons["保存草稿"]())
+    await asyncio.wait_for(auth_entered.wait(), 3)
+    cleared_before = len(clears)
+    changed = widgets[page.slot_label("focus.0")][-1]
+    changed.value = "认证等待中手改"
+    changed.on_change()
+    auth_release.set()
+    await authorizing
+    monkeypatch.setattr(page, "require_bound_ui_session", bound)
+    assert widgets[page.slot_label("focus.0")][-1].value == "认证等待中手改", (
+        "auth wait must not accept older sampled control values with a newer revision"
+    )
+    assert len(clears) == cleared_before, (
+        "authentication drift must preserve existing controls"
+    )
 
     # Supplied renderer business failures exercise real UI explanations only;
     # this is initial coverage, not native missing-font/renderer evidence.

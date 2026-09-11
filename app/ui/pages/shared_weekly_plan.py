@@ -12,7 +12,7 @@ from app.service.shared_weekly.authoring_contracts import (
     OUTDOOR_TITLE,
     SLOT_PATHS,
 )
-from app.service.shared_weekly.body_contracts import CollaborationDay
+from app.service.shared_weekly.body_contracts import CollaborationDay, TargetPath
 from app.service.shared_weekly.editor_contracts import ManualWeekEdit
 from app.service.shared_weekly.people_contracts import People
 from app.service.shared_weekly.production_composition import get_shared_weekly_services
@@ -54,7 +54,12 @@ LAYOUT_MESSAGES = {
 }
 
 
-def slot_label(path: str) -> str:
+def slot_label(path: str | TargetPath) -> str:
+    if type(path) is TargetPath:
+        return f"{path.day} · {DAY_LABELS[path.field]}"
+    if path.startswith("days."):
+        _, day, field = path.split(".", 2)
+        return f"{day} · {DAY_LABELS[field]}"
     labels = {
         "games": "整周游戏",
         "collective": "集体游戏",
@@ -96,8 +101,10 @@ class WeeklyEditor:
             raise ValueError("page_stale")
 
     async def live(self):
+        presentation = self.presentation_stamp()
         if await require_bound_ui_session(self.expected) is None:
             raise ValueError("session_invalid")
+        self.require_same_presentation(presentation)
 
     async def open(self, choice, start, end, theme=""):
         await self.live()
@@ -381,7 +388,7 @@ async def _weekly_content(expected):
                         getattr(
                             difference,
                             "path",
-                            str(getattr(difference, "target_path", "")),
+                            getattr(difference, "target_path", ""),
                         )
                     )
                 )
@@ -416,12 +423,14 @@ async def _weekly_content(expected):
         dialog.props("persistent").open()
 
     async def render():
+        presentation = editor.presentation_stamp()
         title, theme, display, people = await services.authoring.header(
             expected, editor.edit.page_id, editor.edit.page
         )
         last = await services.page.last_editor(
             expected, editor.edit.target.plan.plan_id
         )
+        editor.require_same_presentation(presentation)
         host.clear()
         fields.clear()
         slot_fields.clear()

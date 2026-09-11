@@ -95,6 +95,7 @@ AUTHORIZED_NON_AGENT_BUSINESS_TABLES = frozenset(
         "shared_weekly_audit",  # Shared weekly business operations, not Agent state.
         "shared_weekly_version",  # Immutable weekly body, not Agent operation state.
         "shared_weekly_source_audit",  # Shared source access, not Agent state.
+        "shared_weekly_export_audit",  # Saved-version export authorization only.
         "weekly_person_defaults_audit",  # Explicit personal settings operations.
         "weekly_monthly_plan",
         "weekly_monthly_plan_version",
@@ -1390,6 +1391,7 @@ async def test_restart_after_draft_has_fresh_ids_history_and_no_agent_schema(
     assert "shared_weekly_audit" in names
     assert "shared_weekly_version" in names
     assert "shared_weekly_source_audit" in names
+    assert "shared_weekly_export_audit" in names
     assert "weekly_person_defaults_audit" in names
     assert not any(
         _is_forbidden_agent_schema_name(name)
@@ -1404,6 +1406,7 @@ async def test_restart_after_draft_has_fresh_ids_history_and_no_agent_schema(
     assert rows_by_table["shared_weekly_audit"] == ()
     assert rows_by_table["shared_weekly_version"] == ()
     assert rows_by_table["shared_weekly_source_audit"] == ()
+    assert rows_by_table["shared_weekly_export_audit"] == ()
     assert rows_by_table["weekly_person_defaults_audit"] == ()
     assert all(
         rows_by_table[table_name] == ()
