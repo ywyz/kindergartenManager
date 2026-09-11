@@ -1,5 +1,19 @@
 # ADR-0011：新周计划班级共享、来源快照与单页交付契约
 
+## 2026-09-11 WP-D 当前实现补充
+
+本节记录隔离工作树中的实际契约，不预写整门关闭、发布或部署结论。最终代码／文档 SHA、适用验证及剩余门以[WP-D 关闭矩阵](../../specs/weekly-plan-authoring/WP-D-completion-contract.md)、[本轮证据](../../specs/weekly-plan-authoring/evidence/WP-D-20260911.md)和[当前状态](../../specs/weekly-plan-authoring/current-status.md)为准；下方 2026-09-08 状态、源码与拟定入口均为历史设计记录。
+
+- `shared_weekly/production_composition.py` 的 `composition.authoring` 接通真实 `AuthoringApplication`，沿用受信会话、唯一共享授权政策、完整教学周、共享根与双 CAS。WP-D 提供打开／编辑转换、取源与结构选择、生成差异、显式采用、保存和重载应用入口；完整填写 UI、资格与正式导出仍属 WP-E。
+- 显式编辑转换产生 `weekly-authoring.v3`，保留 v1/v2 解析、规范字节和历史 operation。v3 序列化冻结 `weekly-authoring-budget.v1`、日历掩码／标签指纹、固定 slot 与 imported/manual/ai 来源。`archive` 仅存仍被 slot 引用的旧 imported 来源快照，重导入不得把旧引用改绑到新源；无引用的 archive 随显式编辑清理，不改历史版本。
+- 游戏和区域结构优先来自已确认、重新授权的原始字段快照；确定性解析返回全部明确选项，模糊共享目标不分配给多个名称。AI 只补当前任务必要字段，经操作教师受支持配置与 integration client；候选绑定页面、目标、来源／映射、prompt、日历与会话基线，等待不持数据库锁，显式采用只改内存。
+- 普通手工保存沿用旧来源快照，不因旧源随后删除或失权而阻止保存；本次新导入、重导入、结构提取或 AI 依赖的来源必须按精确源及 mapping 基线重验。最终保存同事务重验授权、双 CAS、日历和本次依赖，未知提交仅按原 operation 只读对账。
+- 日历锁定 `chinesecalendar 1.11.0`，沿用 v1 教学事实指纹，独立记录 `shared-week-display.v1` 标签规则与指纹。周序包含整周假期，但零实际教学日授权交集仍拒绝。每日页面以个人学期配置作展示输入，采用同一前置调休周日规则；它不构成共享权威身份或授权。
+- 本轮唯一 Alembic head 为 `c264d8fa1037`，仅追加八类 weekly prompt task；不重写现有 prompt 版本、不创建候选持久表。产品 Agent 仍是四 READ＋两 DRAFT，未扩 WRITE、月计划、全局／个人 prompt 产品 #79、云端或 Word 验收。
+
+## 2026-09-08 历史设计记录
+
+
 - 状态：提议；产品规则已确认，技术方案已首轮复审，仍有未关闭 finding；不是 WP-B～WP-F GREEN 或部署授权。
 - 日期：2026-09-08
 - 工作源码：`8dcc83376577695b562529ec42adc6b48817f004` 加本门未提交文档/测试。

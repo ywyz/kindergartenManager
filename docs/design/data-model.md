@@ -1,3 +1,15 @@
+# 2026-09-11 WP-D 当前数据契约补充
+
+新共享周正文通过显式编辑转换使用 `weekly-authoring.v3`，外层根、不可变版本、来源审计与双 CAS 仍走 WP-C 路径；旧 v1/v2 规范解析、hash 和历史 operation 不被后台改写。v3 不是新业务表：它在版本正文内冻结 `budget_version=weekly-authoring-budget.v1`、固定标题、日历规则／标签指纹及每列教学掩码、固定 slot、来源 references 和 `archive`。
+
+固定结构包括两个集体游戏与一个自主游戏（各名称及三个目标）、一个重点区域（名称、三个目标、材料、三条指导）、本周重点三条、环境三条、生活习惯三组名称／内容及家园共育短段。缺项以固定空 slot 保存；完整生成结果另验数量和非空，合法草稿不等于单页／正式导出合格。字段同时限制字符与 UTF-8 字节：名称／晨谈主题 64／256，材料和家园共育 400／1600，其他 slot 160／640；正文总量上限 1,048,576 字节，不截断内容。
+
+slot 的 imported/manual/ai provenance 与 `SourceReference(target,snapshot_hash)` 显式保存。引用绑定原始 imported baseline；旧源重导入后仍被整周 slot 使用时进入 `archive`，最多 128 份，只允许同周、原始 imported 状态且实际被引用的唯一快照。显式编辑清除最后引用可清理 archive；历史不可变版本仍保留原字节。普通手工保存不要求旧源继续可读，本次结构／AI／导入依赖则在保存前重新验证精确源、mapping 和权限。
+
+唯一迁移 head 为 `c264d8fa1037`，前驱 `b153c7e9f026`：扩展已有 prompt task 枚举，不重写现有 prompt 版本。没有长期页面、候选或 Provider 会话表。当前表级约束与迁移行为见[迁移契约](../../specs/weekly-plan-authoring/migration-proposal.md)；最终代码 SHA、验证和剩余门只见[WP-D 矩阵](../../specs/weekly-plan-authoring/WP-D-completion-contract.md)、[本轮证据](../../specs/weekly-plan-authoring/evidence/WP-D-20260911.md)及[当前状态](../../specs/weekly-plan-authoring/current-status.md)。下方旧 head、表数和阶段描述为各自日期的历史记录。
+
+---
+
 > 2026-09-11 WP-C完整协作实现已接入生产composition：显式映射、逐日选源、差异采用、CAS来源快照、检查/重导入及人员默认。迁移head为b153c7e9f026；最终验证及尚缺门以[当前状态](../../specs/weekly-plan-authoring/current-status.md)和[本轮账本](../../specs/weekly-plan-authoring/evidence/WP-C-complete-20260911.md)为准。下方旧阶段记录保留历史语境。
 
 > 2026-09-11 当前周计划状态见[实时核对](../../specs/weekly-plan-authoring/current-status.md)：WP-A 已限定关闭，WP-C 授权/事实子步已本地交付、身份基线已公开；下方旧阶段记录不作当前阻塞。

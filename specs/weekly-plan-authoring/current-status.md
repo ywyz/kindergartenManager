@@ -1,3 +1,19 @@
+# 当前状态：2026-09-11 WP-D 本地授权范围完成
+
+**WP-D本地实现与适用验证 COMPLETE；WP-C及#77整门未宣称PASS。** 用户允许证据差异查明后继续依赖实现，四类历史native双RED缺口仍未满足。原清单177/178 raw hash事实、JSON覆写时序及本轮保全证据见[账本](evidence/WP-D-20260911.md)。
+
+- worktree `/home/ywyz/code/km-wpd-authoring-20260911`，分支 `feat/wp-d-authoring-20260911`；tested_code_sha `258a9b0978e89397c90a4b7e271388d58b13b8d7`，文档后继为本文件所在docs提交。
+- 真实composition.authoring已接通规范日期/五六列假期、显式v3编辑转换、固定slot、来源结构选择、八任务生成/重生成、差异确认、双CAS保存/重载；v1/v2/hash/人员/来源历史保持。缺项草稿合法，不表示单页或正式导出通过。
+- 唯一Alembic head `c264d8fa1037`；日历包1.11.0锁定、支持2004–2026。仅一次性SQLite/专属MySQL迁移；没有真实业务迁移。
+- Main：常规1613 passed/1既有R5skip；WP-C/D MySQL调用413 passed；Foundation261、旧周月兼容347、Agent快照7。Reviewer：WP-D两库调用各183，所审范围剩余H/M/L=0/0/0。各调用中的MySQL/固定SQLite/无库角色和逐行覆盖只见[矩阵](WP-D-completion-contract.md)与[最终清单](evidence/WP-D-manifest-20260911.json)。28个改动Python文件lint/format、依赖、diff通过。
+- 11处非任务工作区及133份初始材料保持。未push/PR/合并/消息/部署/发布；#77本轮回写读回NOT_AUTHORIZED/NOT_SENT。没有当前SHA远端CI、真实AI、云端浏览器或Word产品验收。
+
+下一阶段仅交付[待授权WP-E提示词](WP-E-next-prompt.md)，包括完整填写UI、模板资格、五/六列正式填充、实际单页检查、有限缩减与确认、保存版本导出及WP-F条件交接。WP-E/F未执行；Word主要、LibreOffice备用、long三份两页FAIL、compact仅合成候选保持。无月计划、#78/#79或产品Agent能力扩展。
+
+---
+
+以下为历史状态记录；其中“WP-D尚未执行”和旧head/数字均按记录时点解释，不覆盖上方当前事实。
+
 # 当前状态：2026-09-11 WP-C完整协作续作
 
 WP-C A–F应用路径已实现：权威身份/授权/事实与共享根复用、显式每日映射、逐日窄来源及完整重复选择、一次性差异采用、不可变来源快照/CAS、来源检查/重导入、人员默认与共享人员历史。`app.main`已注册生产composition；完整填写UI仍属WP-E。

@@ -1,3 +1,17 @@
+# 2026-09-11 WP-D 当前日历实现
+
+当前入口为 `CalendarApplication.resolve_week(expected,class_id,semester_id,requested_start,requested_end)` 与 `display_for_scope(expected,scope)`，返回关闭的 `WeekDisplay(scope,facts,week_number,columns,class_name,grade,semester_display,display_rule_version,label_fingerprint)`；每日列为 `DayDisplay(day,teaching,morning_label)`。同一身份事务内复用唯一共享 READ 政策并读取权威学期寒暑假类型、班级和学年。内部 `display_from_facts(repository,facts)` 供已授权事务重验展示指纹，不再开连接。
+
+先解析完整规范五／六列与实际教学日再取源／AI：缩短选择仍为同一 scope 和完整列；前置调休周日归下一周一，周六归本周。跨周、无学期交集、同周跨学期冲突、七列、未知覆盖或矛盾数据失败关闭。整周假期仍计周序，但唯一政策要求 assignment 与实际教学日至少一天交集，因此零教学日整周仍 `scope_denied`；假期标签纯投影与授权是不同证据角色。
+
+锁定包已经是 `chinesecalendar 1.11.0`，不按下方历史“未锁定”文字重复升级。原 v1 日期集合指纹和教学事实序列化不变；独立 holiday-name 数据校验与 `shared-week-display.v1` 指纹覆盖标签变化。学校寒暑假优先于调休：开学前周一标学校假期，其余空；期末后首格标学校假期，其余空。连续法定假期在本周可见段首标节名，即使连续日期节名不同也不重复标；跨周新段重新标。普通周末不标法定假期，调休教学日不因节名而标休假。日历变化提供差异，不后台改历史；采用／保存校验当前标签、版本和掩码。
+
+每日页面现通过 `get_daily_week_number` 和 DatePanel 的显式 resolver 使用相同的前置调休周日规则。每日旧个人学期配置仅是展示输入，不替代共享权威 semester/class 或授予成员权限；其学期外周日不前移。完整候选窗口日历不可用时页面清除可用日期／周次和 Agent scope，显示不可用提示并停止日期依赖加载；其他 DatePanel 调用方、随机日期业务和旧 get_week_number 不变。每日历史已保存的周次快照不后台重算。
+
+最终证据与未满足门见[WP-D 矩阵](WP-D-completion-contract.md)、[本轮证据](evidence/WP-D-20260911.md)和[当前状态](current-status.md)。以下为 WP-A/WP-C 各日期的历史契约，不作为当前尚无实现或整门通过的声明。
+
+---
+
 > 2026-09-11 WP-C完整协作路径已实现；[关闭矩阵](WP-C-completion-contract.md)、[本轮证据](evidence/WP-C-complete-20260911.md)与[当前状态](current-status.md)说明实际覆盖和未完成门。历史阶段描述不代表当前实现缺项。
 
 > 2026-09-11当前实现补充：授权及最小教学日事实见[本轮冻结契约](WP-C-authorization-contract.md)与[交付账本](evidence/WP-C-authorization-20260911.md)。下方WP-A提案按当时时点保留；未实现的共享根/来源及WP-D/E仍不计通过。本步无新schema。

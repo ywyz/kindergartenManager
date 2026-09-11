@@ -1,3 +1,15 @@
+# 2026-09-11 WP-D 应用层实现补充
+
+当前 `app/service/shared_weekly/production_composition.py` 暴露 `composition.authoring`，由 `AuthoringApplication` 复用 WP-C 的身份、共享根、双 CAS、映射与来源服务。`CalendarApplication.resolve_week` 在取源／AI 前规范完整五／六列；`display_from_facts` 在已有授权事务中投影标签，不新建连接。每日页面单独注入 `get_daily_week_number` 到 DatePanel，保留其他调用方的旧日期行为；个人学期只参与展示，不授予共享权限。
+
+应用路径为打开共享草稿并显式转换 v3、选择／确认逐日来源、选择明确游戏／区域、生成缺项或选定分项、查看差异、显式采用内存候选、同一共享 CAS 保存并重载。Provider 等待不持数据库锁；页面、候选有 TTL／容量和一次性消费约束，重启不恢复。授权、session/epoch、assignment、目标、页面、来源／mapping、prompt 和日历漂移在适用边界失败关闭。没有 Provider 会话／记忆、持久候选或新增产品 Agent 工具。
+
+普通手工编辑保留已存来源历史；本次新取源和 AI 依赖重新授权并绑定精确基线。手工历史的保留不等于旧源仍可重新读取。v3 固定结构、archive 和预算见[数据模型](data-model.md)；prompt 枚举迁移唯一 head 为 `c264d8fa1037`。完整填写 UI、模板资格、单页与正式导出属于 WP-E，云端／Word 外部门属于后续授权。
+
+以上为当前代码契约，未宣称整门通过。最终 SHA、验证、review 与未满足门见[WP-D 矩阵](../../specs/weekly-plan-authoring/WP-D-completion-contract.md)、[证据](../../specs/weekly-plan-authoring/evidence/WP-D-20260911.md)及[当前状态](../../specs/weekly-plan-authoring/current-status.md)。以下各日期基线、迁移 head 和阶段状态按历史保留。
+
+---
+
 > 2026-09-11 WP-C完整协作实现已接入生产composition：显式映射、逐日选源、差异采用、CAS来源快照、检查/重导入及人员默认。迁移head为b153c7e9f026；最终验证及尚缺门以[当前状态](../../specs/weekly-plan-authoring/current-status.md)和[本轮账本](../../specs/weekly-plan-authoring/evidence/WP-C-complete-20260911.md)为准。下方旧阶段记录保留历史语境。
 
 > 2026-09-11 当前周计划状态见[实时核对](../../specs/weekly-plan-authoring/current-status.md)：WP-A 已限定关闭，WP-C 授权/事实子步已本地交付、身份基线已公开；下方旧阶段记录不作当前阻塞。

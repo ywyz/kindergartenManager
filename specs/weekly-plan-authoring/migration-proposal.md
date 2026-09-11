@@ -1,3 +1,15 @@
+# 2026-09-11 WP-D 当前迁移契约
+
+本轮源树 Alembic 唯一 head 为 `c264d8fa1037`，其唯一前驱为 `b153c7e9f026`。该 revision 仅将 `weekly_morning_talk`、`weekly_games`、`weekly_area`、`weekly_materials`、`weekly_focus`、`weekly_environment`、`weekly_habits`、`weekly_home` 登记到已有 prompt task 类型；不重写旧 prompt 内容或 active version。
+
+MySQL 显式扩展 `prompt_template.task_type` ENUM；SQLite 已用不带枚举约束的 VARCHAR，升级不重写数据。降级先检查上述 weekly task 是否已有行，非空则以 `weekly_prompt_nonempty_downgrade_denied` 拒绝，不能裁掉真实 prompt。升级／回滚仅能在授权环境执行，本段源码说明不是生产执行证据。
+
+WP-D 固定正文不是新表：现有共享不可变版本保存显式转换的 `weekly-authoring.v3`，含预算版本、固定 slot、来源 references、必要 archive 及日历标签／掩码；v1/v2 正文、历史 hash 和 operation 保持原语义。没有新长期候选、页面、Provider 对话或补丁表。archive 只保留实际仍被 slot 引用的原始来源，不替代本次取源／AI 的授权基线。
+
+迁移、并发、两库和历史兼容的实际结果以及最终 SHA 以[WP-D 关闭矩阵](WP-D-completion-contract.md)、[本轮证据](evidence/WP-D-20260911.md)和[当前状态](current-status.md)为准，不据本段预判通过。下方旧 head、分门顺序和表设计是 WP-A/WP-C 的历史提案。
+
+---
+
 > 2026-09-11 WP-C完整协作路径已实现；[关闭矩阵](WP-C-completion-contract.md)、[本轮证据](evidence/WP-C-complete-20260911.md)与[当前状态](current-status.md)说明实际覆盖和未完成门。历史阶段描述不代表当前实现缺项。
 
 > 2026-09-11当前实现补充：授权及最小教学日事实见[本轮冻结契约](WP-C-authorization-contract.md)与[交付账本](evidence/WP-C-authorization-20260911.md)。下方WP-A提案按当时时点保留；未实现的共享根/来源及WP-D/E仍不计通过。本步无新schema。

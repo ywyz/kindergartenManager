@@ -1,3 +1,19 @@
+# 2026-09-11 WP-D 当前真实服务入口
+
+`shared_weekly/production_composition.py` 的 `composition.authoring` 为 `AuthoringApplication`。当前方法包括 `begin_authoring`／`begin_edit`、`header`、`calendar_changes`、`check_authoring_sources`、`update_edit`／`update_slots`、`propose_import`、`list_structure`／`propose_structure`、`generate_missing`／`regenerate`、`adopt_generated` 和 `save_edit`。这些是应用入口；下方 WP-A 拟定名称保留历史，不当作额外承诺。
+
+输入绑定重新验证的 TrustedUiSession、page_id/PageStamp、共享目标双 CAS 及明确选择。服务端保管一次性 opaque candidate ID；caller 不重传 AI 正文、provenance 或来源基线。生成缺项只提议空 slot，分项重生成只提议明确路径，差异含 before/after，采用只改内存；持久化只通过原共享 CAS。失败、超时、取消、拒绝、重放、过期或任何适用基线漂移不保存正文或成功审计。未知提交只按原 operation 当前授权只读对账，不自动重试。
+
+正文是显式编辑转换的 `weekly-authoring.v3`，冻结 `weekly-authoring-budget.v1`、日历掩码／标签、固定数量 slots 和来源。旧 v1/v2 仍按原 schema/hash 读取。`archive` 保留仍被整周字段引用的旧 imported baseline；`check_authoring_sources` 可检查当前及 archive 引用，不改历史。普通手工编辑沿用旧快照可保存，本次新导入、重导入、结构提取或 AI 依赖则必须精确重验源、mapping、权限及目标。
+
+`list_structure` 从确认的原始 outdoor_activity／indoor_area 快照给出全部明确游戏／区域选项；重复备课与不同名称保留选择，模糊共享目标不擅自归属。材料和四类总结仍由 AI 生成或手工填写。AI 使用当前操作教师受支持配置／解密流和 integration client，只发送任务必要字段与长度预算；缺失／不安全配置零请求，prompt 的标识／active version 绑定候选，不能通过定制提示词绕过固定 schema 和预算。
+
+等待不持数据库锁。取数、发出 AI 前、结果发布、采用和最终保存分别执行适用授权及 session/epoch、assignment、page、双 CAS、prompt、来源／mapping、日历校验；最后保存通过已有事务投影当前日历，无嵌套新连接。候选／页面有容量和 TTL，只在进程内短期保存，重启不恢复。完整 UI、正式导出、单页缩减、云端／Word 和产品 Agent 扩能力均不在本门。
+
+最终 SHA、验证和剩余门见[WP-D 关闭矩阵](WP-D-completion-contract.md)、[本轮证据](evidence/WP-D-20260911.md)及[当前状态](current-status.md)。以下各旧阶段结论按当时时点保留。
+
+---
+
 > 2026-09-11 WP-C完整协作路径已实现；[关闭矩阵](WP-C-completion-contract.md)、[本轮证据](evidence/WP-C-complete-20260911.md)与[当前状态](current-status.md)说明实际覆盖和未完成门。历史阶段描述不代表当前实现缺项。
 
 > 2026-09-11当前实现补充：授权及最小教学日事实见[本轮冻结契约](WP-C-authorization-contract.md)与[交付账本](evidence/WP-C-authorization-20260911.md)。下方WP-A提案按当时时点保留；未实现的共享根/来源及WP-D/E仍不计通过。本步无新schema。

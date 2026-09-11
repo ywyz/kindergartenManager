@@ -1,5 +1,12 @@
 # 幼儿园教学管理系统架构文档（初始化）
 
+## 2026-09-11 WP-D 历史指针
+
+本轮在隔离工作树接通 `composition.authoring`：权威教学周／标签、v3 固定结构与预算、明确来源结构选择、分项 prompt、短期一次性候选及双 CAS 保存。`weekly-authoring.v3` 显式转换并保留 v1/v2 历史；archive 保留仍被整周字段引用的旧来源，普通手工历史与本次重新授权的来源依赖分别处理。每日页面增加相同调休周日周序展示，但个人学期不构成共享授权。唯一 prompt 注册迁移为 `c264d8fa1037`，未执行真实迁移或扩展产品 Agent。
+
+当前架构和边界见[ADR-0011](../docs/ADR/ADR-0011-shared-weekly-authoring-and-source-snapshots.md)、[系统架构](../docs/design/system-architecture.md)、[数据模型](../docs/design/data-model.md)；最终 SHA、验证、review 与剩余门仅见[WP-D 矩阵](../specs/weekly-plan-authoring/WP-D-completion-contract.md)、[证据](../specs/weekly-plan-authoring/evidence/WP-D-20260911.md)和[当前状态](../specs/weekly-plan-authoring/current-status.md)。本指针不预写整门通过、发布、部署或云端／Word 结论；以下累积记录均保留原历史语境。
+
+
 2026-09-08 历史指针：用户确认[周计划填写与班级协作需求](../specs/weekly-plan-authoring/spec.md)，
 包括同班共享、草稿导出、重复备课人工选择、来源快照及缩减确认；
 [实施计划](../specs/weekly-plan-authoring/tasks.md)尚未执行。该需求改变后续周计划产品方向，不改写原 WMP 交付证据。
