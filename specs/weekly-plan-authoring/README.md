@@ -24,3 +24,7 @@
 源模板/产品代码在本次交接未更改；新增的校验脚本仅计算样本文件完整性。
 外部Linux运行目录的历史日志/运维脚本仍是历史本地路径，Windows任务使用本目录自带材料，
 不依赖重新执行那些Linux命令。没有因为上传历史材料产生新的Office/云端/Quality PASS。
+
+## WP-D 提示词续审（仅文档）
+
+[修订提示词](WP-D-next-prompt.md)与[本轮核对记录](evidence/WP-D-prompt-revision-20260911.md)已更新。WP-D 尚未执行；四类历史 RED 缺口未豁免，外部 preservation-final.json 与原清单哈希不一致另列执行前待核查。后续按 WP-D → WP-E → WP-F 交接，本轮仅本地文档同步。

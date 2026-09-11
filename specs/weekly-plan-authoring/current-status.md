@@ -23,3 +23,7 @@ WP-C A–F应用路径已实现：权威身份/授权/事实与共享根复用�
 ## 2026-09-11 提示词审查与 Bug 登记
 
 [WP-D 审查与 Bug 记录](evidence/WP-D-prompt-review-and-bugs-20260911.md)：原提示词不足以确保完整交付，已补强数量、日历、应用闭环及完成判据；WP-D 尚未执行，WP-C 历史 RED 缺口未豁免。线上问题分别登记 #80（Agent 契约失败提示）与 #81（已上传照片误报未上传），尚未复现或修复。用户已授权连同 WP-C 推送现有续作分支，不合并 main；此授权不表示发布或任何验收门通过。
+
+## WP-D 提示词续审（仅文档）
+
+[修订提示词](WP-D-next-prompt.md)与[本轮核对记录](evidence/WP-D-prompt-revision-20260911.md)已更新。WP-D 尚未执行；四类历史 RED 缺口未豁免，外部 preservation-final.json 与原清单哈希不一致另列执行前待核查。后续按 WP-D → WP-E → WP-F 交接，本轮仅本地文档同步。
