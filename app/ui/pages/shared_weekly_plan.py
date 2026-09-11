@@ -107,6 +107,7 @@ class WeeklyEditor:
         self.require_same_presentation(presentation)
 
     async def open(self, choice, start, end, theme=""):
+        presentation = self.presentation_stamp()
         await self.live()
         if self.dirty or self.unknown:
             raise ValueError("unsaved_changes")
@@ -114,6 +115,7 @@ class WeeklyEditor:
         display = await author.calendar.resolve_week(
             self.expected, choice.class_id, choice.semester_id, start, end
         )
+        self.require_same_presentation(presentation)
         op = uuid4()
         try:
             result = await author.create_week(self.expected, display.scope, theme, op)
@@ -121,8 +123,9 @@ class WeeklyEditor:
             if str(exc) == "commit_unknown":
                 self.unknown = (display.scope, op)
             raise
-        self.edit = await author.begin_authoring(self.expected, result.plan.plan_id)
-        self.check = None
+        self.require_same_presentation(presentation)
+        fresh = await author.begin_authoring(self.expected, result.plan.plan_id)
+        self._replace_navigation(presentation, fresh)
         return self.edit
 
     async def manual(self, values, slots):
@@ -184,13 +187,23 @@ class WeeklyEditor:
         return await self.services.authoring.reconcile(self.expected, scope, operation)
 
     async def reload(self):
+        presentation = self.presentation_stamp()
         await self.live()
         if self.unknown:
             raise ValueError("commit_unknown")
         fresh = await self.services.authoring.begin_authoring(
             self.expected, self.edit.target.plan.plan_id
         )
-        self.services.authoring.discard_edit(self.expected, self.edit.page_id)
+        self._replace_navigation(presentation, fresh)
+
+    def _replace_navigation(self, presentation, fresh):
+        try:
+            self.require_same_presentation(presentation)
+            if self.edit is not None:
+                self.services.authoring.discard_edit(self.expected, self.edit.page_id)
+        except Exception:
+            self.services.authoring.discard_edit(self.expected, fresh.page_id)
+            raise
         self.edit, self.dirty, self.check = fresh, False, None
         self.proposal = None
 

@@ -473,6 +473,45 @@ async def test_rendered_teacher_page_opens_inputs_saves_and_imports(world, monke
         "authentication drift must preserve existing controls"
     )
 
+    navigation_issues = []
+    for mode in ("open", "reload"):
+        await buttons["保存草稿"]()
+        original_begin = author.begin_authoring
+        navigation_entered, navigation_release = asyncio.Event(), asyncio.Event()
+        old_pages = set(author._pages._items)
+
+        async def held_begin(
+            *args,
+            entered=navigation_entered,
+            release=navigation_release,
+            begin=original_begin,
+        ):
+            entered.set()
+            await release.wait()
+            return await begin(*args)
+
+        author.begin_authoring = held_begin
+        if mode == "reload":
+            await buttons["重载保存版本"]()
+            callback = buttons["明确放弃并重载"]
+        else:
+            callback = buttons["打开 / 新建本周共享计划"]
+        navigating = asyncio.create_task(callback())
+        await asyncio.wait_for(navigation_entered.wait(), 3)
+        changed = widgets[page.slot_label("focus.0")][-1]
+        changed.value = f"{mode}导航等待中手改"
+        changed.on_change()
+        navigation_release.set()
+        await navigating
+        author.begin_authoring = original_begin
+        if widgets[page.slot_label("focus.0")][-1].value != f"{mode}导航等待中手改":
+            navigation_issues.append(mode + " replaced late input")
+        if set(author._pages._items) != old_pages:
+            navigation_issues.append(
+                mode + " abandoned the old page or leaked the fresh page"
+            )
+    assert navigation_issues == [], navigation_issues
+
     # Supplied renderer business failures exercise real UI explanations only;
     # this is initial coverage, not native missing-font/renderer evidence.
     from app.service.shared_weekly.collaboration_application import body_hash
