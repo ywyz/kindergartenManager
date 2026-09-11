@@ -19,3 +19,7 @@ WP-C A–F应用路径已实现：权威身份/授权/事实与共享根复用�
 最终本地：tests **1430 passed/1 skipped**（skip为独立R5实库备份演练）；Foundation **261**；旧周/月兼容 **347**；Agent快照 **7**。WP-C集合**230 passed**：MySQL运行含211项MySQL、3项固定SQLite、16项无库；SQLite同集合包含在常规tests中。Reviewer两库专项各**27 passed**。Ruff0.16.6本轮46文件、format、diff及依赖一致性通过。无本轮远端CI；不以这些结果关闭整个#77产品门。
 
 最终[#77回写](https://github.com/ywyz/kindergartenManager/issues/77#issuecomment-5630591033)已逐字规范化读回且Issue仍OPEN；[读回证据](evidence/WP-C-complete-issue-readback-20260911.md)固定本地文档SHA及原始响应hash。
+
+## 2026-09-11 提示词审查与 Bug 登记
+
+[WP-D 审查与 Bug 记录](evidence/WP-D-prompt-review-and-bugs-20260911.md)：原提示词不足以确保完整交付，已补强数量、日历、应用闭环及完成判据；WP-D 尚未执行，WP-C 历史 RED 缺口未豁免。线上问题分别登记 #80（Agent 契约失败提示）与 #81（已上传照片误报未上传），尚未复现或修复。用户已授权连同 WP-C 推送现有续作分支，不合并 main；此授权不表示发布或任何验收门通过。
