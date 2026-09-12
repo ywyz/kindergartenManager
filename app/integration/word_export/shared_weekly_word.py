@@ -111,8 +111,13 @@ def fill_document(
     # Retain controlled template margins, not historical compact trial margins.
     document.add_paragraph("幼儿园每周工作计划表")
     theme = body.theme.strip().strip("《》")
+    first, last = body.calendar.columns[0][0], body.calendar.columns[-1][0]
+    date_range = (
+        f"{first.year}年{first.month}月{first.day}日—"
+        f"{last.year}年{last.month}月{last.day}日"
+    )
     document.add_paragraph(
-        f"主题名称：《{theme}》    班级：{display.class_name}    {display.term_name} 第{display.week_number}周"
+        f"主题名称：《{theme}》    班级：{display.class_name}（{date_range}）"
     )
     document.add_paragraph(
         f"教师：{'、'.join(body.people.teachers)}    保育员：{body.people.caregiver}"
@@ -138,11 +143,11 @@ def fill_document(
         col.width = widths[i]
         for cell in col.cells:
             cell.width = widths[i]
-    table.cell(0, 0).merge(table.cell(0, 1)).text = f"第{display.week_number}周"
+    table.cell(0, 0).merge(table.cell(0, 1)).text = ""
     for offset, (day, teaching, label) in enumerate(body.calendar.columns, 2):
         table.cell(
             0, offset
-        ).text = f"周{'一二三四五六日'[day.weekday()]}\n{day:%m月%d日}"
+        ).text = f"周{'一二三四五六日'[day.weekday()]}"
         item = body.days[offset - 2]
         table.cell(1, offset).text = (
             f"{item.morning_talk_topic}\n{item.morning_talk_questions}"

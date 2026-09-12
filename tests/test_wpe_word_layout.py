@@ -252,3 +252,25 @@ def test_reference_layout_preserves_title_and_usable_content_width(count):
     assert "自主游戏：" in table.cell(3, 2).text
     assert "本周重点指导区域：" in table.cell(4, 2).text
     assert "\n2." in table.cell(5, 1).text
+
+
+@pytest.mark.parametrize("count", [5, 6])
+@pytest.mark.parametrize("start", [date(2026, 9, 28), date(2026, 12, 28)])
+def test_week_dates_follow_class_and_table_header_is_weekdays_only(count, start):
+    body = complete_body(count)
+    days = tuple(replace(d, day=start + timedelta(days=i)) for i, d in enumerate(body.days))
+    body = replace(body, base=replace(body.base, days=days), calendar=replace(body.calendar, columns=tuple(
+        (d.day, teaching, label)
+        for d, (_, teaching, label) in zip(days, body.calendar.columns)
+    )))
+    doc = Document(BytesIO(fill_document(
+        SEED_PATH.read_bytes(), body, WeekDisplay("中四班", "第一学期", 3)
+    )))
+    first, last = days[0].day, days[-1].day
+    expected = f"班级：中四班（{first.year}年{first.month}月{first.day}日—{last.year}年{last.month}月{last.day}日）"
+    assert expected in doc.paragraphs[1].text
+    table = doc.tables[0]
+    assert table.cell(0, 0).text == table.cell(0, 1).text == ""
+    assert [table.cell(0, i + 2).text for i in range(count)] == [
+        "周" + "一二三四五六日"[d.day.weekday()] for d in days
+    ]
