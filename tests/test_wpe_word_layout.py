@@ -74,7 +74,8 @@ def test_controlled_seed_fill_roundtrip_fixed_format(count):
     assert table.cell(2, 5).text == ""
     assert "《秋天》" in doc.paragraphs[1].text
     assert "甲老师、乙老师" in doc.paragraphs[2].text
-    paragraphs = list(doc.paragraphs) + [
+    assert doc.paragraphs[0].runs[0].font.size.pt == 16
+    paragraphs = list(doc.paragraphs[1:]) + [
         p for r in table.rows for c in r.cells for p in c.paragraphs
     ]
     for p in paragraphs:
@@ -227,3 +228,27 @@ async def test_renderer_text_crossing_cell_edge_is_not_delivered(monkeypatch, ax
     )
     assert not result.fits, "text crosses a cell border but is delivered"
     assert result.reason == "layout_overflow" and result.data is None
+
+
+@pytest.mark.parametrize("count", [5, 6])
+def test_reference_layout_preserves_title_and_usable_content_width(count):
+    doc = Document(BytesIO(fill_document(
+        SEED_PATH.read_bytes(), complete_body(count), WeekDisplay("小一班", "第一学期", 3)
+    )))
+    table = doc.tables[0]
+    assert doc.paragraphs[0].runs[0].font.size.pt == 16
+    assert doc.paragraphs[0].alignment == 1
+    assert doc.paragraphs[0].runs[0].bold is True
+    assert doc.paragraphs[0].runs[0].font.cs_bold is True
+    assert table.columns[0].width < table.columns[2].width
+    printable = doc.sections[0].page_width - doc.sections[0].left_margin - doc.sections[0].right_margin
+    assert abs(sum(c.width for c in table.columns) - printable) < 635 * (count + 2)
+    for i in range(2, count + 2):
+        assert table.cell(0, i).width == table.columns[i].width
+    for row in range(5, 9):
+        assert table.cell(row, 0)._tc is not table.cell(row, 1)._tc
+        assert table.cell(row, 1)._tc is table.cell(row, count + 1)._tc
+    assert "集体游戏：1." in table.cell(3, 2).text
+    assert "自主游戏：" in table.cell(3, 2).text
+    assert "本周重点指导区域：" in table.cell(4, 2).text
+    assert "\n2." in table.cell(5, 1).text

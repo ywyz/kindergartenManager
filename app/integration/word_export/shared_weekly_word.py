@@ -19,7 +19,8 @@ from io import BytesIO
 from pathlib import Path
 
 from docx import Document
-from docx.enum.text import WD_LINE_SPACING
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Mm, Pt
@@ -76,8 +77,8 @@ def _complete(body):
             raise LayoutRejected("required_fields_missing")
 
 
-def _numbered(body, prefix):
-    return " ".join(f"{i + 1}.{body.value_at(f'{prefix}.{i}')}" for i in range(3))
+def _numbered(body, prefix, separator=" "):
+    return separator.join(f"{i + 1}.{body.value_at(f'{prefix}.{i}')}" for i in range(3))
 
 
 def fill_document(
@@ -95,6 +96,10 @@ def fill_document(
     _complete(body)
     document = Document(BytesIO(seed))
     table_style = document.tables[0].style
+    seed_widths = [col.width for col in document.tables[0].columns]
+    title_size = document.paragraphs[0].runs[0].font.size
+    title_bold = document.paragraphs[0].runs[0].bold
+    title_cs_bold = document.paragraphs[0].runs[0].font.cs_bold
     cell_borders = deepcopy(
         document.tables[0].cell(0, 0)._tc.tcPr.find(qn("w:tcBorders"))
     )
@@ -112,16 +117,27 @@ def fill_document(
     document.add_paragraph(
         f"教师：{'、'.join(body.people.teachers)}    保育员：{body.people.caregiver}"
     )
+    for paragraph in document.paragraphs:
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
     count = len(body.days)
     table = document.add_table(rows=9, cols=count + 2)
     table.style = table_style
     table.autofit = False
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
     for row in table.rows:
         for cell in row.cells:
             cell._tc.get_or_add_tcPr().append(deepcopy(cell_borders))
     width = section.page_width - section.left_margin - section.right_margin
-    for col in table.columns:
-        col.width = int(width / (count + 2))
+    # Preserve the seed's narrow label columns. Scale the five/six day region
+    # into the remaining printable width; set both grid and cell widths.
+    label_widths = [int(width * value / sum(seed_widths)) for value in seed_widths[:2]]
+    day_width = int((width - sum(label_widths)) / count)
+    widths = label_widths + [day_width] * count
+    widths[-1] += width - sum(widths)
+    for i, col in enumerate(table.columns):
+        col.width = widths[i]
+        for cell in col.cells:
+            cell.width = widths[i]
     table.cell(0, 0).merge(table.cell(0, 1)).text = f"第{display.week_number}周"
     for offset, (day, teaching, label) in enumerate(body.calendar.columns, 2):
         table.cell(
@@ -134,34 +150,48 @@ def fill_document(
             else label
         )
         table.cell(2, offset).text = item.activity_name if teaching else ""
-    table.cell(1, 0).merge(table.cell(2, 0)).text = "学习活动"
-    table.cell(1, 1).text = "晨间谈话"
-    table.cell(2, 1).text = "集体活动"
-    table.cell(3, 0).merge(table.cell(4, 0)).text = "游戏活动"
-    table.cell(3, 1).text = "户外游戏"
-    table.cell(4, 1).text = "区域游戏"
+    table.cell(1, 0).merge(table.cell(2, 0)).text = "学习\n活动"
+    table.cell(1, 1).text = "晨间\n谈话"
+    table.cell(2, 1).text = "集体\n活动"
+    table.cell(3, 0).merge(table.cell(4, 0)).text = "游戏\n活动"
+    table.cell(3, 1).text = "户外\n游戏"
+    table.cell(4, 1).text = "区域\n游戏"
     games = [OUTDOOR_TITLE]
-    for prefix in ("games.collective.0", "games.collective.1", "games.autonomous"):
+    for label, prefix in (
+        ("集体游戏：1.", "games.collective.0"),
+        ("2.", "games.collective.1"),
+        ("自主游戏：", "games.autonomous"),
+    ):
         games.append(
-            body.value_at(prefix + ".name") + "：" + _numbered(body, prefix + ".goals")
+            label + body.value_at(prefix + ".name") + "（目标："
+            + _numbered(body, prefix + ".goals") + "）"
         )
+    newline = "\n"
     values = [
         "\n".join(games),
-        f"{AREA_TITLE}\n重点区域：{body.value_at('area.name')}\n目标：{_numbered(body, 'area.goals')}\n材料：{body.value_at('area.materials')}\n指导：{_numbered(body, 'area.guidance')}",
-        _numbered(body, "focus"),
-        _numbered(body, "environment"),
-        " ".join(
+        f"{AREA_TITLE}\n本周重点指导区域：{body.value_at('area.name')}\n目标：\n{_numbered(body, 'area.goals', newline)}\n材料：{body.value_at('area.materials')}\n指导：\n{_numbered(body, 'area.guidance', newline)}",
+        _numbered(body, "focus", newline),
+        _numbered(body, "environment", newline),
+        "\n".join(
             f"{i + 1}.{body.value_at(f'habits.{i}.name')}：{body.value_at(f'habits.{i}.content')}"
             for i in range(3)
         ),
         body.value_at("home"),
     ]
     for row, value in enumerate(values, 3):
-        table.cell(row, 2).merge(table.cell(row, count + 1)).text = value
+        start = 2 if row < 5 else 1
+        table.cell(row, start).merge(table.cell(row, count + 1)).text = value
     for row, label in enumerate(
-        ("本周重点", "环境创设", "生活习惯培养", "家园共育"), 5
+        ("本周\n重点", "环境\n创设", "生活\n习惯\n培养", "家园\n共育"), 5
     ):
-        table.cell(row, 0).merge(table.cell(row, 1)).text = label
+        table.cell(row, 0).text = label
+    for row_index, row in enumerate(table.rows):
+        for column_index, cell in enumerate(row.cells):
+            is_label = column_index < (2 if row_index < 5 else 1)
+            if row_index < 3 or is_label:
+                cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+                for paragraph in cell.paragraphs:
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
     paragraphs = list(document.paragraphs)
     seen = set()
     for row in table.rows:
@@ -184,6 +214,11 @@ def fill_document(
                 fonts = OxmlElement("w:rFonts")
                 run._element.get_or_add_rPr().append(fonts)
             fonts.set(qn("w:eastAsia"), "宋体")
+    # The controlled title is 16 pt; the body remains 12 pt / fixed 20 pt.
+    for run in document.paragraphs[0].runs:
+        run.font.size = title_size
+        run.bold = title_bold
+        run.font.cs_bold = title_cs_bold
     stream = BytesIO()
     document.save(stream)
     data = stream.getvalue()
