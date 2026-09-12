@@ -31,6 +31,7 @@ DAY_LABELS = {
 
 LAYOUT_MESSAGES = {
     "ok": "实际单页检测通过",
+    "fits": "实际单页检测通过",
     "font_missing": "缺少宋体字体，无法检查或导出；请联系管理员配置字体。",
     "renderer_missing": "缺少排版渲染器，无法检查或导出；请联系管理员配置。",
     "renderer_unavailable": "受控排版渲染器不可用，无法检查或导出。",
