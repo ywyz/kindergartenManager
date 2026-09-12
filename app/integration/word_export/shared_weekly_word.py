@@ -133,7 +133,7 @@ def fill_document(
             if teaching
             else label
         )
-        table.cell(2, offset).text = item.activity_name if teaching else label
+        table.cell(2, offset).text = item.activity_name if teaching else ""
     table.cell(1, 0).merge(table.cell(2, 0)).text = "学习活动"
     table.cell(1, 1).text = "晨间谈话"
     table.cell(2, 1).text = "集体活动"

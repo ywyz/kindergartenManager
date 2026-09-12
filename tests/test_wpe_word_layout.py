@@ -71,7 +71,7 @@ def test_controlled_seed_fill_roundtrip_fixed_format(count):
     assert len(table.columns) == count + 2
     assert len(table.rows) == 9
     assert table.cell(1, 5).text == "中秋节放假"
-    assert table.cell(2, 5).text == "中秋节放假"
+    assert table.cell(2, 5).text == ""
     assert "《秋天》" in doc.paragraphs[1].text
     assert "甲老师、乙老师" in doc.paragraphs[2].text
     paragraphs = list(doc.paragraphs) + [
@@ -126,6 +126,7 @@ def test_consecutive_holiday_continuation_keeps_blank_cell():
         )
     )
     assert document.tables[0].cell(1, 5).text == "中秋节放假"
+    assert document.tables[0].cell(2, 5).text == ""
     assert document.tables[0].cell(1, 6).text == ""
     assert document.tables[0].cell(2, 6).text == ""
 
