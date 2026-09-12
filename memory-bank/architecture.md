@@ -552,3 +552,7 @@ WP-A 实现基线、契约与最短完整 Word 五／六列单页可行性完成
 ### 2026-09-11 WP-C完整协作续作历史指针
 
 本地分支feat/wp-c-complete-20260911补齐映射→逐日选源→差异采用→CAS保存→检查/重导入及人员默认；正式状态与SHA/双库/Review/RED覆盖缺项只见specs/weekly-plan-authoring/evidence/WP-C-complete-20260911.md。未push/发布/部署，未实施WP-D/E/F。管理员/教师分离与全局提示词分别登记#78/#79。
+
+### 2026-09-12 WP-E 本地续作指针
+
+填写/生成/保存/渲染缩减与导出实现及独立资格边界见 [WP-E本地契约](../specs/weekly-plan-authoring/WP-E-local-contract.md)。WP-C历史RED缺口保留；Word和外部门未关闭，不提前执行WP-F。

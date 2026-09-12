@@ -1,5 +1,9 @@
 > 2026-09-11 WP-D 已按用户授权进入实现：日期投影、显式 v3 正文、分项生成与确认/CAS 应用闭环已接线。最终范围、代码 SHA、验证与剩余门只以[当前状态](specs/weekly-plan-authoring/current-status.md)及[WP-D 矩阵](specs/weekly-plan-authoring/WP-D-completion-contract.md)为准。下方 WP-C / WP-D 未启动措辞为历史时点，不表示当前执行状态；WP-C 四项历史过程缺口仍未满足。
 
+## 2026-09-12 WP-E 本地续作
+
+Issue #77 的填写页面、保存版本单页检查、显式缩减与导出在隔离分支实现，见 [WP-E 本地契约](specs/weekly-plan-authoring/WP-E-local-contract.md)。用户明确允许 WP-C 四类历史 RED 缺口保持 UNMET 而继续 WP-E 本地工作；不改写 177/178 raw hash 历史。Word正式资格、远端CI/云端/真实模型仍独立未关闭；WP-E不是 COMPLETE，未进入 WP-F、无发布或 Issue 回写。
+
 > 2026-09-11 WP-C完整协作实现已接入生产composition：显式映射、逐日选源、差异采用、CAS来源快照、检查/重导入及人员默认。迁移head为b153c7e9f026；最终验证及尚缺门以[当前状态](specs/weekly-plan-authoring/current-status.md)和[本轮账本](specs/weekly-plan-authoring/evidence/WP-C-complete-20260911.md)为准。下方旧阶段记录保留历史语境。
 
 > 2026-09-11 当前周计划状态见[实时核对](specs/weekly-plan-authoring/current-status.md)：WP-A 已限定关闭，WP-C 授权/事实子步已本地交付、身份基线已公开；下方旧阶段记录不作当前阻塞。

@@ -1,5 +1,9 @@
 # 当前状态：2026-09-11 WP-D 本地授权范围完成
 
+## 2026-09-12 WP-E 用户授权后的本地实现
+
+用户对保留 WP-C 四类历史缺口 UNMET 而继续 WP-E 本地实现/隔离验证明确回复“授权”。冻结前置记录保持原历史状态，本轮实现与门矩阵见 [WP-E-local-contract.md](WP-E-local-contract.md)，最终 SHA/复审/证据以本轮交付清单为准。本文后续 WP-E“未执行”叙述是此前阶段快照。当前 WP-E 未完整关闭：正式 Word 资格及外部门无 PASS，不执行 WP-F。
+
 **WP-D本地实现与适用验证 COMPLETE；WP-C及#77整门未宣称PASS。** 用户允许证据差异查明后继续依赖实现，四类历史native双RED缺口仍未满足。原清单177/178 raw hash事实、JSON覆写时序及本轮保全证据见[账本](evidence/WP-D-20260911.md)。
 
 - worktree `/home/ywyz/code/km-wpd-authoring-20260911`，分支 `feat/wp-d-authoring-20260911`；tested_code_sha `258a9b0978e89397c90a4b7e271388d58b13b8d7`，文档后继为本文件所在docs提交。

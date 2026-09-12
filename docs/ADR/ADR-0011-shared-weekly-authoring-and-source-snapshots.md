@@ -168,3 +168,7 @@ WP-A 实现基线、契约与最短完整 Word 五／六列单页可行性完成
 ## 2026-09-11 WP-C完整协作实现补充
 
 本轮落实显式来源映射、逐日双方当前assignment授权、全部重复候选人工选择、内存差异/明确采用、同一版本CAS保存来源、检查/重导入及人员默认隔离。关闭正文采用weekly-collaboration.v2；仅存主题、人员、每日晨谈/名称和带source_field/target_path的室内外来源片段，固定游戏数量/AI仍属WP-D。旧weekly-theme.v1保持解析、hash和历史operation对账，进入v2须明确编辑流程；旧主题保存入口不能覆盖v2。默认姓名不是assignment；重复创建与打开均不改已有人员。数据库映射事件/来源/审计不可变，当前pointer可CAS重映射，原历史基线保留。精确实现/测试/Review门及限制见[完整账本](../../specs/weekly-plan-authoring/evidence/WP-C-complete-20260911.md)。
+
+## 2026-09-12 WP-E 本地实现说明
+
+[WP-E本地契约](../../specs/weekly-plan-authoring/WP-E-local-contract.md)承接本ADR：保存版本实际渲染，最多两轮显式缩减，无审核前置和隐式AI/保存。固定规则短写保护名称、引用、事实；规则不能收敛时交教师调整。新独立模板资格绑定当前受控模板与released active依赖，不能继承历史compact试排结论。Word主要客户端实际证据与云端门仍未满足，本说明不把WP-E标成COMPLETE。

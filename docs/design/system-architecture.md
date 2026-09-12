@@ -363,3 +363,7 @@ CI、人工验收、Issue 回写和 no-ff merge；旧 F009 人工结果没有被
 ## 2026-09-11 WP-C完整协作应用接线
 
 app.main启动production_composition，注册weekly、mapping和people三个应用服务；每次调用从当前UI session取得actor，服务器候选仅保留有界、短期内存状态。共享来源操作遵循User升序→class_semester→assignment升序→root→DailyPlan升序，MySQL READ COMMITTED/SQLite BEGIN IMMEDIATE；事务发布前重新检查session及任职截止。来源选择/差异采用不持锁等待用户，也不保存正文；save_edit才原子发布版本、字段来源和审计。完整填写UI、AI与正式导出仍在后续门。
+
+## WP-E 保存版本交付
+
+`/weekly-plan`经同一生产composition连接authoring/page/exporting/reduction，无第二套共享根/policy。保存前正文以v3 slot/schema为权威，候选采用只改页面。实际渲染在数据库事务外，最终模板binding guard与短事务重验actor/session/assignment、双CAS和本次live依赖。UI同时检查未flush输入epoch。详见 [本地契约](../../specs/weekly-plan-authoring/WP-E-local-contract.md)；正式Word/云端门仍未关闭。

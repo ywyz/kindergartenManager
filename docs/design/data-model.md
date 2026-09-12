@@ -345,3 +345,7 @@ W008 固定 SHA 的独立人工门闭合。
 从8d20f3b5c721依次迁移9e31a6c8d204→a042b6d8e915→b153c7e9f026。daily_plan_identity为显式来源当前指针，identity_mapping_event保留不可变映射基线；删除daily只清指针。shared_weekly_source按不可变version保存关闭字段路径、源身份/revision、mapping基线、原导入值/hash、采用hash与imported/manual来源方式，不随源删除。shared_weekly_source_audit用tenant/root/version复合FK保持归属。weekly_person_defaults为tenant/user/class的CAS设置，操作账只存revision/hash/outcome，不含姓名。weekly-collaboration.v2显式扩展主题、人员与按日来源片段，旧weekly-theme.v1历史不被打开或后台迁移改写。全部迁移仅在一次性库验证，未连接真实业务库。
 
 来源INSERT同时校验parent班级/学期与关闭目标日期路径；原导入基线可从predecessor来源完整沿用（采用hash/provenance允许手改），新基线则须匹配live DailyPlan和当前mapping的精确revision/字段值。源删除后仍允许已有基线在正常手工保存中延续，不能凭残留event新增伪造基线。
+
+## WP-E 无正文导出授权审计
+
+迁移 `d375e9012abc` 新增 `shared_weekly_export_audit`，关联tenant/actor/shared plan/version/class，记录授权revision、assignment摘要、operation/session及body/template hash；无正文/人员姓名/文件路径，非ExportRecord。禁止UPDATE/DELETE，非空拒绝降级。记录证明授权事务，不证明浏览器收件。`d375e9ab2148`登记weekly_reduction提示词任务，不重写旧版本；其非空提示词拒绝移除任务。详见 [WP-E契约](../../specs/weekly-plan-authoring/WP-E-local-contract.md)。
