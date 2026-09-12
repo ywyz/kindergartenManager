@@ -117,7 +117,7 @@ def fill_document(
         f"{last.year}年{last.month}月{last.day}日"
     )
     document.add_paragraph(
-        f"主题名称：《{theme}》    班级：{display.class_name}（{date_range}）"
+        f"主题名称：《{theme}》    班级：{display.class_name} 第{display.week_number}周（{date_range}）"
     )
     document.add_paragraph(
         f"教师：{'、'.join(body.people.teachers)}    保育员：{body.people.caregiver}"
