@@ -112,9 +112,10 @@ def fill_document(
     document.add_paragraph("幼儿园每周工作计划表")
     theme = body.theme.strip().strip("《》")
     first, last = body.calendar.columns[0][0], body.calendar.columns[-1][0]
+    end_year = f"{last.year}年" if last.year != first.year else ""
     date_range = (
         f"{first.year}年{first.month}月{first.day}日—"
-        f"{last.year}年{last.month}月{last.day}日"
+        f"{end_year}{last.month}月{last.day}日"
     )
     document.add_paragraph(
         f"主题名称：《{theme}》    班级：{display.class_name} 第{display.week_number}周（{date_range}）"

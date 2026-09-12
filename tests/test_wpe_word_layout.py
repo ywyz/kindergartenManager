@@ -267,7 +267,8 @@ def test_week_dates_follow_class_and_table_header_is_weekdays_only(count, start)
         SEED_PATH.read_bytes(), body, WeekDisplay("中四班", "第一学期", 3)
     )))
     first, last = days[0].day, days[-1].day
-    expected = f"班级：中四班 第3周（{first.year}年{first.month}月{first.day}日—{last.year}年{last.month}月{last.day}日）"
+    end_year = f"{last.year}年" if last.year != first.year else ""
+    expected = f"班级：中四班 第3周（{first.year}年{first.month}月{first.day}日—{end_year}{last.month}月{last.day}日）"
     assert expected in doc.paragraphs[1].text
     table = doc.tables[0]
     assert table.cell(0, 0).text == table.cell(0, 1).text == ""
