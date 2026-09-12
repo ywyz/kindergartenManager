@@ -1,0 +1,26 @@
+{
+  "wpe": {
+    "artifact_count": 829,
+    "code_count": 33,
+    "document_count": 13,
+    "manifest_sha256": "b0334a1bce754dcef39157eadca181353e625a4e50ee51f6a746a5f133cc5b2d",
+    "closure_sha256": "2202b860ba65765d05df01f3e444bff5ba53f765c2bb97edf20486781ab1c70c",
+    "errors": []
+  },
+  "wpd": {
+    "artifact_count": 318,
+    "code_count": 28,
+    "document_count": 16,
+    "manifest_sha256": "da6ae8f6328d85ecd9b066fa2d6bd8ffa3fbdc1f7f8c17aaa2c76be20ae9eb2a",
+    "closure_sha256": "26c478512918260a65f9306931e7ef9b0257731f08138356067d3b0731e17f76",
+    "errors": []
+  },
+  "preservation": {
+    "existing_worktrees": 14,
+    "errors": []
+  },
+  "code_tree_unchanged": true,
+  "tested_code_sha": "9cde71655c30cafdc6ac4e99ed22509ad989b121",
+  "documentation_successor_sha": "7c0acb9337534d0db60b9ff6d9e1abd09e382643",
+  "sole_alembic_head": "d375e9ab2148"
+}

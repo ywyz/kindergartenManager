@@ -1,0 +1,57 @@
+{
+  "role": "Main receipt compiled from this turn actual exec call; not pytest-generated metadata",
+  "cwd": "/home/ywyz/code/km-wpe-continuation-20260912",
+  "argv": [
+    "/home/ywyz/code/km-wpe-authoring-20260912/.venv/bin/python",
+    "-m",
+    "pytest",
+    "tests/test_wpc_people.py",
+    "tests/test_wpc_sources.py",
+    "tests/test_wpd_application.py",
+    "tests/test_wpd_application_matrix.py",
+    "tests/test_wpe_export_application.py",
+    "tests/test_wpe_migrations.py",
+    "tests/test_wpe_reduction_application.py",
+    "tests/test_wpe_reduction_rules.py",
+    "tests/test_wpe_render_pipeline.py",
+    "tests/test_wpe_ui_actual_renderer.py",
+    "tests/test_wpe_ui_callbacks.py",
+    "tests/test_wpe_ui_navigation.py",
+    "tests/test_wpe_word_authority.py",
+    "tests/test_wpe_word_layout.py",
+    "-q"
+  ],
+  "environment_set": {
+    "KINDERGARTEN_DATA_DIR": "/home/ywyz/km-wpe-continuation-runtime-20260912"
+  },
+  "environment_unset": [
+    "WPC_MYSQL_PORT",
+    "DATABASE_URL",
+    "ENCRYPTION_KEY",
+    "JWT_SECRET"
+  ],
+  "calendar_version_verified": "1.11.0",
+  "files_sha256": {
+    "tests/test_wpc_people.py": "b8e215fa2b10e3cff1a0776f55773c0910df077900b1ae655479d71fd37c086f",
+    "tests/test_wpc_sources.py": "e9eef2c4df79d21bddab9af9f2de0e55a6bb3fb8b47ce55768540d1311ba0748",
+    "tests/test_wpd_application.py": "d56501d0c8548ea60422811ad394e330a89c61227efe1fdddb70b038f2837050",
+    "tests/test_wpd_application_matrix.py": "65318397f9c3ef34d895aa0e1ba4891554be5b720994d9c3c447e46ac2695fb4",
+    "tests/test_wpe_export_application.py": "60ef0e49ee49254c5257048a2e6e34cb9db38e49f19c03fd09e6c2689562e53a",
+    "tests/test_wpe_migrations.py": "4b37e896c7aa16eff8a0c0108b82e30727a09ed28374bdded260411580a3a3b3",
+    "tests/test_wpe_reduction_application.py": "6782ce0a4bc822da40d39948ebab64f82e3305098a7d57c930ebab4bfb95e46d",
+    "tests/test_wpe_reduction_rules.py": "662f915b01ad16f1c20eff954750567f3eb53b0673d4466b66b0a269a7b20b59",
+    "tests/test_wpe_render_pipeline.py": "2cab89d491ff67dffa26c1ee2bb92f43c6d0af3eb5d3b706130bf4a49b107f48",
+    "tests/test_wpe_ui_actual_renderer.py": "2e4ddc2cb61dcd97856298c2b5c2359c0ccdb90a927efbe977ddefe9da33b9c1",
+    "tests/test_wpe_ui_callbacks.py": "b3f70d3c64e02b86685c387dc17922e0f85ac95aa7b751d9b6f3975805910b00",
+    "tests/test_wpe_ui_navigation.py": "ecf148ba2e55ba733e370bf85cb8ed4f3798c2661fa48fa30003d04830fb8d63",
+    "tests/test_wpe_word_authority.py": "aa336b000b979c4c914212fa89f3cdc7a0d977e6abd966f9fe3bfb37c6707bb8",
+    "tests/test_wpe_word_layout.py": "7b15b14fe5c5dabd07a09c80fdfa937a79406d9bd2c00b5841cdf0aff18000bf"
+  },
+  "exit_code": 0,
+  "log_sha256": "244412341f34e061cc95520a3a6c678d0630ff7e75f2cfd7c736fc373299f8a0",
+  "checks": {
+    "lint_log_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "format_log_sha256": "3cbc764509f46afb88053c5d0216718d29af883ed4a6216db2de94a84f3fa1bc",
+    "diff_and_head_receipt": "checks.json"
+  }
+}

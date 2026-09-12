@@ -1,0 +1,47 @@
+{
+  "reviewer": "reduction_impl",
+  "role": "independent read-only review of Main-owned export repository, migration, composition and pipeline",
+  "files": {
+    "app/repository/weekly_export_repository.py": "5a1ed5b48ca58dd3bca2f94eca229ed5f30a115a86e69997831176b3d823f239",
+    "alembic/versions/d375e9012abc_shared_weekly_export_audit.py": "1562ba4b8171494bcd7d5c254866a05d2bc455ab7385f7ae921b222235c74b97",
+    "app/service/shared_weekly/production_composition.py": "f1cb994c7b71b9c956fb06c4698b7c2bd2190fe012ce98a5aa0340d91a510177",
+    "app/service/shared_weekly/export_application.py": "2c23ea36797d6cbf18d30b0b721f7572e6edd7bc0c5205ebb5854bf479078d02",
+    "tests/test_wpe_export_application.py": "60ef0e49ee49254c5257048a2e6e34cb9db38e49f19c03fd09e6c2689562e53a",
+    "tests/test_wpe_render_pipeline.py": "2cab89d491ff67dffa26c1ee2bb92f43c6d0af3eb5d3b706130bf4a49b107f48",
+    "tests/test_wpe_migrations.py": "4b37e896c7aa16eff8a0c0108b82e30727a09ed28374bdded260411580a3a3b3",
+    "specs/agent-foundation/tests/test_f009_zero_persistence_matrix_red.py": "c144333d65e1900ff6ed85f82139a0465cdfcaf351896270951850c355a043ba"
+  },
+  "evidence": {
+    "delivery-green": {
+      "recorded_exit_code": 0,
+      "mysql_port": null,
+      "log_sha256": "7f382deac155f79fe851f2ee49963d28b2c41e5b305c187f0911a5bc2a8b1742",
+      "matches_recorded": true
+    },
+    "export-migration-mysql": {
+      "recorded_exit_code": 1,
+      "mysql_port": "32772",
+      "log_sha256": "324353907c407c4d6e49da16eedba91e2ee621ef17a78bb75d802fa55d813f90",
+      "matches_recorded": true
+    },
+    "migration-mysql-retry": {
+      "recorded_exit_code": 0,
+      "mysql_port": "32772",
+      "log_sha256": "cb5f091db02ded4550413f802290d0bbaf13f1a3eed310d0f61197ec9455497d",
+      "matches_recorded": true
+    },
+    "actual-pipeline-chinese": {
+      "recorded_exit_code": 1,
+      "mysql_port": null,
+      "log_sha256": "ab8e71be65bd71c4a60dc541b1f84d113ad3784922571dffd99a4050fa5c6e44",
+      "matches_recorded": true
+    }
+  },
+  "new_findings": [],
+  "foundation_compatibility_review": {
+    "changed_lines": 3,
+    "classification": "test compatibility update, not native business RED",
+    "finding_count": 0,
+    "checks": "exact NON_AGENT name whitelist; explicit existence and empty rows after restart; all-table reflection and side-effect snapshots unchanged; no production Agent permissions changed"
+  }
+}

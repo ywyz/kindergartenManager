@@ -1,0 +1,18 @@
+{
+  "tested_code_sha": "9cde71655c30cafdc6ac4e99ed22509ad989b121",
+  "documentation_successor_sha": "7c0acb9337534d0db60b9ff6d9e1abd09e382643",
+  "local_chain": {
+    "passed": 170,
+    "warnings": 12,
+    "exit_code": 0,
+    "log_sha256": "244412341f34e061cc95520a3a6c678d0630ff7e75f2cfd7c736fc373299f8a0",
+    "role": "Main current isolated SQLite/application/LO verification; not full regression/MySQL/Word/cloud"
+  },
+  "initial_attempts": {
+    "local-chain.log": "environment error: insecure data-dir ancestor; not business RED",
+    "local-chain-retry.log": "missing calendar package and isolated fonts; 138 failed/32 passed; not business RED"
+  },
+  "source_changes": false,
+  "report_sha256": "206ecbcee17e5113d1aed76e9f793e979ab9e85c2aa78224f5140985b2b003be",
+  "status": "WP-E BLOCKED; WP-F NOT_RUN"
+}

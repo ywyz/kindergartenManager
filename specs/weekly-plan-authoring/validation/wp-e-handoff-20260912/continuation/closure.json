@@ -1,0 +1,12 @@
+{
+  "status": "WP-E BLOCKED / NOT COMPLETE",
+  "tested_code_sha": "9cde71655c30cafdc6ac4e99ed22509ad989b121",
+  "source_unchanged": true,
+  "documentation_successor_sha": "7c0acb9337534d0db60b9ff6d9e1abd09e382643",
+  "new_report_uncommitted": "/home/ywyz/code/km-wpe-continuation-20260912/specs/weekly-plan-authoring/evidence/WP-E-continuation-20260912.md",
+  "report_sha256": "206ecbcee17e5113d1aed76e9f793e979ab9e85c2aa78224f5140985b2b003be",
+  "artifact_manifest_sha256": "4f7118a0b04103a6f2a1f56d86d20b8f5e4feea3400db2518bdb6a107f79ea8d",
+  "artifacts": 19,
+  "remote_actions": "none",
+  "WP_F": "NOT_RUN"
+}

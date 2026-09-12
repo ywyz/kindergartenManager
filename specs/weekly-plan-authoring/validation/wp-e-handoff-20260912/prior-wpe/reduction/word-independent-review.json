@@ -1,0 +1,12 @@
+{
+  "args": [
+    "/home/ywyz/code/km-wpe-authoring-20260912/.venv/bin/python",
+    "-c",
+    "import os; from app.core.config import settings; os.environ.pop(\"KINDERGARTEN_DATA_DIR\", None); import pytest; raise SystemExit(pytest.main(['tests/test_wpe_word_layout.py', 'tests/test_wpe_word_authority.py', '-q']))"
+  ],
+  "exit_code": 0,
+  "elapsed": 8.829283269005828,
+  "mysql_port": null,
+  "head": "3fcefdf08a4b6aa6d3d7d5eb674cac2fce180713",
+  "log_sha256": "dbc06f41e525a699076a1b53ac09eda498210df85023cc37eb8f30a7e5859b20"
+}
