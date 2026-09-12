@@ -2,6 +2,8 @@
 
 ## 2026-09-12 WP-E 用户授权后的本地实现
 
+用户明确采用四份长文去重方案后，已另存本地验收文件并完成原生八页重检，四份仍两页 FAIL；见 [去重重检记录](evidence/WP-E-dedup-recheck-20260912.md)。此为合成材料手改采用及文件保存，不是产品数据库保存或自动缩减链通过，WP-E 仍 BLOCKED。
+
 本地 Windows 续作最新原生 Word 观察见 [2026-09-12 原生账本](evidence/WP-E-native-Word-20260912.md)：产品 `0bded3377c01956833bcbb6cd306f9a7f5d924e1` 八份新候选全部页已观察，四份正常各一页、四份长文各两页（单页 FAIL）；详细格式矩阵仍 PARTIAL。正式资格和 WP-E 总门仍 BLOCKED，不执行 WP-F。旧批次/历史结果不改写。
 
 用户对保留 WP-C 四类历史缺口 UNMET 而继续 WP-E 本地实现/隔离验证明确回复“授权”。冻结前置记录保持原历史状态，本轮实现与门矩阵见 [WP-E-local-contract.md](WP-E-local-contract.md)，最终 SHA/复审/证据以本轮交付清单为准。本文后续 WP-E“未执行”叙述是此前阶段快照。当前 WP-E 未完整关闭：正式 Word 资格及外部门无 PASS，不执行 WP-F。
