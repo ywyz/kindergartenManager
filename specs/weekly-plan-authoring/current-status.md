@@ -1,6 +1,12 @@
-# 当前状态：2026-09-13 WP-E Windows候选格式补验完成，整体仍未关闭
+# 当前状态：2026-09-13 WP-E Ubuntu质量修复本地通过，整体仍OPEN/BLOCKED
 
-2026-09-13：四份正常五／六列已完成当前产品 `0bded3377c01956833bcbb6cd306f9a7f5d924e1` / Microsoft365 Word2608客户端下的候选格式验收及独立复审。原始4长文和已采用4去重长文仍各2页、单页FAIL；正式released/catalog资格、应用页面与外部门未关闭，WP-C四类历史native双RED仍UNMET，WP-F未执行。
+本轮代码SHA `0b3656c919ddfe6f09db4ed0aa0732a828727a5c`。用户确认 weekplan 内容无问题，五/六列排版交由 Python，内置模板不改；本轮模板hash保持。浏览器与两库、mock与真实AI、LO与Word、默认拒绝与合成资格下载分别记账。
+原44项质量修复与真实渲染缺陷已通过本地复验及独立审查；普通1762通过/1跳过、Foundation261、WRITE267。十二候选输入不变重新生成，四正常LO1页、八长文LO2页。真实本地浏览器已验证默认拒绝、五/六列下载及来源/生成/保存/冲突；新合成长文采用待用户答复；新代码Word及正式资格、外部门未关闭。见[Ubuntu本轮报告](evidence/WP-E-Ubuntu-quality-acceptance-20260913.md)。
+
+## 先前Windows候选格式观察（保留时点）
+
+
+2026-09-13：四份正常五／六列已完成历史产品 `0bded3377c01956833bcbb6cd306f9a7f5d924e1` / Microsoft365 Word2608客户端下的候选格式验收及独立复审。原始4长文和已采用4去重长文仍各2页、单页FAIL；正式released/catalog资格、应用页面与外部门未关闭，WP-C四类历史native双RED仍UNMET，WP-F未执行。
 
 [原生报告](evidence/WP-E-native-Word-20260913.md) · [Ubuntu交接](WP-E-Ubuntu-handoff-20260913.md)。下方2026-09-12格式PARTIAL为历史快照，已由本轮逐件补证闭合；不改写原始历史清单或长文FAIL。
 
