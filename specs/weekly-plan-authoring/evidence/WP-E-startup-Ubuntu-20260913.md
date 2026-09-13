@@ -1,6 +1,6 @@
 # WP-E Ubuntu 资格启动与 Windows 交接阶段一
 
-状态：执行中。阶段二 Windows 原生复验和阶段三返回材料资格审查尚未执行；不预写 PASS。WP-E 仍 OPEN/BLOCKED，WP-F 未执行。
+状态：阶段一本地代码、测试和候选已完成；合成长文采用决定仍待用户。阶段二 Windows 原生复验和阶段三返回材料资格审查尚未执行；不预写 PASS。WP-E 仍 OPEN/BLOCKED，WP-F 未执行。
 
 ## 基线与保护
 
@@ -43,3 +43,21 @@ OpenCode 按逐轮任务书、绝对路径、明确权限、`--pure`、JSON 事�
 Quality workflow固定基础runner为Ubuntu24.04，并从其公开APT源安装`libreoffice-writer/poppler-utils/fontconfig`、输出实际包与工具版本；测试前明确检查SimSun，缺失即失败，不跳过真实渲染测试。已通过本地YAML解析和各run段`bash -n`、本机字体前置核验。未执行远端job；公开APT源更新未冻结为历史快照，不声称其版本或渲染结果等同本机。runner合法宋体供应仍是未解决前置条件。
 
 来源：[Ubuntu LO包](https://packages.ubuntu.com/noble/libreoffice-writer)、[Ubuntu Poppler包](https://packages.ubuntu.com/noble/poppler-utils)、[Microsoft字体再分发说明](https://learn.microsoft.com/en-us/typography/fonts/font-faq)。字体文件不进入仓库、Git bundle或交接包。
+
+## 本轮冻结与十二候选
+
+- 分支：`codex/wp-e-startup-handoff-20260913`（仅本地，未push）。
+- tested_code_sha：`2c310b7f170c8cc509e0c9ddcb8d8c0a2322c427`。冻结时工作树干净，最终全量运行前记录的七份产品/辅助脚本/测试源hash与提交逐一匹配。
+- 独立启动复审23+8+1项通过，交接验证器15项通过；交接helper的路径、额外文件/目录、FIFO、symlink、case/role/NOT_RUN语义和可信hash校验已独立复审，无代码阻断。CI配置另经独立只读复审。复审范围和文件hash见外部记录。
+- 从该冻结代码重新生成4正常+4原长文+4已采用去重长文；十二份输入正文逐字节与旧源一致，十二份DOCX的全部ZIP内部成员字节亦一致，新的DOCX容器hash逐件另记，不继承旧Word PASS。
+- 实际LO辅助观察：4正常各1页、8长文各2页，长文均`layout_overflow`，未缩字号/行距/删内容。新增浏览器合成样例另列`browser-evidence`，未混入十二历史候选。
+- 候选manifest SHA256：`175ae794759a220f890e2a9e8fa30ff36590ef2166706dbc6ac8697574704c42`；当前便携验证器已实际核验。候选目录为外部证据下`word-revalidation-candidates`。
+- 源码恢复先实测从前置基线`101aedc08982521216e018692afb58ac0df1d91f`的全新隔离仓库导入`tested-source.bundle`，恢复tested SHA、七份源hash和干净状态均匹配。最终文档后继随`source.bundle`另行记录，不用孤立SHA冒充源码交接。
+
+文档提交是tested代码的独立后继；完整evidence_closure_sha、最终bundle/交付manifest/ZIP hash在独立交付清单中记录，以避免文档自含自己的提交hash。最终包逐件完整性和恢复实测属于外部封包证据，不能替代Windows观察。Windows按[操作说明](../WP-E-Windows-startup-handoff-20260913.md)从仓库/bundle拉取分支，绝不临场修改产品/schema。当前17原生观察字段和两fixture规则已按当前资格校验器提取，Word PDF与runtime LO PDF单独命名绑定，报告保持NOT_RUN。
+
+## 真正剩余项
+
+合成长文26字段提案尚未获得明确采用/拒绝：未采用、未显式保存、未下载；采用后的真实页面分支未执行，不能记PASS。候选TTL只按正常入口处理，不重启服务或重建状态绕过计数；有实质新差异必须重新确认。浏览器已有周期请求及失败计数保留。
+
+Windows阶段二、返回材料资格审查阶段三、新tested SHA的Word原生观察、正式资格材料和安装均未执行。当前v1自动绑定LO产品/版本、profile/template/released；Poppler/字体二进制hash仅随附旁证，扩展强绑定需另行契约决策。远端CI和合法runner宋体供应未闭合。四个历史锁文件仍MISSING，WP-C四类历史native双RED仍UNMET。WP-E整体仍OPEN/BLOCKED；不进入WP-F。

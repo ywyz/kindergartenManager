@@ -1,4 +1,4 @@
-> 2026-09-13 WP-E阶段一后继正在执行：普通启动的受控资格接入已完成本地双RED→GREEN；当前合成长文候选已重新从真实页面请求，等待明确采用或拒绝。Windows复验交接正在准备，阶段二/三NOT_RUN，正式资格未安装，WP-F未执行。精确当前证据见[本轮账本](specs/weekly-plan-authoring/evidence/WP-E-startup-Ubuntu-20260913.md)。以下前轮记录保留历史时点。
+> 2026-09-13 WP-E阶段一本地代码与候选已冻结：普通启动的受控资格接入已完成本地双RED→GREEN；当前合成长文候选已重新从真实页面请求，等待明确采用或拒绝。普通全量1800通过/1跳过；代码SHA `2c310b7f170c8cc509e0c9ddcb8d8c0a2322c427`，十二候选已重新生成（4正常LO1页、8长文LO2页）。可恢复源码bundle从明确基线已实测恢复；Windows交接使用本地仓库分支，未push，阶段二/三NOT_RUN，正式资格未安装，WP-F未执行。精确当前证据见[本轮账本](specs/weekly-plan-authoring/evidence/WP-E-startup-Ubuntu-20260913.md)。以下前轮记录保留历史时点。
 
 > 2026-09-13 Ubuntu续作：原Quality44项已本地修复；实际1页被标题描边误判的渲染缺陷完成两库双RED→GREEN与独立复审。普通1762通过/1跳过、Foundation261、WRITE267；本地页面已验证默认拒绝、五/六列下载及来源/生成/保存/冲突；新合成长文采用待用户答复。正式资格、新SHA原生Word和外部门未关闭，WP-E仍OPEN/BLOCKED，WP-C四类历史native双RED仍UNMET，WP-F未执行。见[本轮报告](specs/weekly-plan-authoring/evidence/WP-E-Ubuntu-quality-acceptance-20260913.md)。
 
