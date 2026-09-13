@@ -1,3 +1,11 @@
+# 当前状态：2026-09-13 WP-E Windows候选格式补验完成，整体仍未关闭
+
+2026-09-13：四份正常五／六列已完成当前产品 `0bded3377c01956833bcbb6cd306f9a7f5d924e1` / Microsoft365 Word2608客户端下的候选格式验收及独立复审。原始4长文和已采用4去重长文仍各2页、单页FAIL；正式released/catalog资格、应用页面与外部门未关闭，WP-C四类历史native双RED仍UNMET，WP-F未执行。
+
+[原生报告](evidence/WP-E-native-Word-20260913.md) · [Ubuntu交接](WP-E-Ubuntu-handoff-20260913.md)。下方2026-09-12格式PARTIAL为历史快照，已由本轮逐件补证闭合；不改写原始历史清单或长文FAIL。
+
+---
+
 # 当前状态：2026-09-11 WP-D 本地授权范围完成
 
 ## 2026-09-12 WP-E 用户授权后的本地实现

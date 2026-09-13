@@ -1,3 +1,5 @@
+> 2026-09-13：四份正常五／六列已完成当前产品 `0bded3377c01956833bcbb6cd306f9a7f5d924e1` / Microsoft365 Word2608客户端下的候选格式验收及独立复审。原始4长文和已采用4去重长文仍各2页、单页FAIL；正式released/catalog资格、应用页面与外部门未关闭，WP-C四类历史native双RED仍UNMET，WP-F未执行。 见[Ubuntu交接报告](../specs/weekly-plan-authoring/WP-E-Ubuntu-handoff-20260913.md)。
+
 > 2026-09-11 WP-D 已按用户授权进入实现：日期投影、显式 v3 正文、分项生成与确认/CAS 应用闭环已接线。最终范围、代码 SHA、验证与剩余门只以[当前状态](../specs/weekly-plan-authoring/current-status.md)及[WP-D 矩阵](../specs/weekly-plan-authoring/WP-D-completion-contract.md)为准。下方 WP-C / WP-D 未启动措辞为历史时点，不表示当前执行状态；WP-C 四项历史过程缺口仍未满足。
 
 ## 2026-09-12 Issue #77 WP-E 本地续作

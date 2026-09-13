@@ -556,3 +556,8 @@ WP-A 实现基线、契约与最短完整 Word 五／六列单页可行性完成
 ### 2026-09-12 WP-E 本地续作指针
 
 填写/生成/保存/渲染缩减与导出实现及独立资格边界见 [WP-E本地契约](../specs/weekly-plan-authoring/WP-E-local-contract.md)。WP-C历史RED缺口保留；Word和外部门未关闭，不提前执行WP-F。
+
+
+## 2026-09-13 WP-E Windows验收交接指针
+
+2026-09-13：四份正常五／六列已完成当前产品 `0bded3377c01956833bcbb6cd306f9a7f5d924e1` / Microsoft365 Word2608客户端下的候选格式验收及独立复审。原始4长文和已采用4去重长文仍各2页、单页FAIL；正式released/catalog资格、应用页面与外部门未关闭，WP-C四类历史native双RED仍UNMET，WP-F未执行。 未变更架构、schema或产品Agent能力；详见[交接报告](../specs/weekly-plan-authoring/WP-E-Ubuntu-handoff-20260913.md)。

@@ -1,0 +1,488 @@
+{
+  "created_utc": "2026-09-13T05:15:27.162079+00:00",
+  "scope": "Candidate format acceptance only; formal released qualification not verified",
+  "normal_cases": [
+    {
+      "id": "five-normal",
+      "tested_code_sha": "0bded3377c01956833bcbb6cd306f9a7f5d924e1",
+      "client": {
+        "observed_utc": "2026-09-13T03:34:38.312Z",
+        "os": {
+          "source": "Windows registry current read",
+          "product": "Windows Server 2025 Datacenter",
+          "version": "24H2",
+          "build": "26100.32860"
+        },
+        "account": {
+          "source": "native Word account accessibility observed this turn",
+          "product": "Microsoft 365",
+          "version": "2608",
+          "build": "20326.20132",
+          "channel": "当前频道"
+        },
+        "about": {
+          "source": "native Word About accessibility observed this turn",
+          "product": "Microsoft Word 适用于 Microsoft 365 MSO",
+          "version": "2608",
+          "build": "16.0.20326.20072",
+          "architecture": "64位"
+        }
+      },
+      "renderer_sha256": "6186fd0bc62ca8a31af2236645d22d07e7fbe8ee4a53069181b78638ba0240f7",
+      "seed_sha256": "f6c17c137f04e29a68524ed400eb395984e93a16c234a065b5794d9f49a9347b",
+      "input": "C:\\Users\\admin\\.codex\\visualizations\\2026\\09\\12\\01a0937c-3f64-7ce2-98f9-fecd1934901c\\wp-e-header-week-20260912\\candidates-final\\five-normal.body.json",
+      "input_sha256": "81c866806c163831c17a550555b36b834824ce5a119b41d3718f6169e8f074c5",
+      "output_original": "C:\\Users\\admin\\.codex\\visualizations\\2026\\09\\12\\01a0937c-3f64-7ce2-98f9-fecd1934901c\\wp-e-header-week-20260912\\candidates-final\\five-normal.docx",
+      "output_sha256": "19da43b55d21e8afe274910890cdad8d1a72dd443b3f1617ae866eaf0840ab64",
+      "original_unchanged": true,
+      "native_page_count": 1,
+      "native_a4_portrait": "PASS",
+      "body_font": "PASS: 宋体12pt常规",
+      "title_font": "PASS: 宋体16pt加粗",
+      "visible_text_paragraph_spacing": "PASS: fixed20pt via per-file grouped native selections",
+      "blank_and_merged_structure": "Not asserted to be uniformly20pt; see report selection scope and mixed-spacing qualification",
+      "content_counts_dates_whitespace_holidays": "PASS",
+      "all_page_text_and_boundaries": "PASS",
+      "result": "PASS_CANDIDATE_FORMAT_CURRENT_SHA_CLIENT_ONLY",
+      "native_evidence": [
+        "five-normal-area-selection.json",
+        "five-normal-area-spacing-20.json",
+        "five-normal-body-font.json",
+        "five-normal-body-selection.json",
+        "five-normal-body-spacing-mixed.json",
+        "five-normal-game-label-selection.json",
+        "five-normal-game-label-spacing-20.json",
+        "five-normal-print-bottom-fullwidth-100.json",
+        "five-normal-print-bottom-left-100.json",
+        "five-normal-print-bottom-left-175.json",
+        "five-normal-print-bottom-right-100.json",
+        "five-normal-print-bottom-right-175.json",
+        "five-normal-print-full-50.json",
+        "five-normal-print-middle-left-100.json",
+        "five-normal-print-middle-left-175.json",
+        "five-normal-print-middle-right-100.json",
+        "five-normal-print-middle-right-175.json",
+        "five-normal-print-top-fullwidth-100.json",
+        "five-normal-print-top-left-100.json",
+        "five-normal-print-top-left-175.json",
+        "five-normal-print-top-right-100.json",
+        "five-normal-print-top-right-175.json",
+        "five-normal-range-a-selection.json",
+        "five-normal-range-a-spacing-20.json",
+        "five-normal-range-b-selection.json",
+        "five-normal-range-b-spacing-20.json",
+        "five-normal-range-c-selection.json",
+        "five-normal-range-c-spacing-20.json",
+        "five-normal-summary-labels-selection.json",
+        "five-normal-summary-labels-spacing-20-resumed.json",
+        "five-normal-terminal-empty-position.json",
+        "five-normal-terminal-empty-spacing-single.json",
+        "five-normal-title-font.json",
+        "five-normal-title-selection.json"
+      ],
+      "independent_reviews": [
+        "review-five-normal-supplement.md",
+        "review-five-normal.md"
+      ]
+    },
+    {
+      "id": "five-holiday",
+      "tested_code_sha": "0bded3377c01956833bcbb6cd306f9a7f5d924e1",
+      "client": {
+        "observed_utc": "2026-09-13T03:34:38.312Z",
+        "os": {
+          "source": "Windows registry current read",
+          "product": "Windows Server 2025 Datacenter",
+          "version": "24H2",
+          "build": "26100.32860"
+        },
+        "account": {
+          "source": "native Word account accessibility observed this turn",
+          "product": "Microsoft 365",
+          "version": "2608",
+          "build": "20326.20132",
+          "channel": "当前频道"
+        },
+        "about": {
+          "source": "native Word About accessibility observed this turn",
+          "product": "Microsoft Word 适用于 Microsoft 365 MSO",
+          "version": "2608",
+          "build": "16.0.20326.20072",
+          "architecture": "64位"
+        }
+      },
+      "renderer_sha256": "6186fd0bc62ca8a31af2236645d22d07e7fbe8ee4a53069181b78638ba0240f7",
+      "seed_sha256": "f6c17c137f04e29a68524ed400eb395984e93a16c234a065b5794d9f49a9347b",
+      "input": "C:\\Users\\admin\\.codex\\visualizations\\2026\\09\\12\\01a0937c-3f64-7ce2-98f9-fecd1934901c\\wp-e-header-week-20260912\\candidates-final\\five-holiday.body.json",
+      "input_sha256": "42103c88a827956e6a2cd6bf726b6cac24962c213d74c5e3632a77af04691f76",
+      "output_original": "C:\\Users\\admin\\.codex\\visualizations\\2026\\09\\12\\01a0937c-3f64-7ce2-98f9-fecd1934901c\\wp-e-header-week-20260912\\candidates-final\\five-holiday.docx",
+      "output_sha256": "50d692e955d4b7e8f0c0ff0defb2e9a88867740674e2de879bfd269717bfed26",
+      "original_unchanged": true,
+      "native_page_count": 1,
+      "native_a4_portrait": "PASS",
+      "body_font": "PASS: 宋体12pt常规",
+      "title_font": "PASS: 宋体16pt加粗",
+      "visible_text_paragraph_spacing": "PASS: fixed20pt via per-file grouped native selections",
+      "blank_and_merged_structure": "Not asserted to be uniformly20pt; see report selection scope and mixed-spacing qualification",
+      "content_counts_dates_whitespace_holidays": "PASS",
+      "all_page_text_and_boundaries": "PASS",
+      "result": "PASS_CANDIDATE_FORMAT_CURRENT_SHA_CLIENT_ONLY",
+      "native_evidence": [
+        "five-holiday-area-all-selection.json",
+        "five-holiday-area-all-spacing.json",
+        "five-holiday-body-excluding-terminal-selection.json",
+        "five-holiday-body-excluding-terminal-spacing.json",
+        "five-holiday-body-font.json",
+        "five-holiday-body-selection.json",
+        "five-holiday-game-label-selection.json",
+        "five-holiday-game-label-spacing.json",
+        "five-holiday-middle-selection.json",
+        "five-holiday-middle-spacing.json",
+        "five-holiday-print-bottom-right-150.json",
+        "five-holiday-print-middle-150.json",
+        "five-holiday-print-middle-right-150.json",
+        "five-holiday-print-overview.json",
+        "five-holiday-print-top-150.json",
+        "five-holiday-print-top-right-150.json",
+        "five-holiday-summary-all-selection.json",
+        "five-holiday-summary-all-spacing.json",
+        "five-holiday-title-font-warning.json",
+        "five-holiday-title-font.json",
+        "five-holiday-title-selection.json",
+        "five-holiday-top-selection.json",
+        "five-holiday-top-spacing.json"
+      ],
+      "independent_reviews": [
+        "review-five-holiday.md"
+      ]
+    },
+    {
+      "id": "six-sunday-normal",
+      "tested_code_sha": "0bded3377c01956833bcbb6cd306f9a7f5d924e1",
+      "client": {
+        "observed_utc": "2026-09-13T03:34:38.312Z",
+        "os": {
+          "source": "Windows registry current read",
+          "product": "Windows Server 2025 Datacenter",
+          "version": "24H2",
+          "build": "26100.32860"
+        },
+        "account": {
+          "source": "native Word account accessibility observed this turn",
+          "product": "Microsoft 365",
+          "version": "2608",
+          "build": "20326.20132",
+          "channel": "当前频道"
+        },
+        "about": {
+          "source": "native Word About accessibility observed this turn",
+          "product": "Microsoft Word 适用于 Microsoft 365 MSO",
+          "version": "2608",
+          "build": "16.0.20326.20072",
+          "architecture": "64位"
+        }
+      },
+      "renderer_sha256": "6186fd0bc62ca8a31af2236645d22d07e7fbe8ee4a53069181b78638ba0240f7",
+      "seed_sha256": "f6c17c137f04e29a68524ed400eb395984e93a16c234a065b5794d9f49a9347b",
+      "input": "C:\\Users\\admin\\.codex\\visualizations\\2026\\09\\12\\01a0937c-3f64-7ce2-98f9-fecd1934901c\\wp-e-header-week-20260912\\candidates-final\\six-sunday-normal.body.json",
+      "input_sha256": "bf3adfb31c368dd9eed494daddb00ee82c2975880c36750bb1e836d0e554c180",
+      "output_original": "C:\\Users\\admin\\.codex\\visualizations\\2026\\09\\12\\01a0937c-3f64-7ce2-98f9-fecd1934901c\\wp-e-header-week-20260912\\candidates-final\\six-sunday-normal.docx",
+      "output_sha256": "6cef09c56b9075dbdb617676132b3267c12634d9fbecb5db43a0a73cdb0a539f",
+      "original_unchanged": true,
+      "native_page_count": 1,
+      "native_a4_portrait": "PASS",
+      "body_font": "PASS: 宋体12pt常规",
+      "title_font": "PASS: 宋体16pt加粗",
+      "visible_text_paragraph_spacing": "PASS: fixed20pt via per-file grouped native selections",
+      "blank_and_merged_structure": "Not asserted to be uniformly20pt; see report selection scope and mixed-spacing qualification",
+      "content_counts_dates_whitespace_holidays": "PASS",
+      "all_page_text_and_boundaries": "PASS",
+      "result": "PASS_CANDIDATE_FORMAT_CURRENT_SHA_CLIENT_ONLY",
+      "native_evidence": [
+        "six-sunday-normal-area-all-selection.json",
+        "six-sunday-normal-area-all-spacing.json",
+        "six-sunday-normal-body-font.json",
+        "six-sunday-normal-body-selection.json",
+        "six-sunday-normal-game-label-selection.json",
+        "six-sunday-normal-game-label-spacing.json",
+        "six-sunday-normal-middle-selection.json",
+        "six-sunday-normal-middle-spacing.json",
+        "six-sunday-normal-print-bottom-right-150.json",
+        "six-sunday-normal-print-guidance-shifted-175.json",
+        "six-sunday-normal-print-lower-125.json",
+        "six-sunday-normal-print-lower-left-175.json",
+        "six-sunday-normal-print-lower-right-175.json",
+        "six-sunday-normal-print-middle-right-150.json",
+        "six-sunday-normal-print-overview.json",
+        "six-sunday-normal-print-top-150.json",
+        "six-sunday-normal-print-top-175.json",
+        "six-sunday-normal-print-top-right-150.json",
+        "six-sunday-normal-summary-all-selection.json",
+        "six-sunday-normal-summary-all-spacing.json",
+        "six-sunday-normal-title-font.json",
+        "six-sunday-normal-title-selection.json",
+        "six-sunday-normal-top-selection.json",
+        "six-sunday-normal-top-spacing.json"
+      ],
+      "independent_reviews": [
+        "review-six-sunday-normal-supplement.md",
+        "review-six-sunday-normal.md"
+      ]
+    },
+    {
+      "id": "six-saturday-normal",
+      "tested_code_sha": "0bded3377c01956833bcbb6cd306f9a7f5d924e1",
+      "client": {
+        "observed_utc": "2026-09-13T03:34:38.312Z",
+        "os": {
+          "source": "Windows registry current read",
+          "product": "Windows Server 2025 Datacenter",
+          "version": "24H2",
+          "build": "26100.32860"
+        },
+        "account": {
+          "source": "native Word account accessibility observed this turn",
+          "product": "Microsoft 365",
+          "version": "2608",
+          "build": "20326.20132",
+          "channel": "当前频道"
+        },
+        "about": {
+          "source": "native Word About accessibility observed this turn",
+          "product": "Microsoft Word 适用于 Microsoft 365 MSO",
+          "version": "2608",
+          "build": "16.0.20326.20072",
+          "architecture": "64位"
+        }
+      },
+      "renderer_sha256": "6186fd0bc62ca8a31af2236645d22d07e7fbe8ee4a53069181b78638ba0240f7",
+      "seed_sha256": "f6c17c137f04e29a68524ed400eb395984e93a16c234a065b5794d9f49a9347b",
+      "input": "C:\\Users\\admin\\.codex\\visualizations\\2026\\09\\12\\01a0937c-3f64-7ce2-98f9-fecd1934901c\\wp-e-header-week-20260912\\candidates-final\\six-saturday-normal.body.json",
+      "input_sha256": "13b1fc519b55479d12fb21addf6746270fa3f2c695177b4d74686b7e661be02e",
+      "output_original": "C:\\Users\\admin\\.codex\\visualizations\\2026\\09\\12\\01a0937c-3f64-7ce2-98f9-fecd1934901c\\wp-e-header-week-20260912\\candidates-final\\six-saturday-normal.docx",
+      "output_sha256": "e3c1b9ff0e9112113659b2f21ecda181021a497b16566b815862189e864a1cb8",
+      "original_unchanged": true,
+      "native_page_count": 1,
+      "native_a4_portrait": "PASS",
+      "body_font": "PASS: 宋体12pt常规",
+      "title_font": "PASS: 宋体16pt加粗",
+      "visible_text_paragraph_spacing": "PASS: fixed20pt via per-file grouped native selections",
+      "blank_and_merged_structure": "Not asserted to be uniformly20pt; see report selection scope and mixed-spacing qualification",
+      "content_counts_dates_whitespace_holidays": "PASS",
+      "all_page_text_and_boundaries": "PASS",
+      "result": "PASS_CANDIDATE_FORMAT_CURRENT_SHA_CLIENT_ONLY",
+      "native_evidence": [
+        "six-saturday-normal-area-all-selection.json",
+        "six-saturday-normal-area-all-spacing.json",
+        "six-saturday-normal-body-font.json",
+        "six-saturday-normal-body-selection.json",
+        "six-saturday-normal-game-label-selection.json",
+        "six-saturday-normal-game-label-spacing.json",
+        "six-saturday-normal-middle-selection.json",
+        "six-saturday-normal-middle-spacing.json",
+        "six-saturday-normal-print-bottom-125.json",
+        "six-saturday-normal-print-bottom-150.json",
+        "six-saturday-normal-print-bottom-right-150.json",
+        "six-saturday-normal-print-lower-center-175.json",
+        "six-saturday-normal-print-lower-left-175.json",
+        "six-saturday-normal-print-lower-right-175.json",
+        "six-saturday-normal-print-middle-right-150.json",
+        "six-saturday-normal-print-overview.json",
+        "six-saturday-normal-print-top-125.json",
+        "six-saturday-normal-print-top-175.json",
+        "six-saturday-normal-print-top-right-150.json",
+        "six-saturday-normal-print-top-shifted-125.json",
+        "six-saturday-normal-print-top-shifted2-125.json",
+        "six-saturday-normal-summary-all-selection.json",
+        "six-saturday-normal-summary-all-spacing.json",
+        "six-saturday-normal-title-font.json",
+        "six-saturday-normal-title-selection.json",
+        "six-saturday-normal-top-selection.json",
+        "six-saturday-normal-top-spacing.json"
+      ],
+      "independent_reviews": [
+        "review-six-saturday-normal-supplement.md",
+        "review-six-saturday-normal.md"
+      ]
+    }
+  ],
+  "original_long_cases": [
+    {
+      "id": "five-long",
+      "display": {
+        "class_name": "验收小一班",
+        "term_name": "2026年秋季学期",
+        "week_number": 3
+      },
+      "body_sha256": "724acf8b0d283d950c4a56d0636a979c717f336b328699d3632c5b9695081236",
+      "docx_sha256": "58a2a6e0151183c9f4ae5eb42638c996fb3ff7bb07032ed0d6c8346facf16e9f",
+      "prior_docx_sha256": "7f0bbf74d5f470df71c45c70560c6037cf3562c9fd5cee5a6bad1859f0bcf0f0",
+      "formal_qualification": "NOT_RUN",
+      "candidate_manifest_native_status": "NOT_RUN",
+      "native_status": "FAIL_SINGLE_PAGE_HISTORICAL",
+      "this_batch_native_observation": "NOT_RUN",
+      "native_page_count": 2,
+      "single_page": "FAIL",
+      "observation_date": "2026-09-12; historical observation retained, not re-observed this batch",
+      "full_format": "NOT_RUN; no inherited PASS"
+    },
+    {
+      "id": "five-holiday-long",
+      "display": {
+        "class_name": "验收小一班",
+        "term_name": "2026年秋季学期",
+        "week_number": 5
+      },
+      "body_sha256": "965c384bae6026a41508f42f65c4cdcc11fcedbbe6aefebe9223967bb07b403e",
+      "docx_sha256": "b08d07c7fa3e31b9f16315b5b557aea105d0137b24f51a1b2408ee11549d61eb",
+      "prior_docx_sha256": "c21a84e6802ddf5bfd1d289bf61d14d63b2f50e4a96caa073b70f08a258d14ad",
+      "formal_qualification": "NOT_RUN",
+      "candidate_manifest_native_status": "NOT_RUN",
+      "native_status": "FAIL_SINGLE_PAGE_HISTORICAL",
+      "this_batch_native_observation": "NOT_RUN",
+      "native_page_count": 2,
+      "single_page": "FAIL",
+      "observation_date": "2026-09-12; historical observation retained, not re-observed this batch",
+      "full_format": "NOT_RUN; no inherited PASS"
+    },
+    {
+      "id": "six-sunday-long",
+      "display": {
+        "class_name": "验收小一班",
+        "term_name": "2026年秋季学期",
+        "week_number": 4
+      },
+      "body_sha256": "fdac9a6a76ef476ef7af87d91552159aa4edfb40d793c5310a726ebf10c73e5c",
+      "docx_sha256": "c68c5b5eb7c6d4fa2004421f388d8a6e1279dace398d118f765ae3c9f06ae2f4",
+      "prior_docx_sha256": "e8b49f157289744c11c050db99264f9dcd026bc793b8950a6e5ecaae0acf5ccb",
+      "formal_qualification": "NOT_RUN",
+      "candidate_manifest_native_status": "NOT_RUN",
+      "native_status": "FAIL_SINGLE_PAGE_HISTORICAL",
+      "this_batch_native_observation": "NOT_RUN",
+      "native_page_count": 2,
+      "single_page": "FAIL",
+      "observation_date": "2026-09-12; historical observation retained, not re-observed this batch",
+      "full_format": "NOT_RUN; no inherited PASS"
+    },
+    {
+      "id": "six-saturday-long",
+      "display": {
+        "class_name": "验收小一班",
+        "term_name": "2026年秋季学期",
+        "week_number": 6
+      },
+      "body_sha256": "ad2ca061a9a7a3aa0381f4218e2bfe76f96b3ec33157c6a99e816b5c9b6bec85",
+      "docx_sha256": "3043f97ecd4cb481a23bb1e6dc0bd18502dc31daf26d00e78106d45a12a5a127",
+      "prior_docx_sha256": "ab75e6bbabe305f29dcaf02ef694b4365c62f9098a1d96245e202d5027d67a6f",
+      "formal_qualification": "NOT_RUN",
+      "candidate_manifest_native_status": "NOT_RUN",
+      "native_status": "FAIL_SINGLE_PAGE_HISTORICAL",
+      "this_batch_native_observation": "NOT_RUN",
+      "native_page_count": 2,
+      "single_page": "FAIL",
+      "observation_date": "2026-09-12; historical observation retained, not re-observed this batch",
+      "full_format": "NOT_RUN; no inherited PASS"
+    }
+  ],
+  "original_long_evidence": "C:\\Users\\admin\\.codex\\visualizations\\2026\\09\\12\\01a0937c-3f64-7ce2-98f9-fecd1934901c\\wp-e-native-final-20260912\\native-matrix.json",
+  "dedup_long_cases": [
+    {
+      "id": "five-long-dedup",
+      "source_id": "five-long",
+      "original_docx_sha256": "58a2a6e0151183c9f4ae5eb42638c996fb3ff7bb07032ed0d6c8346facf16e9f",
+      "accepted_proposal_sha256": "c4c86168a69d9e9e69e50135a98b3299a83b74c67b2f6cbf961aa1366b38babe",
+      "serialization_note": "Removed JSON terminal newline only to satisfy canonical parser; field values unchanged",
+      "body_sha256": "6788a57cbeb696ebfdc2afeb0544a1bdb6176a4d0f9bf971492ebb2b10b54b2d",
+      "docx_sha256": "dd74854e9d2155162fdf2ce016830adf86a23be0b02cc03954e4efa12ac8f415",
+      "display": {
+        "class_name": "验收小一班",
+        "term_name": "2026年秋季学期",
+        "week_number": 3
+      },
+      "native_status": "FAIL_SINGLE_PAGE",
+      "native_pages": 2,
+      "all_pages_observed": true,
+      "a4_portrait": "PASS",
+      "single_page": "FAIL",
+      "font_spacing_clipping": "NOT_RUN for this batch; no inherited full-format PASS",
+      "docx_unchanged": true
+    },
+    {
+      "id": "five-holiday-long-dedup",
+      "source_id": "five-holiday-long",
+      "original_docx_sha256": "b08d07c7fa3e31b9f16315b5b557aea105d0137b24f51a1b2408ee11549d61eb",
+      "accepted_proposal_sha256": "a66a57f54d2b129de71a2c3160202cba018b6717ec704c6e39b735f5276e00e5",
+      "serialization_note": "Removed JSON terminal newline only to satisfy canonical parser; field values unchanged",
+      "body_sha256": "cba92bae8279553cd47ec01ed3e25c4902e6396f167bdb9ee106ddc32027564a",
+      "docx_sha256": "ec8fe6d907a7d69f6b3759c0c32687ceef8d2d22f3d78ec9d6e521c35c768828",
+      "display": {
+        "class_name": "验收小一班",
+        "term_name": "2026年秋季学期",
+        "week_number": 5
+      },
+      "native_status": "FAIL_SINGLE_PAGE",
+      "native_pages": 2,
+      "all_pages_observed": true,
+      "a4_portrait": "PASS",
+      "single_page": "FAIL",
+      "font_spacing_clipping": "NOT_RUN for this batch; no inherited full-format PASS",
+      "docx_unchanged": true
+    },
+    {
+      "id": "six-sunday-long-dedup",
+      "source_id": "six-sunday-long",
+      "original_docx_sha256": "c68c5b5eb7c6d4fa2004421f388d8a6e1279dace398d118f765ae3c9f06ae2f4",
+      "accepted_proposal_sha256": "ca52d772d2d7cbef69e5a651850eb1257e32929b7db8c6bc8f3c2fdf0e00f8f8",
+      "serialization_note": "Removed JSON terminal newline only to satisfy canonical parser; field values unchanged",
+      "body_sha256": "b1546409e3261c0182ab1c0ce316f4a428410e27dec8dba3c9228ebdc281856d",
+      "docx_sha256": "1f4a9c38acf9211a6c3ab3a8d52d28913dc0df0a7f5c26c2bbc90d58e4de0c69",
+      "display": {
+        "class_name": "验收小一班",
+        "term_name": "2026年秋季学期",
+        "week_number": 4
+      },
+      "native_status": "FAIL_SINGLE_PAGE",
+      "native_pages": 2,
+      "all_pages_observed": true,
+      "a4_portrait": "PASS",
+      "single_page": "FAIL",
+      "font_spacing_clipping": "NOT_RUN for this batch; no inherited full-format PASS",
+      "docx_unchanged": true
+    },
+    {
+      "id": "six-saturday-long-dedup",
+      "source_id": "six-saturday-long",
+      "original_docx_sha256": "3043f97ecd4cb481a23bb1e6dc0bd18502dc31daf26d00e78106d45a12a5a127",
+      "accepted_proposal_sha256": "17021078fe73682149b85e215f7276dfaac96a86d9a5cc452c7ba761f4ad5683",
+      "serialization_note": "Removed JSON terminal newline only to satisfy canonical parser; field values unchanged",
+      "body_sha256": "4391b810def576fe0b064a78b92c7c8a80d1d0f606437f196763c0c489dd53cf",
+      "docx_sha256": "368e14442d24b0991be8a5f6a980f0ceb605bf204a0a9dbcedf39408704cd718",
+      "display": {
+        "class_name": "验收小一班",
+        "term_name": "2026年秋季学期",
+        "week_number": 6
+      },
+      "native_status": "FAIL_SINGLE_PAGE",
+      "native_pages": 2,
+      "all_pages_observed": true,
+      "a4_portrait": "PASS",
+      "single_page": "FAIL",
+      "font_spacing_clipping": "NOT_RUN for this batch; no inherited full-format PASS",
+      "docx_unchanged": true
+    }
+  ],
+  "dedup_evidence": "C:\\Users\\admin\\.codex\\visualizations\\2026\\09\\12\\01a0937c-3f64-7ce2-98f9-fecd1934901c\\wp-e-reduction-20260912\\native-recheck.json",
+  "dedup_client_reference": "../wp-e-native-final-20260912/environment.json; same host and native Word application; Account/About not re-read for this batch",
+  "dedup_observation_date": "2026-09-12; retained, not new observation",
+  "other_states": {
+    "new_adopted_single_page_revision": "NOT_RUN; no new proposal adopted or saved",
+    "historical_three_long": "Retain historical two-page FAIL; not re-observed",
+    "compact_synthetic": "Retain historical candidate status; not promoted to revision success",
+    "application_refuses_download_when_cannot_converge": "NOT_RUN; later page acceptance",
+    "released_catalog_binding": "NOT_VERIFIED; later qualification binding gate",
+    "ubuntu_pages_real_model_database_catalog_ci_oci_migrations_deployment": "NOT_RUN this batch; later WP-E gates",
+    "WP-C_historical_native_dual_RED_four_types": "UNMET; user-authorized local WP-E continuation unchanged",
+    "WP-E": "OPEN",
+    "WP-F": "NOT_RUN"
+  }
+}

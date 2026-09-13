@@ -1,0 +1,23 @@
+{
+  "observed_utc": "2026-09-13T03:34:38.312Z",
+  "os": {
+    "source": "Windows registry current read",
+    "product": "Windows Server 2025 Datacenter",
+    "version": "24H2",
+    "build": "26100.32860"
+  },
+  "account": {
+    "source": "native Word account accessibility observed this turn",
+    "product": "Microsoft 365",
+    "version": "2608",
+    "build": "20326.20132",
+    "channel": "当前频道"
+  },
+  "about": {
+    "source": "native Word About accessibility observed this turn",
+    "product": "Microsoft Word 适用于 Microsoft 365 MSO",
+    "version": "2608",
+    "build": "16.0.20326.20072",
+    "architecture": "64位"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "created_utc": "2026-09-13T05:15:27.162079+00:00",
+  "main": {
+    "head": {
+      "exit": 0,
+      "stdout": "8dcc83376577695b562529ec42adc6b48817f004",
+      "stderr": ""
+    },
+    "branch": {
+      "exit": 0,
+      "stdout": "main",
+      "stderr": ""
+    },
+    "status": {
+      "exit": 0,
+      "stdout": "?? specs/wmp9-production-prerequisites/tasks/WMP-9-windows-acceptance-prompt.md",
+      "stderr": "warning: unable to access 'C:\\Users\\admin/.config/git/ignore': Permission denied\nwarning: unable to access 'C:\\Users\\admin/.config/git/ignore': Permission denied"
+    }
+  },
+  "worktree": {
+    "head": {
+      "exit": 0,
+      "stdout": "247fc3472481bcdc7b161b36301e08f205da9c71",
+      "stderr": ""
+    },
+    "branch": {
+      "exit": 0,
+      "stdout": "codex/wp-e-windows-holiday-20260912",
+      "stderr": ""
+    },
+    "status": {
+      "exit": 0,
+      "stdout": "?? specs/weekly-plan-authoring/WP-E-Windows-Ubuntu-acceptance-prompt.md\n?? specs/weekly-plan-authoring/WP-E-Windows-only-acceptance-prompt.md",
+      "stderr": "warning: unable to access 'C:\\Users\\admin/.config/git/ignore': Permission denied\nwarning: unable to access 'C:\\Users\\admin/.config/git/ignore': Permission denied"
+    },
+    "product_diff": {
+      "exit": 0,
+      "stdout": "specs/weekly-plan-authoring/current-status.md\nspecs/weekly-plan-authoring/evidence/WP-E-dedup-recheck-20260912.md\nspecs/weekly-plan-authoring/evidence/WP-E-header-week-20260912.md\nspecs/weekly-plan-authoring/evidence/WP-E-native-Word-20260912.md",
+      "stderr": ""
+    }
+  },
+  "remote_note": "No fetch/push performed; local commits are not assumed present remotely."
+}
