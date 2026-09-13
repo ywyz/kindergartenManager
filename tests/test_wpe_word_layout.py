@@ -1,9 +1,12 @@
 """Initial coverage: new independent v3 layout, not historical business RED."""
 
+import re
 from dataclasses import replace
 from datetime import date, timedelta
 from hashlib import sha256
 from io import BytesIO
+from pathlib import Path
+from xml.etree import ElementTree as ET
 
 import pytest
 from docx import Document
@@ -12,7 +15,9 @@ from docx.oxml.ns import qn
 from app.integration.word_export.shared_weekly_word import (
     SEED_PATH,
     SEED_SHA256,
+    LayoutRejected,
     SharedWeeklyWordPort,
+    _rendered_grid,
     fill_document,
 )
 from app.service.shared_weekly.authoring_contracts import (
@@ -275,3 +280,231 @@ def test_week_dates_follow_class_and_table_header_is_weekdays_only(count, start)
     assert [table.cell(0, i + 2).text for i in range(count)] == [
         "周" + "一二三四五六日"[d.day.weekday()] for d in days
     ]
+
+
+TITLE_STROKE_FIXTURE = (
+    Path(__file__).resolve().parents[1]
+    / "tests/fixtures/wpe-title-stroke-20260913.svg"
+)
+
+
+def _svg_namespace(tag: str) -> str:
+    return "{http://www.w3.org/2000/svg}" + tag
+
+
+def _load_frozen_title_stroke_svg():
+    return ET.parse(TITLE_STROKE_FIXTURE)
+
+
+def _stroked_paths(svg):
+    return [
+        path
+        for path in svg.iter(_svg_namespace("path"))
+        if path.get("fill") == "none" and path.get("stroke") is not None
+    ]
+
+
+def _frozen_svg_with_diagnostic(d: str, transform: str = "matrix(1, 0, 0, 1, 0, 0)"):
+    """Copy the known-good frozen SVG plus ONE diagnostic stroked path."""
+    svg = _load_frozen_title_stroke_svg()
+    path = ET.Element(_svg_namespace("path"))
+    path.set("fill", "none")
+    path.set("stroke", "rgb(0%, 0%, 0%)")
+    path.set("d", d)
+    path.set("transform", transform)
+    svg.getroot().append(path)
+    return svg
+
+
+def test_frozen_native_title_stroke_svg_parses_real_table_axes():
+    svg = _load_frozen_title_stroke_svg()
+    assert len(_stroked_paths(svg)) == 19
+    vertical, horizontal = _rendered_grid(svg)
+    assert len(vertical) == 8
+    assert len(horizontal) == 10
+    assert min(vertical) == pytest.approx(35.957, abs=0.01)
+    assert max(vertical) == pytest.approx(558.648, abs=0.01)
+    assert min(horizontal) == pytest.approx(74.801, abs=0.01)
+    assert max(horizontal) == pytest.approx(602.582, abs=0.01)
+
+
+def _native_title_contour() -> str:
+    return next(
+        path.get("d")
+        for path in _stroked_paths(_load_frozen_title_stroke_svg())
+        if "C" in path.get("d", "")
+    )
+
+
+def test_native_trailing_complete_move_only_subpath_is_accepted():
+    """The actual contour ends 'Z M x y' (complete trailing move); it parses.
+
+    With the identity transform the native coordinates lie below the real
+    table bounds, so the frozen grid still resolves 8/10 clustered axes —
+    success proves the parser accepts the native trailing move-only subpath.
+    """
+    svg = _frozen_svg_with_diagnostic(_native_title_contour())
+    vertical, horizontal = _rendered_grid(svg)
+    assert len(vertical) == 8 and len(horizontal) == 10
+
+
+def test_supported_closed_contour_outside_table_ending_before_z_is_accepted():
+    """A supported C/Z contour outside the table may end at a point different
+    from its start: Z implicitly closes the drawn subpath, and the trailing
+    move-only subpath completes the contour."""
+    outside = (
+        "M 20 760 C 30 750 40 750 50 760 C 60 770 30 770 20 765 Z M 50 780"
+    )
+    svg = _frozen_svg_with_diagnostic(outside)
+    vertical, horizontal = _rendered_grid(svg)
+    assert len(vertical) == 8 and len(horizontal) == 10
+
+
+def test_complete_move_only_subpath_outside_table_is_accepted():
+    svg = _frozen_svg_with_diagnostic("M 10 10 Z M 20 20")
+    vertical, horizontal = _rendered_grid(svg)
+    assert len(vertical) == 8 and len(horizontal) == 10
+
+
+def test_intersecting_supported_closed_contour_is_rejected():
+    """A supported C/Z contour fully inside the real table bounds is rejected."""
+    inside = (
+        "M 100 300 C 150 250 250 250 300 300 "
+        "C 350 350 150 350 100 300 Z M 300 300"
+    )
+    svg = _frozen_svg_with_diagnostic(inside)
+    with pytest.raises(LayoutRejected, match="layout_geometry_invalid"):
+        _rendered_grid(svg)
+
+
+def test_contour_touching_table_edge_is_rejected():
+    """A supported contour that touches (not only crosses) the table bounds
+    must fail closed: the bounds already carry the strict-disjointness
+    epsilon, so even exact contact is intersection."""
+    # Real frozen table bounds: x 35.957..558.648, y 74.801..602.582.
+    touching_left_edge = (
+        "M 35.957 300 C 30 250 20 250 10 300 C 0 350 30 350 35.957 300 Z"
+    )
+    svg = _frozen_svg_with_diagnostic(touching_left_edge)
+    with pytest.raises(LayoutRejected, match="layout_geometry_invalid"):
+        _rendered_grid(svg)
+
+
+def test_unsupported_contour_outside_table_is_rejected_geometry_invalid():
+    svg = _frozen_svg_with_diagnostic("M 10 10 Q 20 5 30 10 Z")
+    with pytest.raises(LayoutRejected, match="layout_geometry_invalid"):
+        _rendered_grid(svg)
+
+
+@pytest.mark.parametrize(
+    ("d", "transform"),
+    [
+        # command without needed coords, then transition discards nothing
+        ("M 10 10 C 12 12 Z", None),
+        ("M 10 10 L 20", None),
+        # incomplete parameters discarded by Z transition
+        ("M 10 10 C 12 12 14 14 Z", None),
+        # zero-parameter commands must be rejected
+        ("M 10 10 C Z", None),
+        ("M 10 10 M", None),
+        ("M", None),
+        # implicit extra parameters restart the completed command
+        ("M 10 10 20 20", None),
+        ("M 10 10 L 20 20 30 30 Z", None),
+        # commands after Z except M
+        ("M 10 10 Z L 20 20", None),
+        # unclosed drawn subpath
+        ("M 10 10 L 20 20", None),
+        ("M 10 10 C 20 20 30 30 40 40", None),
+        # relative command letter
+        ("m 10 10 l 20 10 z", None),
+        # unsupported quadratic command
+        ("M 10 10 Q 22 8 24 10 Z", None),
+        # Python-only float spelling (underscore) is not a valid SVG lexeme
+        ("M 10 10 L 1_0 20 Z", None),
+        # non-finite and junk tokens
+        ("M nan nan L 20 10 Z", None),
+        ("M 10 10 L 20 10 junk", None),
+        # multiple unclosed subpaths
+        ("M 10 10 L 20 20 M 30 30 L 40 40", None),
+        # empty path
+        ("", None),
+    ],
+)
+def test_malformed_or_nonfinite_paths_are_rejected(d, transform):
+    matrix = transform if transform is not None else "matrix(1, 0, 0, 1, 0, 0)"
+    svg = _frozen_svg_with_diagnostic(d, matrix)
+    with pytest.raises(LayoutRejected, match="layout_geometry_invalid"):
+        _rendered_grid(svg)
+
+
+@pytest.mark.parametrize("transform", ["matrix(1, 0, 0)", "matrix(inf, 0, 0, 1, 0, 0)"])
+def test_malformed_transform_matrix_is_rejected(transform):
+    svg = _frozen_svg_with_diagnostic("M 10 10 L 20 10 Z", transform)
+    with pytest.raises(LayoutRejected, match="layout_geometry_invalid"):
+        _rendered_grid(svg)
+
+
+@pytest.mark.parametrize("count", [5, 6])
+async def test_removing_a_required_border_keeps_actual_render_undelivered(
+    count, monkeypatch
+):
+    from app.integration.word_export import shared_weekly_word as module
+
+    original = module._process
+    straight = (
+        r"M\s+(-?[0-9.]+)\s+(-?[0-9.]+)\s+L\s+(-?[0-9.]+)\s+(-?[0-9.]+)\s*"
+    )
+
+    async def drop_one_border(*args):
+        output = await original(*args)
+        if args[0] == "pdftocairo":
+            tree = ET.parse(args[-1])
+            borders = [
+                path
+                for path in tree.iter(_svg_namespace("path"))
+                if path.get("fill") == "none"
+                and path.get("stroke") is not None
+                and "C" not in path.get("d", "")
+            ]
+            assert len(borders) == count + 13, "real straight border path count"
+            # The unique outer right edge is a required vertical axis source;
+            # find it by parsed straight coordinates, not a literal guess.
+            straight_borders = []
+            for path in borders:
+                match = re.fullmatch(straight, path.get("d", ""))
+                assert match is not None
+                x0, y0, x1, y1 = map(float, match.groups())
+                straight_borders.append((path, x0, y0, x1, y1))
+            verticals = [
+                (path, x0, y0, y1)
+                for path, x0, y0, x1, y1 in straight_borders
+                if abs(x0 - x1) < 0.1 and abs(y1 - y0) > 5
+            ]
+            assert verticals
+            target = max(verticals, key=lambda item: item[1])[0]
+            parent = next(
+                element
+                for element in tree.iter()
+                if target in list(element)
+            )
+            parent.remove(target)
+            remaining = [
+                path
+                for path in tree.iter(_svg_namespace("path"))
+                if path.get("fill") == "none"
+                and path.get("stroke") is not None
+                and "C" not in path.get("d", "")
+            ]
+            assert len(remaining) == count + 12, (
+                "required border path must be removed"
+            )
+            tree.write(args[-1], encoding="utf-8", xml_declaration=True)
+        return output
+
+    monkeypatch.setattr(module, "_process", drop_one_border)
+    result = await SharedWeeklyWordPort().inspect_local(
+        complete_body(count), WeekDisplay("小一班", "第一学期", 3)
+    )
+    assert not result.fits
+    assert result.reason == "layout_overflow" and result.data is None

@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-
 PAGE_DIR = Path(__file__).parents[1] / "app" / "ui" / "pages"
 
 

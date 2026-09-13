@@ -2,25 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import fields
 import hashlib
-from io import StringIO
 import json
 import re
+from dataclasses import fields
+from io import StringIO
 from uuid import UUID
 
-from alembic import command
-from alembic.config import Config
 import pytest
-from sqlalchemy import inspect, select, text
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.automap import automap_base
-
-from app.core.config import settings
-from app.core.models.daily_plan import DailyPlan
-from app.service.agent.contracts import Permission
-from app.service.agent.registry import AgentToolRejected, build_foundation_registry
-
+from alembic.config import Config
 from conftest import (
     AFTER_GOAL,
     AFTER_PREP,
@@ -44,7 +34,15 @@ from conftest import (
     trusted_ui_session,
     write_api,
 )
+from sqlalchemy import inspect, select, text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.automap import automap_base
 
+from alembic import command
+from app.core.config import settings
+from app.core.models.daily_plan import DailyPlan
+from app.service.agent.contracts import Permission
+from app.service.agent.registry import AgentToolRejected, build_foundation_registry
 
 RESULT_FIELDS = {
     "before_version_id",
@@ -475,7 +473,12 @@ def test_mysql_offline_migration_defines_all_four_immutability_triggers(
     output = StringIO()
     config = Config(str(REPOSITORY_ROOT / "alembic.ini"), output_buffer=output)
 
-    command.upgrade(config, "b7d9e1f3a5c2:head", sql=True)
+    # Offline scope is bounded to the Agent-owned append-only migration:
+    # the later WP-C online-reflection revision (7c91e2a4b610) emits DDL that
+    # SQLAlchemy's MockConnection cannot execute offline, and the current head
+    # is covered separately by the independently migrated SQLite gate and a
+    # dedicated MySQL online gate.
+    command.upgrade(config, "b7d9e1f3a5c2:e5f7a9c2d4b6", sql=True)
 
     ddl = " ".join(output.getvalue().replace("`", "").casefold().split())
     for table_name in ("daily_plan_operation_version", "agent_write_audit"):

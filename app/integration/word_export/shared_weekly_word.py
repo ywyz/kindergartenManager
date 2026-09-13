@@ -7,6 +7,7 @@ Until a independently qualified authority is installed, formal resolution fails.
 from __future__ import annotations
 
 import asyncio
+import math
 import re
 import shutil
 import tempfile
@@ -19,8 +20,8 @@ from io import BytesIO
 from pathlib import Path
 
 from docx import Document
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
-from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Mm, Pt
@@ -326,41 +327,184 @@ def _text_complete(document, xml, grid):
     return Counter(clean("".join(expected))) == Counter(full)
 
 
+_STRAIGHT_LINE_COMMAND = re.compile(
+    r"^M\s+(-?[0-9]+(?:\.[0-9]+)?)\s+(-?[0-9]+(?:\.[0-9]+)?)"
+    r"\s+L\s+(-?[0-9]+(?:\.[0-9]+)?)\s+(-?[0-9]+(?:\.[0-9]+)?)\s*$"
+)
+_TRANSFORM_MATRIX = re.compile(r"^matrix\(([^)]+)\)")
+# SVG number lexeme: no underscores, no Python-only spellings.
+_FLOAT_LEXEME = re.compile(
+    r"-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][-+]?[0-9]+)?"
+)
+_CONTOUR_TOKEN = re.compile(r"([MLCZ])|([^MLCZ\s]+)")
+_CONTOUR_ARITY = {"M": 2, "L": 2, "C": 6, "Z": 0}
+_TABLE_EPSILON = 0.5
+
+
+def _finite(*values) -> bool:
+    return all(math.isfinite(value) for value in values)
+
+
+def _transformed_matrix(path) -> tuple[float, ...]:
+    """Parse exactly six finite matrix values or reject the path."""
+    match = _TRANSFORM_MATRIX.fullmatch(path.get("transform", ""))
+    if match is None:
+        raise LayoutRejected("layout_geometry_invalid")
+    values = tuple(_parse_float_lexeme(v.strip()) for v in match.group(1).split(","))
+    if len(values) != 6 or not _finite(*values):
+        raise LayoutRejected("layout_geometry_invalid")
+    return values
+
+
+def _parse_float_lexeme(literal: str) -> float:
+    """Parse a strict SVG float lexeme; reject Python-only spellings."""
+    if not _FLOAT_LEXEME.fullmatch(literal):
+        raise LayoutRejected("layout_geometry_invalid")
+    value = float(literal)
+    if not math.isfinite(value):
+        raise LayoutRejected("layout_geometry_invalid")
+    return value
+
+
+def _transform_points(matrix: tuple[float, ...], points) -> list[tuple[float, float]]:
+    """Apply the matrix to points; reject any non-finite transformed value."""
+    a, b, c, d, e, f = matrix
+    transformed = [(a * x + c * y + e, b * x + d * y + f) for x, y in points]
+    if not _finite(*(value for point in transformed for value in point)):
+        raise LayoutRejected("layout_geometry_invalid")
+    return transformed
+
+
+def _contour_bbox(
+    d: str, matrix: tuple[float, ...]
+) -> tuple[float, float, float, float]:
+    """Conservative transformed bbox of a strict absolute M/L/C/Z contour.
+
+    Only endpoints and Bezier control points are collected: every Bezier
+    segment stays within its control hull, so the hull bbox bounds the curve.
+    Each explicit command must consume exactly its own arity before the next
+    command or the end of the path (Z consumes zero); a numeric token after a
+    completed command (implicit repetition) is refused, and a command left
+    incomplete — including a zero-parameter one — is rejected. Supported
+    forms: explicit M/L/C/Z, multiple Z-closed subpaths, and complete
+    trailing move-only subpaths; a drawn subpath must be Z-closed before the
+    next M. Numbers must match strict SVG float lexemes (no underscores).
+    """
+    if not d or not d[0] in "M":
+        raise LayoutRejected("layout_geometry_invalid")
+    tokens = _CONTOUR_TOKEN.findall(d)
+    command: str | None = None
+    arity = 0
+    parameters: list[float] = []
+    completed = False
+    subpath_open = False
+    subpath_segments = 0
+    points: list[tuple[float, float]] = []
+    for matched_command, literal in tokens:
+        if matched_command:
+            if command is not None and not completed:
+                # A transition must never leave the previous command incomplete.
+                raise LayoutRejected("layout_geometry_invalid")
+            if matched_command == "M" and subpath_open and subpath_segments:
+                # A drawn subpath must be closed before the next M.
+                raise LayoutRejected("layout_geometry_invalid")
+            if matched_command != "M" and not subpath_open:
+                # Numbers after Z are only valid with a new M first.
+                raise LayoutRejected("layout_geometry_invalid")
+            command = matched_command
+            arity = _CONTOUR_ARITY[command]
+            parameters = []
+            completed = arity == 0
+            if command == "Z":
+                # Closepath implicitly returns to the subpath start.
+                subpath_open = False
+                subpath_segments = 0
+        else:
+            if command is None or completed:
+                # Numbers need a pending command; once a command completed,
+                # implicit repetition is not part of the supported subset.
+                raise LayoutRejected("layout_geometry_invalid")
+            parameters.append(_parse_float_lexeme(literal))
+            if len(parameters) < arity:
+                continue
+            # The explicit command reached its exact arity and now completes.
+            completed = True
+            if command == "M":
+                points.append((parameters[0], parameters[1]))
+                subpath_open = True
+                subpath_segments = 0
+            elif command == "L":
+                points.append((parameters[0], parameters[1]))
+                subpath_segments += 1
+            else:
+                points.extend(
+                    (
+                        (parameters[0], parameters[1]),
+                        (parameters[2], parameters[3]),
+                        (parameters[4], parameters[5]),
+                    )
+                )
+                subpath_segments += 1
+            parameters = []
+    if command is None or not completed:
+        # A trailing command must have consumed its exact arity.
+        raise LayoutRejected("layout_geometry_invalid")
+    if subpath_open and subpath_segments:
+        raise LayoutRejected("layout_geometry_invalid")
+    if not points:
+        raise LayoutRejected("layout_geometry_invalid")
+    transformed = _transform_points(matrix, points)
+    xs = [point[0] for point in transformed]
+    ys = [point[1] for point in transformed]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
 def _rendered_grid(svg):
-    """Read actual stroked borders from Poppler's renderer output, not OOXML."""
+    """Read actual stroked borders from Poppler's renderer output, not OOXML.
+
+    Pass 1 collects strict transformed M...L straight paths as table edges and
+    derives the real table bounds. Pass 2 validates every remaining stroked
+    path as a strict absolute M/L/C/Z contour whose conservative bbox must lie
+    strictly outside the table bounds; title/glyph strokes with M/L/C/Z thus
+    pass while any contour touching or crossing the table is rejected.
+    """
     horizontal, vertical = [], []
-    number = r"(-?[0-9]+(?:\.[0-9]+)?)"
+    table_bounds: tuple[float, float, float, float] | None = None
+    nonline: list[tuple[float, float, float, float]] = []
     for path in svg.iter("{http://www.w3.org/2000/svg}path"):
         if path.get("stroke") is None or path.get("fill") != "none":
             continue
-        match = re.fullmatch(
-            r"M\s+"
-            + number
-            + r"\s+"
-            + number
-            + r"\s+L\s+"
-            + number
-            + r"\s+"
-            + number
-            + r"\s*",
-            path.get("d", ""),
-        )
-        transform = re.fullmatch(r"matrix\(([^)]+)\)", path.get("transform", ""))
-        if match is None or transform is None:
-            raise LayoutRejected("layout_geometry_invalid")
-        a, b, c, d, e, f = (float(v.strip()) for v in transform[1].split(","))
+        matrix = _transformed_matrix(path)
+        match = _STRAIGHT_LINE_COMMAND.fullmatch(path.get("d", ""))
+        if match is None:
+            nonline.append(_contour_bbox(path.get("d", ""), matrix))
+            continue
         x0, y0, x1, y1 = map(float, match.groups())
-        x0, y0, x1, y1 = (
-            a * x0 + c * y0 + e,
-            b * x0 + d * y0 + f,
-            a * x1 + c * y1 + e,
-            b * x1 + d * y1 + f,
-        )
+        if not _finite(x0, y0, x1, y1):
+            raise LayoutRejected("layout_geometry_invalid")
+        (x0, y0), (x1, y1) = _transform_points(matrix, ((x0, y0), (x1, y1)))
         if abs(y0 - y1) < 0.1 and abs(x1 - x0) > 5:
             horizontal.append(y0)
         elif abs(x0 - x1) < 0.1 and abs(y1 - y0) > 5:
             vertical.append(x0)
         else:
+            raise LayoutRejected("layout_geometry_invalid")
+    if not horizontal or not vertical:
+        raise LayoutRejected("layout_geometry_invalid")
+    table_bounds = (
+        min(vertical) - _TABLE_EPSILON,
+        min(horizontal) - _TABLE_EPSILON,
+        max(vertical) + _TABLE_EPSILON,
+        max(horizontal) + _TABLE_EPSILON,
+    )
+    for left, top, right, bottom in nonline:
+        strictly_disjoint = (
+            right < table_bounds[0]
+            or left > table_bounds[2]
+            or bottom < table_bounds[1]
+            or top > table_bounds[3]
+        )
+        if not strictly_disjoint:
             raise LayoutRejected("layout_geometry_invalid")
 
     def clustered(values):

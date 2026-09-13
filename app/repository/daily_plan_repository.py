@@ -1,6 +1,6 @@
 """daily_plan_repository — 每日活动计划数据访问层。"""
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,7 +8,6 @@ from sqlalchemy.orm.exc import StaleDataError
 
 from app.core.activity_name import validate_activity_name
 from app.core.models.daily_plan import DailyPlan
-
 
 _EDITABLE_FIELDS = frozenset(
     {
@@ -97,7 +96,7 @@ async def save_daily_plan(
         # 只有真正的业务变化才形成新 revision。
         for key, value in updates.items():
             setattr(existing, key, value)
-        existing.updated_at = datetime.now(timezone.utc)
+        existing.updated_at = datetime.now(UTC)
         await session.flush()
         return existing
 

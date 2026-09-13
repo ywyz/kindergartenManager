@@ -63,11 +63,7 @@ jobs:
           mapfile -d '' python_files < <(
             git diff --name-only -z --diff-filter=ACMR "$lint_base"...HEAD -- '*.py'
           )
-          if ((${#python_files[@]})); then
-            ruff check "${python_files[@]}"
-          else
-            echo "No changed Python files."
-          fi
+          python scripts/check_changed_python.py "${python_files[@]}"
 
       - name: Migrate fresh SQLite database
         run: |

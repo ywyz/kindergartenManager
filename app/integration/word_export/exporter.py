@@ -101,7 +101,7 @@ def _parse_fields(text: str | None) -> dict[str, str]:
         matched: str | None = None
         rest = ""
         for label in _KNOWN_LABELS:
-            if line.startswith(label + "：") or line.startswith(label + ":"):
+            if line.startswith((label + "：", label + ":")):
                 matched = label
                 rest = line[len(label) + 1 :].strip()
                 break

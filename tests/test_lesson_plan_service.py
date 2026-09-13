@@ -196,18 +196,20 @@ async def test_process_lesson_plan_no_ai_key_raises_config_error():
     """用户未配置 AI Key 时，抛出 ConfigError。"""
     mock_session = AsyncMock()
 
-    with patch(
-        "app.service.lesson_plan_service.get_active_ai_key",
-        new=AsyncMock(return_value=None),
+    with (
+        patch(
+            "app.service.lesson_plan_service.get_active_ai_key",
+            new=AsyncMock(return_value=None),
+        ),
+        pytest.raises(ConfigError, match="AI Key"),
     ):
-        with pytest.raises(ConfigError, match="AI Key"):
-            await process_lesson_plan(
-                session=mock_session,
-                tenant_id=1,
-                user_id=1,
-                raw_text="教案",
-                grade="大班",
-            )
+        await process_lesson_plan(
+            session=mock_session,
+            tenant_id=1,
+            user_id=1,
+            raw_text="教案",
+            grade="大班",
+        )
 
 
 # -------------------------------------------------------------------

@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import ast
 import os
-from pathlib import Path
 import subprocess
 import sys
-
+from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[3]
 
@@ -65,26 +64,37 @@ def test_deployment_settings_are_sys_admin_only_and_never_echo_db_password() -> 
         ) < callback_source.index("write_dot_env(")
 
 
-def test_bootstrap_cli_migration_failure_has_nonzero_process_exit() -> None:
-    """部署自动化不得把迁移失败误报为成功。"""
+def test_bootstrap_cli_migration_failure_has_nonzero_process_exit(
+    tmp_path: Path,
+) -> None:
+    """部署自动化在数据库不可用时必须非零退出且不泄漏任何敏感细节。
+
+    ADR-0007 禁止启动/引导时隐式执行 Alembic 迁移：数据库未就绪时 CLI 只
+    输出固定失败文案（提示先运行显式迁移并检查连接状态）并以退出码 1 结束，
+    绝不回显原始 SQLAlchemy/驱动错误、堆栈或连接串中的测试口令。
+    """
     test_password = "TestOnlyDatabasePassword!"
+    test_admin_password = "TestOnlyAdminPassword!"
     env = os.environ.copy()
     env.update(
         {
             "BOOTSTRAP_ADMIN_ENABLED": "true",
             "BOOTSTRAP_ADMIN_USERNAME": "sysadmin",
-            "BOOTSTRAP_ADMIN_PASSWORD": "TestOnlyAdminPassword!",
+            "BOOTSTRAP_ADMIN_PASSWORD": test_admin_password,
             "BOOTSTRAP_ADMIN_ALLOW_REMOTE": "false",
+            "KINDERGARTEN_DATA_DIR": str(tmp_path),
             "DATABASE_URL": (
                 "mysql+aiomysql://test_only_user:"
                 f"{test_password}@127.0.0.1:1/test_only_db"
             ),
+            # cwd 是隔离的临时目录；模块解析必须显式指向源码根。
+            "PYTHONPATH": str(_ROOT),
         }
     )
 
     completed = subprocess.run(
         [sys.executable, "-m", "app.jobs.bootstrap_admin", "--init"],
-        cwd=_ROOT,
+        cwd=tmp_path,
         env=env,
         capture_output=True,
         text=True,
@@ -93,8 +103,10 @@ def test_bootstrap_cli_migration_failure_has_nonzero_process_exit() -> None:
     )
     output = completed.stdout + completed.stderr
 
-    assert "迁移失败" in output
+    assert "创建失败：请先运行显式数据库迁移并检查连接状态" in output
+    assert "迁移失败" not in output
     assert test_password not in output
+    assert test_admin_password not in output
     assert "Traceback" not in output
     assert "Connection refused" not in output
     assert "sqlalchemy.exc" not in output
