@@ -17,7 +17,7 @@ env:
 jobs:
   quality:
     name: Python 3.14 quality
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     steps:
@@ -29,6 +29,14 @@ jobs:
         with:
           python-version: '3.14.7'
           cache: pip
+
+      - name: Install public rendering tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libreoffice-writer poppler-utils fontconfig
+          dpkg-query -W libreoffice-writer poppler-utils fontconfig
+          libreoffice --version
+          pdftocairo -v
 
       - name: Install dependencies
         run: |
@@ -71,7 +79,20 @@ jobs:
           python -m alembic current
 
       - name: Test
-        run: python -m pytest tests/ -q
+        run: |
+          # SimSun requires separately authorized provisioning; never fetch a
+          # Windows font from an arbitrary archive or substitute another family.
+          python - <<'PY'
+          import hashlib
+          import pathlib
+          import subprocess
+          family = subprocess.check_output(["fc-match", "-f", "%{family}", "SimSun"], text=True)
+          if "SimSun" not in family.split(","):
+              raise SystemExit("SimSun unavailable: licensed runner font provisioning is required; rendering tests cannot be skipped")
+          font = pathlib.Path(subprocess.check_output(["fc-match", "-f", "%{file}", "SimSun"], text=True))
+          print("SimSun SHA256:", hashlib.sha256(font.read_bytes()).hexdigest())
+          PY
+          python -m pytest tests/ -q
 
       - name: Agent Foundation
         run: python -m pytest specs/agent-foundation/tests -q

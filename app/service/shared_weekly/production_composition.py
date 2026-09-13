@@ -51,8 +51,15 @@ def build_shared_weekly_production_application(
     )
 
 
-def configure_shared_weekly_production(*, word_port=None) -> None:
+async def configure_shared_weekly_production(*, word_port=None) -> None:
     global _services
+    # Publish only after the independently trusted operator configuration and
+    # current dependencies pass. Explicit injection is for isolated composition.
+    _services = None
+    if word_port is None:
+        from app.service.shared_weekly.layout_startup import load_operator_word_port
+
+        word_port = await load_operator_word_port()
     _services = build_shared_weekly_production_application(word_port=word_port)
 
 

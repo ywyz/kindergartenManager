@@ -551,7 +551,8 @@ class SharedWeeklyWordPort:
                 raise LayoutRejected("template_changed")
             yield
 
-    async def render_check(self, binding, body, display):
+    async def verify_runtime(self, binding: LayoutBinding) -> None:
+        """Recheck the actual renderer and controlled seed without a DB or render."""
         renderer = await self.authority.renderer(binding)
         if renderer["product"] != "LibreOffice":
             raise LayoutRejected("renderer_unavailable")
@@ -562,6 +563,11 @@ class SharedWeeklyWordPort:
             raise LayoutRejected("renderer_changed")
         if binding.template_sha256 != SEED_SHA256:
             raise LayoutRejected("template_changed")
+        async with self.binding_guard(binding):
+            pass
+
+    async def render_check(self, binding, body, display):
+        await self.verify_runtime(binding)
         result = await self._render(binding, body, display)
         async with self.binding_guard(binding):
             return result

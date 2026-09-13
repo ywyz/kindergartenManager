@@ -77,6 +77,8 @@ WP-A 已限定关闭；授权/事实与根/版本/CAS子步已本地交付；本
 
 ## WP-E 填写页面与单页导出
 
+2026-09-13阶段一后继：普通启动资格接入已完成本地双RED→GREEN，当前结果与剩余门见[新账本](evidence/WP-E-startup-Ubuntu-20260913.md)，Windows操作及返回schema见[新交接说明](WP-E-Windows-startup-handoff-20260913.md)。阶段二/三NOT_RUN，WP-E整体不勾选。下方“当前产品”按前轮记录时点解释，不代表新代码已经完成Word复验。
+
 2026-09-13：四份正常五／六列已完成当前产品 `0bded3377c01956833bcbb6cd306f9a7f5d924e1` / Microsoft365 Word2608客户端下的候选格式验收及独立复审。原始4长文和已采用4去重长文仍各2页、单页FAIL；正式released/catalog资格、应用页面与外部门未关闭，WP-C四类历史native双RED仍UNMET，WP-F未执行。 见[交接报告](WP-E-Ubuntu-handoff-20260913.md)。以下整体任务仍不勾选。
 
 2026-09-12：已实现本地链路，整门仍 BLOCKED；见 [交付证据](evidence/WP-E-20260912.md) 与 [续作提示词](WP-E-continuation-prompt.md)，以下定义不视为完整验收勾选。

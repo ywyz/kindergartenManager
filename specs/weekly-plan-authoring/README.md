@@ -1,3 +1,5 @@
+> 2026-09-13 WP-E阶段一后继：[当前证据](evidence/WP-E-startup-Ubuntu-20260913.md)与[Windows新交接](WP-E-Windows-startup-handoff-20260913.md)。新工作仅本地提交，未push；从交接bundle获取代码，不将下方历史远端分支当作本轮已发布。阶段二/三NOT_RUN，WP-F未执行。
+
 > 2026-09-11 WP-D 已按用户授权进入实现：日期投影、显式 v3 正文、分项生成与确认/CAS 应用闭环已接线。最终范围、代码 SHA、验证与剩余门只以[当前状态](current-status.md)及[WP-D 矩阵](WP-D-completion-contract.md)为准。下方 WP-C / WP-D 未启动措辞为历史时点，不表示当前执行状态；WP-C 四项历史过程缺口仍未满足。
 
 > 2026-09-11 WP-C完整协作路径已实现；[关闭矩阵](WP-C-completion-contract.md)、[本轮证据](evidence/WP-C-complete-20260911.md)与[当前状态](current-status.md)说明实际覆盖和未完成门。历史阶段描述不代表当前实现缺项。

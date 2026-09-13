@@ -281,7 +281,7 @@ def _serve(args: argparse.Namespace) -> int:
                 "serve startup role=local-synthetic "
                 "local test authority, never a qualification installation"
             )
-            original(word_port=SharedWeeklyWordPort(authority))
+            await original(word_port=SharedWeeklyWordPort(authority))
 
         composition.configure_shared_weekly_production = configure_local
 

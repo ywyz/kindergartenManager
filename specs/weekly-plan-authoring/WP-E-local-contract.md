@@ -1,3 +1,22 @@
+## 2026-09-13 资格启动接入后继（阶段一执行中）
+
+普通 `app.main` 启动现通过异步 `configure_shared_weekly_production` 装配资格。运维仅通过进程环境提供以下四项：
+
+| 环境变量 | 受信输入 |
+|---|---|
+| `KM_WEEKLY_LAYOUT_MANIFEST` | 已独立审阅材料的绝对、非符号链接 manifest 文件路径 |
+| `KM_WEEKLY_LAYOUT_SHA256` | 独立审阅后从可信渠道取得的 manifest SHA256；不得从该 manifest 自取信任值 |
+| `KM_WEEKLY_LAYOUT_TENANT_ID` | 明确激活的单个正整数租户 ID |
+| `KM_WEEKLY_LAYOUT_ACTIVATE` | 显式值 `1` |
+
+四项全无时保留空 authority 和 `qualification_required`；部分配置、空值或非法配置中止装配，服务不会发布。配置不读取教师可写的 Settings、`.env` 或教学数据库。教师没有资格上传、任意路径或 pass 标志接口。当前最小配置只激活一个租户，其余租户保持未资格；不支持从材料自行推断租户。
+
+生产 authority 固定 `local_only=False`，复用未修改的严格资格 schema、released 依赖和锁内激活。启动另复用实际 renderer 版本与模板字节校验；后续解析/渲染/交付仍重验材料及依赖。没有启动迁移、数据库写入或模板变更。明确 `local_only=True` 只留在隔离测试与既有本地验收 helper，环境变量不能打开此模式。
+
+本轮新增业务入口先连续两次原源 RED（各13失败/1通过）再最小 GREEN；后加负向用例单独按当前覆盖记账。准确代码/文档 SHA、复审和交接状态见[本轮证据](evidence/WP-E-startup-Ubuntu-20260913.md)。Windows 阶段二和资格审查阶段三尚未执行，正式资格未安装，WP-E仍 OPEN/BLOCKED，不进入WP-F。
+
+以下为前轮历史时点，关于默认空 authority 的描述不替代本节当前接入行为。
+
 > 2026-09-13 Ubuntu续作：原Quality44项已本地修复；实际1页被标题描边误判的渲染缺陷完成两库双RED→GREEN与独立复审。普通1762通过/1跳过、Foundation261、WRITE267；本地页面已验证默认拒绝、五/六列下载及来源/生成/保存/冲突；新合成长文采用待用户答复。正式资格、新SHA原生Word和外部门未关闭，WP-E仍OPEN/BLOCKED，WP-C四类历史native双RED仍UNMET，WP-F未执行。见[本轮报告](evidence/WP-E-Ubuntu-quality-acceptance-20260913.md)。
 
 本轮代码SHA `0b3656c919ddfe6f09db4ed0aa0732a828727a5c`。用户确认 weekplan 内容无问题，五/六列排版交由 Python，内置模板不改；本轮模板hash保持。浏览器与两库、mock与真实AI、LO与Word、默认拒绝与合成资格下载分别记账。

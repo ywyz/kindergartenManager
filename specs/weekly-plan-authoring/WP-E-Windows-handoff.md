@@ -1,3 +1,5 @@
+> 2026-09-13 WP-E阶段一后继：[当前证据](evidence/WP-E-startup-Ubuntu-20260913.md)与[Windows新交接](WP-E-Windows-startup-handoff-20260913.md)。新工作仅本地提交，未push；从交接bundle获取代码，不将下方历史远端分支当作本轮已发布。阶段二/三NOT_RUN，WP-F未执行。
+
 # WP-E Windows 续作交接（2026-09-12）
 
 用户本次授权同步到仓库以切换 Windows。同步分支：
