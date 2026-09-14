@@ -282,7 +282,7 @@ async def test_daily_outdoor_area_format_reuses_named_game_goals(world):
             .where(DAILY.c.id == sid)
             .values(
                 revision=2,
-                outdoor_activity="游戏区域：沙水区 、 攀爬区\n重点指导：攀爬区\n活动目标：\n1.保持平衡\n2.尝试攀爬\n3.遵守规则\n指导要点：\n1.观察\n2.支持\n3.鼓励"
+                outdoor_activity="游戏区域：沙水区 、 攀爬区\n重点指导：攀爬区\n活动目标：\n1.保持平衡\n2.尝试攀爬\n3.遵守规则\n指导要点：\n1.观察\n2.支持\n3.鼓励",
             )
         )
         await session.commit()
@@ -296,3 +296,21 @@ async def test_daily_outdoor_area_format_reuses_named_game_goals(world):
     assert filled.body.value_at("games.autonomous.goals.0") == "保持平衡"
     options = extract_options(filled.body)
     assert any(o.kind == "outdoor" and o.name == "攀爬区" for o in options)
+
+
+async def test_saved_manual_clear_without_source_reference_is_preserved(world):
+    app, edit = await setup(world)
+    edit = await app.update_slots(
+        world[2][3],
+        edit.page_id,
+        edit.page,
+        (SlotChange("area.materials", "手工材料"),),
+    )
+    edit = await app.update_slots(
+        world[2][3], edit.page_id, edit.page, (SlotChange("area.materials", ""),)
+    )
+    saved = await app.save_edit(world[2][3], edit.page_id, edit.page, uuid4())
+    await daily(world)
+    reopened = await app.begin_authoring(world[2][3], saved.plan_id)
+    filled = await app.autofill_owned(world[2][3], reopened.page_id, reopened.page)
+    assert filled.body.value_at("area.materials") == ""

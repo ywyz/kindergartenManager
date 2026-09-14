@@ -127,6 +127,7 @@ class AuthoringApplication(CollaborationApplication):
         self._prompts = {}
         self._reduction = None
         self._owned_conflicts = {}
+        self._protected_empty = {}
 
     async def _source_identities(self, repo, scope, actor):
         mapped = await repo.identities(scope)
@@ -173,7 +174,9 @@ class AuthoringApplication(CollaborationApplication):
                         chosen_bindings.append(binding)
                 if any(i not in {s.source_id for s in chosen} for i in source_ids):
                     raise IdentityRejected("source_unavailable")
-                body = fill_owned(state.view.body, chosen)
+                body = fill_owned(
+                    state.view.body, chosen, self._protected_empty.get(page_id, ())
+                )
                 await context[2].audit_sources(
                     context[4], context[5], "source_read", str(uuid4())
                 )
@@ -220,6 +223,9 @@ class AuthoringApplication(CollaborationApplication):
         self._prompts = {k: v for k, v in self._prompts.items() if k in live}
         self._owned_conflicts = {
             k: v for k, v in self._owned_conflicts.items() if k in live
+        }
+        self._protected_empty = {
+            k: v for k, v in self._protected_empty.items() if k in live
         }
         for store in (self._generated, self._structure, self._imports):
             store._items = {
@@ -284,6 +290,24 @@ class AuthoringApplication(CollaborationApplication):
             self._pages._items[key], value=EditorState(view, (), ())
         )
         self._prompts[key] = ()
+        # Existing v3 blanks may represent an intentional manual deletion.
+        # The historical format has no separate touched flag: preserve these
+        # conservatively instead of treating them as a new empty worksheet.
+        self._protected_empty[key] = (
+            {
+                p
+                for p in body.paths
+                if not body.slot_at(p).value.strip()
+                and body.slot_at(p).provenance == "manual"
+            }
+            | {
+                f"days.{d.day}.activity_name"
+                for d in body.days
+                if not d.activity_name.strip()
+            }
+            if type(loaded.body) is WeeklyAuthoringDraft
+            else set()
+        )
         return view
 
     async def check_authoring_sources(
@@ -471,6 +495,15 @@ class AuthoringApplication(CollaborationApplication):
             )
             self._validate_mask(body, display)
             await self._check(expected, state)
+            self._protected_empty.setdefault(page_id, set()).update(
+                f"days.{d.day}.{field}"
+                for d in values.days
+                for field in ("morning_talk_topic", "activity_name")
+                if not getattr(d, field).strip()
+                and getattr(
+                    next(old for old in state.view.body.days if old.day == d.day), field
+                ).strip()
+            )
             return self._store_page(expected, state, body)
 
     async def update_slots(
@@ -505,6 +538,9 @@ class AuthoringApplication(CollaborationApplication):
             )
             self._validate_mask(body, display)
             await self._check(expected, state)
+            self._protected_empty.setdefault(page_id, set()).update(
+                c.path for c in changes if not c.value.strip()
+            )
             return self._store_page(expected, state, body)
 
     async def propose_import(

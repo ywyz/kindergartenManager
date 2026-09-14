@@ -36,7 +36,7 @@ def morning_summary(value: str) -> str:
     return result if len(result) <= chars and len(result.encode()) <= size else ""
 
 
-def fill_owned(body: WeeklyAuthoringDraft, selected):
+def fill_owned(body: WeeklyAuthoringDraft, selected, protected_empty=()):
     """Fill empty slots from exact authorized snapshots without overwriting history."""
     days = list(body.days)
     snapshots = {s.target: s for s in body.sources}
@@ -60,7 +60,11 @@ def fill_owned(body: WeeklyAuthoringDraft, selected):
                 if field in ("morning_talk_topic", "activity_name")
                 else ""
             )
-            if not current.strip() and value:
+            if (
+                not current.strip()
+                and value
+                and f"days.{source.day}.{field}" not in protected_empty
+            ):
                 days[index] = replace(days[index], **{field: value})
                 current = value
             snapshots[target] = SourceSnapshot(
@@ -114,6 +118,8 @@ def fill_owned(body: WeeklyAuthoringDraft, selected):
                 continue
             for suffix in dict.fromkeys(k for o in matches for k, _ in o.values):
                 path = group + "." + suffix
+                if path in protected_empty:
+                    continue
                 if kind != "area" and suffix not in (
                     "name",
                     "goals.0",
