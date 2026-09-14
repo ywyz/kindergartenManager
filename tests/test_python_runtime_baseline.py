@@ -16,12 +16,11 @@ def test_python_version_file_pins_reviewed_runtime():
 def test_docker_image_pins_reviewed_runtime():
     dockerfile = (PROJECT_ROOT / "Dockerfile").read_text(encoding="utf-8")
 
-    assert dockerfile.startswith(f"FROM python:{EXPECTED_PYTHON_VERSION}-slim\n")
-    assert "ARG PIP_INDEX_URL=https://pypi.org/simple" in dockerfile
-    assert (
-        'pip install --no-cache-dir --index-url "${PIP_INDEX_URL}" -r requirements.txt'
-        in dockerfile
-    )
+    assert "FROM ghcr.io/ywyz/kindergartenmanager@sha256:f4c76e24375c129e3bc0ae2b97f3a60e21f18a832e9eca49ee27d4361f9c5d34" in dockerfile
+    assert "COPY alembic/ /app/alembic/" in dockerfile
+    assert "COPY app/" not in dockerfile
+    assert "pip install" not in dockerfile
+
 
 
 def test_release_jobs_pin_reviewed_runtime():
