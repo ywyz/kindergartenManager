@@ -49,6 +49,7 @@ class DailyPlanOut(BaseModel):
     weekday_cn: str
     grade: str
     class_name: str
+    activity_name: str | None = None
     activity_goal: str | None = None
     activity_prep: str | None = None
     activity_key: str | None = None
@@ -76,6 +77,7 @@ class DailyPlanOut(BaseModel):
             weekday_cn=m.weekday_cn,
             grade=m.grade,
             class_name=m.class_name,
+            activity_name=m.activity_name,
             activity_goal=m.activity_goal,
             activity_prep=m.activity_prep,
             activity_key=m.activity_key,

@@ -1,4 +1,23 @@
+# 2026-09-11 WP-D 当前数据契约补充
+
+新共享周正文通过显式编辑转换使用 `weekly-authoring.v3`，外层根、不可变版本、来源审计与双 CAS 仍走 WP-C 路径；旧 v1/v2 规范解析、hash 和历史 operation 不被后台改写。v3 不是新业务表：它在版本正文内冻结 `budget_version=weekly-authoring-budget.v1`、固定标题、日历规则／标签指纹及每列教学掩码、固定 slot、来源 references 和 `archive`。
+
+固定结构包括两个集体游戏与一个自主游戏（各名称及三个目标）、一个重点区域（名称、三个目标、材料、三条指导）、本周重点三条、环境三条、生活习惯三组名称／内容及家园共育短段。缺项以固定空 slot 保存；完整生成结果另验数量和非空，合法草稿不等于单页／正式导出合格。字段同时限制字符与 UTF-8 字节：名称／晨谈主题 64／256，材料和家园共育 400／1600，其他 slot 160／640；正文总量上限 1,048,576 字节，不截断内容。
+
+slot 的 imported/manual/ai provenance 与 `SourceReference(target,snapshot_hash)` 显式保存。引用绑定原始 imported baseline；旧源重导入后仍被整周 slot 使用时进入 `archive`，最多 128 份，只允许同周、原始 imported 状态且实际被引用的唯一快照。显式编辑清除最后引用可清理 archive；历史不可变版本仍保留原字节。普通手工保存不要求旧源继续可读，本次结构／AI／导入依赖则在保存前重新验证精确源、mapping 和权限。
+
+唯一迁移 head 为 `c264d8fa1037`，前驱 `b153c7e9f026`：扩展已有 prompt task 枚举，不重写现有 prompt 版本。没有长期页面、候选或 Provider 会话表。当前表级约束与迁移行为见[迁移契约](../../specs/weekly-plan-authoring/migration-proposal.md)；最终代码 SHA、验证和剩余门只见[WP-D 矩阵](../../specs/weekly-plan-authoring/WP-D-completion-contract.md)、[本轮证据](../../specs/weekly-plan-authoring/evidence/WP-D-20260911.md)及[当前状态](../../specs/weekly-plan-authoring/current-status.md)。下方旧 head、表数和阶段描述为各自日期的历史记录。
+
+---
+
+> 2026-09-11 WP-C完整协作实现已接入生产composition：显式映射、逐日选源、差异采用、CAS来源快照、检查/重导入及人员默认。迁移head为b153c7e9f026；最终验证及尚缺门以[当前状态](../../specs/weekly-plan-authoring/current-status.md)和[本轮账本](../../specs/weekly-plan-authoring/evidence/WP-C-complete-20260911.md)为准。下方旧阶段记录保留历史语境。
+
+> 2026-09-11 当前周计划状态见[实时核对](../../specs/weekly-plan-authoring/current-status.md)：WP-A 已限定关闭，WP-C 授权/事实子步已本地交付、身份基线已公开；下方旧阶段记录不作当前阻塞。
+
 # KindergartenManager 数据模型
+
+2026-09-08 已确认、尚未实施的[周计划填写需求](../../specs/weekly-plan-authoring/spec.md)将涉及每日活动名称、
+权威班级成员、同班共享周聚合与来源 revision。下文表结构仍描述当前实现，不代表上述新模型已经迁移。
 
 > 文档审查基线：2026-09-07 当前工作树；当前 Alembic head：`3c9f4b2a7d1e`。
 > W005-W008 已闭合。当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的应用服务层 WRITE；
@@ -306,3 +325,27 @@ W008 固定 SHA 的独立人工门闭合。
 - 可信 UI session 已恢复并进入分支/远端 CI，但当前会话不落独立 server-side session 表，后续撤销/运维策略需以独立需求收紧。
 - W005-W008 已闭合逐次确认、操作前版本、不可变审计、原子 CAS、真实 MySQL 8 与固定 SHA 可见验收；
   精确门禁以 `specs/agent-write/tests/README.md` 为准，后续改动不得沿用历史证据。
+
+## 新周计划WP-A迁移提案
+
+[迁移设计](../../specs/weekly-plan-authoring/migration-proposal.md)拟分门增加activity_name、最小权威班级成员和独立共享聚合。
+包含tenant复合FK、教学周/日期唯一、不可变来源版本、CAS及旧数据显式映射；仅提案，未新增migration或变更当前schema。
+[WP-A账本](../../specs/weekly-plan-authoring/evidence/WP-A-20260908.md)区分旧基线通过、差距RED与未实现能力。
+
+### 2026-09-10 WP-C身份子步（当时本地交付快照，非全门通过）
+
+在隔离worktree实现最小权威学年/学期/班级/assignment、独立manager资格与session绑定管理事务；
+本地代码`00afdc878b306475508c777997956cdf4638dbef`，Alembic新增`7c91e2a4b610`派生`6a8d2c4e9f10`，
+只验一次性SQLite和专属MySQL。共享授权/根/CAS/来源仍未实现；不扩旧周/月或源写权限。
+精确证据与未执行项见隔离worktree的`specs/weekly-plan-authoring/evidence/WP-C-20260910.md`，
+下一提示词`specs/weekly-plan-authoring/WP-C-next-prompt.md`。未公开提交，无CI/云端/Office/部署结论；WP-A仍缺目标Office。
+
+## 2026-09-11 WP-C协作数据模型
+
+从8d20f3b5c721依次迁移9e31a6c8d204→a042b6d8e915→b153c7e9f026。daily_plan_identity为显式来源当前指针，identity_mapping_event保留不可变映射基线；删除daily只清指针。shared_weekly_source按不可变version保存关闭字段路径、源身份/revision、mapping基线、原导入值/hash、采用hash与imported/manual来源方式，不随源删除。shared_weekly_source_audit用tenant/root/version复合FK保持归属。weekly_person_defaults为tenant/user/class的CAS设置，操作账只存revision/hash/outcome，不含姓名。weekly-collaboration.v2显式扩展主题、人员与按日来源片段，旧weekly-theme.v1历史不被打开或后台迁移改写。全部迁移仅在一次性库验证，未连接真实业务库。
+
+来源INSERT同时校验parent班级/学期与关闭目标日期路径；原导入基线可从predecessor来源完整沿用（采用hash/provenance允许手改），新基线则须匹配live DailyPlan和当前mapping的精确revision/字段值。源删除后仍允许已有基线在正常手工保存中延续，不能凭残留event新增伪造基线。
+
+## WP-E 无正文导出授权审计
+
+迁移 `d375e9012abc` 新增 `shared_weekly_export_audit`，关联tenant/actor/shared plan/version/class，记录授权revision、assignment摘要、operation/session及body/template hash；无正文/人员姓名/文件路径，非ExportRecord。禁止UPDATE/DELETE，非空拒绝降级。记录证明授权事务，不证明浏览器收件。`d375e9ab2148`登记weekly_reduction提示词任务，不重写旧版本；其非空提示词拒绝移除任务。详见 [WP-E契约](../../specs/weekly-plan-authoring/WP-E-local-contract.md)。

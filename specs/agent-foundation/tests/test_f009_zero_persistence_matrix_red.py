@@ -91,6 +91,12 @@ AUTHORIZED_AGENT_WRITE_EVIDENCE_TABLES = frozenset(
 )
 AUTHORIZED_NON_AGENT_BUSINESS_TABLES = frozenset(
     {
+        "identity_audit",  # Existing WP-C identity_manage audit, not Agent state.
+        "shared_weekly_audit",  # Shared weekly business operations, not Agent state.
+        "shared_weekly_version",  # Immutable weekly body, not Agent operation state.
+        "shared_weekly_source_audit",  # Shared source access, not Agent state.
+        "shared_weekly_export_audit",  # Saved-version export authorization only.
+        "weekly_person_defaults_audit",  # Explicit personal settings operations.
         "weekly_monthly_plan",
         "weekly_monthly_plan_version",
         "weekly_activity_plan_day",
@@ -1381,6 +1387,12 @@ async def test_restart_after_draft_has_fresh_ids_history_and_no_agent_schema(
     for term in FORBIDDEN_AGENT_SCHEMA_TERMS:
         assert _is_forbidden_agent_schema_name(f"foundation_{term}")
     assert AUTHORIZED_AGENT_WRITE_EVIDENCE_TABLES <= names
+    assert "identity_audit" in names
+    assert "shared_weekly_audit" in names
+    assert "shared_weekly_version" in names
+    assert "shared_weekly_source_audit" in names
+    assert "shared_weekly_export_audit" in names
+    assert "weekly_person_defaults_audit" in names
     assert not any(
         _is_forbidden_agent_schema_name(name)
         for name in names
@@ -1390,6 +1402,12 @@ async def test_restart_after_draft_has_fresh_ids_history_and_no_agent_schema(
     rows_by_table = {
         table_name: rows for table_name, _columns, rows in snapshot.database
     }
+    assert rows_by_table["identity_audit"] == ()
+    assert rows_by_table["shared_weekly_audit"] == ()
+    assert rows_by_table["shared_weekly_version"] == ()
+    assert rows_by_table["shared_weekly_source_audit"] == ()
+    assert rows_by_table["shared_weekly_export_audit"] == ()
+    assert rows_by_table["weekly_person_defaults_audit"] == ()
     assert all(
         rows_by_table[table_name] == ()
         for table_name in AUTHORIZED_AGENT_WRITE_EVIDENCE_TABLES

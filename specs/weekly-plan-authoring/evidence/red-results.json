@@ -1,0 +1,58 @@
+{
+  "source_sha": "8dcc83376577695b562529ec42adc6b48817f004",
+  "test_sha256": "3f05269ebad5227dbe48a97e0212f3a5b94645557b1f5f637c20a46ecdf1bc31",
+  "results": [
+    {
+      "run": 1,
+      "exit": 1,
+      "collected": 16,
+      "passed": 4,
+      "failed": 12,
+      "node_sha256": "4e27e606dfa7cb334a3c850f1d9080819e33c5d8fb132e7b8522ea7eec830274",
+      "outcomes": [
+        "FAILED",
+        "FAILED",
+        "FAILED",
+        "FAILED",
+        "FAILED",
+        "FAILED",
+        "FAILED",
+        "FAILED",
+        "FAILED",
+        "FAILED",
+        "FAILED",
+        "FAILED",
+        "PASSED",
+        "PASSED",
+        "PASSED",
+        "PASSED"
+      ]
+    },
+    {
+      "run": 2,
+      "exit": 1,
+      "collected": 16,
+      "passed": 4,
+      "failed": 12,
+      "node_sha256": "4e27e606dfa7cb334a3c850f1d9080819e33c5d8fb132e7b8522ea7eec830274",
+      "outcomes": [
+        "FAILED",
+        "FAILED",
+        "FAILED",
+        "FAILED",
+        "FAILED",
+        "FAILED",
+        "FAILED",
+        "FAILED",
+        "FAILED",
+        "FAILED",
+        "FAILED",
+        "FAILED",
+        "PASSED",
+        "PASSED",
+        "PASSED",
+        "PASSED"
+      ]
+    }
+  ]
+}

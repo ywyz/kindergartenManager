@@ -1,5 +1,5 @@
 import enum
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     BigInteger,
@@ -7,6 +7,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     Enum,
+    Index,
     Integer,
     String,
     UniqueConstraint,
@@ -29,6 +30,7 @@ class User(Base):
     __table_args__ = (
         # 同一 tenant_id 下 username 唯一
         UniqueConstraint("tenant_id", "username", name="uq_user_tenant_username"),
+        Index("uq_user_tenant_id", "tenant_id", "id", unique=True),
     )
 
     # BigInteger().with_variant(Integer, "sqlite") 解决 SQLite 测试时自增兼容问题
@@ -63,11 +65,11 @@ class User(Base):
         default=None,
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime, default=lambda: datetime.now(UTC), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
         nullable=False,
     )

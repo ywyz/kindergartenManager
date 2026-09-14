@@ -54,3 +54,11 @@ __all__ = [
     "WeeklyMonthlyPlanVersion",
     "WeeklyMonthlyScopeGrant",
 ]
+
+from app.core.models import (  # noqa: F401
+    academic_identity,
+    shared_weekly,
+    source_mapping,
+    weekly_people,
+    weekly_sources,
+)

@@ -1,0 +1,155 @@
+{
+  "role": "Synthetic WP-A verification fixtures, not product exports or qualified templates",
+  "historical_code_sha": "8dcc83376577695b562529ec42adc6b48817f004",
+  "historical_manifest_sha256": "b395c5930f2e53c5f148aab76d4bdbe2c3b589e9fb3cb085927013ee7a017d2c",
+  "files": {
+    "samples/normal-five-short.docx": {
+      "sha256": "7eca517011011b5cb7c3b74d38756fdfef6da5f2a7df44503bceefdbd07593c9",
+      "bytes": 17897
+    },
+    "samples/normal-five-long.docx": {
+      "sha256": "9cd738dd630228f8d3b3c314742f7f62e16de498904a097407b52edef7597f4f",
+      "bytes": 19348
+    },
+    "samples/preceding-sunday-six-short.docx": {
+      "sha256": "78b7f8fdab2714a4cb4a5cacfaba55092229462653811ce66503d61e2ff1109a",
+      "bytes": 17941
+    },
+    "samples/preceding-sunday-six-long.docx": {
+      "sha256": "ff6088b80654fbfdd096b233e995ef1394b9209ea50728ea9b21ce43a4f0c6d6",
+      "bytes": 19385
+    },
+    "samples/saturday-six-short.docx": {
+      "sha256": "99bfb2d7be462be4353a5b54affddac60c4bd257040f4a6e237f5bbd58073259",
+      "bytes": 17939
+    },
+    "samples/saturday-six-long.docx": {
+      "sha256": "600fc88240d87d03854d4a51c4985b654fb606015dcb1a771f8947f78c74d374",
+      "bytes": 19383
+    },
+    "samples/normal-compact-candidate.docx": {
+      "sha256": "e6d7a4dbb44418e0078fdd2280fec89bb12f33c0c3aaec67235ab9d1821bb350",
+      "bytes": 18008
+    },
+    "samples/sunday-compact-candidate.docx": {
+      "sha256": "45b02145e835b27d54d2ed57aa3a8f2e57bbb13c335b1c0fadd2dcf69288d27a",
+      "bytes": 18041
+    },
+    "samples/saturday-compact-candidate.docx": {
+      "sha256": "4286ee43ced4a9043231264851c75cb9b1ddf76594294f23a3ac9f85066b69b3",
+      "bytes": 18039
+    },
+    "linux-reference/normal-five-short/normal-five-short.pdf": {
+      "sha256": "dd2244461ab95df7a77042c5ea46fd149645b1787bb4f5f5d4e582f89167b7f5",
+      "bytes": 73004
+    },
+    "linux-reference/normal-five-short/page-1.png": {
+      "sha256": "2733fbdafb6997522cb83c995e35cb11be01c7bfd505137e9fa41b5e64d680d0",
+      "bytes": 254825
+    },
+    "linux-reference/normal-five-long/normal-five-long.pdf": {
+      "sha256": "54629601274e1917ef4f32cdd2a6d90c1a01d8eac472b8cbf4b8664d0b6e1ddc",
+      "bytes": 123973
+    },
+    "linux-reference/normal-five-long/page-1.png": {
+      "sha256": "cd91fa523cb4577e25b2ec20b3c20d1e9d56b68e5af36f7f2567f5004d5ee7b2",
+      "bytes": 631557
+    },
+    "linux-reference/normal-five-long/page-2.png": {
+      "sha256": "c5a06a083ecbbfb05813f4679b47a0aff7990ec7e7831dd37032956162ee3281",
+      "bytes": 255718
+    },
+    "linux-reference/preceding-sunday-six-short/preceding-sunday-six-short.pdf": {
+      "sha256": "df5498f7c169e86c3eccd952bbfb623be368e6fc8a3f6bc323adc0d764206024",
+      "bytes": 74885
+    },
+    "linux-reference/preceding-sunday-six-short/page-1.png": {
+      "sha256": "575603df03fb42e041918bb3e308168c9ef1df40d8e05520810a8bf4b006393d",
+      "bytes": 256310
+    },
+    "linux-reference/preceding-sunday-six-long/preceding-sunday-six-long.pdf": {
+      "sha256": "9a7ff5d9c68383ee08943244b4c29825caa2fc18cdaa256cc5ce9f70dc0f821d",
+      "bytes": 126174
+    },
+    "linux-reference/preceding-sunday-six-long/page-1.png": {
+      "sha256": "1a5854506f09465232e05760896889e8da2c3177ce0a3496e75e75852e4edb1b",
+      "bytes": 610089
+    },
+    "linux-reference/preceding-sunday-six-long/page-2.png": {
+      "sha256": "6c54eb922d1cc8e971d95323f36ee8ec5312b8aa13233691adcd3e08a325813b",
+      "bytes": 281651
+    },
+    "linux-reference/saturday-six-short/saturday-six-short.pdf": {
+      "sha256": "d5887e9cc21ce2fc18394ebc35c6c41011db625b9d72a6aafcedd01c35337400",
+      "bytes": 74968
+    },
+    "linux-reference/saturday-six-short/page-1.png": {
+      "sha256": "7ce2e4a65f350bc1f1a11ef1f1ae6cab63b65145a305048c3e5dc67249b83938",
+      "bytes": 256558
+    },
+    "linux-reference/saturday-six-long/saturday-six-long.pdf": {
+      "sha256": "f1e69ea66b12b473e5bf819442e9d222b3a1a59dec357b4ab3c3ae807acbf789",
+      "bytes": 126262
+    },
+    "linux-reference/saturday-six-long/page-1.png": {
+      "sha256": "cfbbb18723ac7b49fe70e36da4955c8270e8947aed18e3a28d94067a314f77ec",
+      "bytes": 610199
+    },
+    "linux-reference/saturday-six-long/page-2.png": {
+      "sha256": "6c54eb922d1cc8e971d95323f36ee8ec5312b8aa13233691adcd3e08a325813b",
+      "bytes": 281651
+    },
+    "linux-reference/normal-compact-candidate/normal-compact-candidate.pdf": {
+      "sha256": "a6155c059232885907917e6224b09cdd4685436434b398bb815d001ede1708eb",
+      "bytes": 78033
+    },
+    "linux-reference/normal-compact-candidate/page-1.png": {
+      "sha256": "c8eb71600479ae93a4cbd5b7246356f3d7fc8d70b6c563cd297c628b511e1f42",
+      "bytes": 332310
+    },
+    "linux-reference/sunday-compact-candidate/sunday-compact-candidate.pdf": {
+      "sha256": "68843144065aaa4318db6155e6d9f0af8ef8b3d9ece36e88ddd404fa497c542e",
+      "bytes": 80006
+    },
+    "linux-reference/sunday-compact-candidate/page-1.png": {
+      "sha256": "2111d5551d71c1219f3d71e264488ed06f37a0567a5594c8f4696a7426e2e7b8",
+      "bytes": 340906
+    },
+    "linux-reference/saturday-compact-candidate/saturday-compact-candidate.pdf": {
+      "sha256": "d577ce1344ed880a118d052aeba1d76f651b96d25a2af6f414803e0bb0fc76e0",
+      "bytes": 80124
+    },
+    "linux-reference/saturday-compact-candidate/page-1.png": {
+      "sha256": "15b951fcb4d830d0e03e002d243337f3de25e6d33a1bfcac0e7def4012336dc2",
+      "bytes": 341095
+    },
+    "historical-linux-scripts/make_layout_samples.py": {
+      "sha256": "6115dee4ed247e7e2cceb6e93e588701aa72a63160a8e3ae2ed665fec52dbe9b",
+      "bytes": 13805
+    },
+    "historical-linux-scripts/make_compact_candidates.py": {
+      "sha256": "93bb2c101d3128fcf3764f0eb0e4ada51b4c8b01193a30d0889968d102364276",
+      "bytes": 3635
+    },
+    "historical-linux-scripts/write_layout_manifest.py": {
+      "sha256": "1cb9a13d3f92111bd2734ad5e98c54134c7ef9142e1a2a7a4681b30f1bd057d0",
+      "bytes": 12928
+    },
+    "historical-linux-scripts/verify_layout.py": {
+      "sha256": "8b88a789c76f2be55f33df5f87445a32432a459db0ad8cf38804c1ffc40eb6d0",
+      "bytes": 5504
+    },
+    "historical-linux-scripts/reproduce.sh": {
+      "sha256": "09e5d0feb2667b4cc43d73e213fdcf0256771a07e2845d5c79f68d337ed2bb66",
+      "bytes": 1250
+    },
+    "historical-linux-manifest.json": {
+      "sha256": "b395c5930f2e53c5f148aab76d4bdbe2c3b589e9fb3cb085927013ee7a017d2c",
+      "bytes": 96790
+    },
+    "historical-linux-report.md": {
+      "sha256": "d7458782e31dea9bc26021c895faf63c42e5a66584ba0411894e322c4a24ce10",
+      "bytes": 5418
+    }
+  }
+}

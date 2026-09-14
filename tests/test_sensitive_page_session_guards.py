@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-
 PAGE_DIR = Path(__file__).parents[1] / "app" / "ui" / "pages"
 
 
@@ -1246,6 +1245,7 @@ def test_daily_plan_target_tracks_every_editable_form_control_generation() -> No
     assert "form_generation=form_generation.capture()" in current
     for control in (
         "raw_text_area",
+        "name_input",
         "goal_area",
         "prep_area",
         "key_area",

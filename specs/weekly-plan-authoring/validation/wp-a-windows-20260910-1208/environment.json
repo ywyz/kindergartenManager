@@ -1,0 +1,33 @@
+{
+  "measured_at": "2026-09-10T12:09:30.7176462+08:00",
+  "word_name": "Microsoft Word",
+  "word_version": "16.0",
+  "word_build": "16.0.20326",
+  "active_printer": "Brother DCP-T725DW Printer",
+  "os": {
+    "Caption": "Microsoft Windows 11 专业版",
+    "Version": "10.0.26200",
+    "BuildNumber": "26200",
+    "OSArchitecture": "64 位"
+  },
+  "culture": "zh-CN",
+  "system_locale": "zh-CN",
+  "office": {
+    "VersionToReport": "16.0.20326.20132",
+    "Platform": "x64",
+    "ProductReleaseIds": "O365HomePremRetail"
+  },
+  "default_printer": [
+    {
+      "Name": "Brother DCP-T725DW Printer",
+      "DriverName": "Brother DCP-T725DW Printer"
+    }
+  ],
+  "default_paper": {
+    "PaperSize": 9,
+    "DuplexingMode": 0,
+    "Color": true
+  },
+  "native_observation": "BLOCKED: Computer Use native pipe os error 2; initial/retry/reset-retry all failed",
+  "warning_observation": "NOT OBSERVED; alerts enabled, OpenAndRepair false"
+}

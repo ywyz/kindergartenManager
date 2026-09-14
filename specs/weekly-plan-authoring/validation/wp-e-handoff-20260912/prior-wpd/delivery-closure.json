@@ -1,0 +1,33 @@
+{
+  "disposable_mysql_container": "km-wpd-mysql-20260911 removed after all tests completed",
+  "documentation_only_successor": true,
+  "documentation_successor_sha": "3fcefdf08a4b6aa6d3d7d5eb674cac2fce180713",
+  "documents_sha256": {
+    "CONTEXT.md": "1d00d593e5ed5f4d77d016448922d578143e71971ef7724d684ec57f7c80054a",
+    "docs/ADR/ADR-0011-shared-weekly-authoring-and-source-snapshots.md": "e3faeacdae57d5427f5e56e2d677bd9c10449df8c7758d026f283d4a1270aa74",
+    "docs/ROADMAP.md": "23aed66660ce9fbc1ba594c98d3b90b4994e9da43c63515944bdaf52aaea3b98",
+    "docs/design/data-model.md": "a7af3b769cb0f147e91e88db621649a99dc6134c59830540049e7ef6ed8abe6b",
+    "docs/design/system-architecture.md": "1b261b924ad844550583072c40a49d8d83f62a65972c02365fdcaf38c6ddf65b",
+    "memory-bank/architecture.md": "64a6300767c5342f2940b2e5e9d3090919cb80b53b56ba288d2e518d8aa3ff21",
+    "specs/weekly-plan-authoring/README.md": "dbb967c97e71d170d4fbca8c5896747c76c7710fbfa91546e5e624483ab3d3c8",
+    "specs/weekly-plan-authoring/WP-D-completion-contract.md": "e6a64d9bec20da7be4457f26921426041e18e245209c27330884ceabf8a736ed",
+    "specs/weekly-plan-authoring/WP-E-next-prompt.md": "84dcc4d9caa0476ee0a051f178184c91369a4e12313464bb7149021f1fafe223",
+    "specs/weekly-plan-authoring/calendar-contract.md": "cfeb7e653e776556eea369a340bc877004d9717314cd49892730dcb7ef5b87b6",
+    "specs/weekly-plan-authoring/current-status.md": "b8eaa584b773cfafe4a0a383cd1b732d2c277a2e06e74dab8bd53d8c4f36ca12",
+    "specs/weekly-plan-authoring/evidence/WP-D-20260911.md": "2e87ba3c4582c06b8d87518d6ce6119bb967649d45d2a3611a1c76d00f296012",
+    "specs/weekly-plan-authoring/evidence/WP-D-manifest-20260911.json": "da6ae8f6328d85ecd9b066fa2d6bd8ffa3fbdc1f7f8c17aaa2c76be20ae9eb2a",
+    "specs/weekly-plan-authoring/migration-proposal.md": "afb23a89249ad9af0364edb93728034ff154af633ed0c9c9f945b26b43980ffa",
+    "specs/weekly-plan-authoring/service-contract.md": "17925da777911e547c1e94f1482773d843deb91e9f8a9a1d8a33efff864a24e8",
+    "specs/weekly-plan-authoring/tasks.md": "dc5f1904f8c6b5c8a840c46ca02a7415ee0e9f2ccc0d4e6852cc6061a2bf238f"
+  },
+  "independent_final_document_review": "integrity_audit: no blocking contradiction; all local claims/limits consistent; no product tests repeated for docs",
+  "issue_77_writeback": "NOT_AUTHORIZED_NOT_SENT",
+  "local_wp_d_gate": "COMPLETE_authorized_scope",
+  "manifest_artifacts_verified": 318,
+  "manifest_sha256": "da6ae8f6328d85ecd9b066fa2d6bd8ffa3fbdc1f7f8c17aaa2c76be20ae9eb2a",
+  "published": false,
+  "relative_document_links_verified": 187,
+  "task_worktree_clean": true,
+  "tested_code_sha": "258a9b0978e89397c90a4b7e271388d58b13b8d7",
+  "wp_c_historical_gaps": "UNMET"
+}

@@ -1,0 +1,30 @@
+{
+  "sample": "preceding-sunday-six-short.docx",
+  "started_at": "2026-09-10T12:09:40.8564549+08:00",
+  "input_sha256": "78b7f8fdab2714a4cb4a5cacfaba55092229462653811ce66503d61e2ff1109a",
+  "word_pages": 1,
+  "compatibility_mode": 15,
+  "read_only": true,
+  "zoom_percent": 100,
+  "view_type": 3,
+  "geometry_points": {
+    "width": 595.3,
+    "height": 841.9,
+    "left": 36.0,
+    "right": 36.0,
+    "top": 14.2,
+    "bottom": 14.2,
+    "orientation": 0,
+    "paper_size": 7
+  },
+  "tables": 1,
+  "rows": 9,
+  "requested_body_font": "",
+  "body_size_pt": 9999999.0,
+  "body_line_spacing_pt": 9999999.0,
+  "body_line_spacing_rule": 9999999,
+  "pdf_sha256": "3de3a2117bfafea601247e3c004bd6948e2c327ca3dccf34800573b352b56a0a",
+  "com_export": "SUCCESS; native warning/preview observation still missing",
+  "input_sha256_after": "78b7f8fdab2714a4cb4a5cacfaba55092229462653811ce66503d61e2ff1109a",
+  "finished_at": "2026-09-10T12:09:42.0473115+08:00"
+}

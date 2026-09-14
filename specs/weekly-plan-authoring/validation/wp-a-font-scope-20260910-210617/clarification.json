@@ -1,0 +1,10 @@
+{
+  "recorded_at_utc": "2026-09-10T13:06:17.135341+00:00",
+  "user_requirement": "空格字体不需要是宋体",
+  "font_result": "PASS_NONEMPTY_TEXT_SIMSUN; WHITESPACE_FONT_UNRESTRICTED",
+  "libreoffice_product_version": "26.8.0.3",
+  "libreoffice_buildid": "bce0998afefdbc355585ca324285661a2170ba77",
+  "stable_release_source": "https://us.libreoffice.org/download/libreoffice-stable/",
+  "libreoffice_sample_measurement": "NOT_YET_OBTAINED",
+  "no_input_or_output_render_changed": true
+}

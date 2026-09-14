@@ -1,0 +1,440 @@
+{
+  "role": "OOXML positioning aid only; not native Word PASS or business RED",
+  "source": "C:\\Users\\admin\\.codex\\visualizations\\2026\\09\\12\\01a0937c-3f64-7ce2-98f9-fecd1934901c\\wp-e-header-week-20260912\\candidates-final\\five-normal.docx",
+  "paragraphs": [
+    {
+      "location": "body/child[1]/p",
+      "text": "幼儿园每周工作计划表",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[2]/p",
+      "text": "主题名称：《秋天 的发现》    班级：验收小一班 第3周（2026年9月14日—9月18日）",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[3]/p",
+      "text": "教师：林老师、王老师、陈老师    保育员：李老师",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[1]/tc[1]/p[1]",
+      "text": "",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[1]/tc[2]/p[1]",
+      "text": "周一",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[1]/tc[3]/p[1]",
+      "text": "周二",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[1]/tc[4]/p[1]",
+      "text": "周三",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[1]/tc[5]/p[1]",
+      "text": "周四",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[1]/tc[6]/p[1]",
+      "text": "周五",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[2]/tc[1]/p[1]",
+      "text": "学习活动",
+      "vMerge": "restart",
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[2]/tc[2]/p[1]",
+      "text": "晨间谈话",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[2]/tc[3]/p[1]",
+      "text": "秋叶什么颜色？",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[2]/tc[4]/p[1]",
+      "text": "秋叶什么颜色？",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[2]/tc[5]/p[1]",
+      "text": "秋叶什么颜色？",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[2]/tc[6]/p[1]",
+      "text": "秋叶什么颜色？",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[2]/tc[7]/p[1]",
+      "text": "秋叶什么颜色？",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[3]/tc[1]/p[1]",
+      "text": "",
+      "vMerge": "continue",
+      "spacing": {},
+      "explicit_exact_20pt": false
+    },
+    {
+      "location": "body/child[4]/tbl/tr[3]/tc[2]/p[1]",
+      "text": "集体活动",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[3]/tc[3]/p[1]",
+      "text": "《拾秋叶》",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[3]/tc[4]/p[1]",
+      "text": "《拾秋叶》",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[3]/tc[5]/p[1]",
+      "text": "《拾秋叶》",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[3]/tc[6]/p[1]",
+      "text": "《拾秋叶》",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[3]/tc[7]/p[1]",
+      "text": "《拾秋叶》",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[4]/tc[1]/p[1]",
+      "text": "游戏活动",
+      "vMerge": "restart",
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[4]/tc[2]/p[1]",
+      "text": "户外游戏",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[4]/tc[3]/p[1]",
+      "text": "体能大循环集体游戏：1.《拾秋叶》（目标：1.观察颜色 2.练习合作 3.整理材料）2.《运果子》（目标：1.观察颜色 2.练习合作 3.整理材料）自主游戏：《搭小屋》（目标：1.观察颜色 2.练习合作 3.整理材料）",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[5]/tc[1]/p[1]",
+      "text": "",
+      "vMerge": "continue",
+      "spacing": {},
+      "explicit_exact_20pt": false
+    },
+    {
+      "location": "body/child[4]/tbl/tr[5]/tc[2]/p[1]",
+      "text": "区域游戏",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[5]/tc[3]/p[1]",
+      "text": "1.户外游戏 2.区域游戏 3.专用室本周重点指导区域：美工区目标：1.观察叶形2.尝试拼贴3.交流发现材料：树叶 纸张指导：1.看一看2.摆一摆3.说一说",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[6]/tc[1]/p[1]",
+      "text": "本周重点",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[6]/tc[2]/p[1]",
+      "text": "1.观察秋叶2.合作游戏3.爱护材料",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[7]/tc[1]/p[1]",
+      "text": "环境创设",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[7]/tc[2]/p[1]",
+      "text": "1.展示秋叶2.摆放作品3.整理角落",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[8]/tc[1]/p[1]",
+      "text": "生活习惯培养",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[8]/tc[2]/p[1]",
+      "text": "1.洗手：餐前洗手2.整理：物归原位3.饮水：主动喝水",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[9]/tc[1]/p[1]",
+      "text": "家园共育",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    },
+    {
+      "location": "body/child[4]/tbl/tr[9]/tc[2]/p[1]",
+      "text": "亲子拾叶，交流发现。",
+      "vMerge": null,
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "lineRule": "exact",
+        "line": "400"
+      },
+      "explicit_exact_20pt": true
+    }
+  ]
+}

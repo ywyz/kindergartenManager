@@ -519,3 +519,22 @@ class TestSignature:
             },
         )
         assert resp.status_code == 401
+
+async def test_daily_name_http_projection_preserves_null_and_tenant(api_client, async_session):
+    from sqlalchemy import select
+    await _seed(async_session)
+    rows = list((await async_session.scalars(select(DailyPlan))).all())
+    own = next(row for row in rows if row.tenant_id == TENANT)
+    other = next(row for row in rows if row.tenant_id == OTHER_TENANT)
+    own.activity_name = '教师手改名称'
+    other.activity_name = '不可泄露名称'
+    await async_session.commit()
+    response = await api_client.get('/api/v1/daily-plans', headers={'X-Api-Key': API_KEY})
+    assert response.status_code == 200
+    items = response.json()['items']
+    assert {item['activity_name'] for item in items} == {'教师手改名称', None}
+    detail = await api_client.get(f'/api/v1/daily-plans/{own.id}', headers={'X-Api-Key': API_KEY})
+    assert detail.json()['activity_name'] == '教师手改名称'
+    forbidden = await api_client.get(f'/api/v1/daily-plans/{other.id}', headers={'X-Api-Key': API_KEY})
+    assert forbidden.status_code == 404
+    assert '不可泄露名称' not in forbidden.text

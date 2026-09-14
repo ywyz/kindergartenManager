@@ -1,0 +1,425 @@
+{
+  "started_at_utc": "2026-09-10T13:09:07.918425+00:00",
+  "platform": "Windows",
+  "profile": "C:\\Users\\yw980\\AppData\\Local\\Temp\\wp-a-lo-validation-jufzi8b1",
+  "mode": "headless PDF export, no native preview observation",
+  "version": {
+    "command": [
+      "C:\\Program Files\\LibreOffice\\program\\soffice.com",
+      "--version"
+    ],
+    "exit_code": 0,
+    "stdout": "LibreOffice 26.8.0.3 bce0998afefdbc355585ca324285661a2170ba77\r\n\r\n",
+    "stderr": ""
+  },
+  "version_ini": "[Version]\nAllLanguages=en-US ab af am ar as ast be bg bn bn-IN bo br brx bs ca ca-valencia ckb cs cy da de dgo dsb dz el en-GB en-ZA eo es et eu fa fi fr fur fy ga gd gl gu gug he hi hr hsb hu hy id is it ja ka kab kk km kmr-Latn kn ko kok ks lb lo lt lv mai mk ml mn mni mr my nb ne nl nn nr nso oc om or pa-IN pl pt pt-BR qtz ro ru rw sa-IN sat sat-Olck sd si sid sk sl sq sr sr-Latn ss st sv sw-TZ szl ta te tg th tl tn tr ts tt ug uk uz ve vec vi xh zh-CN zh-TW zu\nbuildid=bce0998afefdbc355585ca324285661a2170ba77\nExtensionUpdateURL=https://updateexte.libreoffice.org/ExtensionUpdateService/check.Update\nReferenceOOoMajorMinor=4.1\nUpdateChannel=LOOnlineUpdater\nUpdateID=LibreOffice_26_en-US_ab_af_am_ar_as_ast_be_bg_bn_bn-IN_bo_br_brx_bs_ca_ca-valencia_ckb_cs_cy_da_de_dgo_dsb_dz_el_en-GB_en-ZA_eo_es_et_eu_fa_fi_fr_fur_fy_ga_gd_gl_gu_gug_he_hi_hr_hsb_hu_hy_id_is_it_ja_ka_kab_kk_km_kmr-Latn_kn_ko_kok_ks_lb_lo_lt_lv_mai_mk_ml_mn_mni_mr_my_nb_ne_nl_nn_nr_nso_oc_om_or_pa-IN_pl_pt_pt-BR_qtz_ro_ru_rw_sa-IN_sat_sat-Olck_sd_si_sid_sk_sl_sq_sr_sr-Latn_ss_st_sv_sw-TZ_szl_ta_te_tg_th_tl_tn_tr_ts_tt_ug_uk_uz_ve_vec_vi_xh_zh-CN_zh-TW_zu\nUpdateURL=https://update.libreoffice.org/check.php\nUpdateUserAgent=<PRODUCT> (${buildid}; ${_OS}; ${_ARCH}; <OPTIONAL_OS_HW_DATA>)\nVendor=The Document Foundation\n",
+  "soffice_bin_sha256": "6e3e16a5c8338138ea14666f7873b8f909eebf266fcacb4bb840906ca115c62e",
+  "samples": [
+    {
+      "sample": "normal-compact-candidate.docx",
+      "started_at_utc": "2026-09-10T13:09:11.162095+00:00",
+      "input_sha256": "e6d7a4dbb44418e0078fdd2280fec89bb12f33c0c3aaec67235ab9d1821bb350",
+      "conversion": {
+        "command": [
+          "C:\\Program Files\\LibreOffice\\program\\soffice.com",
+          "-env:UserInstallation=file:///C:/Users/yw980/AppData/Local/Temp/wp-a-lo-validation-jufzi8b1",
+          "--headless",
+          "--convert-to",
+          "pdf:writer_pdf_Export",
+          "--outdir",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\normal-compact-candidate",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-simsun-20260909\\samples\\normal-compact-candidate.docx"
+        ],
+        "exit_code": 0,
+        "stdout": "convert C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-simsun-20260909\\samples\\normal-compact-candidate.docx as a Writer document -> C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\normal-compact-candidate\\normal-compact-candidate.pdf using filter : writer_pdf_Export\n",
+        "stderr": "Could not find platform independent libraries <prefix>\r\n"
+      },
+      "pdf_sha256": "162352df254c567baef52ee18208c48c8ed0c9394dd7414e441f8a014c4f5bf4",
+      "pdfinfo": {
+        "command": [
+          "C:\\Users\\yw980\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\poppler\\Library\\bin\\pdfinfo.exe",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\normal-compact-candidate\\normal-compact-candidate.pdf"
+        ],
+        "exit_code": 0,
+        "stdout": "Creator:         Writer\r\nProducer:        LibreOffice 26.8.0.3 (X86_64)\r\nCreationDate:    Thu Sep 10 21:09:30 2026 �й���׼ʱ��\r\nCustom Metadata: no\r\nMetadata Stream: yes\r\nTagged:          yes\r\nUserProperties:  no\r\nSuspects:        no\r\nForm:            none\r\nJavaScript:      no\r\nPages:           1\r\nEncrypted:       no\r\nPage size:       595.304 x 841.89 pts (A4)\r\nPage rot:        0\r\nFile size:       81362 bytes\r\nOptimized:       no\r\nPDF version:     1.7\r\n",
+        "stderr": ""
+      },
+      "render": {
+        "command": [
+          "C:\\Users\\yw980\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\poppler\\Library\\bin\\pdftoppm.exe",
+          "-r",
+          "144",
+          "-png",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\normal-compact-candidate\\normal-compact-candidate.pdf",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\normal-compact-candidate\\page"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "input_sha256_after": "e6d7a4dbb44418e0078fdd2280fec89bb12f33c0c3aaec67235ab9d1821bb350",
+      "finished_at_utc": "2026-09-10T13:09:31.923629+00:00"
+    },
+    {
+      "sample": "normal-five-long.docx",
+      "started_at_utc": "2026-09-10T13:09:31.925344+00:00",
+      "input_sha256": "9cd738dd630228f8d3b3c314742f7f62e16de498904a097407b52edef7597f4f",
+      "conversion": {
+        "command": [
+          "C:\\Program Files\\LibreOffice\\program\\soffice.com",
+          "-env:UserInstallation=file:///C:/Users/yw980/AppData/Local/Temp/wp-a-lo-validation-jufzi8b1",
+          "--headless",
+          "--convert-to",
+          "pdf:writer_pdf_Export",
+          "--outdir",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\normal-five-long",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-simsun-20260909\\samples\\normal-five-long.docx"
+        ],
+        "exit_code": 0,
+        "stdout": "convert C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-simsun-20260909\\samples\\normal-five-long.docx as a Writer document -> C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\normal-five-long\\normal-five-long.pdf using filter : writer_pdf_Export\n",
+        "stderr": "Could not find platform independent libraries <prefix>\r\n"
+      },
+      "pdf_sha256": "41bd7bd4ff76161347a1a996cf7db8b6a1dd17e51cc573a937740aa09ee60077",
+      "pdfinfo": {
+        "command": [
+          "C:\\Users\\yw980\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\poppler\\Library\\bin\\pdfinfo.exe",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\normal-five-long\\normal-five-long.pdf"
+        ],
+        "exit_code": 0,
+        "stdout": "Creator:         Writer\r\nProducer:        LibreOffice 26.8.0.3 (X86_64)\r\nCreationDate:    Thu Sep 10 21:09:38 2026 �й���׼ʱ��\r\nCustom Metadata: no\r\nMetadata Stream: yes\r\nTagged:          yes\r\nUserProperties:  no\r\nSuspects:        no\r\nForm:            none\r\nJavaScript:      no\r\nPages:           2\r\nEncrypted:       no\r\nPage size:       595.304 x 841.89 pts (A4)\r\nPage rot:        0\r\nFile size:       127272 bytes\r\nOptimized:       no\r\nPDF version:     1.7\r\n",
+        "stderr": ""
+      },
+      "render": {
+        "command": [
+          "C:\\Users\\yw980\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\poppler\\Library\\bin\\pdftoppm.exe",
+          "-r",
+          "144",
+          "-png",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\normal-five-long\\normal-five-long.pdf",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\normal-five-long\\page"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "input_sha256_after": "9cd738dd630228f8d3b3c314742f7f62e16de498904a097407b52edef7597f4f",
+      "finished_at_utc": "2026-09-10T13:09:39.683423+00:00"
+    },
+    {
+      "sample": "normal-five-short.docx",
+      "started_at_utc": "2026-09-10T13:09:39.684639+00:00",
+      "input_sha256": "7eca517011011b5cb7c3b74d38756fdfef6da5f2a7df44503bceefdbd07593c9",
+      "conversion": {
+        "command": [
+          "C:\\Program Files\\LibreOffice\\program\\soffice.com",
+          "-env:UserInstallation=file:///C:/Users/yw980/AppData/Local/Temp/wp-a-lo-validation-jufzi8b1",
+          "--headless",
+          "--convert-to",
+          "pdf:writer_pdf_Export",
+          "--outdir",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\normal-five-short",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-simsun-20260909\\samples\\normal-five-short.docx"
+        ],
+        "exit_code": 0,
+        "stdout": "convert C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-simsun-20260909\\samples\\normal-five-short.docx as a Writer document -> C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\normal-five-short\\normal-five-short.pdf using filter : writer_pdf_Export\n",
+        "stderr": "Could not find platform independent libraries <prefix>\r\n"
+      },
+      "pdf_sha256": "0a6dddbdbd1726aa3664fae88cc8dcb06d7e53846bf493b29b2d67df90bccf3b",
+      "pdfinfo": {
+        "command": [
+          "C:\\Users\\yw980\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\poppler\\Library\\bin\\pdfinfo.exe",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\normal-five-short\\normal-five-short.pdf"
+        ],
+        "exit_code": 0,
+        "stdout": "Creator:         Writer\r\nProducer:        LibreOffice 26.8.0.3 (X86_64)\r\nCreationDate:    Thu Sep 10 21:09:46 2026 �й���׼ʱ��\r\nCustom Metadata: no\r\nMetadata Stream: yes\r\nTagged:          yes\r\nUserProperties:  no\r\nSuspects:        no\r\nForm:            none\r\nJavaScript:      no\r\nPages:           1\r\nEncrypted:       no\r\nPage size:       595.304 x 841.89 pts (A4)\r\nPage rot:        0\r\nFile size:       76838 bytes\r\nOptimized:       no\r\nPDF version:     1.7\r\n",
+        "stderr": ""
+      },
+      "render": {
+        "command": [
+          "C:\\Users\\yw980\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\poppler\\Library\\bin\\pdftoppm.exe",
+          "-r",
+          "144",
+          "-png",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\normal-five-short\\normal-five-short.pdf",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\normal-five-short\\page"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "input_sha256_after": "7eca517011011b5cb7c3b74d38756fdfef6da5f2a7df44503bceefdbd07593c9",
+      "finished_at_utc": "2026-09-10T13:09:46.927690+00:00"
+    },
+    {
+      "sample": "preceding-sunday-six-long.docx",
+      "started_at_utc": "2026-09-10T13:09:46.928887+00:00",
+      "input_sha256": "ff6088b80654fbfdd096b233e995ef1394b9209ea50728ea9b21ce43a4f0c6d6",
+      "conversion": {
+        "command": [
+          "C:\\Program Files\\LibreOffice\\program\\soffice.com",
+          "-env:UserInstallation=file:///C:/Users/yw980/AppData/Local/Temp/wp-a-lo-validation-jufzi8b1",
+          "--headless",
+          "--convert-to",
+          "pdf:writer_pdf_Export",
+          "--outdir",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\preceding-sunday-six-long",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-simsun-20260909\\samples\\preceding-sunday-six-long.docx"
+        ],
+        "exit_code": 0,
+        "stdout": "convert C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-simsun-20260909\\samples\\preceding-sunday-six-long.docx as a Writer document -> C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\preceding-sunday-six-long\\preceding-sunday-six-long.pdf using filter : writer_pdf_Export\n",
+        "stderr": "Could not find platform independent libraries <prefix>\r\n"
+      },
+      "pdf_sha256": "8a27e0b4dbe79e377ad2b5509cbf9701818cac4fd50fa798d8f850c5d9277e2e",
+      "pdfinfo": {
+        "command": [
+          "C:\\Users\\yw980\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\poppler\\Library\\bin\\pdfinfo.exe",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\preceding-sunday-six-long\\preceding-sunday-six-long.pdf"
+        ],
+        "exit_code": 0,
+        "stdout": "Creator:         Writer\r\nProducer:        LibreOffice 26.8.0.3 (X86_64)\r\nCreationDate:    Thu Sep 10 21:09:53 2026 �й���׼ʱ��\r\nCustom Metadata: no\r\nMetadata Stream: yes\r\nTagged:          yes\r\nUserProperties:  no\r\nSuspects:        no\r\nForm:            none\r\nJavaScript:      no\r\nPages:           2\r\nEncrypted:       no\r\nPage size:       595.304 x 841.89 pts (A4)\r\nPage rot:        0\r\nFile size:       129698 bytes\r\nOptimized:       no\r\nPDF version:     1.7\r\n",
+        "stderr": ""
+      },
+      "render": {
+        "command": [
+          "C:\\Users\\yw980\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\poppler\\Library\\bin\\pdftoppm.exe",
+          "-r",
+          "144",
+          "-png",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\preceding-sunday-six-long\\preceding-sunday-six-long.pdf",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\preceding-sunday-six-long\\page"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "input_sha256_after": "ff6088b80654fbfdd096b233e995ef1394b9209ea50728ea9b21ce43a4f0c6d6",
+      "finished_at_utc": "2026-09-10T13:09:54.843015+00:00"
+    },
+    {
+      "sample": "preceding-sunday-six-short.docx",
+      "started_at_utc": "2026-09-10T13:09:54.845803+00:00",
+      "input_sha256": "78b7f8fdab2714a4cb4a5cacfaba55092229462653811ce66503d61e2ff1109a",
+      "conversion": {
+        "command": [
+          "C:\\Program Files\\LibreOffice\\program\\soffice.com",
+          "-env:UserInstallation=file:///C:/Users/yw980/AppData/Local/Temp/wp-a-lo-validation-jufzi8b1",
+          "--headless",
+          "--convert-to",
+          "pdf:writer_pdf_Export",
+          "--outdir",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\preceding-sunday-six-short",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-simsun-20260909\\samples\\preceding-sunday-six-short.docx"
+        ],
+        "exit_code": 0,
+        "stdout": "convert C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-simsun-20260909\\samples\\preceding-sunday-six-short.docx as a Writer document -> C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\preceding-sunday-six-short\\preceding-sunday-six-short.pdf using filter : writer_pdf_Export\n",
+        "stderr": "Could not find platform independent libraries <prefix>\r\n"
+      },
+      "pdf_sha256": "6b071c04051f974f671e8ae6f58c346fa4a077f3e1551e808ebc4447fdccf58a",
+      "pdfinfo": {
+        "command": [
+          "C:\\Users\\yw980\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\poppler\\Library\\bin\\pdfinfo.exe",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\preceding-sunday-six-short\\preceding-sunday-six-short.pdf"
+        ],
+        "exit_code": 0,
+        "stdout": "Creator:         Writer\r\nProducer:        LibreOffice 26.8.0.3 (X86_64)\r\nCreationDate:    Thu Sep 10 21:10:01 2026 �й���׼ʱ��\r\nCustom Metadata: no\r\nMetadata Stream: yes\r\nTagged:          yes\r\nUserProperties:  no\r\nSuspects:        no\r\nForm:            none\r\nJavaScript:      no\r\nPages:           1\r\nEncrypted:       no\r\nPage size:       595.304 x 841.89 pts (A4)\r\nPage rot:        0\r\nFile size:       78986 bytes\r\nOptimized:       no\r\nPDF version:     1.7\r\n",
+        "stderr": ""
+      },
+      "render": {
+        "command": [
+          "C:\\Users\\yw980\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\poppler\\Library\\bin\\pdftoppm.exe",
+          "-r",
+          "144",
+          "-png",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\preceding-sunday-six-short\\preceding-sunday-six-short.pdf",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\preceding-sunday-six-short\\page"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "input_sha256_after": "78b7f8fdab2714a4cb4a5cacfaba55092229462653811ce66503d61e2ff1109a",
+      "finished_at_utc": "2026-09-10T13:10:02.199896+00:00"
+    },
+    {
+      "sample": "saturday-compact-candidate.docx",
+      "started_at_utc": "2026-09-10T13:10:02.201334+00:00",
+      "input_sha256": "4286ee43ced4a9043231264851c75cb9b1ddf76594294f23a3ac9f85066b69b3",
+      "conversion": {
+        "command": [
+          "C:\\Program Files\\LibreOffice\\program\\soffice.com",
+          "-env:UserInstallation=file:///C:/Users/yw980/AppData/Local/Temp/wp-a-lo-validation-jufzi8b1",
+          "--headless",
+          "--convert-to",
+          "pdf:writer_pdf_Export",
+          "--outdir",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\saturday-compact-candidate",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-simsun-20260909\\samples\\saturday-compact-candidate.docx"
+        ],
+        "exit_code": 0,
+        "stdout": "convert C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-simsun-20260909\\samples\\saturday-compact-candidate.docx as a Writer document -> C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\saturday-compact-candidate\\saturday-compact-candidate.pdf using filter : writer_pdf_Export\n",
+        "stderr": "Could not find platform independent libraries <prefix>\r\n"
+      },
+      "pdf_sha256": "5f1bbd443b03668b4639230b7d4e73c32ce80f209fe0dcaaada311c1443885e8",
+      "pdfinfo": {
+        "command": [
+          "C:\\Users\\yw980\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\poppler\\Library\\bin\\pdfinfo.exe",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\saturday-compact-candidate\\saturday-compact-candidate.pdf"
+        ],
+        "exit_code": 0,
+        "stdout": "Creator:         Writer\r\nProducer:        LibreOffice 26.8.0.3 (X86_64)\r\nCreationDate:    Thu Sep 10 21:10:08 2026 �й���׼ʱ��\r\nCustom Metadata: no\r\nMetadata Stream: yes\r\nTagged:          yes\r\nUserProperties:  no\r\nSuspects:        no\r\nForm:            none\r\nJavaScript:      no\r\nPages:           1\r\nEncrypted:       no\r\nPage size:       595.304 x 841.89 pts (A4)\r\nPage rot:        0\r\nFile size:       83640 bytes\r\nOptimized:       no\r\nPDF version:     1.7\r\n",
+        "stderr": ""
+      },
+      "render": {
+        "command": [
+          "C:\\Users\\yw980\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\poppler\\Library\\bin\\pdftoppm.exe",
+          "-r",
+          "144",
+          "-png",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\saturday-compact-candidate\\saturday-compact-candidate.pdf",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\saturday-compact-candidate\\page"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "input_sha256_after": "4286ee43ced4a9043231264851c75cb9b1ddf76594294f23a3ac9f85066b69b3",
+      "finished_at_utc": "2026-09-10T13:10:09.462276+00:00"
+    },
+    {
+      "sample": "saturday-six-long.docx",
+      "started_at_utc": "2026-09-10T13:10:09.463579+00:00",
+      "input_sha256": "600fc88240d87d03854d4a51c4985b654fb606015dcb1a771f8947f78c74d374",
+      "conversion": {
+        "command": [
+          "C:\\Program Files\\LibreOffice\\program\\soffice.com",
+          "-env:UserInstallation=file:///C:/Users/yw980/AppData/Local/Temp/wp-a-lo-validation-jufzi8b1",
+          "--headless",
+          "--convert-to",
+          "pdf:writer_pdf_Export",
+          "--outdir",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\saturday-six-long",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-simsun-20260909\\samples\\saturday-six-long.docx"
+        ],
+        "exit_code": 0,
+        "stdout": "convert C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-simsun-20260909\\samples\\saturday-six-long.docx as a Writer document -> C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\saturday-six-long\\saturday-six-long.pdf using filter : writer_pdf_Export\n",
+        "stderr": "Could not find platform independent libraries <prefix>\r\n"
+      },
+      "pdf_sha256": "fec64cd010639d8db35f81f26528ff1c68a382869b38afe9ddd7f71295bf7e16",
+      "pdfinfo": {
+        "command": [
+          "C:\\Users\\yw980\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\poppler\\Library\\bin\\pdfinfo.exe",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\saturday-six-long\\saturday-six-long.pdf"
+        ],
+        "exit_code": 0,
+        "stdout": "Creator:         Writer\r\nProducer:        LibreOffice 26.8.0.3 (X86_64)\r\nCreationDate:    Thu Sep 10 21:10:16 2026 �й���׼ʱ��\r\nCustom Metadata: no\r\nMetadata Stream: yes\r\nTagged:          yes\r\nUserProperties:  no\r\nSuspects:        no\r\nForm:            none\r\nJavaScript:      no\r\nPages:           2\r\nEncrypted:       no\r\nPage size:       595.304 x 841.89 pts (A4)\r\nPage rot:        0\r\nFile size:       129787 bytes\r\nOptimized:       no\r\nPDF version:     1.7\r\n",
+        "stderr": ""
+      },
+      "render": {
+        "command": [
+          "C:\\Users\\yw980\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\poppler\\Library\\bin\\pdftoppm.exe",
+          "-r",
+          "144",
+          "-png",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\saturday-six-long\\saturday-six-long.pdf",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\saturday-six-long\\page"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "input_sha256_after": "600fc88240d87d03854d4a51c4985b654fb606015dcb1a771f8947f78c74d374",
+      "finished_at_utc": "2026-09-10T13:10:17.177968+00:00"
+    },
+    {
+      "sample": "saturday-six-short.docx",
+      "started_at_utc": "2026-09-10T13:10:17.179455+00:00",
+      "input_sha256": "99bfb2d7be462be4353a5b54affddac60c4bd257040f4a6e237f5bbd58073259",
+      "conversion": {
+        "command": [
+          "C:\\Program Files\\LibreOffice\\program\\soffice.com",
+          "-env:UserInstallation=file:///C:/Users/yw980/AppData/Local/Temp/wp-a-lo-validation-jufzi8b1",
+          "--headless",
+          "--convert-to",
+          "pdf:writer_pdf_Export",
+          "--outdir",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\saturday-six-short",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-simsun-20260909\\samples\\saturday-six-short.docx"
+        ],
+        "exit_code": 0,
+        "stdout": "convert C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-simsun-20260909\\samples\\saturday-six-short.docx as a Writer document -> C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\saturday-six-short\\saturday-six-short.pdf using filter : writer_pdf_Export\n",
+        "stderr": "Could not find platform independent libraries <prefix>\r\n"
+      },
+      "pdf_sha256": "a6684c8796c70fd5ae73d6776fb24ca261f7219ee9b1dd1970d76368e23b63cf",
+      "pdfinfo": {
+        "command": [
+          "C:\\Users\\yw980\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\poppler\\Library\\bin\\pdfinfo.exe",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\saturday-six-short\\saturday-six-short.pdf"
+        ],
+        "exit_code": 0,
+        "stdout": "Creator:         Writer\r\nProducer:        LibreOffice 26.8.0.3 (X86_64)\r\nCreationDate:    Thu Sep 10 21:10:23 2026 �й���׼ʱ��\r\nCustom Metadata: no\r\nMetadata Stream: yes\r\nTagged:          yes\r\nUserProperties:  no\r\nSuspects:        no\r\nForm:            none\r\nJavaScript:      no\r\nPages:           1\r\nEncrypted:       no\r\nPage size:       595.304 x 841.89 pts (A4)\r\nPage rot:        0\r\nFile size:       79072 bytes\r\nOptimized:       no\r\nPDF version:     1.7\r\n",
+        "stderr": ""
+      },
+      "render": {
+        "command": [
+          "C:\\Users\\yw980\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\poppler\\Library\\bin\\pdftoppm.exe",
+          "-r",
+          "144",
+          "-png",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\saturday-six-short\\saturday-six-short.pdf",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\saturday-six-short\\page"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "input_sha256_after": "99bfb2d7be462be4353a5b54affddac60c4bd257040f4a6e237f5bbd58073259",
+      "finished_at_utc": "2026-09-10T13:10:24.565189+00:00"
+    },
+    {
+      "sample": "sunday-compact-candidate.docx",
+      "started_at_utc": "2026-09-10T13:10:24.566628+00:00",
+      "input_sha256": "45b02145e835b27d54d2ed57aa3a8f2e57bbb13c335b1c0fadd2dcf69288d27a",
+      "conversion": {
+        "command": [
+          "C:\\Program Files\\LibreOffice\\program\\soffice.com",
+          "-env:UserInstallation=file:///C:/Users/yw980/AppData/Local/Temp/wp-a-lo-validation-jufzi8b1",
+          "--headless",
+          "--convert-to",
+          "pdf:writer_pdf_Export",
+          "--outdir",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\sunday-compact-candidate",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-simsun-20260909\\samples\\sunday-compact-candidate.docx"
+        ],
+        "exit_code": 0,
+        "stdout": "convert C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-simsun-20260909\\samples\\sunday-compact-candidate.docx as a Writer document -> C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\sunday-compact-candidate\\sunday-compact-candidate.pdf using filter : writer_pdf_Export\n",
+        "stderr": "Could not find platform independent libraries <prefix>\r\n"
+      },
+      "pdf_sha256": "caf8addebf182943903fffa3f14fdf43629935dd604cb385259ffdae1059a75e",
+      "pdfinfo": {
+        "command": [
+          "C:\\Users\\yw980\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\poppler\\Library\\bin\\pdfinfo.exe",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\sunday-compact-candidate\\sunday-compact-candidate.pdf"
+        ],
+        "exit_code": 0,
+        "stdout": "Creator:         Writer\r\nProducer:        LibreOffice 26.8.0.3 (X86_64)\r\nCreationDate:    Thu Sep 10 21:10:35 2026 �й���׼ʱ��\r\nCustom Metadata: no\r\nMetadata Stream: yes\r\nTagged:          yes\r\nUserProperties:  no\r\nSuspects:        no\r\nForm:            none\r\nJavaScript:      no\r\nPages:           1\r\nEncrypted:       no\r\nPage size:       595.304 x 841.89 pts (A4)\r\nPage rot:        0\r\nFile size:       83519 bytes\r\nOptimized:       no\r\nPDF version:     1.7\r\n",
+        "stderr": ""
+      },
+      "render": {
+        "command": [
+          "C:\\Users\\yw980\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\poppler\\Library\\bin\\pdftoppm.exe",
+          "-r",
+          "144",
+          "-png",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\sunday-compact-candidate\\sunday-compact-candidate.pdf",
+          "C:\\Users\\yw980\\code\\kindergartenManager\\specs\\weekly-plan-authoring\\validation\\wp-a-libreoffice-windows-20260910-2108\\sunday-compact-candidate\\page"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "input_sha256_after": "45b02145e835b27d54d2ed57aa3a8f2e57bbb13c335b1c0fadd2dcf69288d27a",
+      "finished_at_utc": "2026-09-10T13:10:36.556791+00:00"
+    }
+  ],
+  "finished_at_utc": "2026-09-10T13:10:36.557682+00:00"
+}

@@ -26,7 +26,8 @@ class TestGetMenuItems:
         teacher_keys = [item["key"] for item in teacher_items]
         assert "user-admin" in admin_keys
         assert "user-admin" not in teacher_keys
-        assert set(teacher_keys) < set(admin_keys)
+        assert set(teacher_keys) - {"weekly-plan"} < set(admin_keys)
+        assert "weekly-plan" not in admin_keys
 
     def test_all_roles_see_core_items(self):
         """所有角色均可见核心菜单项：每日活动计划、设置、提示词管理。"""

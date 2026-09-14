@@ -1,0 +1,762 @@
+[
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "environment.json",
+    "sha256": "e7c6f014f50162949f857a202eae0c608e74f585467a24d3c3127741c4bcef8f",
+    "expected": "e7c6f014f50162949f857a202eae0c608e74f585467a24d3c3127741c4bcef8f",
+    "bytes": 684,
+    "expected_bytes": 684
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-holiday-full-page-0.png",
+    "sha256": "08cfbe46ee7573576c8c5535f4ea9b3fb939987bf8a5dfae465590bb9ad7b868",
+    "expected": "08cfbe46ee7573576c8c5535f4ea9b3fb939987bf8a5dfae465590bb9ad7b868",
+    "bytes": 103822,
+    "expected_bytes": 103822
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-holiday-full-page.json",
+    "sha256": "4f0310725afed194c91f1f288f4fc0246c79fc2b867c54b899b96213c027f4b5",
+    "expected": "4f0310725afed194c91f1f288f4fc0246c79fc2b867c54b899b96213c027f4b5",
+    "bytes": 532,
+    "expected_bytes": 532
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-holiday-long-page-1-0.png",
+    "sha256": "6887297782ec154da13cf4d4d5b7105f322f031334ad5fd3f59a116197261e34",
+    "expected": "6887297782ec154da13cf4d4d5b7105f322f031334ad5fd3f59a116197261e34",
+    "bytes": 149353,
+    "expected_bytes": 149353
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-holiday-long-page-1.json",
+    "sha256": "edeb8c89a7a22f00dde0a0993bd88009074c28d5c43909b5f3559c941843fbb0",
+    "expected": "edeb8c89a7a22f00dde0a0993bd88009074c28d5c43909b5f3559c941843fbb0",
+    "bytes": 526,
+    "expected_bytes": 526
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-holiday-long-page-2-0.png",
+    "sha256": "f711cef2cf93b138d7a91e03c57469edd876bbc9b1706ce4b930cbe06b40b7c2",
+    "expected": "f711cef2cf93b138d7a91e03c57469edd876bbc9b1706ce4b930cbe06b40b7c2",
+    "bytes": 136283,
+    "expected_bytes": 136283
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-holiday-long-page-2.json",
+    "sha256": "c47db28481d103114556350a7dc4b24cc956f52e2b64a6f333f2342904209cbc",
+    "expected": "c47db28481d103114556350a7dc4b24cc956f52e2b64a6f333f2342904209cbc",
+    "bytes": 537,
+    "expected_bytes": 537
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-holiday-native-text.txt",
+    "sha256": "4201a326a62f2494cc09f162a35ec1489a6869ed0536b75acb1fae38e845eb45",
+    "expected": "4201a326a62f2494cc09f162a35ec1489a6869ed0536b75acb1fae38e845eb45",
+    "bytes": 1208,
+    "expected_bytes": 1208
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-long-native-text.txt",
+    "sha256": "123b6aa94b835736161ffad21adabd9b7ed4a9754b9438d5edf480964b3056ff",
+    "expected": "123b6aa94b835736161ffad21adabd9b7ed4a9754b9438d5edf480964b3056ff",
+    "bytes": 2817,
+    "expected_bytes": 2817
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-long-page-1-0.png",
+    "sha256": "258dfcf5d7f238a9727a1c223777a8b5fda8d8b5e82d1f5a1b9e06cc85a3e823",
+    "expected": "258dfcf5d7f238a9727a1c223777a8b5fda8d8b5e82d1f5a1b9e06cc85a3e823",
+    "bytes": 150291,
+    "expected_bytes": 150291
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-long-page-1.json",
+    "sha256": "065fef5ce89a54c8831d20717666d35137d4ddad15824c1e5924067ef1bc3d01",
+    "expected": "065fef5ce89a54c8831d20717666d35137d4ddad15824c1e5924067ef1bc3d01",
+    "bytes": 517,
+    "expected_bytes": 517
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-long-page-2-0.png",
+    "sha256": "16a12d5f9c06b37fdea07c45b637fafa479e3ae015c3a341619709ea76882a9b",
+    "expected": "16a12d5f9c06b37fdea07c45b637fafa479e3ae015c3a341619709ea76882a9b",
+    "bytes": 135835,
+    "expected_bytes": 135835
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-long-page-2.json",
+    "sha256": "14c4116e0c679b35ebdfd68b19d90ed1c2ceee1c90636bf21755f48788a8c369",
+    "expected": "14c4116e0c679b35ebdfd68b19d90ed1c2ceee1c90636bf21755f48788a8c369",
+    "bytes": 517,
+    "expected_bytes": 517
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-normal-body-font-0.png",
+    "sha256": "7dbe66f2534df2a2b52171aff7368e9d958946e93f34b039f2dc894e23613044",
+    "expected": "7dbe66f2534df2a2b52171aff7368e9d958946e93f34b039f2dc894e23613044",
+    "bytes": 114878,
+    "expected_bytes": 114878
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-normal-body-font-1.png",
+    "sha256": "59db308bdef377409cde26c81c1e95e5d88724eed325d533d6a4b0ca3ab69d4a",
+    "expected": "59db308bdef377409cde26c81c1e95e5d88724eed325d533d6a4b0ca3ab69d4a",
+    "bytes": 45642,
+    "expected_bytes": 45642
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-normal-body-font.json",
+    "sha256": "6ff74709bcce5b4c14142f1632503ad113fdb2adca0ba27840a526e79c981db1",
+    "expected": "6ff74709bcce5b4c14142f1632503ad113fdb2adca0ba27840a526e79c981db1",
+    "bytes": 1783,
+    "expected_bytes": 1783
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-normal-body-spacing-0.png",
+    "sha256": "0ec0166ef54b9a0f80f01a6479ee233240d20ea891eb4e66413eacbd556c185e",
+    "expected": "0ec0166ef54b9a0f80f01a6479ee233240d20ea891eb4e66413eacbd556c185e",
+    "bytes": 119917,
+    "expected_bytes": 119917
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-normal-body-spacing-1.png",
+    "sha256": "d91a822c746411b05c632ad0b9a99a8c67e247d32cb759a628dc7240c6e07be1",
+    "expected": "d91a822c746411b05c632ad0b9a99a8c67e247d32cb759a628dc7240c6e07be1",
+    "bytes": 52480,
+    "expected_bytes": 52480
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-normal-body-spacing-trimmed-0.png",
+    "sha256": "4015a4821efe2abb0f33dc7dad667f29b0cf92cfcab09c4e07d747f6698919ea",
+    "expected": "4015a4821efe2abb0f33dc7dad667f29b0cf92cfcab09c4e07d747f6698919ea",
+    "bytes": 119775,
+    "expected_bytes": 119775
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-normal-body-spacing-trimmed-1.png",
+    "sha256": "d91a822c746411b05c632ad0b9a99a8c67e247d32cb759a628dc7240c6e07be1",
+    "expected": "d91a822c746411b05c632ad0b9a99a8c67e247d32cb759a628dc7240c6e07be1",
+    "bytes": 52480,
+    "expected_bytes": 52480
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-normal-body-spacing-trimmed.json",
+    "sha256": "8458f26668f3b454ba7af5a51fef9665ce70cf143b417bec3e66b53ec0e5d0f2",
+    "expected": "8458f26668f3b454ba7af5a51fef9665ce70cf143b417bec3e66b53ec0e5d0f2",
+    "bytes": 1374,
+    "expected_bytes": 1374
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-normal-body-spacing.json",
+    "sha256": "5821517bbccebd838993e61b84acac569f27bcae281e136258e69e557454e4fd",
+    "expected": "5821517bbccebd838993e61b84acac569f27bcae281e136258e69e557454e4fd",
+    "bytes": 1373,
+    "expected_bytes": 1373
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-normal-bottom-0.png",
+    "sha256": "a80a4621e3ed293d6907e04899ec2c53c5360dd4f1eb7479d0a15d93045b4057",
+    "expected": "a80a4621e3ed293d6907e04899ec2c53c5360dd4f1eb7479d0a15d93045b4057",
+    "bytes": 110565,
+    "expected_bytes": 110565
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-normal-bottom.json",
+    "sha256": "5d61200c1440be969d88efc232ab1dcb996fe28b75c50a973eebd3c10622d7dd",
+    "expected": "5d61200c1440be969d88efc232ab1dcb996fe28b75c50a973eebd3c10622d7dd",
+    "bytes": 530,
+    "expected_bytes": 530
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-normal-detail-0.png",
+    "sha256": "60e33b5a045a33ecd8ba812b27ad002ddbe78b67b093ef2e89021a01380a9da2",
+    "expected": "60e33b5a045a33ecd8ba812b27ad002ddbe78b67b093ef2e89021a01380a9da2",
+    "bytes": 115250,
+    "expected_bytes": 115250
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-normal-detail.json",
+    "sha256": "1a7d3453b14e688151212055977db6c7cf35551bc8538aa8254722a2af7a638a",
+    "expected": "1a7d3453b14e688151212055977db6c7cf35551bc8538aa8254722a2af7a638a",
+    "bytes": 530,
+    "expected_bytes": 530
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-normal-full-page-0.png",
+    "sha256": "f4e8a5af5b3fe5eefa104410ef805fb106c7d919ca85a995d959b87503d8875e",
+    "expected": "f4e8a5af5b3fe5eefa104410ef805fb106c7d919ca85a995d959b87503d8875e",
+    "bytes": 104864,
+    "expected_bytes": 104864
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-normal-full-page.json",
+    "sha256": "260873c8d1b1288bc16426fc9dceda17805f540666dc8d37b1582b0d674d37a9",
+    "expected": "260873c8d1b1288bc16426fc9dceda17805f540666dc8d37b1582b0d674d37a9",
+    "bytes": 530,
+    "expected_bytes": 530
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-normal-home-spacing-0.png",
+    "sha256": "378fe02f8dd8f24fc9a333c97366479d6907a3cc006242d83a00dc8a7d4e5266",
+    "expected": "378fe02f8dd8f24fc9a333c97366479d6907a3cc006242d83a00dc8a7d4e5266",
+    "bytes": 120132,
+    "expected_bytes": 120132
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-normal-home-spacing-1.png",
+    "sha256": "d6013a63e5a28e9100a5003cfaf8c99707de54a25f50ac8688aeccc9a8e433f4",
+    "expected": "d6013a63e5a28e9100a5003cfaf8c99707de54a25f50ac8688aeccc9a8e433f4",
+    "bytes": 51594,
+    "expected_bytes": 51594
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-normal-home-spacing.json",
+    "sha256": "ddc95ca4f49a91c4e24228bb8b4fd711a87ac5a51fbf75bd089cd96b5f50e071",
+    "expected": "ddc95ca4f49a91c4e24228bb8b4fd711a87ac5a51fbf75bd089cd96b5f50e071",
+    "bytes": 1374,
+    "expected_bytes": 1374
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "five-normal-selected-body.txt",
+    "sha256": "ee3382a3642dbe88ab9b42572d68da64c37f872b7d3f6b65acce7e28f01deacd",
+    "expected": "ee3382a3642dbe88ab9b42572d68da64c37f872b7d3f6b65acce7e28f01deacd",
+    "bytes": 1236,
+    "expected_bytes": 1236
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "input-hashes-after-shared-read.json",
+    "sha256": "c703923c8c01dcf90b3c0013d82707c010f4890d54766c781b72e65fc8bf1b9c",
+    "expected": "c703923c8c01dcf90b3c0013d82707c010f4890d54766c781b72e65fc8bf1b9c",
+    "bytes": 1807,
+    "expected_bytes": 1807
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "input-hashes-after.json",
+    "sha256": "979f25ead01ddb25214cc1937cb7cf68d9c7a83b4405f81d40aefc4fc6f9c242",
+    "expected": "979f25ead01ddb25214cc1937cb7cf68d9c7a83b4405f81d40aefc4fc6f9c242",
+    "bytes": 1370,
+    "expected_bytes": 1370
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "native-matrix.json",
+    "sha256": "a2862f7b7a9914e060690c1a4b27b830693586947daeeeba67b69ec48ae65908",
+    "expected": "a2862f7b7a9914e060690c1a4b27b830693586947daeeeba67b69ec48ae65908",
+    "bytes": 9981,
+    "expected_bytes": 9981
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "six-saturday-long-page-1-0.png",
+    "sha256": "e94fe0d72042f633e2809b8c369d962db10ae851616edc900bf053ea59fb70a0",
+    "expected": "e94fe0d72042f633e2809b8c369d962db10ae851616edc900bf053ea59fb70a0",
+    "bytes": 149405,
+    "expected_bytes": 149405
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "six-saturday-long-page-1.json",
+    "sha256": "13e73c8264011040fb7e20ccc2f748705c5d89fa48172ce98d9eb080449fb3a4",
+    "expected": "13e73c8264011040fb7e20ccc2f748705c5d89fa48172ce98d9eb080449fb3a4",
+    "bytes": 525,
+    "expected_bytes": 525
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "six-saturday-long-page-2-0.png",
+    "sha256": "13c617c031009fe7a7f1bf0ab7f31c7e17139fd682f7ffcc83e170cc66bd2f5d",
+    "expected": "13c617c031009fe7a7f1bf0ab7f31c7e17139fd682f7ffcc83e170cc66bd2f5d",
+    "bytes": 136249,
+    "expected_bytes": 136249
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "six-saturday-long-page-2.json",
+    "sha256": "1fcd7899d2327beee1bb3d0bc350b7bcb04b20c2540ffeff1b14ea3427ec922b",
+    "expected": "1fcd7899d2327beee1bb3d0bc350b7bcb04b20c2540ffeff1b14ea3427ec922b",
+    "bytes": 525,
+    "expected_bytes": 525
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "six-saturday-normal-full-page-0.png",
+    "sha256": "5cfec9bf06501932cc836782889fda4df38882c2db530be466d138681502d58a",
+    "expected": "5cfec9bf06501932cc836782889fda4df38882c2db530be466d138681502d58a",
+    "bytes": 104280,
+    "expected_bytes": 104280
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "six-saturday-normal-full-page.json",
+    "sha256": "5e7b0d045ea1f8def5afdc07458d5c9386c2366a32f7e2aeeb80a00f6b8ccf9c",
+    "expected": "5e7b0d045ea1f8def5afdc07458d5c9386c2366a32f7e2aeeb80a00f6b8ccf9c",
+    "bytes": 539,
+    "expected_bytes": 539
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "six-saturday-normal-native-text.txt",
+    "sha256": "69f182654123ca86edaee31854d5fc35071f615d81ae738bfce0ac6ba9225b21",
+    "expected": "69f182654123ca86edaee31854d5fc35071f615d81ae738bfce0ac6ba9225b21",
+    "bytes": 1218,
+    "expected_bytes": 1218
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "six-sunday-long-page-1-0.png",
+    "sha256": "1302bfc931bd0f0c3bc0e994100371f7031122444cad03e73216e16e7bc25a6f",
+    "expected": "1302bfc931bd0f0c3bc0e994100371f7031122444cad03e73216e16e7bc25a6f",
+    "bytes": 150840,
+    "expected_bytes": 150840
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "six-sunday-long-page-1.json",
+    "sha256": "c0224306c91eb98d989543498977b0864b4dd3e4cd85168330ec2bde070c2d0e",
+    "expected": "c0224306c91eb98d989543498977b0864b4dd3e4cd85168330ec2bde070c2d0e",
+    "bytes": 524,
+    "expected_bytes": 524
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "six-sunday-long-page-2-0.png",
+    "sha256": "3ca067961d74ede467d13a07f2f8ce54a9d144d5c457a0b1778c25725133d319",
+    "expected": "3ca067961d74ede467d13a07f2f8ce54a9d144d5c457a0b1778c25725133d319",
+    "bytes": 136156,
+    "expected_bytes": 136156
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "six-sunday-long-page-2.json",
+    "sha256": "7cf44e0fbeeedd3e7a51cabb586ca99720c9339b93ebf3ea7d059bc60a61fae7",
+    "expected": "7cf44e0fbeeedd3e7a51cabb586ca99720c9339b93ebf3ea7d059bc60a61fae7",
+    "bytes": 524,
+    "expected_bytes": 524
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "six-sunday-normal-full-page-0.png",
+    "sha256": "23a054c1577fa4e8f868716eeeae9b06ae52a73e730a12516a9d46226ebd0f3c",
+    "expected": "23a054c1577fa4e8f868716eeeae9b06ae52a73e730a12516a9d46226ebd0f3c",
+    "bytes": 106144,
+    "expected_bytes": 106144
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "six-sunday-normal-full-page.json",
+    "sha256": "91ab64cd1224f57bf25aab270e94bcc8536276cd039b1c9229102f535e22a76d",
+    "expected": "91ab64cd1224f57bf25aab270e94bcc8536276cd039b1c9229102f535e22a76d",
+    "bytes": 537,
+    "expected_bytes": 537
+  },
+  {
+    "scope": "wp-e-native-final-20260912",
+    "file": "six-sunday-normal-native-text.txt",
+    "sha256": "5f8861b806284a5e0999c741c3dd0ff880f63ea0bfe860e20b99544d2955b154",
+    "expected": "5f8861b806284a5e0999c741c3dd0ff880f63ea0bfe860e20b99544d2955b154",
+    "bytes": 1291,
+    "expected_bytes": 1291
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "adoption-save-receipt.json",
+    "sha256": "88a11dce027cdb4a7bd4e906ce5c3e2424977bb59b62063fd400f55fd8036eba",
+    "expected": "88a11dce027cdb4a7bd4e906ce5c3e2424977bb59b62063fd400f55fd8036eba",
+    "bytes": 4155,
+    "expected_bytes": 4155
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "five-holiday-long.proposed-manual.body.json",
+    "sha256": "a66a57f54d2b129de71a2c3160202cba018b6717ec704c6e39b735f5276e00e5",
+    "expected": "a66a57f54d2b129de71a2c3160202cba018b6717ec704c6e39b735f5276e00e5",
+    "bytes": 7647,
+    "expected_bytes": 7647
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "five-long.proposed-manual.body.json",
+    "sha256": "c4c86168a69d9e9e69e50135a98b3299a83b74c67b2f6cbf961aa1366b38babe",
+    "expected": "c4c86168a69d9e9e69e50135a98b3299a83b74c67b2f6cbf961aa1366b38babe",
+    "bytes": 7714,
+    "expected_bytes": 7714
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "native-recheck.json",
+    "sha256": "30ace69cd01325d5b03a496b54afb535b4f6bccc3618023a0a17c07fe36e13e2",
+    "expected": "30ace69cd01325d5b03a496b54afb535b4f6bccc3618023a0a17c07fe36e13e2",
+    "bytes": 4522,
+    "expected_bytes": 4522
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "prepare_review.py",
+    "sha256": "0570ef49586ced96c9261f0c8f6a5a3ef801d19f694bc51daabb02cb43de709e",
+    "expected": "0570ef49586ced96c9261f0c8f6a5a3ef801d19f694bc51daabb02cb43de709e",
+    "bytes": 5396,
+    "expected_bytes": 5396
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "proposal-review.json",
+    "sha256": "b703b99294288e01eeea21be5691638aa4f1bc9fab34d3a30f9ba9197b0951bf",
+    "expected": "b703b99294288e01eeea21be5691638aa4f1bc9fab34d3a30f9ba9197b0951bf",
+    "bytes": 45236,
+    "expected_bytes": 45236
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "proposal-review.md",
+    "sha256": "bd48b1ecc52802770bacfa79e14757a8a46d3fee6685d07127b87f189d673fef",
+    "expected": "bd48b1ecc52802770bacfa79e14757a8a46d3fee6685d07127b87f189d673fef",
+    "bytes": 37598,
+    "expected_bytes": 37598
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "save_accepted.py",
+    "sha256": "defa4607d9a72f91a59875ae4a92aece06c2a2dcf37faa56be56ca8f72b21c28",
+    "expected": "defa4607d9a72f91a59875ae4a92aece06c2a2dcf37faa56be56ca8f72b21c28",
+    "bytes": 2807,
+    "expected_bytes": 2807
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "six-saturday-long.proposed-manual.body.json",
+    "sha256": "17021078fe73682149b85e215f7276dfaac96a86d9a5cc452c7ba761f4ad5683",
+    "expected": "17021078fe73682149b85e215f7276dfaac96a86d9a5cc452c7ba761f4ad5683",
+    "bytes": 8007,
+    "expected_bytes": 8007
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "six-sunday-long.proposed-manual.body.json",
+    "sha256": "ca52d772d2d7cbef69e5a651850eb1257e32929b7db8c6bc8f3c2fdf0e00f8f8",
+    "expected": "ca52d772d2d7cbef69e5a651850eb1257e32929b7db8c6bc8f3c2fdf0e00f8f8",
+    "bytes": 8119,
+    "expected_bytes": 8119
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "accepted-files/five-holiday-long-dedup.body.json",
+    "sha256": "cba92bae8279553cd47ec01ed3e25c4902e6396f167bdb9ee106ddc32027564a",
+    "expected": "cba92bae8279553cd47ec01ed3e25c4902e6396f167bdb9ee106ddc32027564a",
+    "bytes": 7646,
+    "expected_bytes": 7646
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "accepted-files/five-holiday-long-dedup.docx",
+    "sha256": "ec8fe6d907a7d69f6b3759c0c32687ceef8d2d22f3d78ec9d6e521c35c768828",
+    "expected": "ec8fe6d907a7d69f6b3759c0c32687ceef8d2d22f3d78ec9d6e521c35c768828",
+    "bytes": 17735,
+    "expected_bytes": 17735
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "accepted-files/five-long-dedup.body.json",
+    "sha256": "6788a57cbeb696ebfdc2afeb0544a1bdb6176a4d0f9bf971492ebb2b10b54b2d",
+    "expected": "6788a57cbeb696ebfdc2afeb0544a1bdb6176a4d0f9bf971492ebb2b10b54b2d",
+    "bytes": 7713,
+    "expected_bytes": 7713
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "accepted-files/five-long-dedup.docx",
+    "sha256": "dd74854e9d2155162fdf2ce016830adf86a23be0b02cc03954e4efa12ac8f415",
+    "expected": "dd74854e9d2155162fdf2ce016830adf86a23be0b02cc03954e4efa12ac8f415",
+    "bytes": 17721,
+    "expected_bytes": 17721
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "accepted-files/six-saturday-long-dedup.body.json",
+    "sha256": "4391b810def576fe0b064a78b92c7c8a80d1d0f606437f196763c0c489dd53cf",
+    "expected": "4391b810def576fe0b064a78b92c7c8a80d1d0f606437f196763c0c489dd53cf",
+    "bytes": 8006,
+    "expected_bytes": 8006
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "accepted-files/six-saturday-long-dedup.docx",
+    "sha256": "368e14442d24b0991be8a5f6a980f0ceb605bf204a0a9dbcedf39408704cd718",
+    "expected": "368e14442d24b0991be8a5f6a980f0ceb605bf204a0a9dbcedf39408704cd718",
+    "bytes": 17762,
+    "expected_bytes": 17762
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "accepted-files/six-sunday-long-dedup.body.json",
+    "sha256": "b1546409e3261c0182ab1c0ce316f4a428410e27dec8dba3c9228ebdc281856d",
+    "expected": "b1546409e3261c0182ab1c0ce316f4a428410e27dec8dba3c9228ebdc281856d",
+    "bytes": 8118,
+    "expected_bytes": 8118
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "accepted-files/six-sunday-long-dedup.docx",
+    "sha256": "1f4a9c38acf9211a6c3ab3a8d52d28913dc0df0a7f5c26c2bbc90d58e4de0c69",
+    "expected": "1f4a9c38acf9211a6c3ab3a8d52d28913dc0df0a7f5c26c2bbc90d58e4de0c69",
+    "bytes": 17764,
+    "expected_bytes": 17764
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "native/five-holiday-long-dedup-page-1-0.png",
+    "sha256": "55eed1a6a518baf8f195b509a822837c83a9494e14a119d858bbae4fafb62ca1",
+    "expected": "55eed1a6a518baf8f195b509a822837c83a9494e14a119d858bbae4fafb62ca1",
+    "bytes": 134319,
+    "expected_bytes": 134319
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "native/five-holiday-long-dedup-page-1.json",
+    "sha256": "868337047c409c548a57535150fbabd408cdb1441c669a890360983afd9561f6",
+    "expected": "868337047c409c548a57535150fbabd408cdb1441c669a890360983afd9561f6",
+    "bytes": 384,
+    "expected_bytes": 384
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "native/five-holiday-long-dedup-page-2-0.png",
+    "sha256": "97bea2128ee710ecebb2e3893125d6c3a8c89f4e7caea4a6a5e3094f33237428",
+    "expected": "97bea2128ee710ecebb2e3893125d6c3a8c89f4e7caea4a6a5e3094f33237428",
+    "bytes": 97428,
+    "expected_bytes": 97428
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "native/five-holiday-long-dedup-page-2.json",
+    "sha256": "9c5366b50d323c154d52e063f0c74b5bba6800843b6f0303df13eacbb5e23f95",
+    "expected": "9c5366b50d323c154d52e063f0c74b5bba6800843b6f0303df13eacbb5e23f95",
+    "bytes": 395,
+    "expected_bytes": 395
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "native/five-long-dedup-page-1-0.png",
+    "sha256": "d30f48e74ea1eee1344266ddf3225c5a2bb19bde4964ac53640da66768d1c2b8",
+    "expected": "d30f48e74ea1eee1344266ddf3225c5a2bb19bde4964ac53640da66768d1c2b8",
+    "bytes": 134706,
+    "expected_bytes": 134706
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "native/five-long-dedup-page-1.json",
+    "sha256": "64e5ba827fc1ad4161a3ef85444f95710d40039b28f3593f2160332ac04d221f",
+    "expected": "64e5ba827fc1ad4161a3ef85444f95710d40039b28f3593f2160332ac04d221f",
+    "bytes": 377,
+    "expected_bytes": 377
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "native/five-long-dedup-page-2-0.png",
+    "sha256": "032393ea6264ef58c029d1ac3db47fdd600111817b295bfad4ef3ba10dd1dacb",
+    "expected": "032393ea6264ef58c029d1ac3db47fdd600111817b295bfad4ef3ba10dd1dacb",
+    "bytes": 97045,
+    "expected_bytes": 97045
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "native/five-long-dedup-page-2.json",
+    "sha256": "bf2bea29ade0cbd124a1098ce6353f6f40f3cfc830d878e2111bc2d744cf7b6f",
+    "expected": "bf2bea29ade0cbd124a1098ce6353f6f40f3cfc830d878e2111bc2d744cf7b6f",
+    "bytes": 388,
+    "expected_bytes": 388
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "native/six-saturday-long-dedup-page-1-0.png",
+    "sha256": "b123e8aec1514ad07472a2cfbdb060b1bbb94a06a22c05cc22e14947355581c4",
+    "expected": "b123e8aec1514ad07472a2cfbdb060b1bbb94a06a22c05cc22e14947355581c4",
+    "bytes": 134352,
+    "expected_bytes": 134352
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "native/six-saturday-long-dedup-page-1.json",
+    "sha256": "09bcf328390bdf0dec67183e0f0aa9072add5a81d8344466a59e55f595bdde1b",
+    "expected": "09bcf328390bdf0dec67183e0f0aa9072add5a81d8344466a59e55f595bdde1b",
+    "bytes": 385,
+    "expected_bytes": 385
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "native/six-saturday-long-dedup-page-2-0.png",
+    "sha256": "ec453f15d29f6db2f18f78b6ed1a8a58bc0301f41de324b5635019ed66bf1180",
+    "expected": "ec453f15d29f6db2f18f78b6ed1a8a58bc0301f41de324b5635019ed66bf1180",
+    "bytes": 97254,
+    "expected_bytes": 97254
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "native/six-saturday-long-dedup-page-2.json",
+    "sha256": "1b3742a99687b675a5e0ce94344d1498972c76f1226be0867ed29de49b44b270",
+    "expected": "1b3742a99687b675a5e0ce94344d1498972c76f1226be0867ed29de49b44b270",
+    "bytes": 385,
+    "expected_bytes": 385
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "native/six-sunday-long-dedup-page-1-0.png",
+    "sha256": "6f051018bf61f81b320a6e8869fcc8bfa47bbfa8f62cf6cf5e2482f5a5cdbe40",
+    "expected": "6f051018bf61f81b320a6e8869fcc8bfa47bbfa8f62cf6cf5e2482f5a5cdbe40",
+    "bytes": 135903,
+    "expected_bytes": 135903
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "native/six-sunday-long-dedup-page-1.json",
+    "sha256": "5ea6911404ce81999fe77b9cf8234fe4b6af502911fe3fc91a5be6fa1936a44d",
+    "expected": "5ea6911404ce81999fe77b9cf8234fe4b6af502911fe3fc91a5be6fa1936a44d",
+    "bytes": 383,
+    "expected_bytes": 383
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "native/six-sunday-long-dedup-page-2-0.png",
+    "sha256": "d755956721b88e4a496d5c648ae38acae1014d233b83237c115f2d1812f08be8",
+    "expected": "d755956721b88e4a496d5c648ae38acae1014d233b83237c115f2d1812f08be8",
+    "bytes": 97298,
+    "expected_bytes": 97298
+  },
+  {
+    "scope": "wp-e-reduction-20260912",
+    "file": "native/six-sunday-long-dedup-page-2.json",
+    "sha256": "e2c9873ea47ab0faf7f60065a9a781c904fc51cb7c75b998ad0848a003495008",
+    "expected": "e2c9873ea47ab0faf7f60065a9a781c904fc51cb7c75b998ad0848a003495008",
+    "bytes": 394,
+    "expected_bytes": 394
+  },
+  {
+    "scope": "candidates-final",
+    "file": "five-normal.body.json",
+    "sha256": "81c866806c163831c17a550555b36b834824ce5a119b41d3718f6169e8f074c5",
+    "expected": "81c866806c163831c17a550555b36b834824ce5a119b41d3718f6169e8f074c5"
+  },
+  {
+    "scope": "candidates-final",
+    "file": "five-normal.docx",
+    "sha256": "19da43b55d21e8afe274910890cdad8d1a72dd443b3f1617ae866eaf0840ab64",
+    "expected": "19da43b55d21e8afe274910890cdad8d1a72dd443b3f1617ae866eaf0840ab64"
+  },
+  {
+    "scope": "candidates-final",
+    "file": "five-long.body.json",
+    "sha256": "724acf8b0d283d950c4a56d0636a979c717f336b328699d3632c5b9695081236",
+    "expected": "724acf8b0d283d950c4a56d0636a979c717f336b328699d3632c5b9695081236"
+  },
+  {
+    "scope": "candidates-final",
+    "file": "five-long.docx",
+    "sha256": "58a2a6e0151183c9f4ae5eb42638c996fb3ff7bb07032ed0d6c8346facf16e9f",
+    "expected": "58a2a6e0151183c9f4ae5eb42638c996fb3ff7bb07032ed0d6c8346facf16e9f"
+  },
+  {
+    "scope": "candidates-final",
+    "file": "five-holiday.body.json",
+    "sha256": "42103c88a827956e6a2cd6bf726b6cac24962c213d74c5e3632a77af04691f76",
+    "expected": "42103c88a827956e6a2cd6bf726b6cac24962c213d74c5e3632a77af04691f76"
+  },
+  {
+    "scope": "candidates-final",
+    "file": "five-holiday.docx",
+    "sha256": "50d692e955d4b7e8f0c0ff0defb2e9a88867740674e2de879bfd269717bfed26",
+    "expected": "50d692e955d4b7e8f0c0ff0defb2e9a88867740674e2de879bfd269717bfed26"
+  },
+  {
+    "scope": "candidates-final",
+    "file": "five-holiday-long.body.json",
+    "sha256": "965c384bae6026a41508f42f65c4cdcc11fcedbbe6aefebe9223967bb07b403e",
+    "expected": "965c384bae6026a41508f42f65c4cdcc11fcedbbe6aefebe9223967bb07b403e"
+  },
+  {
+    "scope": "candidates-final",
+    "file": "five-holiday-long.docx",
+    "sha256": "b08d07c7fa3e31b9f16315b5b557aea105d0137b24f51a1b2408ee11549d61eb",
+    "expected": "b08d07c7fa3e31b9f16315b5b557aea105d0137b24f51a1b2408ee11549d61eb"
+  },
+  {
+    "scope": "candidates-final",
+    "file": "six-sunday-normal.body.json",
+    "sha256": "bf3adfb31c368dd9eed494daddb00ee82c2975880c36750bb1e836d0e554c180",
+    "expected": "bf3adfb31c368dd9eed494daddb00ee82c2975880c36750bb1e836d0e554c180"
+  },
+  {
+    "scope": "candidates-final",
+    "file": "six-sunday-normal.docx",
+    "sha256": "6cef09c56b9075dbdb617676132b3267c12634d9fbecb5db43a0a73cdb0a539f",
+    "expected": "6cef09c56b9075dbdb617676132b3267c12634d9fbecb5db43a0a73cdb0a539f"
+  },
+  {
+    "scope": "candidates-final",
+    "file": "six-sunday-long.body.json",
+    "sha256": "fdac9a6a76ef476ef7af87d91552159aa4edfb40d793c5310a726ebf10c73e5c",
+    "expected": "fdac9a6a76ef476ef7af87d91552159aa4edfb40d793c5310a726ebf10c73e5c"
+  },
+  {
+    "scope": "candidates-final",
+    "file": "six-sunday-long.docx",
+    "sha256": "c68c5b5eb7c6d4fa2004421f388d8a6e1279dace398d118f765ae3c9f06ae2f4",
+    "expected": "c68c5b5eb7c6d4fa2004421f388d8a6e1279dace398d118f765ae3c9f06ae2f4"
+  },
+  {
+    "scope": "candidates-final",
+    "file": "six-saturday-normal.body.json",
+    "sha256": "13b1fc519b55479d12fb21addf6746270fa3f2c695177b4d74686b7e661be02e",
+    "expected": "13b1fc519b55479d12fb21addf6746270fa3f2c695177b4d74686b7e661be02e"
+  },
+  {
+    "scope": "candidates-final",
+    "file": "six-saturday-normal.docx",
+    "sha256": "e3c1b9ff0e9112113659b2f21ecda181021a497b16566b815862189e864a1cb8",
+    "expected": "e3c1b9ff0e9112113659b2f21ecda181021a497b16566b815862189e864a1cb8"
+  },
+  {
+    "scope": "candidates-final",
+    "file": "six-saturday-long.body.json",
+    "sha256": "ad2ca061a9a7a3aa0381f4218e2bfe76f96b3ec33157c6a99e816b5c9b6bec85",
+    "expected": "ad2ca061a9a7a3aa0381f4218e2bfe76f96b3ec33157c6a99e816b5c9b6bec85"
+  },
+  {
+    "scope": "candidates-final",
+    "file": "six-saturday-long.docx",
+    "sha256": "3043f97ecd4cb481a23bb1e6dc0bd18502dc31daf26d00e78106d45a12a5a127",
+    "expected": "3043f97ecd4cb481a23bb1e6dc0bd18502dc31daf26d00e78106d45a12a5a127"
+  }
+]

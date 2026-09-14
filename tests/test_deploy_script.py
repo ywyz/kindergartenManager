@@ -33,12 +33,37 @@ def _avoid_registry_access(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
     default_runner = tmp_path / "default-acceptance-runner"
     default_runner.write_text(
         """#!/bin/sh
-if [ "$R5_ACCEPTANCE_GATE" = "login" ]; then
-  checks='{"login":"passed"}'
+profile="${R5_ACCEPTANCE_PROFILE:-legacy}"
+if [ "$profile" = "legacy" ]; then
+  schema_version=1
+  if [ "$R5_ACCEPTANCE_GATE" = "login" ]; then
+    checks='{"login":"passed"}'
+  else
+    checks='{"daily_plan":"passed","game_observation":"passed","one_on_one_listening":"passed","homemade_teaching":"passed","course_review":"passed","image_blob":"passed","ai_key_decryption":"passed","word_export":"passed","data_snapshot":"passed"}'
+  fi
+elif [ "$profile" = "weekly-plan" ]; then
+  schema_version=2
+  if [ "$R5_ACCEPTANCE_GATE" = "login" ]; then
+    checks='{"login":"passed"}'
+  else
+    checks='{"shared_edit":"passed","concurrent_conflict":"passed","five_column_export":"passed","six_column_export":"passed","overflow_manual_shorten":"passed"}'
+  fi
+elif [ "$profile" = "service-recovery" ]; then
+  schema_version=2
+  if [ "$R5_ACCEPTANCE_GATE" = "login" ]; then
+    checks='{"login":"passed"}'
+  else
+    checks='{"home":"passed","existing_plan_read":"passed"}'
+  fi
 else
-  checks='{"daily_plan":"passed","game_observation":"passed","one_on_one_listening":"passed","homemade_teaching":"passed","course_review":"passed","image_blob":"passed","ai_key_decryption":"passed","word_export":"passed","data_snapshot":"passed"}'
+  echo "unknown profile: $profile" >&2
+  exit 1
 fi
-printf '{"schema_version":1,"status":"passed","phase":"%s","image_ref":"%s","gate":"%s","checks":%s}\n' "$R5_ACCEPTANCE_PHASE" "$R5_ACCEPTANCE_IMAGE" "$R5_ACCEPTANCE_GATE" "$checks"
+if [ "$schema_version" = "1" ]; then
+  printf '{"schema_version":1,"status":"passed","phase":"%s","image_ref":"%s","gate":"%s","checks":%s}\n' "$R5_ACCEPTANCE_PHASE" "$R5_ACCEPTANCE_IMAGE" "$R5_ACCEPTANCE_GATE" "$checks"
+else
+  printf '{"schema_version":2,"status":"passed","phase":"%s","image_ref":"%s","gate":"%s","profile":"%s","checks":%s}\n' "$R5_ACCEPTANCE_PHASE" "$R5_ACCEPTANCE_IMAGE" "$R5_ACCEPTANCE_GATE" "$profile" "$checks"
+fi
 """,
         encoding="utf-8",
     )
@@ -350,7 +375,9 @@ def test_post_migration_business_failure_rolls_back_without_state_update(
     )
     monkeypatch.setattr(deploy, "_wait_for_http_gate", lambda *a, **k: None)
 
-    def acceptance(path: Path, *, phase: str, image_ref: str, gate: str) -> None:
+    def acceptance(
+        path: Path, *, phase: str, image_ref: str, gate: str, profile: str
+    ) -> None:
         phases.append(f"{phase}_{gate}")
         if phase == "target" and gate == "business":
             raise deploy.DeployError("synthetic business failure")
@@ -406,7 +433,9 @@ def test_post_migration_old_image_incompatibility_requires_database_restore(
     )
     monkeypatch.setattr(deploy, "_wait_for_http_gate", lambda *a, **k: None)
 
-    def acceptance(path: Path, *, phase: str, image_ref: str, gate: str) -> None:
+    def acceptance(
+        path: Path, *, phase: str, image_ref: str, gate: str, profile: str
+    ) -> None:
         if phase == "target" and gate == "business":
             raise deploy.DeployError("synthetic target incompatibility")
         if phase == "rollback" and gate == "business":
@@ -446,7 +475,7 @@ def test_acceptance_result_requires_closed_login_and_business_checks() -> None:
         "checks": {"login": "passed"},
     }
     deploy._validate_acceptance_result(
-        login, phase="target", image_ref=_image("a"), gate="login"
+        login, phase="target", image_ref=_image("a"), gate="login", profile="legacy"
     )
 
     incomplete = {
@@ -460,6 +489,7 @@ def test_acceptance_result_requires_closed_login_and_business_checks() -> None:
             phase="target",
             image_ref=_image("a"),
             gate="business",
+            profile="legacy",
         )
 
 
@@ -473,6 +503,8 @@ import json
 import os
 if "DATABASE_URL" in os.environ or "ENCRYPTION_KEY" in os.environ:
     raise SystemExit(9)
+if os.environ.get("R5_ACCEPTANCE_PROFILE") != "legacy":
+    raise SystemExit(10)
 gate = os.environ["R5_ACCEPTANCE_GATE"]
 checks = {"login": "passed"}
 if gate == "business":
@@ -497,10 +529,18 @@ print(json.dumps({
     monkeypatch.setenv("ENCRYPTION_KEY", "must-not-leak")
 
     deploy._run_acceptance_gate(
-        runner, phase="target", image_ref=_image("a"), gate="login"
+        runner,
+        phase="target",
+        image_ref=_image("a"),
+        gate="login",
+        profile="legacy",
     )
     deploy._run_acceptance_gate(
-        runner, phase="target", image_ref=_image("a"), gate="business"
+        runner,
+        phase="target",
+        image_ref=_image("a"),
+        gate="business",
+        profile="legacy",
     )
 
 
@@ -575,7 +615,9 @@ def test_post_migration_cli_keeps_gate_granularity_and_state_bytes(
         lambda url, *, gate, **k: events.append(f"{gate}:{url}"),
     )
 
-    def acceptance(path: Path, *, phase: str, image_ref: str, gate: str) -> None:
+    def acceptance(
+        path: Path, *, phase: str, image_ref: str, gate: str, profile: str
+    ) -> None:
         events.append(f"{phase}_{gate}")
         if phase == "target" and gate == "login":
             raise deploy.DeployError("synthetic login failure")
@@ -1190,7 +1232,7 @@ def test_standalone_rollback_acceptance_precedes_state_write(
     monkeypatch.setattr(
         deploy,
         "_run_acceptance_gate",
-        lambda path, *, phase, image_ref, gate: events.append(
+        lambda path, *, phase, image_ref, gate, profile: events.append(
             f"{phase}_{gate}:{image_ref}"
         ),
     )
@@ -1252,7 +1294,9 @@ def test_standalone_rollback_acceptance_failure_restores_and_preserves_state_byt
         lambda *args, image_ref, **kwargs: images.append(image_ref) or image_ref,
     )
 
-    def acceptance(path: Path, *, phase: str, image_ref: str, gate: str) -> None:
+    def acceptance(
+        path: Path, *, phase: str, image_ref: str, gate: str, profile: str
+    ) -> None:
         if image_ref == rollback_target and gate == "business":
             raise deploy.DeployError("synthetic rollback business failure")
 
@@ -1304,7 +1348,9 @@ def test_standalone_rollback_double_acceptance_failure_preserves_state_bytes(
         lambda *args, image_ref, **kwargs: images.append(image_ref) or image_ref,
     )
 
-    def acceptance(path: Path, *, phase: str, image_ref: str, gate: str) -> None:
+    def acceptance(
+        path: Path, *, phase: str, image_ref: str, gate: str, profile: str
+    ) -> None:
         if gate == "business":
             if image_ref == rollback_target:
                 raise deploy.DeployError("synthetic rollback business failure")
@@ -1361,7 +1407,9 @@ def test_regular_deploy_acceptance_failure_restores_without_state_update(
         lambda *args, image_ref, **kwargs: images.append(image_ref) or image_ref,
     )
 
-    def acceptance(path: Path, *, phase: str, image_ref: str, gate: str) -> None:
+    def acceptance(
+        path: Path, *, phase: str, image_ref: str, gate: str, profile: str
+    ) -> None:
         if phase == "target" and gate == "business":
             raise deploy.DeployError("synthetic target business failure")
 
@@ -1413,7 +1461,9 @@ def test_regular_deploy_double_acceptance_failure_preserves_state_bytes(
         lambda *args, image_ref, **kwargs: images.append(image_ref) or image_ref,
     )
 
-    def acceptance(path: Path, *, phase: str, image_ref: str, gate: str) -> None:
+    def acceptance(
+        path: Path, *, phase: str, image_ref: str, gate: str, profile: str
+    ) -> None:
         if gate == "business":
             if image_ref == target_image:
                 raise deploy.DeployError("synthetic target business failure")
@@ -1765,3 +1815,508 @@ def test_documented_global_option_order_parses(tmp_path: Path) -> None:
         )
         == 0
     )
+
+
+def test_weekly_plan_profile_deploys_with_exact_business_checks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _compose(tmp_path)
+    old_image = _image("a")
+    new_image = _image("b")
+    monkeypatch.setattr(
+        deploy, "_snapshot_current_state", lambda *args, **kwargs: old_image
+    )
+    monkeypatch.setattr(
+        deploy,
+        "_deploy_once",
+        lambda *args, image_ref, **kwargs: image_ref,
+    )
+
+    deploy.main(
+        [
+            "--project-dir",
+            str(tmp_path),
+            *HEALTH_ARGS,
+            "--acceptance-profile",
+            "weekly-plan",
+            "deploy",
+            new_image,
+        ]
+    )
+
+    state = json.loads((tmp_path / ".deploy" / "state.json").read_text())
+    assert state["app"] == {
+        "current_image": new_image,
+        "previous_image": old_image,
+    }
+
+
+def test_unknown_acceptance_profile_is_rejected(tmp_path: Path) -> None:
+    _compose(tmp_path)
+    with pytest.raises(SystemExit, match="Unknown acceptance profile"):
+        deploy.main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                *HEALTH_ARGS,
+                "--acceptance-profile",
+                "unknown-profile",
+                "deploy",
+                _image("a"),
+            ]
+        )
+
+
+def test_unknown_rollback_acceptance_profile_is_rejected(tmp_path: Path) -> None:
+    _compose(tmp_path)
+    with pytest.raises(SystemExit, match="Unknown acceptance profile"):
+        deploy.main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                *HEALTH_ARGS,
+                "--rollback-acceptance-profile",
+                "unknown-profile",
+                "rollback",
+            ]
+        )
+
+
+def test_acceptance_runner_receives_profile_in_environment(tmp_path: Path) -> None:
+    runner = tmp_path / "profile-recorder"
+    runner.write_text(
+        """#!/bin/sh
+if [ "$R5_ACCEPTANCE_GATE" != "login" ]; then
+  echo "unexpected gate" >&2
+  exit 2
+fi
+printf '{"schema_version":2,"status":"passed","phase":"%s","image_ref":"%s","gate":"%s","profile":"%s","checks":{"login":"passed"}}' "$R5_ACCEPTANCE_PHASE" "$R5_ACCEPTANCE_IMAGE" "$R5_ACCEPTANCE_GATE" "$R5_ACCEPTANCE_PROFILE"
+test "$R5_ACCEPTANCE_PROFILE" = "weekly-plan"
+""",
+        encoding="utf-8",
+    )
+    runner.chmod(0o700)
+
+    deploy._run_acceptance_gate(
+        runner,
+        phase="target",
+        image_ref=_image("a"),
+        gate="login",
+        profile="weekly-plan",
+    )
+
+
+def test_weekly_plan_result_with_missing_check_fails() -> None:
+    payload = {
+        "schema_version": 2,
+        "status": "passed",
+        "phase": "target",
+        "image_ref": _image("a"),
+        "gate": "business",
+        "profile": "weekly-plan",
+        "checks": {
+            "shared_edit": "passed",
+            "concurrent_conflict": "passed",
+            "five_column_export": "passed",
+            "six_column_export": "passed",
+            # overflow_manual_shorten is intentionally missing
+        },
+    }
+    with pytest.raises(deploy.DeployError, match="incomplete"):
+        deploy._validate_acceptance_result(
+            payload,
+            phase="target",
+            image_ref=_image("a"),
+            gate="business",
+            profile="weekly-plan",
+        )
+
+
+def test_weekly_plan_result_with_extra_check_fails() -> None:
+    payload = {
+        "schema_version": 2,
+        "status": "passed",
+        "phase": "target",
+        "image_ref": _image("a"),
+        "gate": "business",
+        "profile": "weekly-plan",
+        "checks": {
+            "shared_edit": "passed",
+            "concurrent_conflict": "passed",
+            "five_column_export": "passed",
+            "six_column_export": "passed",
+            "overflow_manual_shorten": "passed",
+            "daily_plan": "passed",
+        },
+    }
+    with pytest.raises(deploy.DeployError, match="incomplete"):
+        deploy._validate_acceptance_result(
+            payload,
+            phase="target",
+            image_ref=_image("a"),
+            gate="business",
+            profile="weekly-plan",
+        )
+
+
+def test_unknown_profile_validation_fails_closed() -> None:
+    payload = {
+        "schema_version": 1,
+        "status": "passed",
+        "phase": "target",
+        "image_ref": _image("a"),
+        "gate": "business",
+        "checks": {"shared_edit": "passed"},
+    }
+    with pytest.raises(deploy.DeployError, match="Unknown acceptance profile"):
+        deploy._validate_acceptance_result(
+            payload,
+            phase="target",
+            image_ref=_image("a"),
+            gate="business",
+            profile="not-a-profile",
+        )
+
+
+def test_rollback_uses_rollback_profile_after_target_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _compose(tmp_path)
+    current_image = _image("a")
+    previous_image = _image("b")
+    target_image = _image("c")
+    state_path = tmp_path / ".deploy" / "state.json"
+    deploy._ensure_file_permissions(state_path)
+    deploy._update_service_state(
+        state_path,
+        "app",
+        current_image=current_image,
+        previous_image=previous_image,
+    )
+    before = state_path.read_bytes()
+    runner = tmp_path / "runner"
+    runner.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    runner.chmod(0o700)
+    monkeypatch.setattr(
+        deploy, "_snapshot_current_state", lambda *args, **kwargs: current_image
+    )
+    images: list[str] = []
+    monkeypatch.setattr(
+        deploy,
+        "_deploy_once",
+        lambda *args, image_ref, **kwargs: images.append(image_ref) or image_ref,
+    )
+    observed_profiles: list[tuple[str, str]] = []
+
+    def acceptance(
+        path: Path, *, phase: str, image_ref: str, gate: str, profile: str
+    ) -> None:
+        observed_profiles.append((phase, profile))
+        if phase == "target" and gate == "business":
+            raise deploy.DeployError("synthetic target business failure")
+
+    monkeypatch.setattr(deploy, "_run_acceptance_gate", acceptance)
+
+    with pytest.raises(SystemExit, match="synthetic target business failure"):
+        deploy.main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                "--acceptance-runner",
+                str(runner),
+                "--acceptance-profile",
+                "weekly-plan",
+                *HEALTH_ARGS,
+                "deploy",
+                target_image,
+            ]
+        )
+
+    assert images == [target_image, current_image]
+    assert observed_profiles == [
+        ("target", "weekly-plan"),
+        ("target", "weekly-plan"),
+        ("rollback", "legacy"),
+        ("rollback", "legacy"),
+    ]
+    assert state_path.read_bytes() == before
+
+
+def test_rollback_command_uses_rollback_profile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _compose(tmp_path)
+    current_image = _image("a")
+    previous_image = _image("b")
+    rollback_target = _image("c")
+    state_path = tmp_path / ".deploy" / "state.json"
+    deploy._ensure_file_permissions(state_path)
+    deploy._update_service_state(
+        state_path,
+        "app",
+        current_image=current_image,
+        previous_image=previous_image,
+    )
+    runner = tmp_path / "runner"
+    runner.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    runner.chmod(0o700)
+    monkeypatch.setattr(
+        deploy, "_snapshot_current_state", lambda *args, **kwargs: current_image
+    )
+    monkeypatch.setattr(
+        deploy,
+        "_deploy_once",
+        lambda *args, image_ref, **kwargs: image_ref,
+    )
+    observed_profiles: list[tuple[str, str]] = []
+
+    def acceptance(
+        path: Path, *, phase: str, image_ref: str, gate: str, profile: str
+    ) -> None:
+        observed_profiles.append((phase, profile))
+
+    monkeypatch.setattr(deploy, "_run_acceptance_gate", acceptance)
+
+    deploy.main(
+        [
+            "--project-dir",
+            str(tmp_path),
+            "--acceptance-runner",
+            str(runner),
+            "--rollback-acceptance-profile",
+            "weekly-plan",
+            *HEALTH_ARGS,
+            "rollback",
+            rollback_target,
+        ]
+    )
+
+    assert observed_profiles == [
+        ("rollback", "weekly-plan"),
+        ("rollback", "weekly-plan"),
+    ]
+
+
+def test_target_and_rollback_profiles_propagate_independently(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _compose(tmp_path)
+    current_image = _image("a")
+    previous_image = _image("b")
+    target_image = _image("c")
+    state_path = tmp_path / ".deploy" / "state.json"
+    deploy._ensure_file_permissions(state_path)
+    deploy._update_service_state(
+        state_path,
+        "app",
+        current_image=current_image,
+        previous_image=previous_image,
+    )
+    runner = tmp_path / "runner"
+    runner.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    runner.chmod(0o700)
+    monkeypatch.setattr(
+        deploy, "_snapshot_current_state", lambda *args, **kwargs: current_image
+    )
+    monkeypatch.setattr(
+        deploy,
+        "_deploy_once",
+        lambda *args, image_ref, **kwargs: image_ref,
+    )
+    observed_profiles: list[tuple[str, str]] = []
+
+    def acceptance(
+        path: Path, *, phase: str, image_ref: str, gate: str, profile: str
+    ) -> None:
+        observed_profiles.append((phase, profile))
+
+    monkeypatch.setattr(deploy, "_run_acceptance_gate", acceptance)
+
+    deploy.main(
+        [
+            "--project-dir",
+            str(tmp_path),
+            "--acceptance-runner",
+            str(runner),
+            "--acceptance-profile",
+            "weekly-plan",
+            "--rollback-acceptance-profile",
+            "legacy",
+            *HEALTH_ARGS,
+            "deploy",
+            target_image,
+        ]
+    )
+
+    assert observed_profiles == [
+        ("target", "weekly-plan"),
+        ("target", "weekly-plan"),
+    ]
+
+
+def test_service_recovery_profile_deploys_with_exact_business_checks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _compose(tmp_path)
+    old_image = _image("a")
+    new_image = _image("b")
+    monkeypatch.setattr(
+        deploy, "_snapshot_current_state", lambda *args, **kwargs: old_image
+    )
+    monkeypatch.setattr(
+        deploy,
+        "_deploy_once",
+        lambda *args, image_ref, **kwargs: image_ref,
+    )
+
+    deploy.main(
+        [
+            "--project-dir",
+            str(tmp_path),
+            *HEALTH_ARGS,
+            "--acceptance-profile",
+            "service-recovery",
+            "deploy",
+            new_image,
+        ]
+    )
+
+    state = json.loads((tmp_path / ".deploy" / "state.json").read_text())
+    assert state["app"] == {
+        "current_image": new_image,
+        "previous_image": old_image,
+    }
+
+
+def test_service_recovery_result_with_missing_check_fails() -> None:
+    payload = {
+        "schema_version": 2,
+        "status": "passed",
+        "phase": "target",
+        "image_ref": _image("a"),
+        "gate": "business",
+        "profile": "service-recovery",
+        "checks": {"home": "passed"},
+    }
+    with pytest.raises(deploy.DeployError, match="incomplete"):
+        deploy._validate_acceptance_result(
+            payload,
+            phase="target",
+            image_ref=_image("a"),
+            gate="business",
+            profile="service-recovery",
+        )
+
+
+def test_service_recovery_result_with_extra_check_fails() -> None:
+    payload = {
+        "schema_version": 2,
+        "status": "passed",
+        "phase": "target",
+        "image_ref": _image("a"),
+        "gate": "business",
+        "profile": "service-recovery",
+        "checks": {
+            "home": "passed",
+            "existing_plan_read": "passed",
+            "daily_plan": "passed",
+        },
+    }
+    with pytest.raises(deploy.DeployError, match="incomplete"):
+        deploy._validate_acceptance_result(
+            payload,
+            phase="target",
+            image_ref=_image("a"),
+            gate="business",
+            profile="service-recovery",
+        )
+
+
+def test_schema_version2_login_rejects_missing_profile() -> None:
+    payload = {
+        "schema_version": 2,
+        "status": "passed",
+        "phase": "target",
+        "image_ref": _image("a"),
+        "gate": "login",
+        "checks": {"login": "passed"},
+    }
+    with pytest.raises(deploy.DeployError, match="invalid"):
+        deploy._validate_acceptance_result(
+            payload,
+            phase="target",
+            image_ref=_image("a"),
+            gate="login",
+            profile="weekly-plan",
+        )
+
+
+def test_schema_version2_rejects_wrong_profile() -> None:
+    payload = {
+        "schema_version": 2,
+        "status": "passed",
+        "phase": "target",
+        "image_ref": _image("a"),
+        "gate": "business",
+        "profile": "weekly-plan",
+        "checks": {"home": "passed", "existing_plan_read": "passed"},
+    }
+    with pytest.raises(deploy.DeployError, match="invalid"):
+        deploy._validate_acceptance_result(
+            payload,
+            phase="target",
+            image_ref=_image("a"),
+            gate="business",
+            profile="service-recovery",
+        )
+
+
+def test_legacy_result_rejects_profile_field() -> None:
+    payload = {
+        "schema_version": 1,
+        "status": "passed",
+        "phase": "target",
+        "image_ref": _image("a"),
+        "gate": "login",
+        "profile": "legacy",
+        "checks": {"login": "passed"},
+    }
+    with pytest.raises(deploy.DeployError, match="invalid"):
+        deploy._validate_acceptance_result(
+            payload,
+            phase="target",
+            image_ref=_image("a"),
+            gate="login",
+            profile="legacy",
+        )
+
+
+def test_empty_acceptance_profile_is_rejected(tmp_path: Path) -> None:
+    _compose(tmp_path)
+    with pytest.raises(SystemExit, match="Unknown acceptance profile"):
+        deploy.main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                *HEALTH_ARGS,
+                "--acceptance-profile",
+                "",
+                "deploy",
+                _image("a"),
+            ]
+        )
+
+
+def test_empty_rollback_acceptance_profile_is_rejected(tmp_path: Path) -> None:
+    _compose(tmp_path)
+    with pytest.raises(SystemExit, match="Unknown acceptance profile"):
+        deploy.main(
+            [
+                "--project-dir",
+                str(tmp_path),
+                *HEALTH_ARGS,
+                "--rollback-acceptance-profile",
+                "",
+                "rollback",
+            ]
+        )

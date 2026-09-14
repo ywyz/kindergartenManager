@@ -1,0 +1,16 @@
+# Add this operator-only overlay after the base deployment Compose file.
+# Mount the reviewed catalog read-only. Never mount tests/synthetic catalogs.
+services:
+  app:
+    environment:
+      KM_WEEKLY_LAYOUT_MANIFEST: /opt/weekly-layout/manifest.json
+      KM_WEEKLY_LAYOUT_SHA256: ${KM_WEEKLY_LAYOUT_SHA256:?set independently reviewed manifest SHA256}
+      KM_WEEKLY_LAYOUT_TENANT_ID: ${KM_WEEKLY_LAYOUT_TENANT_ID:?set explicit comma-separated tenant IDs}
+      KM_WEEKLY_LAYOUT_ACTIVATE: "1"
+    volumes:
+      - type: bind
+        source: ${KM_WEEKLY_LAYOUT_CATALOG_DIR:?set absolute reviewed catalog directory}
+        target: /opt/weekly-layout
+        read_only: true
+        bind:
+          create_host_path: false

@@ -1,0 +1,101 @@
+{
+  "tested_code_sha": "9cde71655c30cafdc6ac4e99ed22509ad989b121",
+  "role": "WP-E local continuation only; environment failures retained; not Word/cloud/complete",
+  "files": [
+    {
+      "path": "authorization-boundaries.json",
+      "size": 578,
+      "sha256": "10b25adeb4415cd42777641efc92c77c7a7f0b2fb856f501a31f21ac021c0de1"
+    },
+    {
+      "path": "preservation-before.json",
+      "size": 24034,
+      "sha256": "cfebeb8901b68ebf317ffaf3b85256d2d48be490d853851935b133c5ce9ff54d"
+    },
+    {
+      "path": "preservation-after.json",
+      "size": 24034,
+      "sha256": "cfebeb8901b68ebf317ffaf3b85256d2d48be490d853851935b133c5ce9ff54d"
+    },
+    {
+      "path": "integrity-final.json",
+      "size": 865,
+      "sha256": "0f152fe15a0c20715efc847882bd1e953dca00a21badb8f2a4729b0d6a22a143"
+    },
+    {
+      "path": "local-chain.log",
+      "size": 1967,
+      "sha256": "e84938375c16b67abbf3e7a1a363b9ab2d8d8e9146d6764d48fc50c80473505b"
+    },
+    {
+      "path": "local-chain-retry.log",
+      "size": 1025401,
+      "sha256": "ad5edb9116e36b7c6ebf1fac60a4ee1e07e89e3abace9a70c607f146ad9d9245"
+    },
+    {
+      "path": "local-chain-configured.log",
+      "size": 777,
+      "sha256": "244412341f34e061cc95520a3a6c678d0630ff7e75f2cfd7c736fc373299f8a0"
+    },
+    {
+      "path": "local-chain-configured.json",
+      "size": 2963,
+      "sha256": "8632d3300750ca39cf7ecbe39635eda8525110a655cb40d8262b7b654c5bd159"
+    },
+    {
+      "path": "qualification-review.md",
+      "size": 7060,
+      "sha256": "fec3e2317c1cbdf8a22ac0d1f5a16b48933595ea48282daec8f15e3a677cde4d"
+    },
+    {
+      "path": "browser-observations.md",
+      "size": 2540,
+      "sha256": "63e4e620b12fcc78b7cd04d91cd943a241698998e72e6526ee4fdf57f13e5d92"
+    },
+    {
+      "path": "browser-fullflow-exact-sha-startup.json",
+      "size": 28939,
+      "sha256": "3c5f3930999abf3c4b15ea40dc59addcc43daebf850728c31bf73c43c8784d3d"
+    },
+    {
+      "path": "harness-input.json",
+      "size": 305,
+      "sha256": "ab6645bfae621d172dec8223a40aa15b46cb9fae154e1dfb76527e9a824db317"
+    },
+    {
+      "path": "browser_fullflow.py",
+      "size": 13388,
+      "sha256": "dc7ed6c9adb3c45685b6ce001e6f1e313a8056ff3d43ceec6d4cc39ba2c46503"
+    },
+    {
+      "path": "lint.log",
+      "size": 19,
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    {
+      "path": "format.log",
+      "size": 27,
+      "sha256": "3cbc764509f46afb88053c5d0216718d29af883ed4a6216db2de94a84f3fa1bc"
+    },
+    {
+      "path": "checks.json",
+      "size": 158,
+      "sha256": "68626e59b8398100060f3d53a3633ab7d8ea50e2ba70a32012e28ba9fbe88edd"
+    },
+    {
+      "path": "server-stop.json",
+      "size": 97,
+      "sha256": "94af182755e00ac3f1bcbcf500ccc06e047687261a75bd10fd8e289242ac58e5"
+    },
+    {
+      "path": "verification-summary.json",
+      "size": 813,
+      "sha256": "0a5eaf9b086ba433e2e48073421c30a33aa7251281c9b50695032e408240d5cf"
+    },
+    {
+      "path": "documentation-review.md",
+      "size": 1743,
+      "sha256": "341b46d79e05c81eba11d71f5bd353262f3e2f4ce28979aea60ca5f8ffa7d3e0"
+    }
+  ]
+}

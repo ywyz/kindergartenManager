@@ -1,0 +1,28 @@
+{
+  "HardMarginX": 11.0,
+  "HardMarginY": 11.0,
+  "PrintableArea": {
+    "Location": {
+      "IsEmpty": false,
+      "X": 11.666667,
+      "Y": 11.666667
+    },
+    "Size": {
+      "IsEmpty": false,
+      "Width": 803.3333,
+      "Height": 1145.6666
+    },
+    "X": 11.666667,
+    "Y": 11.666667,
+    "Width": 803.3333,
+    "Height": 1145.6666,
+    "Left": 11.666667,
+    "Top": 11.666667,
+    "Right": 815.0,
+    "Bottom": 1157.3333,
+    "IsEmpty": false
+  },
+  "Paper": "A4 (210 x 297 毫米)",
+  "PaperWidth": 827,
+  "PaperHeight": 1169
+}

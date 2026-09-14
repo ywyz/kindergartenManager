@@ -1,0 +1,30 @@
+{
+  "sample": "saturday-six-short.docx",
+  "started_at": "2026-09-10T12:09:44.5766153+08:00",
+  "input_sha256": "99bfb2d7be462be4353a5b54affddac60c4bd257040f4a6e237f5bbd58073259",
+  "word_pages": 1,
+  "compatibility_mode": 15,
+  "read_only": true,
+  "zoom_percent": 100,
+  "view_type": 3,
+  "geometry_points": {
+    "width": 595.3,
+    "height": 841.9,
+    "left": 36.0,
+    "right": 36.0,
+    "top": 14.2,
+    "bottom": 14.2,
+    "orientation": 0,
+    "paper_size": 7
+  },
+  "tables": 1,
+  "rows": 9,
+  "requested_body_font": "",
+  "body_size_pt": 9999999.0,
+  "body_line_spacing_pt": 9999999.0,
+  "body_line_spacing_rule": 9999999,
+  "pdf_sha256": "523ed7dba058b4e1ab035134471ee0aaa44f6118204e4413fe138a297d72d5e6",
+  "com_export": "SUCCESS; native warning/preview observation still missing",
+  "input_sha256_after": "99bfb2d7be462be4353a5b54affddac60c4bd257040f4a6e237f5bbd58073259",
+  "finished_at": "2026-09-10T12:09:45.8540401+08:00"
+}

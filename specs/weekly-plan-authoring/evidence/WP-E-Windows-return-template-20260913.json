@@ -1,0 +1,192 @@
+{
+  "schema": "wp-e-windows-return.v1",
+  "status": "NOT_RUN",
+  "tested_code_sha": null,
+  "handoff_manifest_sha256": null,
+  "template_sha256": "f6c17c137f04e29a68524ed400eb395984e93a16c234a065b5794d9f49a9347b",
+  "profile": "shared-weekly-v3.v1",
+  "released_binding_tenant_id": 11,
+  "released_binding": null,
+  "word_environment": {
+    "product": null,
+    "version": null,
+    "renderer": null,
+    "account_or_build_evidence": null
+  },
+  "cases": [
+    {
+      "id": "five-normal",
+      "columns": 5,
+      "input_body_sha256": null,
+      "candidate_docx_sha256": null,
+      "runtime_lo_pdf_sha256": null,
+      "runtime_lo_png_sha256": [],
+      "word_export_pdf_sha256": null,
+      "word_page_png_sha256": [],
+      "native_observation": {
+        "schema": "NOT_RUN",
+        "role": "NOT_RUN",
+        "client": "NOT_RUN",
+        "renderer": "NOT_RUN",
+        "columns": "NOT_RUN",
+        "body_sha256": "NOT_RUN",
+        "template_sha256": "NOT_RUN",
+        "profile": "NOT_RUN",
+        "pages": "NOT_RUN",
+        "page_observations": "NOT_RUN",
+        "font": "NOT_RUN",
+        "font_pt": "NOT_RUN",
+        "line_pt": "NOT_RUN",
+        "fixed_counts": "NOT_RUN",
+        "docx_sha256": "NOT_RUN",
+        "pdf_sha256": "NOT_RUN",
+        "png_sha256": "NOT_RUN"
+      }
+    },
+    {
+      "id": "five-long",
+      "columns": 5,
+      "input_body_sha256": null,
+      "candidate_docx_sha256": null,
+      "runtime_lo_pdf_sha256": null,
+      "runtime_lo_png_sha256": [],
+      "word_export_pdf_sha256": null,
+      "word_page_png_sha256": [],
+      "native_observation": {
+        "schema": "NOT_RUN", "role": "NOT_RUN", "client": "NOT_RUN", "renderer": "NOT_RUN", "columns": "NOT_RUN", "body_sha256": "NOT_RUN", "template_sha256": "NOT_RUN", "profile": "NOT_RUN", "pages": "NOT_RUN", "page_observations": "NOT_RUN", "font": "NOT_RUN", "font_pt": "NOT_RUN", "line_pt": "NOT_RUN", "fixed_counts": "NOT_RUN", "docx_sha256": "NOT_RUN", "pdf_sha256": "NOT_RUN", "png_sha256": "NOT_RUN"
+      }
+    },
+    {
+      "id": "five-long-dedup",
+      "columns": 5,
+      "input_body_sha256": null,
+      "candidate_docx_sha256": null,
+      "runtime_lo_pdf_sha256": null,
+      "runtime_lo_png_sha256": [],
+      "word_export_pdf_sha256": null,
+      "word_page_png_sha256": [],
+      "native_observation": {
+        "schema": "NOT_RUN", "role": "NOT_RUN", "client": "NOT_RUN", "renderer": "NOT_RUN", "columns": "NOT_RUN", "body_sha256": "NOT_RUN", "template_sha256": "NOT_RUN", "profile": "NOT_RUN", "pages": "NOT_RUN", "page_observations": "NOT_RUN", "font": "NOT_RUN", "font_pt": "NOT_RUN", "line_pt": "NOT_RUN", "fixed_counts": "NOT_RUN", "docx_sha256": "NOT_RUN", "pdf_sha256": "NOT_RUN", "png_sha256": "NOT_RUN"
+      }
+    },
+    {
+      "id": "five-holiday",
+      "columns": 5,
+      "input_body_sha256": null,
+      "candidate_docx_sha256": null,
+      "runtime_lo_pdf_sha256": null,
+      "runtime_lo_png_sha256": [],
+      "word_export_pdf_sha256": null,
+      "word_page_png_sha256": [],
+      "native_observation": {
+        "schema": "NOT_RUN", "role": "NOT_RUN", "client": "NOT_RUN", "renderer": "NOT_RUN", "columns": "NOT_RUN", "body_sha256": "NOT_RUN", "template_sha256": "NOT_RUN", "profile": "NOT_RUN", "pages": "NOT_RUN", "page_observations": "NOT_RUN", "font": "NOT_RUN", "font_pt": "NOT_RUN", "line_pt": "NOT_RUN", "fixed_counts": "NOT_RUN", "docx_sha256": "NOT_RUN", "pdf_sha256": "NOT_RUN", "png_sha256": "NOT_RUN"
+      }
+    },
+    {
+      "id": "five-holiday-long",
+      "columns": 5,
+      "input_body_sha256": null,
+      "candidate_docx_sha256": null,
+      "runtime_lo_pdf_sha256": null,
+      "runtime_lo_png_sha256": [],
+      "word_export_pdf_sha256": null,
+      "word_page_png_sha256": [],
+      "native_observation": {
+        "schema": "NOT_RUN", "role": "NOT_RUN", "client": "NOT_RUN", "renderer": "NOT_RUN", "columns": "NOT_RUN", "body_sha256": "NOT_RUN", "template_sha256": "NOT_RUN", "profile": "NOT_RUN", "pages": "NOT_RUN", "page_observations": "NOT_RUN", "font": "NOT_RUN", "font_pt": "NOT_RUN", "line_pt": "NOT_RUN", "fixed_counts": "NOT_RUN", "docx_sha256": "NOT_RUN", "pdf_sha256": "NOT_RUN", "png_sha256": "NOT_RUN"
+      }
+    },
+    {
+      "id": "five-holiday-long-dedup",
+      "columns": 5,
+      "input_body_sha256": null,
+      "candidate_docx_sha256": null,
+      "runtime_lo_pdf_sha256": null,
+      "runtime_lo_png_sha256": [],
+      "word_export_pdf_sha256": null,
+      "word_page_png_sha256": [],
+      "native_observation": {
+        "schema": "NOT_RUN", "role": "NOT_RUN", "client": "NOT_RUN", "renderer": "NOT_RUN", "columns": "NOT_RUN", "body_sha256": "NOT_RUN", "template_sha256": "NOT_RUN", "profile": "NOT_RUN", "pages": "NOT_RUN", "page_observations": "NOT_RUN", "font": "NOT_RUN", "font_pt": "NOT_RUN", "line_pt": "NOT_RUN", "fixed_counts": "NOT_RUN", "docx_sha256": "NOT_RUN", "pdf_sha256": "NOT_RUN", "png_sha256": "NOT_RUN"
+      }
+    },
+    {
+      "id": "six-sunday-normal",
+      "columns": 6,
+      "input_body_sha256": null,
+      "candidate_docx_sha256": null,
+      "runtime_lo_pdf_sha256": null,
+      "runtime_lo_png_sha256": [],
+      "word_export_pdf_sha256": null,
+      "word_page_png_sha256": [],
+      "native_observation": {
+        "schema": "NOT_RUN", "role": "NOT_RUN", "client": "NOT_RUN", "renderer": "NOT_RUN", "columns": "NOT_RUN", "body_sha256": "NOT_RUN", "template_sha256": "NOT_RUN", "profile": "NOT_RUN", "pages": "NOT_RUN", "page_observations": "NOT_RUN", "font": "NOT_RUN", "font_pt": "NOT_RUN", "line_pt": "NOT_RUN", "fixed_counts": "NOT_RUN", "docx_sha256": "NOT_RUN", "pdf_sha256": "NOT_RUN", "png_sha256": "NOT_RUN"
+      }
+    },
+    {
+      "id": "six-sunday-long",
+      "columns": 6,
+      "input_body_sha256": null,
+      "candidate_docx_sha256": null,
+      "runtime_lo_pdf_sha256": null,
+      "runtime_lo_png_sha256": [],
+      "word_export_pdf_sha256": null,
+      "word_page_png_sha256": [],
+      "native_observation": {
+        "schema": "NOT_RUN", "role": "NOT_RUN", "client": "NOT_RUN", "renderer": "NOT_RUN", "columns": "NOT_RUN", "body_sha256": "NOT_RUN", "template_sha256": "NOT_RUN", "profile": "NOT_RUN", "pages": "NOT_RUN", "page_observations": "NOT_RUN", "font": "NOT_RUN", "font_pt": "NOT_RUN", "line_pt": "NOT_RUN", "fixed_counts": "NOT_RUN", "docx_sha256": "NOT_RUN", "pdf_sha256": "NOT_RUN", "png_sha256": "NOT_RUN"
+      }
+    },
+    {
+      "id": "six-sunday-long-dedup",
+      "columns": 6,
+      "input_body_sha256": null,
+      "candidate_docx_sha256": null,
+      "runtime_lo_pdf_sha256": null,
+      "runtime_lo_png_sha256": [],
+      "word_export_pdf_sha256": null,
+      "word_page_png_sha256": [],
+      "native_observation": {
+        "schema": "NOT_RUN", "role": "NOT_RUN", "client": "NOT_RUN", "renderer": "NOT_RUN", "columns": "NOT_RUN", "body_sha256": "NOT_RUN", "template_sha256": "NOT_RUN", "profile": "NOT_RUN", "pages": "NOT_RUN", "page_observations": "NOT_RUN", "font": "NOT_RUN", "font_pt": "NOT_RUN", "line_pt": "NOT_RUN", "fixed_counts": "NOT_RUN", "docx_sha256": "NOT_RUN", "pdf_sha256": "NOT_RUN", "png_sha256": "NOT_RUN"
+      }
+    },
+    {
+      "id": "six-saturday-normal",
+      "columns": 6,
+      "input_body_sha256": null,
+      "candidate_docx_sha256": null,
+      "runtime_lo_pdf_sha256": null,
+      "runtime_lo_png_sha256": [],
+      "word_export_pdf_sha256": null,
+      "word_page_png_sha256": [],
+      "native_observation": {
+        "schema": "NOT_RUN", "role": "NOT_RUN", "client": "NOT_RUN", "renderer": "NOT_RUN", "columns": "NOT_RUN", "body_sha256": "NOT_RUN", "template_sha256": "NOT_RUN", "profile": "NOT_RUN", "pages": "NOT_RUN", "page_observations": "NOT_RUN", "font": "NOT_RUN", "font_pt": "NOT_RUN", "line_pt": "NOT_RUN", "fixed_counts": "NOT_RUN", "docx_sha256": "NOT_RUN", "pdf_sha256": "NOT_RUN", "png_sha256": "NOT_RUN"
+      }
+    },
+    {
+      "id": "six-saturday-long",
+      "columns": 6,
+      "input_body_sha256": null,
+      "candidate_docx_sha256": null,
+      "runtime_lo_pdf_sha256": null,
+      "runtime_lo_png_sha256": [],
+      "word_export_pdf_sha256": null,
+      "word_page_png_sha256": [],
+      "native_observation": {
+        "schema": "NOT_RUN", "role": "NOT_RUN", "client": "NOT_RUN", "renderer": "NOT_RUN", "columns": "NOT_RUN", "body_sha256": "NOT_RUN", "template_sha256": "NOT_RUN", "profile": "NOT_RUN", "pages": "NOT_RUN", "page_observations": "NOT_RUN", "font": "NOT_RUN", "font_pt": "NOT_RUN", "line_pt": "NOT_RUN", "fixed_counts": "NOT_RUN", "docx_sha256": "NOT_RUN", "pdf_sha256": "NOT_RUN", "png_sha256": "NOT_RUN"
+      }
+    },
+    {
+      "id": "six-saturday-long-dedup",
+      "columns": 6,
+      "input_body_sha256": null,
+      "candidate_docx_sha256": null,
+      "runtime_lo_pdf_sha256": null,
+      "runtime_lo_png_sha256": [],
+      "word_export_pdf_sha256": null,
+      "word_page_png_sha256": [],
+      "native_observation": {
+        "schema": "NOT_RUN", "role": "NOT_RUN", "client": "NOT_RUN", "renderer": "NOT_RUN", "columns": "NOT_RUN", "body_sha256": "NOT_RUN", "template_sha256": "NOT_RUN", "profile": "NOT_RUN", "pages": "NOT_RUN", "page_observations": "NOT_RUN", "font": "NOT_RUN", "font_pt": "NOT_RUN", "line_pt": "NOT_RUN", "fixed_counts": "NOT_RUN", "docx_sha256": "NOT_RUN", "pdf_sha256": "NOT_RUN", "png_sha256": "NOT_RUN"
+      }
+    }
+  ],
+  "formal_qualification": "NOT_RUN",
+  "notes": "Fill from actual Windows Word observations only; do not prefill PASS or replace Word artifacts with Ubuntu runtime artifacts."
+}

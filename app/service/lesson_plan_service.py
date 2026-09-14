@@ -47,6 +47,13 @@ class LessonPlanResult:
     activity_process_original: str
     activity_process_adapted: str
     diff_result: list[dict] = field(default_factory=list)
+    activity_name: str = ""
+
+    @property
+    def activity_name_hint(self) -> str:
+        return (
+            "未提取到明确的集体活动名称，请手动填写" if not self.activity_name else ""
+        )
 
 
 async def process_lesson_plan(
@@ -142,6 +149,7 @@ async def process_lesson_plan(
     log_audit("ai_split", tenant_id=tenant_id, user_id=user_id, grade=grade)
 
     return LessonPlanResult(
+        activity_name=split_result.get("activity_name", ""),
         activity_goal=split_result["activity_goal"],
         activity_prep=split_result["activity_prep"],
         activity_key=split_result["activity_key"],

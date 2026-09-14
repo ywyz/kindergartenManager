@@ -1,0 +1,516 @@
+{
+  "created_at_utc": "2026-09-10T13:15:28.046452+00:00",
+  "handoff_sha": "eb3504383023eac6f6c93d8769b6d273a55abd7f",
+  "evidence_closure_sha": null,
+  "client": "Windows LibreOffice26.8.0.3",
+  "build": "bce0998afefdbc355585ca324285661a2170ba77",
+  "status": "FAIL_FIXED_20PT_LINE_SPACING; THREE_LONG_SINGLE_PAGE_FAIL",
+  "native_ui": "NOT_OBSERVED_HEADLESS_PDF_ONLY",
+  "linux_stable_gate": "NOT_REQUIRED_FOR_FORMAT_BY_USER_DECISION",
+  "samples": [
+    {
+      "sample": "normal-compact-candidate.docx",
+      "input_sha256": "e6d7a4dbb44418e0078fdd2280fec89bb12f33c0c3aaec67235ab9d1821bb350",
+      "input_sha256_after": "e6d7a4dbb44418e0078fdd2280fec89bb12f33c0c3aaec67235ab9d1821bb350",
+      "pdf": "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/normal-compact-candidate/normal-compact-candidate.pdf",
+      "pdf_sha256": "162352df254c567baef52ee18208c48c8ed0c9394dd7414e441f8a014c4f5bf4",
+      "pdf_pages": 1,
+      "pngs": [
+        "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/normal-compact-candidate/page-1.png"
+      ],
+      "font": "PASS_NONEMPTY_SIMSUN_12_16_PT_WHITESPACE_UNRESTRICTED",
+      "line_spacing": "FAIL_16.9_PT_OBSERVED_VS_20_PT_REQUIRED",
+      "single_page": "ONE_PAGE_ONLY_NOT_LAYOUT_PASS",
+      "fixed_counts": {
+        "physical_cycle": true,
+        "collective_games": 2,
+        "autonomous_games": 1,
+        "three_goals_each": true,
+        "area_focus": 1,
+        "area_goals": 3,
+        "area_guidance": 3,
+        "materials": true,
+        "weekly_focus": 3,
+        "environment": 3,
+        "habits": 3,
+        "home_school_paragraphs": 1
+      },
+      "nonwhitespace_text_equal": true
+    },
+    {
+      "sample": "normal-five-long.docx",
+      "input_sha256": "9cd738dd630228f8d3b3c314742f7f62e16de498904a097407b52edef7597f4f",
+      "input_sha256_after": "9cd738dd630228f8d3b3c314742f7f62e16de498904a097407b52edef7597f4f",
+      "pdf": "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/normal-five-long/normal-five-long.pdf",
+      "pdf_sha256": "41bd7bd4ff76161347a1a996cf7db8b6a1dd17e51cc573a937740aa09ee60077",
+      "pdf_pages": 2,
+      "pngs": [
+        "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/normal-five-long/page-1.png",
+        "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/normal-five-long/page-2.png"
+      ],
+      "font": "PASS_NONEMPTY_SIMSUN_12_16_PT_WHITESPACE_UNRESTRICTED",
+      "line_spacing": "FAIL_16.9_PT_OBSERVED_VS_20_PT_REQUIRED",
+      "single_page": "FAIL",
+      "fixed_counts": {
+        "physical_cycle": true,
+        "collective_games": 2,
+        "autonomous_games": 1,
+        "three_goals_each": true,
+        "area_focus": 1,
+        "area_goals": 3,
+        "area_guidance": 3,
+        "materials": true,
+        "weekly_focus": 3,
+        "environment": 3,
+        "habits": 3,
+        "home_school_paragraphs": 1
+      },
+      "nonwhitespace_text_equal": true
+    },
+    {
+      "sample": "normal-five-short.docx",
+      "input_sha256": "7eca517011011b5cb7c3b74d38756fdfef6da5f2a7df44503bceefdbd07593c9",
+      "input_sha256_after": "7eca517011011b5cb7c3b74d38756fdfef6da5f2a7df44503bceefdbd07593c9",
+      "pdf": "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/normal-five-short/normal-five-short.pdf",
+      "pdf_sha256": "0a6dddbdbd1726aa3664fae88cc8dcb06d7e53846bf493b29b2d67df90bccf3b",
+      "pdf_pages": 1,
+      "pngs": [
+        "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/normal-five-short/page-1.png"
+      ],
+      "font": "PASS_NONEMPTY_SIMSUN_12_16_PT_WHITESPACE_UNRESTRICTED",
+      "line_spacing": "FAIL_16.9_PT_OBSERVED_VS_20_PT_REQUIRED",
+      "single_page": "ONE_PAGE_ONLY_NOT_LAYOUT_PASS",
+      "fixed_counts": {
+        "physical_cycle": true,
+        "collective_games": 2,
+        "autonomous_games": 1,
+        "three_goals_each": true,
+        "area_focus": 1,
+        "area_goals": 3,
+        "area_guidance": 3,
+        "materials": true,
+        "weekly_focus": 3,
+        "environment": 3,
+        "habits": 3,
+        "home_school_paragraphs": 1
+      },
+      "nonwhitespace_text_equal": true
+    },
+    {
+      "sample": "preceding-sunday-six-long.docx",
+      "input_sha256": "ff6088b80654fbfdd096b233e995ef1394b9209ea50728ea9b21ce43a4f0c6d6",
+      "input_sha256_after": "ff6088b80654fbfdd096b233e995ef1394b9209ea50728ea9b21ce43a4f0c6d6",
+      "pdf": "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/preceding-sunday-six-long/preceding-sunday-six-long.pdf",
+      "pdf_sha256": "8a27e0b4dbe79e377ad2b5509cbf9701818cac4fd50fa798d8f850c5d9277e2e",
+      "pdf_pages": 2,
+      "pngs": [
+        "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/preceding-sunday-six-long/page-1.png",
+        "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/preceding-sunday-six-long/page-2.png"
+      ],
+      "font": "PASS_NONEMPTY_SIMSUN_12_16_PT_WHITESPACE_UNRESTRICTED",
+      "line_spacing": "FAIL_16.9_PT_OBSERVED_VS_20_PT_REQUIRED",
+      "single_page": "FAIL",
+      "fixed_counts": {
+        "physical_cycle": true,
+        "collective_games": 2,
+        "autonomous_games": 1,
+        "three_goals_each": true,
+        "area_focus": 1,
+        "area_goals": 3,
+        "area_guidance": 3,
+        "materials": true,
+        "weekly_focus": 3,
+        "environment": 3,
+        "habits": 3,
+        "home_school_paragraphs": 1
+      },
+      "nonwhitespace_text_equal": true
+    },
+    {
+      "sample": "preceding-sunday-six-short.docx",
+      "input_sha256": "78b7f8fdab2714a4cb4a5cacfaba55092229462653811ce66503d61e2ff1109a",
+      "input_sha256_after": "78b7f8fdab2714a4cb4a5cacfaba55092229462653811ce66503d61e2ff1109a",
+      "pdf": "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/preceding-sunday-six-short/preceding-sunday-six-short.pdf",
+      "pdf_sha256": "6b071c04051f974f671e8ae6f58c346fa4a077f3e1551e808ebc4447fdccf58a",
+      "pdf_pages": 1,
+      "pngs": [
+        "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/preceding-sunday-six-short/page-1.png"
+      ],
+      "font": "PASS_NONEMPTY_SIMSUN_12_16_PT_WHITESPACE_UNRESTRICTED",
+      "line_spacing": "FAIL_16.9_PT_OBSERVED_VS_20_PT_REQUIRED",
+      "single_page": "ONE_PAGE_ONLY_NOT_LAYOUT_PASS",
+      "fixed_counts": {
+        "physical_cycle": true,
+        "collective_games": 2,
+        "autonomous_games": 1,
+        "three_goals_each": true,
+        "area_focus": 1,
+        "area_goals": 3,
+        "area_guidance": 3,
+        "materials": true,
+        "weekly_focus": 3,
+        "environment": 3,
+        "habits": 3,
+        "home_school_paragraphs": 1
+      },
+      "nonwhitespace_text_equal": true
+    },
+    {
+      "sample": "saturday-compact-candidate.docx",
+      "input_sha256": "4286ee43ced4a9043231264851c75cb9b1ddf76594294f23a3ac9f85066b69b3",
+      "input_sha256_after": "4286ee43ced4a9043231264851c75cb9b1ddf76594294f23a3ac9f85066b69b3",
+      "pdf": "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/saturday-compact-candidate/saturday-compact-candidate.pdf",
+      "pdf_sha256": "5f1bbd443b03668b4639230b7d4e73c32ce80f209fe0dcaaada311c1443885e8",
+      "pdf_pages": 1,
+      "pngs": [
+        "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/saturday-compact-candidate/page-1.png"
+      ],
+      "font": "PASS_NONEMPTY_SIMSUN_12_16_PT_WHITESPACE_UNRESTRICTED",
+      "line_spacing": "FAIL_16.9_PT_OBSERVED_VS_20_PT_REQUIRED",
+      "single_page": "ONE_PAGE_ONLY_NOT_LAYOUT_PASS",
+      "fixed_counts": {
+        "physical_cycle": true,
+        "collective_games": 2,
+        "autonomous_games": 1,
+        "three_goals_each": true,
+        "area_focus": 1,
+        "area_goals": 3,
+        "area_guidance": 3,
+        "materials": true,
+        "weekly_focus": 3,
+        "environment": 3,
+        "habits": 3,
+        "home_school_paragraphs": 1
+      },
+      "nonwhitespace_text_equal": true
+    },
+    {
+      "sample": "saturday-six-long.docx",
+      "input_sha256": "600fc88240d87d03854d4a51c4985b654fb606015dcb1a771f8947f78c74d374",
+      "input_sha256_after": "600fc88240d87d03854d4a51c4985b654fb606015dcb1a771f8947f78c74d374",
+      "pdf": "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/saturday-six-long/saturday-six-long.pdf",
+      "pdf_sha256": "fec64cd010639d8db35f81f26528ff1c68a382869b38afe9ddd7f71295bf7e16",
+      "pdf_pages": 2,
+      "pngs": [
+        "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/saturday-six-long/page-1.png",
+        "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/saturday-six-long/page-2.png"
+      ],
+      "font": "PASS_NONEMPTY_SIMSUN_12_16_PT_WHITESPACE_UNRESTRICTED",
+      "line_spacing": "FAIL_16.9_PT_OBSERVED_VS_20_PT_REQUIRED",
+      "single_page": "FAIL",
+      "fixed_counts": {
+        "physical_cycle": true,
+        "collective_games": 2,
+        "autonomous_games": 1,
+        "three_goals_each": true,
+        "area_focus": 1,
+        "area_goals": 3,
+        "area_guidance": 3,
+        "materials": true,
+        "weekly_focus": 3,
+        "environment": 3,
+        "habits": 3,
+        "home_school_paragraphs": 1
+      },
+      "nonwhitespace_text_equal": true
+    },
+    {
+      "sample": "saturday-six-short.docx",
+      "input_sha256": "99bfb2d7be462be4353a5b54affddac60c4bd257040f4a6e237f5bbd58073259",
+      "input_sha256_after": "99bfb2d7be462be4353a5b54affddac60c4bd257040f4a6e237f5bbd58073259",
+      "pdf": "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/saturday-six-short/saturday-six-short.pdf",
+      "pdf_sha256": "a6684c8796c70fd5ae73d6776fb24ca261f7219ee9b1dd1970d76368e23b63cf",
+      "pdf_pages": 1,
+      "pngs": [
+        "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/saturday-six-short/page-1.png"
+      ],
+      "font": "PASS_NONEMPTY_SIMSUN_12_16_PT_WHITESPACE_UNRESTRICTED",
+      "line_spacing": "FAIL_16.9_PT_OBSERVED_VS_20_PT_REQUIRED",
+      "single_page": "ONE_PAGE_ONLY_NOT_LAYOUT_PASS",
+      "fixed_counts": {
+        "physical_cycle": true,
+        "collective_games": 2,
+        "autonomous_games": 1,
+        "three_goals_each": true,
+        "area_focus": 1,
+        "area_goals": 3,
+        "area_guidance": 3,
+        "materials": true,
+        "weekly_focus": 3,
+        "environment": 3,
+        "habits": 3,
+        "home_school_paragraphs": 1
+      },
+      "nonwhitespace_text_equal": true
+    },
+    {
+      "sample": "sunday-compact-candidate.docx",
+      "input_sha256": "45b02145e835b27d54d2ed57aa3a8f2e57bbb13c335b1c0fadd2dcf69288d27a",
+      "input_sha256_after": "45b02145e835b27d54d2ed57aa3a8f2e57bbb13c335b1c0fadd2dcf69288d27a",
+      "pdf": "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/sunday-compact-candidate/sunday-compact-candidate.pdf",
+      "pdf_sha256": "caf8addebf182943903fffa3f14fdf43629935dd604cb385259ffdae1059a75e",
+      "pdf_pages": 1,
+      "pngs": [
+        "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/sunday-compact-candidate/page-1.png"
+      ],
+      "font": "PASS_NONEMPTY_SIMSUN_12_16_PT_WHITESPACE_UNRESTRICTED",
+      "line_spacing": "FAIL_16.9_PT_OBSERVED_VS_20_PT_REQUIRED",
+      "single_page": "ONE_PAGE_ONLY_NOT_LAYOUT_PASS",
+      "fixed_counts": {
+        "physical_cycle": true,
+        "collective_games": 2,
+        "autonomous_games": 1,
+        "three_goals_each": true,
+        "area_focus": 1,
+        "area_goals": 3,
+        "area_guidance": 3,
+        "materials": true,
+        "weekly_focus": 3,
+        "environment": 3,
+        "habits": 3,
+        "home_school_paragraphs": 1
+      },
+      "nonwhitespace_text_equal": true
+    }
+  ],
+  "files": {
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/border-bounds.json": {
+      "sha256": "0e7cd5652f8d3d496d4f754bfb93b436a4a2059293d9912ef80dcada06b2c86a",
+      "bytes": 4830
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/environment.json": {
+      "sha256": "09a8fcf55f5772630609d368a350f74c8472d2b2327c1475bff5bd28b3d64b8b",
+      "bytes": 466
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/font.json": {
+      "sha256": "87e2ea42d97d3ba0f090b62da35cff51e4e70c2b20af7120a52efedcdafb8521",
+      "bytes": 409
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/inspect_outputs.py": {
+      "sha256": "336b3d969f043f2f687716b8f6d049f300d5ae1c47a6ab18e2acacb08eaac97b",
+      "bytes": 6022
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/inspection.json": {
+      "sha256": "873003c67f9b83050f7d4c8adc694eb30aa96449340bf3c8da5391fc8dc2a68c",
+      "bytes": 73196
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/issue-77-before.json": {
+      "sha256": "82fb6fc499f7e5787dcbce2f2555db91278e91d6d7829bac4faa19feec611a2b",
+      "bytes": 35984
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/line-spacing.json": {
+      "sha256": "2768ff415e147921b50f748aa04bd2d773f384b21f43ef4c5b297aff2996a5dd",
+      "bytes": 18477
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/measure.py": {
+      "sha256": "dfda33fde31ae5d393778b2d6fc420b0e519b3868a9d7dc79cf92a54190eacfa",
+      "bytes": 2702
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/normal-compact-candidate/inspection.json": {
+      "sha256": "7c14b155f4384cf7562800b155fdc4d7e65d2c3df69159bc6cbb17be14c73d99",
+      "bytes": 5694
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/normal-compact-candidate/normal-compact-candidate.pdf": {
+      "sha256": "162352df254c567baef52ee18208c48c8ed0c9394dd7414e441f8a014c4f5bf4",
+      "bytes": 81362
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/normal-compact-candidate/page-1.png": {
+      "sha256": "b7f6bb44b907203b53cd6f7a344b86a86d861f2dcd0344ab1c78bf011910a970",
+      "bytes": 272043
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/normal-compact-candidate/page-1.txt": {
+      "sha256": "2fb584f09212d1014738c2f0cab44c2d0130f0031d7dfef966881f1dbf161cfc",
+      "bytes": 1746
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/normal-five-long/inspection.json": {
+      "sha256": "faea36617d74734a4f7c4f05b5b39f743edc6a72b050c8505ffd1fd4ac58eb4e",
+      "bytes": 9454
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/normal-five-long/normal-five-long.pdf": {
+      "sha256": "41bd7bd4ff76161347a1a996cf7db8b6a1dd17e51cc573a937740aa09ee60077",
+      "bytes": 127272
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/normal-five-long/page-1.png": {
+      "sha256": "ed2c7b6503c04f1cfe06b11b126b2ce725a7380bc577acceb73a1b4c99392aee",
+      "bytes": 540673
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/normal-five-long/page-1.txt": {
+      "sha256": "b09e40f6e45b09b10df251bf47d76aca7e6a999b7e83b5c6c2d14eddbcd056f8",
+      "bytes": 3496
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/normal-five-long/page-2.png": {
+      "sha256": "0a394d6f38a85d0caad85511b1e38d5e8b076652a6be25febdc6aa3bea167cb7",
+      "bytes": 202691
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/normal-five-long/page-2.txt": {
+      "sha256": "37f1880d9aca176afa5f083da5eee332830d0901fdd2759559d3a58579318a20",
+      "bytes": 1140
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/normal-five-short/inspection.json": {
+      "sha256": "44edad49e93dacb81a5ec454ed69fc1a27d2d572df512a20017546ea10f74a1a",
+      "bytes": 5290
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/normal-five-short/normal-five-short.pdf": {
+      "sha256": "0a6dddbdbd1726aa3664fae88cc8dcb06d7e53846bf493b29b2d67df90bccf3b",
+      "bytes": 76838
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/normal-five-short/page-1.png": {
+      "sha256": "1baea761489b37200ed53f187f9d28d766d7b16f220102f201781dd7250ebfe6",
+      "bytes": 205149
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/normal-five-short/page-1.txt": {
+      "sha256": "19e129b45a9d4bcb16472a44c38342b8f4eb65bb75c6e16b239d674f0cb223cf",
+      "bytes": 1329
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/preceding-sunday-six-long/inspection.json": {
+      "sha256": "52de79a81af77890b2e59b21087e8917ae862c7d7c6d88b4adfc496d60d08603",
+      "bytes": 9829
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/preceding-sunday-six-long/page-1.png": {
+      "sha256": "21240cd913bb5ad881f7a7bc53777556bdbff652ac3007a5fbfcbfc87ff200f0",
+      "bytes": 488349
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/preceding-sunday-six-long/page-1.txt": {
+      "sha256": "df98ca38264364f211352093ffbedce38f000a184bc49eb30a1441115ab7ecf8",
+      "bytes": 3661
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/preceding-sunday-six-long/page-2.png": {
+      "sha256": "dadb6f47e9fda4fa848d14685c00f9f825999ec0127a2fc0f250f7436a33b38e",
+      "bytes": 224333
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/preceding-sunday-six-long/page-2.txt": {
+      "sha256": "cbdbf3112162b9adc3f353f4aafb29d7a557534ee9a5da4c2a3f681e03157311",
+      "bytes": 1268
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/preceding-sunday-six-long/preceding-sunday-six-long.pdf": {
+      "sha256": "8a27e0b4dbe79e377ad2b5509cbf9701818cac4fd50fa798d8f850c5d9277e2e",
+      "bytes": 129698
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/preceding-sunday-six-short/inspection.json": {
+      "sha256": "013d945380f8dcc102a7a750294afa90326649d248d30ee363701a439b0c18e5",
+      "bytes": 5454
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/preceding-sunday-six-short/page-1.png": {
+      "sha256": "cb81913e4f0229b3840ab3cc0ca55f9d3d06f66ecbad13e1a98a6cb5267c17ed",
+      "bytes": 202757
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/preceding-sunday-six-short/page-1.txt": {
+      "sha256": "69555cc43bfa97202cfd39f553361620fba8bb4ccd38713df454bf63877cd59e",
+      "bytes": 1377
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/preceding-sunday-six-short/preceding-sunday-six-short.pdf": {
+      "sha256": "6b071c04051f974f671e8ae6f58c346fa4a077f3e1551e808ebc4447fdccf58a",
+      "bytes": 78986
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/prior-word-manifest.json": {
+      "sha256": "303306c47fbb426bae9d2a997cc543495c5b302f7874d99945d5725c193a55de",
+      "bytes": 47607
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/prior-word-report.md": {
+      "sha256": "8eca5698cf0e822271c1a1feb73935794e92df246eee8d874b409d62717f0cb2",
+      "bytes": 15078
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/README.md": {
+      "sha256": "38e93c02a42f94b21d9568659ced16301be73b4b76eab1b6d6ce9361fee3a6cf",
+      "bytes": 1802
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/run.json": {
+      "sha256": "5e4ae51eee6ad1f6b5482a5f5b7ebab73f8645791e58a8ed5e039cd3b04bfc62",
+      "bytes": 31678
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/saturday-compact-candidate/inspection.json": {
+      "sha256": "18b66de202652829553ab92ff3a38cb7ffd62a05b9de1f378317700646f3a491",
+      "bytes": 5901
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/saturday-compact-candidate/page-1.png": {
+      "sha256": "ad7de5ec3409d14fe7bc830faedb071fc6587efa3fb093e096478388aba7d12d",
+      "bytes": 269457
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/saturday-compact-candidate/page-1.txt": {
+      "sha256": "023fb870d31bf830b1a9d8550b39fd735eaf73c9162bc02b3bd1d88435551afd",
+      "bytes": 1872
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/saturday-compact-candidate/saturday-compact-candidate.pdf": {
+      "sha256": "5f1bbd443b03668b4639230b7d4e73c32ce80f209fe0dcaaada311c1443885e8",
+      "bytes": 83640
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/saturday-six-long/inspection.json": {
+      "sha256": "92c60e6d67000dca0461a35ef897f32b71b7822b46bc6adcc37dc6278328de37",
+      "bytes": 9821
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/saturday-six-long/page-1.png": {
+      "sha256": "8f2f5982bc4d322b0fff929230c95f64c4ca990a6dc2031cb16fcbaf0847cdc4",
+      "bytes": 488781
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/saturday-six-long/page-1.txt": {
+      "sha256": "aa1d15f39dfa935b1e7b1b44941a8dfff5aa07a21f3640ec3e56987b2e244105",
+      "bytes": 3661
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/saturday-six-long/page-2.png": {
+      "sha256": "dadb6f47e9fda4fa848d14685c00f9f825999ec0127a2fc0f250f7436a33b38e",
+      "bytes": 224333
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/saturday-six-long/page-2.txt": {
+      "sha256": "cbdbf3112162b9adc3f353f4aafb29d7a557534ee9a5da4c2a3f681e03157311",
+      "bytes": 1268
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/saturday-six-long/saturday-six-long.pdf": {
+      "sha256": "fec64cd010639d8db35f81f26528ff1c68a382869b38afe9ddd7f71295bf7e16",
+      "bytes": 129787
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/saturday-six-short/inspection.json": {
+      "sha256": "51a6c71976e147a5a0362e33557c19ea5791fa502c6d9d0ed2bd9b36daac8b2c",
+      "bytes": 5446
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/saturday-six-short/page-1.png": {
+      "sha256": "34e4ae18bb03d280261903569b3d181ac7efb89f7d066f80674d83b490b8b869",
+      "bytes": 203157
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/saturday-six-short/page-1.txt": {
+      "sha256": "00778477e894fdb5a2ff225ee61a5ec314b1dc1735fd833a066e5826127065b8",
+      "bytes": 1377
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/saturday-six-short/saturday-six-short.pdf": {
+      "sha256": "a6684c8796c70fd5ae73d6776fb24ca261f7219ee9b1dd1970d76368e23b63cf",
+      "bytes": 79072
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/sunday-compact-candidate/inspection.json": {
+      "sha256": "ede42bbd9ec184a8ad8b646b29f43f910dc58e5f9ff791e7f498da1950e5a1e3",
+      "bytes": 5899
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/sunday-compact-candidate/page-1.png": {
+      "sha256": "adfbde288519a828f61243a814bb3f0b273bd480cdf59837e3836dabade1106b",
+      "bytes": 269047
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/sunday-compact-candidate/page-1.txt": {
+      "sha256": "33b3cc75f07ff792ff2178fa06665249635c32c7b65c3023335a835822254ec4",
+      "bytes": 1872
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/sunday-compact-candidate/sunday-compact-candidate.pdf": {
+      "sha256": "caf8addebf182943903fffa3f14fdf43629935dd604cb385259ffdae1059a75e",
+      "bytes": 83519
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/issue-77-comment.md": {
+      "sha256": "10e92c135e2fec293d4d65a88ec5aab826ebba2ad4e23cbd8834f47685bfed6c",
+      "bytes": 2573
+    },
+    "specs/weekly-plan-authoring/validation/wp-a-libreoffice-windows-20260910-2108/issue-77-readback.json": {
+      "sha256": "8afeff1c164f0fc121335f59d1b116ad0f9281a0788b5d464febfa126d026503",
+      "bytes": 4193
+    },
+    "specs/weekly-plan-authoring/evidence/WP-A-LibreOffice-Windows-20260910.md": {
+      "sha256": "6bc36e5baf0595ff3c5d6fdfe91a0723baa89abe353dcc1080bb4335d4db1320",
+      "bytes": 6939
+    },
+    "specs/weekly-plan-authoring/evidence/WP-A-LibreOffice-Windows-20260910-review.md": {
+      "sha256": "8f530423637f79234bcd10850f01926c677562f72a634a280321302d28a3e99c",
+      "bytes": 1836
+    }
+  },
+  "issue_comment": "https://github.com/ywyz/kindergartenManager/issues/77#issuecomment-5619295160",
+  "independent_review": "ALL_12_PAGES_VIEWED; 9_LINE_SPACING_INDEPENDENTLY_RECOMPUTED_FAIL",
+  "updated_at_utc": "2026-09-10T13:27:38.979811+00:00",
+  "client_policy": "MICROSOFT_WORD_PRIMARY; LIBREOFFICE_BACKUP_OPEN_ONLY_NO_FORMAT_GATE",
+  "client_policy_issue_comment": "https://github.com/ywyz/kindergartenManager/issues/77#issuecomment-5619437453",
+  "acceptance_disposition": "HISTORICAL_LAYOUT_FAILURE_RETAINED; NON_BLOCKING_BY_EXPLICIT_USER_DECISION"
+}

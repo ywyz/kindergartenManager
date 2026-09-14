@@ -1,0 +1,19 @@
+{
+  "scope": "local current user only; no sudo; no application/container modification",
+  "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.43",
+  "files": {
+    "/home/ywyz/.local/share/fonts/km-simsun-20260909/simsun.ttc": {
+      "sha256": "1526ac24375f51f6eb73bc2d3f8072dbe4a80a3a65217677c9d9a84f67dab2ab",
+      "bytes": 18316748
+    },
+    "/home/ywyz/.local/share/fonts/km-simsun-20260909/simsunb.ttf": {
+      "sha256": "2a476ca00b5fbbbc12a4c5335634722b11a495ed87429284325701f1e36b596a",
+      "bytes": 21894056
+    }
+  },
+  "fc_match": {
+    "宋体": "SimSun,宋体|Regular,常规|/home/ywyz/.local/share/fonts/km-simsun-20260909/simsun.ttc",
+    "SimSun": "SimSun,宋体|Regular,常规|/home/ywyz/.local/share/fonts/km-simsun-20260909/simsun.ttc",
+    "SimSun-ExtB": "SimSun,宋体|Regular,常规|/home/ywyz/.local/share/fonts/km-simsun-20260909/simsun.ttc"
+  }
+}

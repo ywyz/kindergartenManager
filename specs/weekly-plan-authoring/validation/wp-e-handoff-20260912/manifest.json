@@ -1,0 +1,164 @@
+{
+  "schema": "wp-e-windows-handoff.v1",
+  "tested_code_sha": "9cde71655c30cafdc6ac4e99ed22509ad989b121",
+  "documentation_successor_sha": "7c0acb9337534d0db60b9ff6d9e1abd09e382643",
+  "scope": "Selected portable evidence copies only; historical absolute paths retained. Original 829/318 artifacts are not all included. Not Word qualification or WP-E completion.",
+  "files": [
+    {
+      "path": "continuation/authorization-boundaries.json",
+      "sha256": "10b25adeb4415cd42777641efc92c77c7a7f0b2fb856f501a31f21ac021c0de1",
+      "bytes": 578,
+      "original_path": "/home/ywyz/code/km-wpe-continuation-evidence-20260912/authorization-boundaries.json"
+    },
+    {
+      "path": "continuation/preservation-before.json",
+      "sha256": "cfebeb8901b68ebf317ffaf3b85256d2d48be490d853851935b133c5ce9ff54d",
+      "bytes": 24034,
+      "original_path": "/home/ywyz/code/km-wpe-continuation-evidence-20260912/preservation-before.json"
+    },
+    {
+      "path": "continuation/preservation-after.json",
+      "sha256": "cfebeb8901b68ebf317ffaf3b85256d2d48be490d853851935b133c5ce9ff54d",
+      "bytes": 24034,
+      "original_path": "/home/ywyz/code/km-wpe-continuation-evidence-20260912/preservation-after.json"
+    },
+    {
+      "path": "continuation/integrity-final.json",
+      "sha256": "0f152fe15a0c20715efc847882bd1e953dca00a21badb8f2a4729b0d6a22a143",
+      "bytes": 865,
+      "original_path": "/home/ywyz/code/km-wpe-continuation-evidence-20260912/integrity-final.json"
+    },
+    {
+      "path": "continuation/local-chain-configured.log",
+      "sha256": "244412341f34e061cc95520a3a6c678d0630ff7e75f2cfd7c736fc373299f8a0",
+      "bytes": 777,
+      "original_path": "/home/ywyz/code/km-wpe-continuation-evidence-20260912/local-chain-configured.log"
+    },
+    {
+      "path": "continuation/local-chain-configured.json",
+      "sha256": "8632d3300750ca39cf7ecbe39635eda8525110a655cb40d8262b7b654c5bd159",
+      "bytes": 2963,
+      "original_path": "/home/ywyz/code/km-wpe-continuation-evidence-20260912/local-chain-configured.json"
+    },
+    {
+      "path": "continuation/qualification-review.md",
+      "sha256": "fec3e2317c1cbdf8a22ac0d1f5a16b48933595ea48282daec8f15e3a677cde4d",
+      "bytes": 7060,
+      "original_path": "/home/ywyz/code/km-wpe-continuation-evidence-20260912/qualification-review.md"
+    },
+    {
+      "path": "continuation/documentation-review.md",
+      "sha256": "341b46d79e05c81eba11d71f5bd353262f3e2f4ce28979aea60ca5f8ffa7d3e0",
+      "bytes": 1743,
+      "original_path": "/home/ywyz/code/km-wpe-continuation-evidence-20260912/documentation-review.md"
+    },
+    {
+      "path": "continuation/browser-observations.md",
+      "sha256": "63e4e620b12fcc78b7cd04d91cd943a241698998e72e6526ee4fdf57f13e5d92",
+      "bytes": 2540,
+      "original_path": "/home/ywyz/code/km-wpe-continuation-evidence-20260912/browser-observations.md"
+    },
+    {
+      "path": "continuation/lint.log",
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+      "bytes": 19,
+      "original_path": "/home/ywyz/code/km-wpe-continuation-evidence-20260912/lint.log"
+    },
+    {
+      "path": "continuation/format.log",
+      "sha256": "3cbc764509f46afb88053c5d0216718d29af883ed4a6216db2de94a84f3fa1bc",
+      "bytes": 27,
+      "original_path": "/home/ywyz/code/km-wpe-continuation-evidence-20260912/format.log"
+    },
+    {
+      "path": "continuation/checks.json",
+      "sha256": "68626e59b8398100060f3d53a3633ab7d8ea50e2ba70a32012e28ba9fbe88edd",
+      "bytes": 158,
+      "original_path": "/home/ywyz/code/km-wpe-continuation-evidence-20260912/checks.json"
+    },
+    {
+      "path": "continuation/verification-summary.json",
+      "sha256": "0a5eaf9b086ba433e2e48073421c30a33aa7251281c9b50695032e408240d5cf",
+      "bytes": 813,
+      "original_path": "/home/ywyz/code/km-wpe-continuation-evidence-20260912/verification-summary.json"
+    },
+    {
+      "path": "continuation/manifest.json",
+      "sha256": "4f7118a0b04103a6f2a1f56d86d20b8f5e4feea3400db2518bdb6a107f79ea8d",
+      "bytes": 3124,
+      "original_path": "/home/ywyz/code/km-wpe-continuation-evidence-20260912/manifest.json"
+    },
+    {
+      "path": "continuation/closure.json",
+      "sha256": "0eb968f74f8480d77de7b7a4f3819c4351294bd2ad9240c0839923ca5927d50d",
+      "bytes": 612,
+      "original_path": "/home/ywyz/code/km-wpe-continuation-evidence-20260912/closure.json"
+    },
+    {
+      "path": "prior-wpe/authorization.txt",
+      "sha256": "a04dbd45542fb17ec7a7a8d794140c4b86b7ed1ce2c7b98811ed82f91d6454a0",
+      "bytes": 370,
+      "original_path": "/home/ywyz/code/km-wpe-evidence-20260912/authorization.txt"
+    },
+    {
+      "path": "prior-wpe/manifest.json",
+      "sha256": "b0334a1bce754dcef39157eadca181353e625a4e50ee51f6a746a5f133cc5b2d",
+      "bytes": 144027,
+      "original_path": "/home/ywyz/code/km-wpe-evidence-20260912/manifest.json"
+    },
+    {
+      "path": "prior-wpe/closure.json",
+      "sha256": "2202b860ba65765d05df01f3e444bff5ba53f765c2bb97edf20486781ab1c70c",
+      "bytes": 2118,
+      "original_path": "/home/ywyz/code/km-wpe-evidence-20260912/closure.json"
+    },
+    {
+      "path": "prior-wpe/word/UI-REVIEW.md",
+      "sha256": "295211590457cb231809f5a9be167fbd86d227245f831a3d73c5824cf31d63da",
+      "bytes": 12162,
+      "original_path": "/home/ywyz/code/km-wpe-evidence-20260912/word/UI-REVIEW.md"
+    },
+    {
+      "path": "prior-wpe/ui/REDUCTION-INDEPENDENT-REVIEW.md",
+      "sha256": "415a56d12e8e30b811e755833af0b8af853dc42f5469978bc176ea676c9cf581",
+      "bytes": 8069,
+      "original_path": "/home/ywyz/code/km-wpe-evidence-20260912/ui/REDUCTION-INDEPENDENT-REVIEW.md"
+    },
+    {
+      "path": "prior-wpe/reduction/MAIN-EXPORT-INDEPENDENT-REVIEW.md",
+      "sha256": "a0722e74051f8d26ebbf62aed948faa53e4e8ad7d093d869090b8c76c3af0a66",
+      "bytes": 4467,
+      "original_path": "/home/ywyz/code/km-wpe-evidence-20260912/reduction/MAIN-EXPORT-INDEPENDENT-REVIEW.md"
+    },
+    {
+      "path": "prior-wpe/reduction/main-export-independent-review.json",
+      "sha256": "c8077fe402df26bdda94e2d2eb754a7051c892e43a196546b026d34d01658a5c",
+      "bytes": 2399,
+      "original_path": "/home/ywyz/code/km-wpe-evidence-20260912/reduction/main-export-independent-review.json"
+    },
+    {
+      "path": "prior-wpe/reduction/word-independent-review.json",
+      "sha256": "6137594fde128261fc58b3659c57a676ed868537f0072f3144c9b258b6981a45",
+      "bytes": 532,
+      "original_path": "/home/ywyz/code/km-wpe-evidence-20260912/reduction/word-independent-review.json"
+    },
+    {
+      "path": "prior-wpd/delivery-closure.json",
+      "sha256": "26c478512918260a65f9306931e7ef9b0257731f08138356067d3b0731e17f76",
+      "bytes": 2693,
+      "original_path": "/home/ywyz/code/km-wpd-evidence-20260911/delivery-closure.json"
+    },
+    {
+      "path": "prior-wpd/integrity-resolution.md",
+      "sha256": "bcc7fa1795cc912642541e03c91bc47a9803696740cf80970781b39b37d240de",
+      "bytes": 2033,
+      "original_path": "/home/ywyz/code/km-wpd-evidence-20260911/integrity-resolution.md"
+    },
+    {
+      "path": "prior-wpd/final/reviewer-report.md",
+      "sha256": "659b57aec744010e206c2db2b34463bd2436d069bec41846a24bf8a20dfa6364",
+      "bytes": 1662,
+      "original_path": "/home/ywyz/code/km-wpd-evidence-20260911/final/reviewer-report.md"
+    }
+  ]
+}

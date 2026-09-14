@@ -1,0 +1,30 @@
+{
+  "sample": "normal-compact-candidate.docx",
+  "started_at": "2026-09-10T12:09:32.2535377+08:00",
+  "input_sha256": "e6d7a4dbb44418e0078fdd2280fec89bb12f33c0c3aaec67235ab9d1821bb350",
+  "word_pages": 1,
+  "compatibility_mode": 15,
+  "read_only": true,
+  "zoom_percent": 100,
+  "view_type": 3,
+  "geometry_points": {
+    "width": 595.3,
+    "height": 841.9,
+    "left": 36.0,
+    "right": 36.0,
+    "top": 14.2,
+    "bottom": 14.2,
+    "orientation": 0,
+    "paper_size": 7
+  },
+  "tables": 1,
+  "rows": 9,
+  "requested_body_font": "",
+  "body_size_pt": 9999999.0,
+  "body_line_spacing_pt": 9999999.0,
+  "body_line_spacing_rule": 9999999,
+  "pdf_sha256": "6858e779c8515fbbc50a899793b1a316265ecfc240685cc82c36eadde58d9400",
+  "com_export": "SUCCESS; native warning/preview observation still missing",
+  "input_sha256_after": "e6d7a4dbb44418e0078fdd2280fec89bb12f33c0c3aaec67235ab9d1821bb350",
+  "finished_at": "2026-09-10T12:09:36.5488859+08:00"
+}

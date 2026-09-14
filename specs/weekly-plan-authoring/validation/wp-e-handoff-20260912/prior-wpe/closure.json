@@ -1,0 +1,32 @@
+{
+  "tested_code_sha": "9cde71655c30cafdc6ac4e99ed22509ad989b121",
+  "documentation_successor_sha": "7c0acb9337534d0db60b9ff6d9e1abd09e382643",
+  "docs_only_successor": true,
+  "worktree_clean": true,
+  "artifact_manifest_sha256": "b0334a1bce754dcef39157eadca181353e625a4e50ee51f6a746a5f133cc5b2d",
+  "artifacts_verified": 829,
+  "changed_code_files_verified": 33,
+  "documents": {
+    "CONTEXT.md": "7e68453977425a00fb84455e4056fbf6837b20a3c46bed44dc7c3ea1eccc351d",
+    "docs/ADR/ADR-0011-shared-weekly-authoring-and-source-snapshots.md": "eb212e67480dbaf86330fc41e8b0db42ab0c6a3fde260259f98730583d394e1f",
+    "docs/ROADMAP.md": "e364c52855114e073a0d5678c72cd388692fba0b38a3a150ff5bd1063999c555",
+    "docs/design/data-model.md": "4496e3b233b848ac29ebbcfbeaa0080296ffd51ba44058b7788a4b877da66386",
+    "docs/design/system-architecture.md": "009ea3a582d1c1adef1ebfe75627f9c7c5a757ea8e5bf32483ac5c3e248dd4b9",
+    "memory-bank/architecture.md": "9625393205ef181b9685c24a5a582ad389c094ad0f8784a2794b38ff01b7de1d",
+    "specs/weekly-plan-authoring/WP-E-continuation-prompt.md": "cab3d2abc15b1369485768012bc1976c2ccab767e92bf8bf4fb75a3e2769804d",
+    "specs/weekly-plan-authoring/WP-E-local-contract.md": "fde091e112d1bf5023d82545e871500269ed919c96ff9a71d7558921ac30a728",
+    "specs/weekly-plan-authoring/WP-E-preflight-20260912.md": "a27553e97cc7e5b7990af3c2633a08cde654e608c95edeb189a36be4d70221f9",
+    "specs/weekly-plan-authoring/current-status.md": "5121955d717b26eec80f6a7bc2aa50d2150b7b358b78b4a86f9ab1fd35d0ed5b",
+    "specs/weekly-plan-authoring/evidence/WP-E-20260912-manifest.json": "320fa1d244008a85070808937386de23be1bddedf508bcab236a882970274e2b",
+    "specs/weekly-plan-authoring/evidence/WP-E-20260912.md": "e6fc58f63289dffef16b22d93c5bf454b6066cf5efb38e296e3aa55faf1fc2e1",
+    "specs/weekly-plan-authoring/tasks.md": "f9bc2e25231b1c7cd4d22e3e8bdb5ce62cdb29ddba9f3cafb5e21ff756ff8cc7"
+  },
+  "main": "/root",
+  "reviewers": [
+    "/root/word_impl",
+    "/root/ui_impl",
+    "/root/reduction_impl"
+  ],
+  "status": "WP-E BLOCKED; local evidence sealed; WP-F not executed",
+  "remote_actions": "none"
+}

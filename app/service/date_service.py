@@ -1,11 +1,11 @@
 """
 日期计算服务 — 纯函数，无 IO，无数据库依赖。
 """
+
 import calendar
 import random
+from collections.abc import Callable
 from datetime import date
-from typing import Callable, Optional
-
 
 _WEEKDAY_CN = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
 
@@ -19,10 +19,64 @@ def get_week_number(start_date: date, target_date: date) -> int:
     target_date 与 start_date 所在周的差值 +1 即为周次。
     """
     # 将两个日期都归到本周周一（weekday() 0=周一）
-    start_monday = start_date - __import__("datetime").timedelta(days=start_date.weekday())
-    target_monday = target_date - __import__("datetime").timedelta(days=target_date.weekday())
+    start_monday = start_date - __import__("datetime").timedelta(
+        days=start_date.weekday()
+    )
+    target_monday = target_date - __import__("datetime").timedelta(
+        days=target_date.weekday()
+    )
     delta_weeks = (target_monday - start_monday).days // 7
     return delta_weeks + 1
+
+
+def get_daily_week_number(
+    start_date: date, target_date: date, end_date: date | None = None
+) -> int:
+    """Daily display only: personal semester dates confer no shared authority.
+
+    A makeup Sunday within the supplied semester belongs to the following week.
+    All candidate dates must have pinned calendar coverage; no weekday fallback.
+    """
+    from datetime import timedelta
+
+    from app.integration.teaching_calendar import load_calendar
+    from app.service.academic_identity.contracts import IdentityRejected
+
+    if (
+        type(start_date) is not date
+        or type(target_date) is not date
+        or (
+            end_date is not None
+            and (type(end_date) is not date or end_date < start_date)
+        )
+    ):
+        raise IdentityRejected("input_invalid")
+    calendar_data = load_calendar()
+    in_term = start_date <= target_date and (
+        end_date is None or target_date <= end_date
+    )
+    try:
+        anchor = target_date - timedelta(days=target_date.weekday())
+        if (
+            target_date.weekday() == 6
+            and in_term
+            and calendar_data.is_workday(target_date)
+        ):
+            anchor = target_date + timedelta(days=1)
+        window = tuple(anchor + timedelta(days=i) for i in range(-1, 6))
+        workdays = {day: calendar_data.is_workday(day) for day in window}
+        extra = [
+            day
+            for day in (window[0], window[-1])
+            if workdays[day]
+            and start_date <= day
+            and (end_date is None or day <= end_date)
+        ]
+        if len(extra) == 2:
+            raise IdentityRejected("unsupported_seven_columns")
+    except OverflowError:
+        raise IdentityRejected("calendar_unavailable") from None
+    return get_week_number(start_date, anchor)
 
 
 def get_weekday_cn(target_date: date) -> str:
@@ -43,8 +97,8 @@ def is_within_semester(start_date: date, end_date: date, target_date: date) -> b
 def pick_three_workdays(
     year: int,
     month: int,
-    is_holiday: Optional[Callable[[date], Optional[bool]]] = None,
-    rng: Optional[random.Random] = None,
+    is_holiday: Callable[[date], bool | None] | None = None,
+    rng: random.Random | None = None,
 ) -> list[date]:
     """从指定年月的全部工作日中随机选取 3 个不同日期，按时间升序返回。
 

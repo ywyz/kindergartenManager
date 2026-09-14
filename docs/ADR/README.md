@@ -23,6 +23,7 @@ ADR 记录会长期影响多个模块、难以通过普通代码注释表达的�
 | [ADR-0008](ADR-0008-word-template-authority-versioning-and-secure-storage.md) | Word 模板权威来源、版本化、安全存储、回滚与占位符契约 | 接受 |
 | [ADR-0009](ADR-0009-weekly-monthly-production-lifecycle-and-authorization.md) | 周/月计划正式业务生命周期、授权、审计与导出交付边界 | 已接受（prerequisites 已 PASS；不授权 WMP-9 最终验收或部署） |
 | [ADR-0010](ADR-0010-cloud-hosted-online-only-product-delivery.md) | 云端在线系统是唯一产品交付形态；桌面包退出产品路线 | 接受 |
+| [ADR-0011](ADR-0011-shared-weekly-authoring-and-source-snapshots.md) | 新周计划同班共享、来源快照、五/六列与单页交付；旧周/月兼容 | 提议（WP-A；未实现） |
 
 ## 何时新增 ADR
 

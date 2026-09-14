@@ -1,0 +1,659 @@
+"""Independent v3 layout qualification; no legacy qualification inheritance.
+
+Local LibreOffice inspection never activates a template or certifies Word.
+Until a independently qualified authority is installed, formal resolution fails.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import math
+import re
+import shutil
+import tempfile
+import xml.etree.ElementTree as ET
+from collections import Counter
+from contextlib import asynccontextmanager
+from copy import deepcopy
+from hashlib import sha256
+from io import BytesIO
+from pathlib import Path
+
+from docx import Document
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.shared import Mm, Pt
+
+from app.service.academic_identity.contracts import IdentityRejected
+from app.service.shared_weekly.authoring_contracts import (
+    AREA_TITLE,
+    OUTDOOR_TITLE,
+    WeeklyAuthoringDraft,
+)
+from app.service.shared_weekly.layout_authority import LayoutAuthority
+from app.service.shared_weekly.layout_contracts import (
+    FONT_FAMILY,
+    LayoutBinding,
+    RenderedWeek,
+    WeekDisplay,
+)
+
+SEED_SHA256 = "f6c17c137f04e29a68524ed400eb395984e93a16c234a065b5794d9f49a9347b"
+SEED_PATH = Path(__file__).resolve().parents[3] / "templates/weekplan.docx"
+
+
+class LayoutRejected(ValueError):
+    def __init__(self, code: str):
+        self.code = code
+        super().__init__(code)
+
+
+def _complete(body):
+    if type(body) is not WeeklyAuthoringDraft or body.calendar is None:
+        raise LayoutRejected("schema_invalid")
+    try:
+        body.validate_complete()
+    except IdentityRejected:
+        raise LayoutRejected("required_fields_missing") from None
+    if (
+        not body.theme.strip()
+        or not body.people.teachers
+        or any(
+            not value.strip()
+            for value in (*body.people.teachers, body.people.caregiver)
+        )
+    ):
+        raise LayoutRejected("required_fields_missing")
+    for day, teaching, label in body.calendar.columns:
+        item = next(d for d in body.days if d.day == day)
+        if teaching and any(
+            not getattr(item, field).strip()
+            for field in (
+                "morning_talk_topic",
+                "morning_talk_questions",
+                "activity_name",
+            )
+        ):
+            raise LayoutRejected("required_fields_missing")
+
+
+def _numbered(body, prefix, separator=" "):
+    return separator.join(f"{i + 1}.{body.value_at(f'{prefix}.{i}')}" for i in range(3))
+
+
+def fill_document(
+    seed: bytes, body: WeeklyAuthoringDraft, display: WeekDisplay
+) -> bytes:
+    """Derive one v3 table from the exact controlled seed, preserving its style.
+
+    The duplicate sample sheet is removed; this is a new profile requiring its
+    own qualification, never a claim that the old seed already qualifies v3.
+    """
+    if sha256(seed).hexdigest() != SEED_SHA256:
+        raise LayoutRejected("template_changed")
+    if type(display) is not WeekDisplay:
+        raise LayoutRejected("display_invalid")
+    _complete(body)
+    document = Document(BytesIO(seed))
+    table_style = document.tables[0].style
+    seed_widths = [col.width for col in document.tables[0].columns]
+    title_size = document.paragraphs[0].runs[0].font.size
+    title_bold = document.paragraphs[0].runs[0].bold
+    title_cs_bold = document.paragraphs[0].runs[0].font.cs_bold
+    cell_borders = deepcopy(
+        document.tables[0].cell(0, 0)._tc.tcPr.find(qn("w:tcBorders"))
+    )
+    for child in list(document.element.body):
+        if child.tag != qn("w:sectPr"):
+            document.element.body.remove(child)
+    section = document.sections[0]
+    section.page_width, section.page_height = Mm(210), Mm(297)
+    # Retain controlled template margins, not historical compact trial margins.
+    document.add_paragraph("幼儿园每周工作计划表")
+    theme = body.theme.strip().strip("《》")
+    first, last = body.calendar.columns[0][0], body.calendar.columns[-1][0]
+    end_year = f"{last.year}年" if last.year != first.year else ""
+    date_range = (
+        f"{first.year}年{first.month}月{first.day}日—"
+        f"{end_year}{last.month}月{last.day}日"
+    )
+    document.add_paragraph(
+        f"主题名称：《{theme}》    班级：{display.class_name} 第{display.week_number}周（{date_range}）"
+    )
+    document.add_paragraph(
+        f"教师：{'、'.join(body.people.teachers)}    保育员：{body.people.caregiver}"
+    )
+    for paragraph in document.paragraphs:
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    count = len(body.days)
+    table = document.add_table(rows=9, cols=count + 2)
+    table.style = table_style
+    table.autofit = False
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    for row in table.rows:
+        for cell in row.cells:
+            cell._tc.get_or_add_tcPr().append(deepcopy(cell_borders))
+    width = section.page_width - section.left_margin - section.right_margin
+    # Preserve the seed's narrow label columns. Scale the five/six day region
+    # into the remaining printable width; set both grid and cell widths.
+    label_widths = [int(width * value / sum(seed_widths)) for value in seed_widths[:2]]
+    day_width = int((width - sum(label_widths)) / count)
+    widths = label_widths + [day_width] * count
+    widths[-1] += width - sum(widths)
+    for i, col in enumerate(table.columns):
+        col.width = widths[i]
+        for cell in col.cells:
+            cell.width = widths[i]
+    table.cell(0, 0).merge(table.cell(0, 1)).text = ""
+    for offset, (day, teaching, label) in enumerate(body.calendar.columns, 2):
+        table.cell(0, offset).text = f"周{'一二三四五六日'[day.weekday()]}"
+        item = body.days[offset - 2]
+        table.cell(1, offset).text = (
+            f"{item.morning_talk_topic}\n{item.morning_talk_questions}"
+            if teaching
+            else label
+        )
+        table.cell(2, offset).text = item.activity_name if teaching else ""
+    table.cell(1, 0).merge(table.cell(2, 0)).text = "学习\n活动"
+    table.cell(1, 1).text = "晨间\n谈话"
+    table.cell(2, 1).text = "集体\n活动"
+    table.cell(3, 0).merge(table.cell(4, 0)).text = "游戏\n活动"
+    table.cell(3, 1).text = "户外\n游戏"
+    table.cell(4, 1).text = "区域\n游戏"
+    games = [OUTDOOR_TITLE]
+    for label, prefix in (
+        ("集体游戏：1.", "games.collective.0"),
+        ("2.", "games.collective.1"),
+        ("自主游戏：", "games.autonomous"),
+    ):
+        games.append(
+            label
+            + body.value_at(prefix + ".name")
+            + "（目标："
+            + _numbered(body, prefix + ".goals")
+            + "）"
+        )
+    newline = "\n"
+    values = [
+        "\n".join(games),
+        f"{AREA_TITLE}\n本周重点指导区域：{body.value_at('area.name')}\n目标：\n{_numbered(body, 'area.goals', newline)}\n材料：{body.value_at('area.materials')}\n指导：\n{_numbered(body, 'area.guidance', newline)}",
+        _numbered(body, "focus", newline),
+        _numbered(body, "environment", newline),
+        "\n".join(
+            f"{i + 1}.{body.value_at(f'habits.{i}.name')}：{body.value_at(f'habits.{i}.content')}"
+            for i in range(3)
+        ),
+        body.value_at("home"),
+    ]
+    for row, value in enumerate(values, 3):
+        start = 2 if row < 5 else 1
+        table.cell(row, start).merge(table.cell(row, count + 1)).text = value
+    for row, label in enumerate(
+        ("本周\n重点", "环境\n创设", "生活\n习惯\n培养", "家园\n共育"), 5
+    ):
+        table.cell(row, 0).text = label
+    for row_index, row in enumerate(table.rows):
+        for column_index, cell in enumerate(row.cells):
+            is_label = column_index < (2 if row_index < 5 else 1)
+            if row_index < 3 or is_label:
+                cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+                for paragraph in cell.paragraphs:
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraphs = list(document.paragraphs)
+    seen = set()
+    for row in table.rows:
+        for cell in row.cells:
+            if cell._tc not in seen:
+                seen.add(cell._tc)
+                paragraphs.extend(cell.paragraphs)
+    for paragraph in paragraphs:
+        fmt = paragraph.paragraph_format
+        fmt.space_before = Pt(0)
+        fmt.space_after = Pt(0)
+        fmt.line_spacing_rule = WD_LINE_SPACING.EXACTLY
+        fmt.line_spacing = Pt(20)
+        fmt.keep_with_next = False
+        for run in paragraph.runs:
+            run.font.name = FONT_FAMILY
+            run.font.size = Pt(12)
+            fonts = run._element.get_or_add_rPr().find(qn("w:rFonts"))
+            if fonts is None:
+                fonts = OxmlElement("w:rFonts")
+                run._element.get_or_add_rPr().append(fonts)
+            fonts.set(qn("w:eastAsia"), FONT_FAMILY)
+    # The controlled title is 16 pt; the body remains 12 pt / fixed 20 pt.
+    for run in document.paragraphs[0].runs:
+        run.font.size = title_size
+        run.bold = title_bold
+        run.font.cs_bold = title_cs_bold
+    stream = BytesIO()
+    document.save(stream)
+    data = stream.getvalue()
+    # Round-trip every visible value, including newline boundaries, in order.
+    parsed = Document(BytesIO(data))
+    expected = [p.text for p in document.paragraphs] + [
+        c.text for r in table.rows for c in r.cells
+    ]
+    actual = [p.text for p in parsed.paragraphs] + [
+        c.text for r in parsed.tables[0].rows for c in r.cells
+    ]
+    if actual != expected or len(parsed.tables) != 1:
+        raise LayoutRejected("roundtrip_failed")
+    return data
+
+
+def _text_complete(document, xml, grid):
+    """Check rendered glyph counts and cell-local reading order.
+
+    PDF layout extraction interleaves columns at every physical line. Restrict
+    the actual word boxes to each cell's horizontal span before joining wrapped
+    lines, so a legal wrapped date/holiday is not mistaken for missing text.
+    """
+    words = list(xml.iter("{http://www.w3.org/1999/xhtml}word"))
+    if not words:
+        return False
+    lines = []
+    for word in sorted(words, key=lambda word: float(word.attrib["yMin"])):
+        top = float(word.attrib["yMin"])
+        if not lines or top - lines[-1][0] > 3:
+            lines.append((top, [word]))
+        else:
+            lines[-1][1].append(word)
+    words = [
+        word
+        for _, line in lines
+        for word in sorted(line, key=lambda word: float(word.attrib["xMin"]))
+    ]
+
+    clean = lambda text: "".join(text.split())
+    full = clean("".join(word.text or "" for word in words))
+    expected = [p.text for p in document.paragraphs]
+    if any(clean(p.text) not in full for p in document.paragraphs if p.text):
+        return False
+    xs, ys = grid
+    for table in document.tables:
+        if len(xs) != len(table.columns) + 1 or len(ys) != len(table.rows) + 1:
+            return False
+        seen = set()
+        for row_index, row in enumerate(table.rows):
+            for index, cell in enumerate(row.cells):
+                if cell._tc in seen:
+                    continue
+                seen.add(cell._tc)
+                expected.append(cell.text)
+                end_row = row_index + 1
+                while (
+                    end_row < len(table.rows)
+                    and table.rows[end_row].cells[index]._tc is cell._tc
+                ):
+                    end_row += 1
+                left, right = xs[index], xs[index + cell._tc.grid_span]
+                top, bottom = ys[row_index], ys[end_row]
+                selected = []
+                for word in words:
+                    a = word.attrib
+                    x0, x1, y0, y1 = (
+                        float(a[k]) for k in ("xMin", "xMax", "yMin", "yMax")
+                    )
+                    if (
+                        left <= (x0 + x1) / 2 <= right
+                        and top <= (y0 + y1) / 2 <= bottom
+                    ):
+                        if (
+                            x0 < left - 0.75
+                            or x1 > right + 0.75
+                            or y0 < top - 0.75
+                            or y1 > bottom + 0.75
+                        ):
+                            return False
+                        selected.append(word)
+                for position, word in enumerate(selected):
+                    a = word.attrib
+                    for other in selected[position + 1 :]:
+                        b = other.attrib
+                        overlap_x = min(float(a["xMax"]), float(b["xMax"])) - max(
+                            float(a["xMin"]), float(b["xMin"])
+                        )
+                        overlap_y = min(float(a["yMax"]), float(b["yMax"])) - max(
+                            float(a["yMin"]), float(b["yMin"])
+                        )
+                        if overlap_x > 0.5 and overlap_y > 1:
+                            return False
+                local = clean("".join(word.text or "" for word in selected))
+                if clean(cell.text) != local:
+                    return False
+    # Ensure duplicate values are preserved too; finding one repeated label
+    # elsewhere is not enough to prove every rendered occurrence survived.
+    return Counter(clean("".join(expected))) == Counter(full)
+
+
+_STRAIGHT_LINE_COMMAND = re.compile(
+    r"^M\s+(-?[0-9]+(?:\.[0-9]+)?)\s+(-?[0-9]+(?:\.[0-9]+)?)"
+    r"\s+L\s+(-?[0-9]+(?:\.[0-9]+)?)\s+(-?[0-9]+(?:\.[0-9]+)?)\s*$"
+)
+_TRANSFORM_MATRIX = re.compile(r"^matrix\(([^)]+)\)")
+# SVG number lexeme: no underscores, no Python-only spellings.
+_FLOAT_LEXEME = re.compile(r"-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][-+]?[0-9]+)?")
+_CONTOUR_TOKEN = re.compile(r"([MLCZ])|([^MLCZ\s]+)")
+_CONTOUR_ARITY = {"M": 2, "L": 2, "C": 6, "Z": 0}
+_TABLE_EPSILON = 0.5
+
+
+def _finite(*values) -> bool:
+    return all(math.isfinite(value) for value in values)
+
+
+def _transformed_matrix(path) -> tuple[float, ...]:
+    """Parse exactly six finite matrix values or reject the path."""
+    match = _TRANSFORM_MATRIX.fullmatch(path.get("transform", ""))
+    if match is None:
+        raise LayoutRejected("layout_geometry_invalid")
+    values = tuple(_parse_float_lexeme(v.strip()) for v in match.group(1).split(","))
+    if len(values) != 6 or not _finite(*values):
+        raise LayoutRejected("layout_geometry_invalid")
+    return values
+
+
+def _parse_float_lexeme(literal: str) -> float:
+    """Parse a strict SVG float lexeme; reject Python-only spellings."""
+    if not _FLOAT_LEXEME.fullmatch(literal):
+        raise LayoutRejected("layout_geometry_invalid")
+    value = float(literal)
+    if not math.isfinite(value):
+        raise LayoutRejected("layout_geometry_invalid")
+    return value
+
+
+def _transform_points(matrix: tuple[float, ...], points) -> list[tuple[float, float]]:
+    """Apply the matrix to points; reject any non-finite transformed value."""
+    a, b, c, d, e, f = matrix
+    transformed = [(a * x + c * y + e, b * x + d * y + f) for x, y in points]
+    if not _finite(*(value for point in transformed for value in point)):
+        raise LayoutRejected("layout_geometry_invalid")
+    return transformed
+
+
+def _contour_bbox(
+    d: str, matrix: tuple[float, ...]
+) -> tuple[float, float, float, float]:
+    """Conservative transformed bbox of a strict absolute M/L/C/Z contour.
+
+    Only endpoints and Bezier control points are collected: every Bezier
+    segment stays within its control hull, so the hull bbox bounds the curve.
+    Each explicit command must consume exactly its own arity before the next
+    command or the end of the path (Z consumes zero); a numeric token after a
+    completed command (implicit repetition) is refused, and a command left
+    incomplete — including a zero-parameter one — is rejected. Supported
+    forms: explicit M/L/C/Z, multiple Z-closed subpaths, and complete
+    trailing move-only subpaths; a drawn subpath must be Z-closed before the
+    next M. Numbers must match strict SVG float lexemes (no underscores).
+    """
+    if not d or not d[0] in "M":
+        raise LayoutRejected("layout_geometry_invalid")
+    tokens = _CONTOUR_TOKEN.findall(d)
+    command: str | None = None
+    arity = 0
+    parameters: list[float] = []
+    completed = False
+    subpath_open = False
+    subpath_segments = 0
+    points: list[tuple[float, float]] = []
+    for matched_command, literal in tokens:
+        if matched_command:
+            if command is not None and not completed:
+                # A transition must never leave the previous command incomplete.
+                raise LayoutRejected("layout_geometry_invalid")
+            if matched_command == "M" and subpath_open and subpath_segments:
+                # A drawn subpath must be closed before the next M.
+                raise LayoutRejected("layout_geometry_invalid")
+            if matched_command != "M" and not subpath_open:
+                # Numbers after Z are only valid with a new M first.
+                raise LayoutRejected("layout_geometry_invalid")
+            command = matched_command
+            arity = _CONTOUR_ARITY[command]
+            parameters = []
+            completed = arity == 0
+            if command == "Z":
+                # Closepath implicitly returns to the subpath start.
+                subpath_open = False
+                subpath_segments = 0
+        else:
+            if command is None or completed:
+                # Numbers need a pending command; once a command completed,
+                # implicit repetition is not part of the supported subset.
+                raise LayoutRejected("layout_geometry_invalid")
+            parameters.append(_parse_float_lexeme(literal))
+            if len(parameters) < arity:
+                continue
+            # The explicit command reached its exact arity and now completes.
+            completed = True
+            if command == "M":
+                points.append((parameters[0], parameters[1]))
+                subpath_open = True
+                subpath_segments = 0
+            elif command == "L":
+                points.append((parameters[0], parameters[1]))
+                subpath_segments += 1
+            else:
+                points.extend(
+                    (
+                        (parameters[0], parameters[1]),
+                        (parameters[2], parameters[3]),
+                        (parameters[4], parameters[5]),
+                    )
+                )
+                subpath_segments += 1
+            parameters = []
+    if command is None or not completed:
+        # A trailing command must have consumed its exact arity.
+        raise LayoutRejected("layout_geometry_invalid")
+    if subpath_open and subpath_segments:
+        raise LayoutRejected("layout_geometry_invalid")
+    if not points:
+        raise LayoutRejected("layout_geometry_invalid")
+    transformed = _transform_points(matrix, points)
+    xs = [point[0] for point in transformed]
+    ys = [point[1] for point in transformed]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def _rendered_grid(svg):
+    """Read actual stroked borders from Poppler's renderer output, not OOXML.
+
+    Pass 1 collects strict transformed M...L straight paths as table edges and
+    derives the real table bounds. Pass 2 validates every remaining stroked
+    path as a strict absolute M/L/C/Z contour whose conservative bbox must lie
+    strictly outside the table bounds; title/glyph strokes with M/L/C/Z thus
+    pass while any contour touching or crossing the table is rejected.
+    """
+    horizontal, vertical = [], []
+    table_bounds: tuple[float, float, float, float] | None = None
+    nonline: list[tuple[float, float, float, float]] = []
+    for path in svg.iter("{http://www.w3.org/2000/svg}path"):
+        if path.get("stroke") is None or path.get("fill") != "none":
+            continue
+        matrix = _transformed_matrix(path)
+        match = _STRAIGHT_LINE_COMMAND.fullmatch(path.get("d", ""))
+        if match is None:
+            nonline.append(_contour_bbox(path.get("d", ""), matrix))
+            continue
+        x0, y0, x1, y1 = map(float, match.groups())
+        if not _finite(x0, y0, x1, y1):
+            raise LayoutRejected("layout_geometry_invalid")
+        (x0, y0), (x1, y1) = _transform_points(matrix, ((x0, y0), (x1, y1)))
+        if abs(y0 - y1) < 0.1 and abs(x1 - x0) > 5:
+            horizontal.append(y0)
+        elif abs(x0 - x1) < 0.1 and abs(y1 - y0) > 5:
+            vertical.append(x0)
+        else:
+            raise LayoutRejected("layout_geometry_invalid")
+    if not horizontal or not vertical:
+        raise LayoutRejected("layout_geometry_invalid")
+    table_bounds = (
+        min(vertical) - _TABLE_EPSILON,
+        min(horizontal) - _TABLE_EPSILON,
+        max(vertical) + _TABLE_EPSILON,
+        max(horizontal) + _TABLE_EPSILON,
+    )
+    for left, top, right, bottom in nonline:
+        strictly_disjoint = (
+            right < table_bounds[0]
+            or left > table_bounds[2]
+            or bottom < table_bounds[1]
+            or top > table_bounds[3]
+        )
+        if not strictly_disjoint:
+            raise LayoutRejected("layout_geometry_invalid")
+
+    def clustered(values):
+        groups = []
+        for value in sorted(values):
+            if not groups or value - groups[-1][-1] > 1:
+                groups.append([value])
+            else:
+                groups[-1].append(value)
+        return tuple(sum(group) / len(group) for group in groups)
+
+    return clustered(vertical), clustered(horizontal)
+
+
+async def _process(*args):
+    process = await asyncio.create_subprocess_exec(
+        *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+    )
+    try:
+        stdout, _ = await asyncio.wait_for(process.communicate(), 45)
+    except BaseException:
+        if process.returncode is None:
+            process.kill()
+        await process.wait()
+        raise
+    if process.returncode:
+        raise LayoutRejected("renderer_failed")
+    return stdout
+
+
+class SharedWeeklyWordPort:
+    """Fail-closed production boundary plus a separate local qualification probe."""
+
+    def __init__(self, authority: LayoutAuthority | None = None):
+        self.authority = authority or LayoutAuthority()
+
+    async def resolve_binding(self, tenant_id: int) -> LayoutBinding:
+        return await self.authority.resolve_binding(tenant_id)
+
+    @asynccontextmanager
+    async def binding_guard(self, binding: LayoutBinding):
+        async with self.authority.binding_guard(binding):
+            if sha256(SEED_PATH.read_bytes()).hexdigest() != binding.template_sha256:
+                raise LayoutRejected("template_changed")
+            yield
+
+    async def verify_runtime(self, binding: LayoutBinding) -> None:
+        """Recheck the actual renderer and controlled seed without a DB or render."""
+        renderer = await self.authority.renderer(binding)
+        if renderer["product"] != "LibreOffice":
+            raise LayoutRejected("renderer_unavailable")
+        if shutil.which("libreoffice") is None:
+            raise LayoutRejected("renderer_missing")
+        current = (await _process("libreoffice", "--version")).decode().strip()
+        if current != renderer["version"]:
+            raise LayoutRejected("renderer_changed")
+        if binding.template_sha256 != SEED_SHA256:
+            raise LayoutRejected("template_changed")
+        async with self.binding_guard(binding):
+            pass
+
+    async def render_check(self, binding, body, display):
+        await self.verify_runtime(binding)
+        result = await self._render(binding, body, display)
+        async with self.binding_guard(binding):
+            return result
+
+    async def inspect_local(
+        self, body: WeeklyAuthoringDraft, display: WeekDisplay
+    ) -> RenderedWeek:
+        """Actual LO report; local-unqualified is never a formal binding."""
+        return await self._render(
+            LayoutBinding(1, SEED_SHA256, "local-unqualified"), body, display
+        )
+
+    async def _render(self, binding, body, display):
+        payload_hash = sha256(body.serialize().encode()).hexdigest()
+
+        def result(fits=False, pages=0, reason="renderer_failed", data=None):
+            return RenderedWeek(binding, payload_hash, fits, pages, reason, data)
+
+        try:
+            data = fill_document(SEED_PATH.read_bytes(), body, display)
+            if any(
+                shutil.which(name) is None
+                for name in (
+                    "libreoffice",
+                    "pdftotext",
+                    "pdfinfo",
+                    "fc-match",
+                    "pdftocairo",
+                )
+            ):
+                return result(reason="renderer_missing")
+            font = (await _process("fc-match", "-f", "%{family}", FONT_FAMILY)).decode()
+            if FONT_FAMILY not in font.strip().split(","):
+                return result(reason="font_missing")
+            with tempfile.TemporaryDirectory(prefix="shared-weekly-layout-") as temp:
+                root = Path(temp)
+                source = root / "week.docx"
+                source.write_bytes(data)
+                await _process(
+                    "libreoffice",
+                    "-env:UserInstallation=" + (root / "profile").as_uri(),
+                    "--headless",
+                    "--convert-to",
+                    "pdf",
+                    "--outdir",
+                    temp,
+                    str(source),
+                )
+                pdf = root / "week.pdf"
+                info = (await _process("pdfinfo", str(pdf))).decode()
+                pages = int(
+                    next(
+                        line.split(":")[1]
+                        for line in info.splitlines()
+                        if line.startswith("Pages:")
+                    )
+                )
+                if pages != 1:
+                    return result(pages=pages, reason="layout_overflow")
+                await _process("pdftotext", "-bbox", str(pdf), str(root / "bbox.html"))
+                xml = ET.parse(root / "bbox.html")
+                for page in xml.iter("{http://www.w3.org/1999/xhtml}page"):
+                    width, height = (
+                        float(page.attrib["width"]),
+                        float(page.attrib["height"]),
+                    )
+                    for word in page.iter("{http://www.w3.org/1999/xhtml}word"):
+                        a = word.attrib
+                        if (
+                            float(a["xMax"]) <= float(a["xMin"])
+                            or float(a["yMax"]) <= float(a["yMin"])
+                            or float(a["xMin"]) < 0
+                            or float(a["yMin"]) < 0
+                            or float(a["xMax"]) > width
+                            or float(a["yMax"]) > height
+                        ):
+                            return result(pages=pages, reason="layout_overflow")
+                await _process("pdftotext", "-layout", str(pdf), str(root / "text.txt"))
+                document = Document(BytesIO(data))
+                await _process("pdftocairo", "-svg", str(pdf), str(root / "grid.svg"))
+                grid = _rendered_grid(ET.parse(root / "grid.svg"))
+                if not _text_complete(document, xml, grid):
+                    return result(pages=pages, reason="layout_overflow")
+                return result(True, pages, "fits", data)
+
+        except (ValueError, OSError, StopIteration, ET.ParseError) as exc:
+            return result(
+                reason=exc.code if isinstance(exc, LayoutRejected) else "layout_invalid"
+            )

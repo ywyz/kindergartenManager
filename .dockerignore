@@ -9,11 +9,11 @@ __pycache__/
 .git/
 .github/
 exports/
-tests/
+# tests/ and pytest.ini are intentionally allowed in the build context so the
+# render-test image can COPY them; the production target never copies them.
 memory-bank/
 docs/
 *.spec
-pytest.ini
 .pytest_cache/
 *.egg-info/
 dist/

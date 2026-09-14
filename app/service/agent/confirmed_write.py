@@ -8,15 +8,15 @@ version/CAS/audit transaction and read-only reconciliation path.
 from __future__ import annotations
 
 import asyncio
-from copy import deepcopy
-from dataclasses import dataclass, field, replace
-from datetime import date, datetime, timedelta, timezone
-from enum import Enum
 import hashlib
 import json
 import secrets
+from collections.abc import Callable
+from copy import deepcopy
+from dataclasses import dataclass, field, replace
+from datetime import UTC, date, datetime, timedelta
+from enum import Enum
 from threading import Lock
-from typing import Callable
 from uuid import UUID, uuid4
 
 from sqlalchemy.exc import DBAPIError, DisconnectionError
@@ -36,11 +36,10 @@ from app.service.agent.canonical import canonical_json, canonical_sha256
 from app.service.agent.patch import PlanPatch, plan_patch_is_canonical
 from app.ui.auth_context import TrustedUiSession
 
-
 _DEFAULT_CONFIRMATION_TTL = timedelta(minutes=5)
 _DEFAULT_STORE_CAPACITY = 1_024
 _AUDIT_ACTION = "daily_plan.apply_confirmed_patch"
-_DAILY_PLAN_SNAPSHOT_FIELDS = frozenset(
+_DAILY_PLAN_SNAPSHOT_V1_FIELDS = frozenset(
     {
         "id",
         "tenant_id",
@@ -169,7 +168,7 @@ def _reject(code: str) -> None:
 
 
 def _as_utc(value: datetime) -> datetime:
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)
 
 
 def _unchecked_session_snapshot(
@@ -224,7 +223,7 @@ def _session_snapshot(
         return _unchecked_session_snapshot(ui_session, now=now)
     except ConfirmedWriteRejected:
         raise
-    except Exception:
+    except Exception:  # noqa: BLE001 — malformed session must map to ui_session_invalid, preserving typed rejection.
         _reject("ui_session_invalid")
 
 
@@ -232,14 +231,16 @@ def _snapshot_datetime(value: object) -> str:
     if type(value) is not datetime:
         raise ValueError
     if value.tzinfo is None:
-        value = value.replace(tzinfo=timezone.utc)
+        value = value.replace(tzinfo=UTC)
     else:
-        value = value.astimezone(timezone.utc)
+        value = value.astimezone(UTC)
     return value.isoformat()
 
 
 def _daily_plan_snapshot(plan: DailyPlan) -> tuple[str, str]:
     snapshot = {
+        "snapshot_schema_version": 2,
+        "activity_name": plan.activity_name,
         "id": plan.id,
         "tenant_id": plan.tenant_id,
         "user_id": plan.user_id,
@@ -280,7 +281,7 @@ def _session_sha256(session_id: UUID) -> str:
 async def _rollback_quietly(session: AsyncSession) -> None:
     try:
         await session.rollback()
-    except BaseException:
+    except BaseException:  # noqa: BLE001, S110 — best-effort cleanup preserves primary failure/commit-unknown cancellation and avoids sensitive driver logging.
         pass
 
 
@@ -378,7 +379,7 @@ class _InMemoryConfirmationStore:
 
             try:
                 claim_token = secrets.token_bytes(32)
-            except Exception:
+            except Exception:  # noqa: BLE001 — fail claimed confirmation closed if claim material unavailable.
                 self._records[record.confirmation_id] = replace(
                     record,
                     state=_ConfirmationState.FAILED,
@@ -498,7 +499,7 @@ class _InMemoryConfirmationStore:
 
 
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class ConfirmedDailyPlanWriteService:
@@ -527,7 +528,7 @@ class ConfirmedDailyPlanWriteService:
             if type(value) is not datetime or value.tzinfo is None:
                 raise ValueError
             return _as_utc(value)
-        except Exception:
+        except Exception:  # noqa: BLE001 — invalid clock cannot issue/write confirmation.
             _reject("write_unavailable")
 
     @staticmethod
@@ -564,7 +565,7 @@ class ConfirmedDailyPlanWriteService:
                 _reject("patch_invalid")
         except ConfirmedWriteRejected:
             raise
-        except Exception:
+        except Exception:  # noqa: BLE001 — canonicalization/deepcopy failure sanitized as patch_invalid.
             _reject("patch_invalid")
         return copied
 
@@ -573,7 +574,7 @@ class ConfirmedDailyPlanWriteService:
         try:
             confirmation_id = uuid4()
             nonce = secrets.token_bytes(32)
-        except Exception:
+        except Exception:  # noqa: BLE001 — UUID/nonce generation failure must be write_unavailable.
             _reject("write_unavailable")
         if (
             type(confirmation_id) is not UUID
@@ -625,7 +626,7 @@ class ConfirmedDailyPlanWriteService:
             raise
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception:  # noqa: BLE001 — sanitize DB/session failures, preserving explicit cancellation and rejection branches.
             _reject("write_unavailable")
 
         issued_at = self._now()
@@ -636,7 +637,7 @@ class ConfirmedDailyPlanWriteService:
                 issued_at + self._confirmation_ttl,
                 actor.expires_at_utc,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001 — fail closed without side effects on expiry failure.
             _reject("write_unavailable")
         if expires_at <= issued_at:
             _reject("ui_session_invalid")
@@ -814,7 +815,7 @@ class ConfirmedDailyPlanWriteService:
         except ConfirmedWriteRejected:
             await _rollback_quietly(session)
             raise
-        except Exception:
+        except Exception:  # noqa: BLE001 — rollback and stable write_failed; preserves earlier unknown/cancel/reject branches.
             await _rollback_quietly(session)
             _reject("write_failed")
 
@@ -854,7 +855,7 @@ class ConfirmedDailyPlanWriteService:
                 raise
             self._store.finish_failed(claim)
             raise
-        except Exception:
+        except Exception:  # noqa: BLE001 — sanitize context failure and preserve already committed result when known.
             if result is not None:
                 if not self._store.finish_applied(claim, result):
                     _reject("write_failed")
@@ -890,7 +891,7 @@ class ConfirmedDailyPlanWriteService:
             snapshot = json.loads(version.snapshot_json)
             if (
                 type(snapshot) is not dict
-                or set(snapshot) != _DAILY_PLAN_SNAPSHOT_FIELDS
+                or not _snapshot_schema_valid(snapshot)
                 or canonical_json(snapshot) != version.snapshot_json
                 or snapshot["id"] != record.daily_plan_id
                 or snapshot["tenant_id"] != record.tenant_id
@@ -904,7 +905,7 @@ class ConfirmedDailyPlanWriteService:
                 if canonical_sha256(before_value) != operation.before_sha256:
                     return False
             return True
-        except Exception:
+        except Exception:  # noqa: BLE001 — malformed stored evidence yields false, never exposing parser/ORM details.
             return False
 
     async def _reconcile_evidence(
@@ -1019,7 +1020,7 @@ class ConfirmedDailyPlanWriteService:
             raise
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception:  # noqa: BLE001 — sanitize read-only DB failure, preserving cancellation; no replay.
             _reject("write_unavailable")
 
         if record.state is _ConfirmationState.CONSUMING:
@@ -1027,3 +1028,25 @@ class ConfirmedDailyPlanWriteService:
         if record.state is _ConfirmationState.FAILED:
             _reject("confirmation_consumed")
         _reject("confirmation_not_applied")
+
+
+def _snapshot_schema_valid(snapshot: dict) -> bool:
+    if "snapshot_schema_version" not in snapshot:
+        return set(snapshot) == _DAILY_PLAN_SNAPSHOT_V1_FIELDS
+    if (
+        type(snapshot["snapshot_schema_version"]) is not int
+        or snapshot["snapshot_schema_version"] != 2
+    ):
+        return False
+    if set(snapshot) != _DAILY_PLAN_SNAPSHOT_V1_FIELDS | {
+        "snapshot_schema_version",
+        "activity_name",
+    }:
+        return False
+    from app.core.activity_name import validate_activity_name
+
+    try:
+        validate_activity_name(snapshot["activity_name"])
+    except ValueError:
+        return False
+    return True

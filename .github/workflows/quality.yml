@@ -17,7 +17,7 @@ env:
 jobs:
   quality:
     name: Python 3.14 quality
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     steps:
@@ -63,19 +63,35 @@ jobs:
           mapfile -d '' python_files < <(
             git diff --name-only -z --diff-filter=ACMR "$lint_base"...HEAD -- '*.py'
           )
-          if ((${#python_files[@]})); then
-            ruff check "${python_files[@]}"
-          else
-            echo "No changed Python files."
-          fi
+          python scripts/check_changed_python.py "${python_files[@]}"
 
       - name: Migrate fresh SQLite database
         run: |
           python -m alembic upgrade head
           python -m alembic current
 
-      - name: Test
-        run: python -m pytest tests/ -q
+      - name: Ordinary tests (no renderer provisioning)
+        run: python -m pytest tests/ -m 'not real_render' -q
 
       - name: Agent Foundation
         run: python -m pytest specs/agent-foundation/tests -q
+
+  render-tests:
+    name: Real LibreOffice rendering
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: render-test
+          load: true
+          tags: kindergarten-render-test:ci
+          cache-from: type=gha,scope=weekly-runtime
+          cache-to: type=gha,mode=max,scope=weekly-render-tests
+      - name: Verify tools, font and actual rendering
+        run: |
+          docker run --rm kindergarten-render-test:ci python -m scripts.render_environment
+          docker run --rm kindergarten-render-test:ci python -m pytest tests/ -m real_render -q

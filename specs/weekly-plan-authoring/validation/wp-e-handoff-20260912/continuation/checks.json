@@ -1,0 +1,12 @@
+[
+  {
+    "check": "diff",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "check": "head",
+    "exit_code": 0,
+    "output": "d375e9ab2148 (head)\n"
+  }
+]

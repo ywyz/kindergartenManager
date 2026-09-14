@@ -1,3 +1,4 @@
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.pool import StaticPool
@@ -22,7 +23,15 @@ def _build_engine():
         }
         if ":memory:" in url:
             options["poolclass"] = StaticPool
-        return create_async_engine(url, **options)
+        sqlite_engine = create_async_engine(url, **options)
+
+        @event.listens_for(sqlite_engine.sync_engine, "connect")
+        def enable_foreign_keys(connection, _record):
+            cursor = connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+
+        return sqlite_engine
     return create_async_engine(
         url,
         pool_pre_ping=False,  # 关闭：避免每次取连接前额外发 SELECT 1（对远程 DB 影响显著）

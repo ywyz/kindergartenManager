@@ -61,6 +61,11 @@ def main() -> None:
     # 认证模式不自动创建固定管理员；首次安装/旧版恢复走显式初始化。
     app.on_startup(run_bootstrap)
     app.on_startup(configure_weekly_monthly_production)
+    from app.service.shared_weekly.production_composition import (
+        configure_shared_weekly_production,
+    )
+
+    app.on_startup(configure_shared_weekly_production)
 
     # 全局异常日志
     app.on_exception(_on_global_exception)

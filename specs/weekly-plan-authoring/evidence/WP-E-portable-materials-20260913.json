@@ -1,0 +1,1905 @@
+{
+  "scope": "All existing files copied from the four named evidence directories; not a replacement for historical26/49/38 manifests. Missing historical lock files are not recreated.",
+  "files": [
+    {
+      "path": "wp-e-header-week-20260912/artifact.md",
+      "bytes": 179,
+      "sha256": "37010a7fb9db1121cd84c2084989731ff0287584d75f94a26ef92b896df6067a"
+    },
+    {
+      "path": "wp-e-header-week-20260912/before-renderer.py",
+      "bytes": 20762,
+      "sha256": "ad2ffbb88b46e40cebaf2bdc6cd8753ec1667385645cffc04d8ec720a50d9522"
+    },
+    {
+      "path": "wp-e-header-week-20260912/before-test.py",
+      "bytes": 10555,
+      "sha256": "6ceddbf956b67f4ae1abea6ad33d575d0840cd749a00f46c0cf8251fd2a50956"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidate-manifest-final.json",
+      "bytes": 5349,
+      "sha256": "8570185e52b0a9ca50ea298556ad6607ebc9014e66cc01f26716ffc4c76e7936"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidate-manifest.json",
+      "bytes": 5349,
+      "sha256": "fa7afdca1e3339afcfa16b4c2ee9f5ddf06a3ffcaae2d98cf233640073e5d3fa"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates/five-holiday-long.body.json",
+      "bytes": 10049,
+      "sha256": "965c384bae6026a41508f42f65c4cdcc11fcedbbe6aefebe9223967bb07b403e"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates/five-holiday-long.docx",
+      "bytes": 17767,
+      "sha256": "8be41f5f6d03ab499532eb49affc89519aa350eb7c532cf493387d52fe2cace2"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates/five-holiday.body.json",
+      "bytes": 5234,
+      "sha256": "42103c88a827956e6a2cd6bf726b6cac24962c213d74c5e3632a77af04691f76"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates/five-holiday.docx",
+      "bytes": 17639,
+      "sha256": "b422cbca4f4b46c96eb513cfbf760c1705ae4f43ec462353e4faf04c8cabd7f8"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates/five-long.body.json",
+      "bytes": 10116,
+      "sha256": "724acf8b0d283d950c4a56d0636a979c717f336b328699d3632c5b9695081236"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates/five-long.docx",
+      "bytes": 17753,
+      "sha256": "2e6cb05e6417838b0c320884076da71c7c3554a86b0c47cb9b7355c0dbe1724e"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates/five-normal.body.json",
+      "bytes": 5301,
+      "sha256": "81c866806c163831c17a550555b36b834824ce5a119b41d3718f6169e8f074c5"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates/five-normal.docx",
+      "bytes": 17624,
+      "sha256": "c521377bfc3df8dcd2a5be4e039875474186e007608570f09bd5d6aae64fe6dc"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates/six-saturday-long.body.json",
+      "bytes": 10409,
+      "sha256": "ad2ca061a9a7a3aa0381f4218e2bfe76f96b3ec33157c6a99e816b5c9b6bec85"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates/six-saturday-long.docx",
+      "bytes": 17794,
+      "sha256": "576d603a850d19821f6d89380df59bf0022bdcbf8ba44e142e115a3ba619db02"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates/six-saturday-normal.body.json",
+      "bytes": 5594,
+      "sha256": "13b1fc519b55479d12fb21addf6746270fa3f2c695177b4d74686b7e661be02e"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates/six-saturday-normal.docx",
+      "bytes": 17664,
+      "sha256": "c360c59031dd285c69bd25526dfe52528230cc021ef7ed9cb3421b549396372e"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates/six-sunday-long.body.json",
+      "bytes": 10521,
+      "sha256": "fdac9a6a76ef476ef7af87d91552159aa4edfb40d793c5310a726ebf10c73e5c"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates/six-sunday-long.docx",
+      "bytes": 17795,
+      "sha256": "c73eb68e5fc4b5785e9babe168f134ee5413409ea6b2a0c5b240c2b5fad490da"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates/six-sunday-normal.body.json",
+      "bytes": 5706,
+      "sha256": "bf3adfb31c368dd9eed494daddb00ee82c2975880c36750bb1e836d0e554c180"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates/six-sunday-normal.docx",
+      "bytes": 17667,
+      "sha256": "ca29eea9cabdf6dded761af6a093b8923c4517f4b7ebc120416a7fd299712f78"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates-final/five-holiday-long.body.json",
+      "bytes": 10049,
+      "sha256": "965c384bae6026a41508f42f65c4cdcc11fcedbbe6aefebe9223967bb07b403e"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates-final/five-holiday-long.docx",
+      "bytes": 17764,
+      "sha256": "b08d07c7fa3e31b9f16315b5b557aea105d0137b24f51a1b2408ee11549d61eb"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates-final/five-holiday.body.json",
+      "bytes": 5234,
+      "sha256": "42103c88a827956e6a2cd6bf726b6cac24962c213d74c5e3632a77af04691f76"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates-final/five-holiday.docx",
+      "bytes": 17637,
+      "sha256": "50d692e955d4b7e8f0c0ff0defb2e9a88867740674e2de879bfd269717bfed26"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates-final/five-long.body.json",
+      "bytes": 10116,
+      "sha256": "724acf8b0d283d950c4a56d0636a979c717f336b328699d3632c5b9695081236"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates-final/five-long.docx",
+      "bytes": 17752,
+      "sha256": "58a2a6e0151183c9f4ae5eb42638c996fb3ff7bb07032ed0d6c8346facf16e9f"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates-final/five-normal.body.json",
+      "bytes": 5301,
+      "sha256": "81c866806c163831c17a550555b36b834824ce5a119b41d3718f6169e8f074c5"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates-final/five-normal.docx",
+      "bytes": 17623,
+      "sha256": "19da43b55d21e8afe274910890cdad8d1a72dd443b3f1617ae866eaf0840ab64"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates-final/six-saturday-long.body.json",
+      "bytes": 10409,
+      "sha256": "ad2ca061a9a7a3aa0381f4218e2bfe76f96b3ec33157c6a99e816b5c9b6bec85"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates-final/six-saturday-long.docx",
+      "bytes": 17793,
+      "sha256": "3043f97ecd4cb481a23bb1e6dc0bd18502dc31daf26d00e78106d45a12a5a127"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates-final/six-saturday-normal.body.json",
+      "bytes": 5594,
+      "sha256": "13b1fc519b55479d12fb21addf6746270fa3f2c695177b4d74686b7e661be02e"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates-final/six-saturday-normal.docx",
+      "bytes": 17664,
+      "sha256": "e3c1b9ff0e9112113659b2f21ecda181021a497b16566b815862189e864a1cb8"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates-final/six-sunday-long.body.json",
+      "bytes": 10521,
+      "sha256": "fdac9a6a76ef476ef7af87d91552159aa4edfb40d793c5310a726ebf10c73e5c"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates-final/six-sunday-long.docx",
+      "bytes": 17794,
+      "sha256": "c68c5b5eb7c6d4fa2004421f388d8a6e1279dace398d118f765ae3c9f06ae2f4"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates-final/six-sunday-normal.body.json",
+      "bytes": 5706,
+      "sha256": "bf3adfb31c368dd9eed494daddb00ee82c2975880c36750bb1e836d0e554c180"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates-final/six-sunday-normal.docx",
+      "bytes": 17667,
+      "sha256": "6cef09c56b9075dbdb617676132b3267c12634d9fbecb5db43a0a73cdb0a539f"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates-final/~$ve-holiday.docx",
+      "bytes": 162,
+      "sha256": "3130d2ae8dfa5fcf66a1582f30bb890a83c60ffcee42ae3244b26100052408a5"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates-final/~$ve-normal.docx",
+      "bytes": 162,
+      "sha256": "5522b8ed0ca07fd469e91d146586e8f0d2c74b332a1b35719085d883fe18343b"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates-final/~$x-saturday-normal.docx",
+      "bytes": 162,
+      "sha256": "ce65d742a1b4ee1dc9d4950e32fa0b1661ea48adbea6fa2dd77db2e22f61c9a1"
+    },
+    {
+      "path": "wp-e-header-week-20260912/candidates-final/~$x-sunday-normal.docx",
+      "bytes": 162,
+      "sha256": "873dfd8f13dd6337b4980110132cdaa15bd59d4efc0e04a306063a6474b7248a"
+    },
+    {
+      "path": "wp-e-header-week-20260912/green-final.log",
+      "bytes": 115,
+      "sha256": "7e4c4275a6d3411c362403a8b02ca2bf3c86309a3bc22ae7a971df5fb1bd8de1"
+    },
+    {
+      "path": "wp-e-header-week-20260912/green.log",
+      "bytes": 115,
+      "sha256": "dab92a63706144b467d663d5c1121a0bc007be4bc773d26d2eb6916317ea6b8c"
+    },
+    {
+      "path": "wp-e-header-week-20260912/manifest.json",
+      "bytes": 8238,
+      "sha256": "3450273e72b3e2e15588c2765fdf6b61197b0572ea02a4b1e8cd3ac6b07c8b4c"
+    },
+    {
+      "path": "wp-e-header-week-20260912/prepare_final_inputs.py",
+      "bytes": 2307,
+      "sha256": "989206ce83f7e697849a86423c18ae76ae5ab9784559336247fd1365b72f1557"
+    },
+    {
+      "path": "wp-e-header-week-20260912/prepare_inputs.py",
+      "bytes": 2295,
+      "sha256": "893c53e0353bc227fec6d99469255f342fbce4659efed0e867b65a7494a5888d"
+    },
+    {
+      "path": "wp-e-header-week-20260912/qa-five/five-normal.pdf",
+      "bytes": 68234,
+      "sha256": "1aa8125fd8e4fd5d5563dffe6fde42ef350b350652927690e52bb6b6320edd35"
+    },
+    {
+      "path": "wp-e-header-week-20260912/qa-five/page-1.png",
+      "bytes": 274154,
+      "sha256": "c1fd2f8bd8d5f5e51a29d22e6b92e4949caffddc87859b50c3b642cbd109f20f"
+    },
+    {
+      "path": "wp-e-header-week-20260912/qa-five-final/five-normal.pdf",
+      "bytes": 67987,
+      "sha256": "6aa0f6a6ab313a4a81cbd54b8106b1fc81801424f26cb40603f38b3eb2e47711"
+    },
+    {
+      "path": "wp-e-header-week-20260912/qa-five-final/page-1.png",
+      "bytes": 271834,
+      "sha256": "17e174fc3d09cca167cb82c4a7e5a8042896786016169bdb757bef3c80b51485"
+    },
+    {
+      "path": "wp-e-header-week-20260912/qa-six/page-1.png",
+      "bytes": 277826,
+      "sha256": "212b854556651b4fe965c16eba2555a54a6dd5fa3ef57139d2014c457a14e7ef"
+    },
+    {
+      "path": "wp-e-header-week-20260912/qa-six/six-sunday-normal.pdf",
+      "bytes": 69902,
+      "sha256": "3f13e67f696ee530b47a9041a0256f6ce363779564de45e4a45a45da14e9da85"
+    },
+    {
+      "path": "wp-e-header-week-20260912/qa-six-final/page-1.png",
+      "bytes": 276065,
+      "sha256": "0f78291e91a74a95cff53d995596ccd97d2e01cea4ab27255a88b284bcbc55f8"
+    },
+    {
+      "path": "wp-e-header-week-20260912/qa-six-final/six-sunday-normal.pdf",
+      "bytes": 69645,
+      "sha256": "06a34e404a8a240532da416d159577a7c4c8400101d498fe83f8a241c89ffd48"
+    },
+    {
+      "path": "wp-e-header-week-20260912/README.md",
+      "bytes": 1818,
+      "sha256": "e5233fcc6fcb4a107e4a59f37856b96cd1b93d9aa9cc03e011da42f0922e1982"
+    },
+    {
+      "path": "wp-e-header-week-20260912/red1.log",
+      "bytes": 7483,
+      "sha256": "5f3f1afc86bbdde49e7018059ecc14d6fbbe07a49030be483a7024a0d9136a01"
+    },
+    {
+      "path": "wp-e-header-week-20260912/red2.log",
+      "bytes": 7483,
+      "sha256": "1156030d47ab05b0a31eafd5dc34a20973d0d370cc9b3490359d5135e3e877ce"
+    },
+    {
+      "path": "wp-e-header-week-20260912/render-five-final.log",
+      "bytes": 202,
+      "sha256": "21eb188b1a582764a5e45080cd3b7ae2e3d3ad0bde71200407631ecd4572a4a7"
+    },
+    {
+      "path": "wp-e-header-week-20260912/render-five.log",
+      "bytes": 196,
+      "sha256": "b042cdfe8ce313bf3364191d68e07d6084f8bf60caf056f3c7c7a37f1507d61f"
+    },
+    {
+      "path": "wp-e-header-week-20260912/render-six-final.log",
+      "bytes": 201,
+      "sha256": "82e0244ea9c1aa59626d0e1854165b7488598c2c45df880a18e1135fc52f9ee5"
+    },
+    {
+      "path": "wp-e-header-week-20260912/render-six.log",
+      "bytes": 195,
+      "sha256": "b2731705eb1ca0110030da9de50fcbb1a987d087fcc4b744f49b8698ab08df33"
+    },
+    {
+      "path": "wp-e-native-20260913/build_delivery.py",
+      "bytes": 6979,
+      "sha256": "f065455ba398503df33938e02e09e2287da75722c7e84e5f8083c2c343e85fc6"
+    },
+    {
+      "path": "wp-e-native-20260913/delivery-evidence-manifest.json",
+      "bytes": 41773,
+      "sha256": "c5dfc4516cea4ab3a47d82a76c9783b6f2b7ba9129ff5e3e351a47d73dab0641"
+    },
+    {
+      "path": "wp-e-native-20260913/environment.json",
+      "bytes": 643,
+      "sha256": "58522aaf2ebf9107cc94646cd0538a3624852eeb07578145638d7d57a034b531"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-area-all-selection-0.png",
+      "bytes": 130839,
+      "sha256": "32b77f57a9e9cfbe652fbb94b6adc188d601befcc135c65015d25d6d376424c3"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-area-all-selection.json",
+      "bytes": 300,
+      "sha256": "d54f1ca1f6de3df69816aafee482b67d319e56ce29027771487caff9c435875e"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-area-all-spacing-0.png",
+      "bytes": 127456,
+      "sha256": "45317f01d78d773318c51c1b77e8251990cad82d8fbcddd804b94dd2310997b2"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-area-all-spacing.json",
+      "bytes": 298,
+      "sha256": "51044b11b7b5b1d5e7db6733a4bab50c3e376138a6f3af230ecebf2fd5cdfe0c"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-body-excluding-terminal-selection-0.png",
+      "bytes": 121091,
+      "sha256": "5a894c8173d8a8e64677df1733a81997e4b3f7966c8cea281b8ce4da1d885b2a"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-body-excluding-terminal-selection.json",
+      "bytes": 315,
+      "sha256": "8a1227c17c7b451dc777c227925a3676cc4e1802e2ec1fd196f984680a39d52f"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-body-excluding-terminal-spacing-0.png",
+      "bytes": 129471,
+      "sha256": "6fba97f27e4c917425f8dd19ab2cfdd74d60fdaa0c4218dd49bfc49a6bf7a72e"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-body-excluding-terminal-spacing.json",
+      "bytes": 313,
+      "sha256": "9dd145628eae24f094f564e02b5d9962eee7cd2212bf8a907124318495dda0d4"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-body-font-0.png",
+      "bytes": 140837,
+      "sha256": "14c10f3a82907bb3744ca1629d2b5fc5502de2663deaadcf2c7c13ff5e5309d9"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-body-font.json",
+      "bytes": 291,
+      "sha256": "f11d741ce073c1d76eb61a806a0a5fb804cdb0145e66382af0d6765f18794f1b"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-body-selection-0.png",
+      "bytes": 123275,
+      "sha256": "85420430155a14432e7a6d26e8e7b4d767d4aff2183c0b606437e85b7e6e9e7d"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-body-selection.json",
+      "bytes": 296,
+      "sha256": "f882bc6f03629ca6b3871f9534fcb3d5ddc9439efbd7c9b41ba4298ec85132b1"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-game-label-selection-0.png",
+      "bytes": 126907,
+      "sha256": "bfdf375a39d79936a775f28ff17d221eff5efc92c6094566e2445e17f9d5804e"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-game-label-selection.json",
+      "bytes": 302,
+      "sha256": "53cd76c36d0521752316b8c4957f0762de0595dc3a8fad9978654ef39fb71387"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-game-label-spacing-0.png",
+      "bytes": 127819,
+      "sha256": "9883e56803ab120a207cd5f065e07ac78199da26c14784344faa19d12bf75419"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-game-label-spacing.json",
+      "bytes": 300,
+      "sha256": "16447c05b29ead32cc623535fbd180d3487b70d6e85fe6e376b7d80dad80017d"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-middle-selection-0.png",
+      "bytes": 157416,
+      "sha256": "95fee62f37e4420442772411ad7e03771d07d4dc8120a246bac977cbd027cf0c"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-middle-selection.json",
+      "bytes": 298,
+      "sha256": "bca2e0320abf6b38af826071e3c965cc10eae4df97ef42a4a96dedc5d2affe6f"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-middle-spacing-0.png",
+      "bytes": 143761,
+      "sha256": "2d133d9e852a9fa6496d45ae6202e66e6ca68caf4d7656980ac2bc1e74ebbdfd"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-middle-spacing.json",
+      "bytes": 296,
+      "sha256": "c1ff75dfddfad4efcbbfa5fb11bec7e722c846c9e5010bb1fc1e072db100613a"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-print-bottom-right-150-0.png",
+      "bytes": 113516,
+      "sha256": "c12737691b5c53532ab9562ea8eb064c572290c527af4188e9c4a3ae099e5c97"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-print-bottom-right-150.json",
+      "bytes": 304,
+      "sha256": "729db33230a608c71969ff291549afbb14903d65c163e5b9eba00d2cac83b2b0"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-print-middle-150-0.png",
+      "bytes": 117507,
+      "sha256": "97205e7baeafc2c1b5228666f3cb900bd694043973b6bf63cde3bbffa4644cf3"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-print-middle-150.json",
+      "bytes": 298,
+      "sha256": "1a02df0ef33545513f5bc6bc695e0e23c9a05969405e3c6f4f15261afc230700"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-print-middle-right-150-0.png",
+      "bytes": 163466,
+      "sha256": "7893f9e77f64e994a8a89bb6fddaabf9f7f0c4a362532bfd74e8a4ff09237a98"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-print-middle-right-150.json",
+      "bytes": 304,
+      "sha256": "7860d479114291d976233cae630670b3866aa6b559472750bc3434977c7875a5"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-print-overview-0.png",
+      "bytes": 124400,
+      "sha256": "cf6f0b6959ed489168b676538a606c2c801f76be672676bdc725e7786a349d5b"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-print-overview.json",
+      "bytes": 296,
+      "sha256": "446e336127fabcf807655ffa6b2b25bab7211a4f3c86745987de79f52bce3a76"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-print-top-150-0.png",
+      "bytes": 174046,
+      "sha256": "144f2e7266c1f166a92b94b0312e170061f3efab92e385a7679d33a4b962b6d3"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-print-top-150.json",
+      "bytes": 295,
+      "sha256": "c156e2860fda8c1c1792ce5e2c869ac8d8c3db5477e18b9ebfb48d2e28934c52"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-print-top-right-150-0.png",
+      "bytes": 171603,
+      "sha256": "f8a8eb748097244d05daa13cbb59b5a5c2a1b4e7d0a644d43adbeea75298d5da"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-print-top-right-150.json",
+      "bytes": 301,
+      "sha256": "88f66355a907edb4f3b8ecc366d3ca54c3bc999c4ed5be50d5685ec7e27bc444"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-summary-all-selection-0.png",
+      "bytes": 131792,
+      "sha256": "769be2a73ae5d021bad5141e911d5b1878861fea387dca67f2cc13dec2a4cdb0"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-summary-all-selection.json",
+      "bytes": 303,
+      "sha256": "fb684b2962574de6863804b0a37b0c8bd23b76b33bea8196665f9ebc9963f3f4"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-summary-all-spacing-0.png",
+      "bytes": 127819,
+      "sha256": "aa9ee40fbf15188423700a06ac502bad93e29023a8fafd7c9c9636c90b67b3e6"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-summary-all-spacing.json",
+      "bytes": 301,
+      "sha256": "eb9e2cf984e916dd6d8013b3ebdd91ceb830e92f21b4a74d9f65cb9db1febb76"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-title-font-0.png",
+      "bytes": 142748,
+      "sha256": "b8747883493b1fd4b68940085c0e64c5764054eef9f8391e5e8f616dc25cf46c"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-title-font-warning.json",
+      "bytes": 211,
+      "sha256": "2ee0551cb38b6f41ae40de84580eb34e47ceac31680da379f33a648e0f91cbc2"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-title-font.json",
+      "bytes": 292,
+      "sha256": "87cb6b74c033d94fba6f0bd35e79baf49fc5828f5d3a417fd921049441549a1c"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-title-selection-0.png",
+      "bytes": 148721,
+      "sha256": "7160a2f42cf36a1f4300f1d91e6485360905734a023bb9b946f77d1efbb8f13d"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-title-selection.json",
+      "bytes": 297,
+      "sha256": "333e926ce34a275e5d44301c87a06ff49e4616780ca8516dd27cc1dc3a956c5f"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-top-selection-0.png",
+      "bytes": 148129,
+      "sha256": "25ef4eb80a20016f365f6df851aac6e4b97262e7936886192ec39ef27bf4de14"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-top-selection.json",
+      "bytes": 295,
+      "sha256": "1f8baf63adad906349f79d657d49846ee9bd86d21c41d9325ddba2b70c9b05d3"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-top-spacing-0.png",
+      "bytes": 144096,
+      "sha256": "6a306eedf87fad509447c654bf541ba79d3b9f3eeadd3ee1313e93233e950653"
+    },
+    {
+      "path": "wp-e-native-20260913/five-holiday-top-spacing.json",
+      "bytes": 293,
+      "sha256": "f5377d6b1ee044da660b1e51174a5e78c796cf8aca1737b486795af89a758533"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-area-selection-0.png",
+      "bytes": 103802,
+      "sha256": "093bea5cbaa9ad0412109730af035c0a0d734d3f6810c6bbecced1cf48b6f88c"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-area-selection.json",
+      "bytes": 292,
+      "sha256": "a82d7310a065326faeb3aa8cffda4e45b7afead39e56f484aab8d198d709442c"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-area-spacing-20-0.png",
+      "bytes": 116766,
+      "sha256": "98cd8aad34e3e15d21cac5fae93bd63d056b6b23f6a0e956691a27cb4427287e"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-area-spacing-20.json",
+      "bytes": 293,
+      "sha256": "3d9b3abd9eb4771a93a74f4adea19d2ca69b1644c63551d32264dc4f5c00bdb6"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-body-font-0.png",
+      "bytes": 115495,
+      "sha256": "395bdb80af6cc652516b686569ea83384b203be51b56cab97b7091da09b8f075"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-body-font.json",
+      "bytes": 287,
+      "sha256": "7b9809135230a0be4dc939e49320c537ab23ef719a2c3eb29443e71b5c6f2b6c"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-body-selection-0.png",
+      "bytes": 92950,
+      "sha256": "3a1faa029cbdf31361000a32a70485e5bde1e0855877cf958392e704404118e6"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-body-selection.json",
+      "bytes": 292,
+      "sha256": "d50867ba16d2162278e09c8b57777a39bc8b4c8d154fff7dbf79a7765b8ac1d5"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-body-spacing-mixed-0.png",
+      "bytes": 120037,
+      "sha256": "da38f73cb24ab2c710cfa3b8be0214938ec98298f587d2c5f2a3aba4b0eea754"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-body-spacing-mixed.json",
+      "bytes": 296,
+      "sha256": "b320aabd7abeb152ff6d928e85e9502c5e856dd7005c3c6564f06247eca5beeb"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-game-label-selection-0.png",
+      "bytes": 102413,
+      "sha256": "d7e3c7e20ce317036c71c01c24b618403203dba4acef42ab2cc5681bac0ead36"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-game-label-selection.json",
+      "bytes": 298,
+      "sha256": "58564ea0114e9df60cb7bb737df2464dd22bbabaacd1407fe761f2a64a3f2d6e"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-game-label-spacing-20-0.png",
+      "bytes": 116760,
+      "sha256": "882b0a327dd61c06d8a770c9d1f5ec1f07181e6e95e213361e2377b990d6cd2a"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-game-label-spacing-20.json",
+      "bytes": 299,
+      "sha256": "24ad33dd5be64a5a273daa333892dbd009754632609dc9737ef904055b13dfe9"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-ooxml-paragraph-diagnostic.json",
+      "bytes": 11538,
+      "sha256": "94f82acf919304c579eee52eef81cb67c49a9a9238585b436c50994059a00236"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-bottom-fullwidth-100-0.png",
+      "bytes": 130373,
+      "sha256": "6e2e9f7df8ce9f6dfb1908a1b191bc58e7ebb97c3d48ac83c069d6fc55045212"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-bottom-fullwidth-100.json",
+      "bytes": 305,
+      "sha256": "f2f8a5b811710db4df9a994bd6bc1ad3b3a9ee069ef8aa72e2606c7f9fbaa52f"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-bottom-left-100-0.png",
+      "bytes": 96423,
+      "sha256": "01ee1e808a0787e10e07b0fdfd5f03b76b4f48c0ef4ad5a1d168834bc99d9d38"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-bottom-left-100.json",
+      "bytes": 299,
+      "sha256": "e00fe21b090992e8f13b07e54352e44fbdf51c2d409460fa48591a02fd11bb5f"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-bottom-left-175-0.png",
+      "bytes": 119789,
+      "sha256": "424423081b2f278b1344366bb0890c205ad684fc915928736f0a02fbf7e95177"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-bottom-left-175.json",
+      "bytes": 300,
+      "sha256": "e5e5e93cd80184fe29e04ade383f3e9251f85bc9ec369ca7b20b18c141c1bec1"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-bottom-right-100-0.png",
+      "bytes": 96481,
+      "sha256": "c94acf1f64de11e3fec68f8b5363f7bfb7e21587b43b9ffc25652436a35f64e9"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-bottom-right-100.json",
+      "bytes": 300,
+      "sha256": "8111d5b1c4cedc588400e9c8a819cb10c7aa4100910390b5eeb2a0df3891eb8f"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-bottom-right-175-0.png",
+      "bytes": 103581,
+      "sha256": "8625db1851cc5b1bcce37d6f979d542bc71734c7dfba29cc3ada4aa935cd1cf3"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-bottom-right-175.json",
+      "bytes": 301,
+      "sha256": "f35abd9b9977201b106834b6ccc282e770676c36bd035649f45f8e7afb2c004a"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-full-50-0.png",
+      "bytes": 106067,
+      "sha256": "a0ecaf87fce131a920021ea06059222cd9f86ef2585fe096b48d96c7cd777454"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-full-50.json",
+      "bytes": 291,
+      "sha256": "68859c0453adc6a1849253fddc4146ff73736381f766c91cdb8b2889923cd014"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-middle-left-100-0.png",
+      "bytes": 110487,
+      "sha256": "9d11a551fb78d186fd11c52c652317b63ea911abbd95566d0928a6ae3320a36f"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-middle-left-100.json",
+      "bytes": 299,
+      "sha256": "67b2f0d539844b2561922cc4742fd630b8c427af28f291fb01d40ec5e7f168be"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-middle-left-175-0.png",
+      "bytes": 132683,
+      "sha256": "5e11ae4e38b15b3e855b5874b6d048d8251137e2816a320fc76c3ffc18f2725e"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-middle-left-175.json",
+      "bytes": 300,
+      "sha256": "d32e60cf383a575419968479e81116dde92f31edbe71629b516a901bc3e6bff1"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-middle-right-100-0.png",
+      "bytes": 114834,
+      "sha256": "8ca9c1e8d5b8c5f519f08f349438e89197ccb8b5cce2863ed13fac6899978d22"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-middle-right-100.json",
+      "bytes": 300,
+      "sha256": "f7de645617bc60826ad6f73bdb18cfb2ec359058c157891370a7dd90367face7"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-middle-right-175-0.png",
+      "bytes": 117304,
+      "sha256": "c42ae17f32f9d4c8a0e22c6da4dce36787d39980cd0998fa011f095b9e779111"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-middle-right-175.json",
+      "bytes": 301,
+      "sha256": "cf4bcc63a8d77f6d1e840bdc62c60231a9335f4b91233ae0563d250266020501"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-top-fullwidth-100-0.png",
+      "bytes": 154354,
+      "sha256": "605e1f052aac4d2fc7fdd8e9e2e4d94e0f615631c51634a702e013a174ac28fe"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-top-fullwidth-100.json",
+      "bytes": 302,
+      "sha256": "2ac0acc5f1270fa287757a7f3d72b71cf5fb99e9b21403ba00c59c765f4752c0"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-top-left-100-0.png",
+      "bytes": 124062,
+      "sha256": "eb54ee6f96f8f800b25949ebfb9722df616e73809e279e713bf5d5b5d4870869"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-top-left-100.json",
+      "bytes": 296,
+      "sha256": "5478c41ec21396324100eeaade4dc92b376a3a2273dc96ecba100b9a6ba94d26"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-top-left-175-0.png",
+      "bytes": 191997,
+      "sha256": "4d45c67088deb3f07765002e8d17c795d469df7557514ebbefa9178c3c3b702f"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-top-left-175.json",
+      "bytes": 297,
+      "sha256": "698bbc445497bcb462312174ecdbaa5191c674e9f82a65ec3caa3d9635f14f9c"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-top-right-100-0.png",
+      "bytes": 127032,
+      "sha256": "8bd9143a9dc704c9a4430c613dee5e065ceff2ea0d0c5f2da0cef350ac37ec3d"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-top-right-100.json",
+      "bytes": 297,
+      "sha256": "841af835b37cd700b363a1d02daf3b092c0c1502ecc4381a8f17e795cac871ea"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-top-right-175-0.png",
+      "bytes": 185654,
+      "sha256": "a68fbbf2d5493ca351f7660bdc7d4efa15e76265f1805a92deee7281a067a67f"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-print-top-right-175.json",
+      "bytes": 298,
+      "sha256": "ef91bb3e29a0459378a93a2418fad4da5eadf6190207ec50b529f450a305c850"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-range-a-selection-0.png",
+      "bytes": 124780,
+      "sha256": "42ec26ecf4c5117fae0771e4dab4fcd420fc1340c7d198b07ec90d0fe2435d41"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-range-a-selection.json",
+      "bytes": 295,
+      "sha256": "cc5e73dca1293eed0b8533017026f6f8bb2054487abb968bcf1349a17c1961b4"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-range-a-spacing-20-0.png",
+      "bytes": 116682,
+      "sha256": "1ce58c0d065fa3250ca618eea799da0092102a2651dc42be9e163de4d98e89f7"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-range-a-spacing-20.json",
+      "bytes": 296,
+      "sha256": "fe350ae4ccff14096dfdf1f6c2b66cf6fb4559ae5ca425c6c4b3429067338de4"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-range-b-selection-0.png",
+      "bytes": 125902,
+      "sha256": "6d17def2f176b76aeae0ebfe88fc5cbdb806baab5bf9405e72f43e87b1e3834f"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-range-b-selection.json",
+      "bytes": 295,
+      "sha256": "5ca86ae94c0cbc46943aa456e9dc929ed5f42f69680a10bd910156ed065ce2ff"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-range-b-spacing-20-0.png",
+      "bytes": 115723,
+      "sha256": "c567d97debeb1c33a2aa159cca941901a8138a10528a484091fabe385ef6ef4a"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-range-b-spacing-20.json",
+      "bytes": 296,
+      "sha256": "5655ca7022807235329be96e33b29eabbaf38687c6ed5a78d0ecf3cd2a6081f0"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-range-c-selection-0.png",
+      "bytes": 97723,
+      "sha256": "1d780fc823e474093bd081b94b93d3ebb51752b90efc23403d2234991eba69af"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-range-c-selection.json",
+      "bytes": 295,
+      "sha256": "f2387dde7e76b01ff42cedf7e7b2f9b96bf3e565c3c9dba03305c876110ae99e"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-range-c-spacing-20-0.png",
+      "bytes": 115818,
+      "sha256": "327b4270c4fb58fdd8837503af348c9bf5096c7d6c4078002b19247dd5bc03b9"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-range-c-spacing-20.json",
+      "bytes": 296,
+      "sha256": "6870f96cb5a9c690eff02dc9d21c35a821be120257e3a209a633e600479525ea"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-summary-labels-selection-0.png",
+      "bytes": 94547,
+      "sha256": "25e1a4ce7967fc0ada7aa458fbdec094a4a7918be70ebfaf32e994bfd89c65cc"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-summary-labels-selection.json",
+      "bytes": 302,
+      "sha256": "8e711b605568ed30a6b1a2376c4d2b6ae60552556ae9b6883cd3a14b5235a3f5"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-summary-labels-spacing-20-resumed-0.png",
+      "bytes": 83729,
+      "sha256": "a932056f52f22d838637e3395ba16cb3bdab5e31e79561b4b5b159d0f248074c"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-summary-labels-spacing-20-resumed.json",
+      "bytes": 310,
+      "sha256": "c21786cf3e72bcb7e0729b77682a4a5f309849b05cfac07b5370f30f3c2a9310"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-terminal-empty-position-0.png",
+      "bytes": 91150,
+      "sha256": "dee876c767bde493cefb2838fc9e3b0154c9772dc10faf96f5c2c3c002518453"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-terminal-empty-position.json",
+      "bytes": 301,
+      "sha256": "272c8f1287d8d4b9a24e5b7807a72d373e591128be3ded0294c05898af5ba4ca"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-terminal-empty-spacing-single-0.png",
+      "bytes": 124495,
+      "sha256": "bde1d579456b9dd8519b660e662ef99df6815f10ed1ab4f04080383ad08378c5"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-terminal-empty-spacing-single.json",
+      "bytes": 307,
+      "sha256": "a80aa2883203e0960e6bf7122d8214305a22460a00eb1b13f923474ac8a0fd61"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-title-font-0.png",
+      "bytes": 136946,
+      "sha256": "f096136bccd729e3619a2b0cce20b6db390bd167ab9961c0b4be5ab97ba363be"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-title-font.json",
+      "bytes": 288,
+      "sha256": "09c0d0085286607c02f41fe05b3962d8783ef8d8bb4a29ad2d9307c61cb52f22"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-title-selection-0.png",
+      "bytes": 152315,
+      "sha256": "b624e1dbee24966c3ed01782376c1d3cf408cfb153fe050d2d6e3276f837dd95"
+    },
+    {
+      "path": "wp-e-native-20260913/five-normal-title-selection.json",
+      "bytes": 293,
+      "sha256": "77cc63f29a8cd9903e8640cf6a395cfda9a88dddd22ba9588a68fac2d871051f"
+    },
+    {
+      "path": "wp-e-native-20260913/git-final.json",
+      "bytes": 1703,
+      "sha256": "515aee894247d50ef14ff98c054c92323f4a1224040b7e0e30926c4011a74b56"
+    },
+    {
+      "path": "wp-e-native-20260913/integrity-final.json",
+      "bytes": 52480,
+      "sha256": "e4332ca2d1cb3a88d0c09261b27c002ac115dcab34609ae03c4ca19289fad4f8"
+    },
+    {
+      "path": "wp-e-native-20260913/integrity-inputs.json",
+      "bytes": 30538,
+      "sha256": "8261bf0edaed4f7b7c4a828cb9bfeaba25384fd8590431aa1cd408223cd5dc6d"
+    },
+    {
+      "path": "wp-e-native-20260913/review-delivery.md",
+      "bytes": 4595,
+      "sha256": "0a27a901ad2f645ce6711a2979b61d5c3a22bef7cf1464f934debd17643cbf9e"
+    },
+    {
+      "path": "wp-e-native-20260913/review-five-holiday.md",
+      "bytes": 5441,
+      "sha256": "d4cdb96f8b12e11280ded821fe25d5f1b3d9f9d1ec8200a8fa079971ffa6f085"
+    },
+    {
+      "path": "wp-e-native-20260913/review-five-normal-supplement.md",
+      "bytes": 2936,
+      "sha256": "99123394e552dc080f7329f9e6bd921ca3ec8a79607ba9b609f5fc2bccf879bb"
+    },
+    {
+      "path": "wp-e-native-20260913/review-five-normal.md",
+      "bytes": 6639,
+      "sha256": "dc3cc73b3a66d5598dc463dd93fda676c25f7d99803166cf1261050a7d71ad6b"
+    },
+    {
+      "path": "wp-e-native-20260913/review-initial.md",
+      "bytes": 5638,
+      "sha256": "00f514ed571738aea8abebb86ceb2a1d7cdd99214470a3421425ba82b5294caf"
+    },
+    {
+      "path": "wp-e-native-20260913/review-six-saturday-normal-supplement.md",
+      "bytes": 2221,
+      "sha256": "6ad56bf0353f685070c299722524bbe826c184451a6d9dc90b971933f9342fc4"
+    },
+    {
+      "path": "wp-e-native-20260913/review-six-saturday-normal.md",
+      "bytes": 4978,
+      "sha256": "1f5fc50de7918c1de752419a438e1324f2f7102c70381c76cb640e2cb8eec643"
+    },
+    {
+      "path": "wp-e-native-20260913/review-six-sunday-normal-supplement.md",
+      "bytes": 1829,
+      "sha256": "654617ba434467b6b58cbab6860c0c08d29c1df7175af288add9f6e251ffccf6"
+    },
+    {
+      "path": "wp-e-native-20260913/review-six-sunday-normal.md",
+      "bytes": 4873,
+      "sha256": "bf5c9b0cc410ff02df76ab5fcf8996bd43eba1243cdca92934f155bbf295eef1"
+    },
+    {
+      "path": "wp-e-native-20260913/seal_evidence.py",
+      "bytes": 1770,
+      "sha256": "6e7ca763ee3aca2b5750b159953fcc3e79ef73409a8252a9f7402628bbf7de22"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-area-all-selection-0.png",
+      "bytes": 130800,
+      "sha256": "7d12fa0f1948e285e50589678c110a632b2d955390d60a68e2a093664f6fdd7a"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-area-all-selection.json",
+      "bytes": 314,
+      "sha256": "48cebadeb417b5dbf9e2eae4816b3bc342fb4dab150ccd5b8a4d2f088b60812a"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-area-all-spacing-0.png",
+      "bytes": 128691,
+      "sha256": "77ad2810e0f4a81c2a5b5e468eafa93b9e0a729d62e2b352fae7307373e9b9eb"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-area-all-spacing.json",
+      "bytes": 312,
+      "sha256": "5f6de8d23b489f885027cef192b839a577a70991ba7010c08d508caf9c4ae51e"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-body-font-0.png",
+      "bytes": 141709,
+      "sha256": "1b159087eef1c97ca41a3bfef3bebbaf64518551e31661e02edddfa97d5546bf"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-body-font.json",
+      "bytes": 305,
+      "sha256": "ebffb34978b17073baecf79d3d6de5723d011a4f995fd289fac5a3e3adcf4ad4"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-body-selection-0.png",
+      "bytes": 124113,
+      "sha256": "dd1cc57d5dcc323358530bb995f9894c1beb87cab60ba9692ace2ac01d5c1936"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-body-selection.json",
+      "bytes": 310,
+      "sha256": "7001abca3252d409c4ae73b15e02be33060f57818024815077f1442f7921198b"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-game-label-selection-0.png",
+      "bytes": 126838,
+      "sha256": "33a4dbd80df9a974e1780c1867b959929ac630c192239e42e868cebe482986b2"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-game-label-selection.json",
+      "bytes": 316,
+      "sha256": "96cddc064204fac60b790256df7dea07efcfda1504741731bd31446156d0102b"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-game-label-spacing-0.png",
+      "bytes": 128926,
+      "sha256": "0c5f432cc5079ea31408bd826e9daec8042a2188ea17fcf9ba1cfebf43f66d25"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-game-label-spacing.json",
+      "bytes": 314,
+      "sha256": "6a172c9036139120cabfcf57abb0b98a0f5c033aad931bbc08bd35ce1f88b66c"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-middle-selection-0.png",
+      "bytes": 157994,
+      "sha256": "01164d54586875563a5527fe8ae61fca50f08e7711feffb45b083fc8e6aed9f4"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-middle-selection.json",
+      "bytes": 312,
+      "sha256": "7a95aa9a4e177f4d718e04ad366d13f6dbd49b55cb8d7815376d328f746f1bda"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-middle-spacing-0.png",
+      "bytes": 149172,
+      "sha256": "03f100d04fb2b774c5ddf07e45de30cd8c60e4344e86da060925851c7aec763b"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-middle-spacing.json",
+      "bytes": 310,
+      "sha256": "d12af74469de63f57d37414e9a1c3468fcab3a9a90b3793b4839ae1084fed280"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-bottom-125-0.png",
+      "bytes": 120836,
+      "sha256": "7ce852ef7013a7b8b372403820af0c479f63b032e414f51495ba6cf964200494"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-bottom-125.json",
+      "bytes": 312,
+      "sha256": "681eaeb1eb9e6e66b2913f90c4cc73b438c354207bb26054964ce211addfa78e"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-bottom-150-0.png",
+      "bytes": 131160,
+      "sha256": "199130324eae6be338f9f56389039607126340897888583e0b730da90808aad8"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-bottom-150.json",
+      "bytes": 312,
+      "sha256": "032d13978c07605f212f6e783c3e5b06f28e85850bd5b4309b8424035f40fc2e"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-bottom-right-150-0.png",
+      "bytes": 114840,
+      "sha256": "e3b7d1463ea35fd0a295d0ef3d470808489b04f2f7055c324364e3956e765228"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-bottom-right-150.json",
+      "bytes": 318,
+      "sha256": "1c66ad09f28950ecdf2d67837e2801acd8a25bb58cb33f1239192f8b43c65090"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-lower-center-175-0.png",
+      "bytes": 134808,
+      "sha256": "7adb0e8453e537d0ee0e1c9153df6b575a56d254e293815e99c04f1b3f4ee404"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-lower-center-175.json",
+      "bytes": 318,
+      "sha256": "ffa76672b0450bb84cbd842030270dd00b91a687dfb6ab7b1c4536686a5131b9"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-lower-left-175-0.png",
+      "bytes": 136725,
+      "sha256": "e31082a0d3f8443cd9e481edec36696c0d57f80eea1d6ed1d815ce1de6a22490"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-lower-left-175.json",
+      "bytes": 316,
+      "sha256": "d360cc32b95619fbeacaf60553e9401ab347fb6786ef599163278cf78f2f92b7"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-lower-right-175-0.png",
+      "bytes": 119256,
+      "sha256": "893d2dd1a93ea2a33c52af0a5211f8b7cfa48265f38103155a63baf5d2c385d2"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-lower-right-175.json",
+      "bytes": 317,
+      "sha256": "e46bb1859a9179dea522dfab928e9907e082cbb0af8274c6eccd5015d059cc77"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-middle-right-150-0.png",
+      "bytes": 132690,
+      "sha256": "36a4be467b4466e6f5e5848795451286b1313f18ec20c1266112b1620653669a"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-middle-right-150.json",
+      "bytes": 318,
+      "sha256": "afd017bcf59bc9cf5924d08c87e95bae081cf40a32a4bdf3b9c200599ed59c11"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-overview-0.png",
+      "bytes": 125269,
+      "sha256": "1b9885f3a317cbedc8cc061f52477693741eb445a3186c9152254735af8c4ab3"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-overview.json",
+      "bytes": 310,
+      "sha256": "32bc848a499f20becf2d1efe4c4f9dd8fa848b7caa5e883ef0ba0846f8a8454a"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-top-125-0.png",
+      "bytes": 160181,
+      "sha256": "73f8b395c5f27511ec6603f294327e4b765f3663810807dbf4b099515900ce38"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-top-125.json",
+      "bytes": 309,
+      "sha256": "781d7c88fad9f8b83738e5a5600695684a04c285239bf5cb7175c425459c11ea"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-top-175-0.png",
+      "bytes": 187608,
+      "sha256": "7658c4752f3af33244180fdc947b670993c35e35478c50307e137af967937165"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-top-175.json",
+      "bytes": 309,
+      "sha256": "389d96e1667fc24b5273060b315b73d7d4fa6de9e556e0da08bd865855603ba9"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-top-right-150-0.png",
+      "bytes": 173161,
+      "sha256": "ff50c37d60aa548f2edaecf0acd594372624fffd6ca735bc72f053ed690a8bc1"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-top-right-150.json",
+      "bytes": 315,
+      "sha256": "0faee0772be4e683c25f12e047b0f7314f546d89dda0c93dea071a4f05845c46"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-top-shifted-125-0.png",
+      "bytes": 160528,
+      "sha256": "0512b0d4094545830d282ee81e04afd95d648693e209487e3e4f26ba2d2d84d6"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-top-shifted-125.json",
+      "bytes": 317,
+      "sha256": "4cd0d12b31df3ad3b727bb1142adc9c612980c1d8ff59ea80086bb23de380c81"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-top-shifted2-125-0.png",
+      "bytes": 156502,
+      "sha256": "232014ac1b6a7ab05513095add3e5bf20361ef365f5d1bfc12cc275f49fe69df"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-print-top-shifted2-125.json",
+      "bytes": 318,
+      "sha256": "2de15eb24f0ece8488a58941395ce9581634cdee2775bf578f6f11076483a9ae"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-summary-all-selection-0.png",
+      "bytes": 131886,
+      "sha256": "1e696f48a589d32ad10af4ffe2378a18add2762bb130bf3a42d689a9a8ceb828"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-summary-all-selection.json",
+      "bytes": 317,
+      "sha256": "244b5d29e9e88d19857f4656e97630c82ccbeb03c36274075cd270422360c6b5"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-summary-all-spacing-0.png",
+      "bytes": 129055,
+      "sha256": "a99d0efcac86198b93bfa068044c448240b1038b70777a2545af7d34b1b9f8ad"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-summary-all-spacing.json",
+      "bytes": 315,
+      "sha256": "e81151fc46c6c793a707837380a58f565e4c8b6afaad0bf2d7dac9968e672b7f"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-title-font-0.png",
+      "bytes": 144833,
+      "sha256": "8d4168d036286445d57b9cce053f10262c5057148e4f76fc67039a3917283024"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-title-font.json",
+      "bytes": 306,
+      "sha256": "ca0f9a830bcdabe986fec1c129bdc147d9608fcc1574eb0155d6b56c64b30c33"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-title-selection-0.png",
+      "bytes": 148881,
+      "sha256": "84cc43b3181ece9d5100673afd75db9e179b52e7240df7daef6418bb7abb2847"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-title-selection.json",
+      "bytes": 311,
+      "sha256": "06ce2350a69dd2a3dda556debf20c4c6116fc4445ac613fd631788ae8e85802d"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-top-selection-0.png",
+      "bytes": 148562,
+      "sha256": "cdf41916d5374b94c7f25fe321cdf7f72a29819abc75712d986ab8737cb1b200"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-top-selection.json",
+      "bytes": 309,
+      "sha256": "a4f98e0539b473ae81ac80d142a2e51bb2b9ddb91114979a1ef78efecfbed87f"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-top-spacing-0.png",
+      "bytes": 148807,
+      "sha256": "f5e7dec072ea5ede2e0e87597e1270b9d8142e44be7bace089616d414c2ad0e1"
+    },
+    {
+      "path": "wp-e-native-20260913/six-saturday-normal-top-spacing.json",
+      "bytes": 307,
+      "sha256": "fe027c8626168df4f593fa86749354e2fc7c31fdbcb6d77450c4163b8abedd34"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-area-all-selection-0.png",
+      "bytes": 130738,
+      "sha256": "0faae79a3ba4490207456f3dc43eec6bd4479d3a3d3a389c9e308abc95272daa"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-area-all-selection.json",
+      "bytes": 310,
+      "sha256": "8598c4bf087b1d7eac0e52068669e804f92ab618e811f092d514716e7cb8b5f8"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-area-all-spacing-0.png",
+      "bytes": 128602,
+      "sha256": "b4619aab69bcd1de31cad64048d4477a38069c69c2d5e16d3f5abc582a23e02b"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-area-all-spacing.json",
+      "bytes": 308,
+      "sha256": "d9c47f9969f93889ee2ff78d5730fa275714aa47083f10a01c1e6a2d69e475e8"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-body-font-0.png",
+      "bytes": 141642,
+      "sha256": "d4fd2967cb97b34f7075f1988f6191bf03bb1398fb11a88e7db8b9f43e2c856c"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-body-font.json",
+      "bytes": 301,
+      "sha256": "266dae37214f7ecdcfd904e8d5f316dc3cc386dae45b2e6da005bce6dcb9c0b8"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-body-selection-0.png",
+      "bytes": 123935,
+      "sha256": "6a3440fb4ece309763238980277e7f3700a6f517c7e61c17f00f77eaeccde94c"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-body-selection.json",
+      "bytes": 306,
+      "sha256": "02b6a93fbd380b944df252afc854825813aafb774c5c006368b09906b45e8fa5"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-game-label-selection-0.png",
+      "bytes": 126705,
+      "sha256": "3b3039f3144edec79dd6daa3d885193e35151f68cff7dfe226945aa37da14d56"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-game-label-selection.json",
+      "bytes": 312,
+      "sha256": "b64de67f164e7cc95fbb27647262ea275561d40a4779b23edf827a37b8f7b279"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-game-label-spacing-0.png",
+      "bytes": 128927,
+      "sha256": "46343fd11375ed235fc25afe2b94fbdcc179b697c85b9fc546731b3889e3ae06"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-game-label-spacing.json",
+      "bytes": 310,
+      "sha256": "324f0cc71c9a6a23d514cf1f934e8889894d8c99cd54fa667760e7ddd1b8ecd4"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-middle-selection-0.png",
+      "bytes": 161043,
+      "sha256": "495473bd573a16f62bb9da8b73bdeda3cafb6f3c6b6fc78b3df9a9f4563f8cbf"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-middle-selection.json",
+      "bytes": 308,
+      "sha256": "842dccf8d143d95f5cdd13acc48b90d2906df1417ef65e59bb50d56eb2da8509"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-middle-spacing-0.png",
+      "bytes": 147766,
+      "sha256": "f7e98b9e2580c135234548dc2ab6b3fc8275f8445e43004d8f3d681e7c195f5b"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-middle-spacing.json",
+      "bytes": 306,
+      "sha256": "b4331bbf83430489ecb61c9134e069bd663a5948f80843020fac778a6f63ac70"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-print-bottom-right-150-0.png",
+      "bytes": 115638,
+      "sha256": "9a2ac87a4a07c0e92abe5dda3c8f6cfb58a91ee68a3c5aad2f53ec973badcb87"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-print-bottom-right-150.json",
+      "bytes": 314,
+      "sha256": "fa3697c9a8f278d5aa5582251a116ed1f9133a9e955138fe5d2ccc4992267c39"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-print-guidance-shifted-175-0.png",
+      "bytes": 114593,
+      "sha256": "83d836266c914126f45ecb6ce2107ef451ba041af09508e868b256d3775ca489"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-print-guidance-shifted-175.json",
+      "bytes": 318,
+      "sha256": "031fd2872feb96e3f9890c50a49d12da2b3216d00724724fd016ec40aca440cb"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-print-lower-125-0.png",
+      "bytes": 115906,
+      "sha256": "33f23231b9c30309f433e30adf7f89659101c1ea68636568aa96935a665dc262"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-print-lower-125.json",
+      "bytes": 307,
+      "sha256": "2b5654d1a2e93e967f283fd4bb09fa413a6b4fa47265f51c9043917cc9dc07ca"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-print-lower-left-175-0.png",
+      "bytes": 126866,
+      "sha256": "63c9c3eef4f13ff0927b3eaea2b4a4d0a7a133000a493a296e261debf3dd64ae"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-print-lower-left-175.json",
+      "bytes": 312,
+      "sha256": "eb8ca582706bc6e2062b77950ffd8e789b80c8582a245eae568787412213ad34"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-print-lower-right-175-0.png",
+      "bytes": 112077,
+      "sha256": "dfd3b3e69d31525a4bf619a5bc4e2da38dbb9f37e39b177e7a121ed47320e56f"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-print-lower-right-175.json",
+      "bytes": 313,
+      "sha256": "6a3cf6cc2460f54243e118e9af885b54954479a5c085737e94b9b04b7030a91a"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-print-middle-right-150-0.png",
+      "bytes": 133151,
+      "sha256": "15d1064dc536d2d9aa9955a1a8617908a20c8a1c7c6f17956b6ac2f639b4cc3f"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-print-middle-right-150.json",
+      "bytes": 314,
+      "sha256": "21babbe77dc5c90b06ee009e19efc65793f7666b2ec3faec6d3a1ddd4ff2ffc0"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-print-overview-0.png",
+      "bytes": 127229,
+      "sha256": "1c5306406036d176d8501fbed2e57c49db477f68039bf8d305914c27bc45565a"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-print-overview.json",
+      "bytes": 306,
+      "sha256": "feccfb368e23d7d22cff5e56c9d800bc68522199d2000dc85343d8030396dfae"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-print-top-150-0.png",
+      "bytes": 180881,
+      "sha256": "da881ee327e456e614857c3fa6d0ffa75c98494aeb9dcfd65bd0fb56ca6e2b95"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-print-top-150.json",
+      "bytes": 305,
+      "sha256": "f82948e3e1a276cb7450e2a23982eb9b18a25a850af8fa181926627ccbb64c94"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-print-top-175-0.png",
+      "bytes": 197588,
+      "sha256": "1baef1c89dd3475048cce6e28bc9ef044d00b5bf32fbfaa2c1515400a0c37ecb"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-print-top-175.json",
+      "bytes": 305,
+      "sha256": "3bfd9cae9171b5cd0536124e1eec9df9b1b60b3a7b90222f64f53da05f12b46c"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-print-top-right-150-0.png",
+      "bytes": 181404,
+      "sha256": "3ff889ee0779802a43ad8bba96a9fd101eb40a55265aa392589960fa01aae126"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-print-top-right-150.json",
+      "bytes": 311,
+      "sha256": "3e6d51867b864d5f3fc7902acfa5a515bd0f4faad566d405443ab6ec4dbcdd54"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-summary-all-selection-0.png",
+      "bytes": 131680,
+      "sha256": "ab03d01548a3593e5feb80431263aa5a5f15666605b4638f38b1f635625b25fe"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-summary-all-selection.json",
+      "bytes": 313,
+      "sha256": "8e02ccbb73309764032af0d16e89b88ff5dd46a03d1ee7766beade7bdff537dd"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-summary-all-spacing-0.png",
+      "bytes": 129035,
+      "sha256": "5e63722029a45bf2e19c17e8cc88b2c8bebd2cf405574ea087b13e18704c059c"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-summary-all-spacing.json",
+      "bytes": 311,
+      "sha256": "f4dc420f82e10202c475f9d818cdddb398cd8a7ffa9411b77614e3d41b261235"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-title-font-0.png",
+      "bytes": 143404,
+      "sha256": "7ebcfc853dde2e1070a6fa98415a839016a65a2dd77f2e58f1fc0f1d3f14d0f2"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-title-font.json",
+      "bytes": 302,
+      "sha256": "b2bba2cc8ce32f7e3a8ccc3b300b081210bdf0535bc2441381ebd038f57c6ec9"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-title-selection-0.png",
+      "bytes": 152121,
+      "sha256": "265738db56a847a72705f47126440b1f31546c9dc9a34abe0a2058762d8b83f5"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-title-selection.json",
+      "bytes": 307,
+      "sha256": "d6cb86bcb47c16c6d968d4f1584b2c8cbaf66a4f3a3c0c939fc88cf01773a247"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-top-selection-0.png",
+      "bytes": 150879,
+      "sha256": "7f2e2321f4dbbb4bcff10ce4e7233171bce42e23a69ebb7ad3cb06c855896a8f"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-top-selection.json",
+      "bytes": 305,
+      "sha256": "268a82bad4fac7540fcf400cd605f8701bad438712062165235fc518f51dbd9b"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-top-spacing-0.png",
+      "bytes": 147709,
+      "sha256": "ffd5e05cf2deb258c7e4c86b6d1cab5e4e29b44779f796900f2674046965cc43"
+    },
+    {
+      "path": "wp-e-native-20260913/six-sunday-normal-top-spacing.json",
+      "bytes": 303,
+      "sha256": "98e5b4080421ce78736844974d7c92edfd4088e9d7843603fcd3afcbd3838440"
+    },
+    {
+      "path": "wp-e-native-20260913/Windows-acceptance-report.md",
+      "bytes": 8546,
+      "sha256": "90cb7be7b9f3cfdccd4d436c66901a07fc92c4a444d7f620ee9b579f8660d071"
+    },
+    {
+      "path": "wp-e-native-20260913/windows-matrix.json",
+      "bytes": 24387,
+      "sha256": "04dc2fc11e895787b37b0bf2fcf4cf2dc46556ad9d8f1c53b6152b00bcf63b2d"
+    },
+    {
+      "path": "wp-e-native-final-20260912/environment.json",
+      "bytes": 684,
+      "sha256": "e7c6f014f50162949f857a202eae0c608e74f585467a24d3c3127741c4bcef8f"
+    },
+    {
+      "path": "wp-e-native-final-20260912/evidence-manifest.json",
+      "bytes": 8040,
+      "sha256": "e5b5062431403bd8a4830171eeeb0010fcb3ead2b800d3ccdda78cc6c7e65cf5"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-holiday-full-page-0.png",
+      "bytes": 103822,
+      "sha256": "08cfbe46ee7573576c8c5535f4ea9b3fb939987bf8a5dfae465590bb9ad7b868"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-holiday-full-page.json",
+      "bytes": 532,
+      "sha256": "4f0310725afed194c91f1f288f4fc0246c79fc2b867c54b899b96213c027f4b5"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-holiday-long-page-1-0.png",
+      "bytes": 149353,
+      "sha256": "6887297782ec154da13cf4d4d5b7105f322f031334ad5fd3f59a116197261e34"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-holiday-long-page-1.json",
+      "bytes": 526,
+      "sha256": "edeb8c89a7a22f00dde0a0993bd88009074c28d5c43909b5f3559c941843fbb0"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-holiday-long-page-2-0.png",
+      "bytes": 136283,
+      "sha256": "f711cef2cf93b138d7a91e03c57469edd876bbc9b1706ce4b930cbe06b40b7c2"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-holiday-long-page-2.json",
+      "bytes": 537,
+      "sha256": "c47db28481d103114556350a7dc4b24cc956f52e2b64a6f333f2342904209cbc"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-holiday-native-text.txt",
+      "bytes": 1208,
+      "sha256": "4201a326a62f2494cc09f162a35ec1489a6869ed0536b75acb1fae38e845eb45"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-long-native-text.txt",
+      "bytes": 2817,
+      "sha256": "123b6aa94b835736161ffad21adabd9b7ed4a9754b9438d5edf480964b3056ff"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-long-page-1-0.png",
+      "bytes": 150291,
+      "sha256": "258dfcf5d7f238a9727a1c223777a8b5fda8d8b5e82d1f5a1b9e06cc85a3e823"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-long-page-1.json",
+      "bytes": 517,
+      "sha256": "065fef5ce89a54c8831d20717666d35137d4ddad15824c1e5924067ef1bc3d01"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-long-page-2-0.png",
+      "bytes": 135835,
+      "sha256": "16a12d5f9c06b37fdea07c45b637fafa479e3ae015c3a341619709ea76882a9b"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-long-page-2.json",
+      "bytes": 517,
+      "sha256": "14c4116e0c679b35ebdfd68b19d90ed1c2ceee1c90636bf21755f48788a8c369"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-normal-body-font-0.png",
+      "bytes": 114878,
+      "sha256": "7dbe66f2534df2a2b52171aff7368e9d958946e93f34b039f2dc894e23613044"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-normal-body-font-1.png",
+      "bytes": 45642,
+      "sha256": "59db308bdef377409cde26c81c1e95e5d88724eed325d533d6a4b0ca3ab69d4a"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-normal-body-font.json",
+      "bytes": 1783,
+      "sha256": "6ff74709bcce5b4c14142f1632503ad113fdb2adca0ba27840a526e79c981db1"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-normal-body-spacing-0.png",
+      "bytes": 119917,
+      "sha256": "0ec0166ef54b9a0f80f01a6479ee233240d20ea891eb4e66413eacbd556c185e"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-normal-body-spacing-1.png",
+      "bytes": 52480,
+      "sha256": "d91a822c746411b05c632ad0b9a99a8c67e247d32cb759a628dc7240c6e07be1"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-normal-body-spacing-trimmed-0.png",
+      "bytes": 119775,
+      "sha256": "4015a4821efe2abb0f33dc7dad667f29b0cf92cfcab09c4e07d747f6698919ea"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-normal-body-spacing-trimmed-1.png",
+      "bytes": 52480,
+      "sha256": "d91a822c746411b05c632ad0b9a99a8c67e247d32cb759a628dc7240c6e07be1"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-normal-body-spacing-trimmed.json",
+      "bytes": 1374,
+      "sha256": "8458f26668f3b454ba7af5a51fef9665ce70cf143b417bec3e66b53ec0e5d0f2"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-normal-body-spacing.json",
+      "bytes": 1373,
+      "sha256": "5821517bbccebd838993e61b84acac569f27bcae281e136258e69e557454e4fd"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-normal-bottom-0.png",
+      "bytes": 110565,
+      "sha256": "a80a4621e3ed293d6907e04899ec2c53c5360dd4f1eb7479d0a15d93045b4057"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-normal-bottom.json",
+      "bytes": 530,
+      "sha256": "5d61200c1440be969d88efc232ab1dcb996fe28b75c50a973eebd3c10622d7dd"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-normal-detail-0.png",
+      "bytes": 115250,
+      "sha256": "60e33b5a045a33ecd8ba812b27ad002ddbe78b67b093ef2e89021a01380a9da2"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-normal-detail.json",
+      "bytes": 530,
+      "sha256": "1a7d3453b14e688151212055977db6c7cf35551bc8538aa8254722a2af7a638a"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-normal-full-page-0.png",
+      "bytes": 104864,
+      "sha256": "f4e8a5af5b3fe5eefa104410ef805fb106c7d919ca85a995d959b87503d8875e"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-normal-full-page.json",
+      "bytes": 530,
+      "sha256": "260873c8d1b1288bc16426fc9dceda17805f540666dc8d37b1582b0d674d37a9"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-normal-home-spacing-0.png",
+      "bytes": 120132,
+      "sha256": "378fe02f8dd8f24fc9a333c97366479d6907a3cc006242d83a00dc8a7d4e5266"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-normal-home-spacing-1.png",
+      "bytes": 51594,
+      "sha256": "d6013a63e5a28e9100a5003cfaf8c99707de54a25f50ac8688aeccc9a8e433f4"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-normal-home-spacing.json",
+      "bytes": 1374,
+      "sha256": "ddc95ca4f49a91c4e24228bb8b4fd711a87ac5a51fbf75bd089cd96b5f50e071"
+    },
+    {
+      "path": "wp-e-native-final-20260912/five-normal-selected-body.txt",
+      "bytes": 1236,
+      "sha256": "ee3382a3642dbe88ab9b42572d68da64c37f872b7d3f6b65acce7e28f01deacd"
+    },
+    {
+      "path": "wp-e-native-final-20260912/input-hashes-after-shared-read.json",
+      "bytes": 1807,
+      "sha256": "c703923c8c01dcf90b3c0013d82707c010f4890d54766c781b72e65fc8bf1b9c"
+    },
+    {
+      "path": "wp-e-native-final-20260912/input-hashes-after.json",
+      "bytes": 1370,
+      "sha256": "979f25ead01ddb25214cc1937cb7cf68d9c7a83b4405f81d40aefc4fc6f9c242"
+    },
+    {
+      "path": "wp-e-native-final-20260912/native-matrix.json",
+      "bytes": 9981,
+      "sha256": "a2862f7b7a9914e060690c1a4b27b830693586947daeeeba67b69ec48ae65908"
+    },
+    {
+      "path": "wp-e-native-final-20260912/six-saturday-long-page-1-0.png",
+      "bytes": 149405,
+      "sha256": "e94fe0d72042f633e2809b8c369d962db10ae851616edc900bf053ea59fb70a0"
+    },
+    {
+      "path": "wp-e-native-final-20260912/six-saturday-long-page-1.json",
+      "bytes": 525,
+      "sha256": "13e73c8264011040fb7e20ccc2f748705c5d89fa48172ce98d9eb080449fb3a4"
+    },
+    {
+      "path": "wp-e-native-final-20260912/six-saturday-long-page-2-0.png",
+      "bytes": 136249,
+      "sha256": "13c617c031009fe7a7f1bf0ab7f31c7e17139fd682f7ffcc83e170cc66bd2f5d"
+    },
+    {
+      "path": "wp-e-native-final-20260912/six-saturday-long-page-2.json",
+      "bytes": 525,
+      "sha256": "1fcd7899d2327beee1bb3d0bc350b7bcb04b20c2540ffeff1b14ea3427ec922b"
+    },
+    {
+      "path": "wp-e-native-final-20260912/six-saturday-normal-full-page-0.png",
+      "bytes": 104280,
+      "sha256": "5cfec9bf06501932cc836782889fda4df38882c2db530be466d138681502d58a"
+    },
+    {
+      "path": "wp-e-native-final-20260912/six-saturday-normal-full-page.json",
+      "bytes": 539,
+      "sha256": "5e7b0d045ea1f8def5afdc07458d5c9386c2366a32f7e2aeeb80a00f6b8ccf9c"
+    },
+    {
+      "path": "wp-e-native-final-20260912/six-saturday-normal-native-text.txt",
+      "bytes": 1218,
+      "sha256": "69f182654123ca86edaee31854d5fc35071f615d81ae738bfce0ac6ba9225b21"
+    },
+    {
+      "path": "wp-e-native-final-20260912/six-sunday-long-page-1-0.png",
+      "bytes": 150840,
+      "sha256": "1302bfc931bd0f0c3bc0e994100371f7031122444cad03e73216e16e7bc25a6f"
+    },
+    {
+      "path": "wp-e-native-final-20260912/six-sunday-long-page-1.json",
+      "bytes": 524,
+      "sha256": "c0224306c91eb98d989543498977b0864b4dd3e4cd85168330ec2bde070c2d0e"
+    },
+    {
+      "path": "wp-e-native-final-20260912/six-sunday-long-page-2-0.png",
+      "bytes": 136156,
+      "sha256": "3ca067961d74ede467d13a07f2f8ce54a9d144d5c457a0b1778c25725133d319"
+    },
+    {
+      "path": "wp-e-native-final-20260912/six-sunday-long-page-2.json",
+      "bytes": 524,
+      "sha256": "7cf44e0fbeeedd3e7a51cabb586ca99720c9339b93ebf3ea7d059bc60a61fae7"
+    },
+    {
+      "path": "wp-e-native-final-20260912/six-sunday-normal-full-page-0.png",
+      "bytes": 106144,
+      "sha256": "23a054c1577fa4e8f868716eeeae9b06ae52a73e730a12516a9d46226ebd0f3c"
+    },
+    {
+      "path": "wp-e-native-final-20260912/six-sunday-normal-full-page.json",
+      "bytes": 537,
+      "sha256": "91ab64cd1224f57bf25aab270e94bcc8536276cd039b1c9229102f535e22a76d"
+    },
+    {
+      "path": "wp-e-native-final-20260912/six-sunday-normal-native-text.txt",
+      "bytes": 1291,
+      "sha256": "5f8861b806284a5e0999c741c3dd0ff880f63ea0bfe860e20b99544d2955b154"
+    },
+    {
+      "path": "wp-e-reduction-20260912/accepted-files/five-holiday-long-dedup.body.json",
+      "bytes": 7646,
+      "sha256": "cba92bae8279553cd47ec01ed3e25c4902e6396f167bdb9ee106ddc32027564a"
+    },
+    {
+      "path": "wp-e-reduction-20260912/accepted-files/five-holiday-long-dedup.docx",
+      "bytes": 17735,
+      "sha256": "ec8fe6d907a7d69f6b3759c0c32687ceef8d2d22f3d78ec9d6e521c35c768828"
+    },
+    {
+      "path": "wp-e-reduction-20260912/accepted-files/five-long-dedup.body.json",
+      "bytes": 7713,
+      "sha256": "6788a57cbeb696ebfdc2afeb0544a1bdb6176a4d0f9bf971492ebb2b10b54b2d"
+    },
+    {
+      "path": "wp-e-reduction-20260912/accepted-files/five-long-dedup.docx",
+      "bytes": 17721,
+      "sha256": "dd74854e9d2155162fdf2ce016830adf86a23be0b02cc03954e4efa12ac8f415"
+    },
+    {
+      "path": "wp-e-reduction-20260912/accepted-files/six-saturday-long-dedup.body.json",
+      "bytes": 8006,
+      "sha256": "4391b810def576fe0b064a78b92c7c8a80d1d0f606437f196763c0c489dd53cf"
+    },
+    {
+      "path": "wp-e-reduction-20260912/accepted-files/six-saturday-long-dedup.docx",
+      "bytes": 17762,
+      "sha256": "368e14442d24b0991be8a5f6a980f0ceb605bf204a0a9dbcedf39408704cd718"
+    },
+    {
+      "path": "wp-e-reduction-20260912/accepted-files/six-sunday-long-dedup.body.json",
+      "bytes": 8118,
+      "sha256": "b1546409e3261c0182ab1c0ce316f4a428410e27dec8dba3c9228ebdc281856d"
+    },
+    {
+      "path": "wp-e-reduction-20260912/accepted-files/six-sunday-long-dedup.docx",
+      "bytes": 17764,
+      "sha256": "1f4a9c38acf9211a6c3ab3a8d52d28913dc0df0a7f5c26c2bbc90d58e4de0c69"
+    },
+    {
+      "path": "wp-e-reduction-20260912/adoption-save-receipt.json",
+      "bytes": 4155,
+      "sha256": "88a11dce027cdb4a7bd4e906ce5c3e2424977bb59b62063fd400f55fd8036eba"
+    },
+    {
+      "path": "wp-e-reduction-20260912/evidence-manifest.json",
+      "bytes": 6579,
+      "sha256": "8b87ea32750bbbacc432c1bc2202bf89ea584b4107af10035183f5afa4f6c103"
+    },
+    {
+      "path": "wp-e-reduction-20260912/five-holiday-long.proposed-manual.body.json",
+      "bytes": 7647,
+      "sha256": "a66a57f54d2b129de71a2c3160202cba018b6717ec704c6e39b735f5276e00e5"
+    },
+    {
+      "path": "wp-e-reduction-20260912/five-long.proposed-manual.body.json",
+      "bytes": 7714,
+      "sha256": "c4c86168a69d9e9e69e50135a98b3299a83b74c67b2f6cbf961aa1366b38babe"
+    },
+    {
+      "path": "wp-e-reduction-20260912/native/five-holiday-long-dedup-page-1-0.png",
+      "bytes": 134319,
+      "sha256": "55eed1a6a518baf8f195b509a822837c83a9494e14a119d858bbae4fafb62ca1"
+    },
+    {
+      "path": "wp-e-reduction-20260912/native/five-holiday-long-dedup-page-1.json",
+      "bytes": 384,
+      "sha256": "868337047c409c548a57535150fbabd408cdb1441c669a890360983afd9561f6"
+    },
+    {
+      "path": "wp-e-reduction-20260912/native/five-holiday-long-dedup-page-2-0.png",
+      "bytes": 97428,
+      "sha256": "97bea2128ee710ecebb2e3893125d6c3a8c89f4e7caea4a6a5e3094f33237428"
+    },
+    {
+      "path": "wp-e-reduction-20260912/native/five-holiday-long-dedup-page-2.json",
+      "bytes": 395,
+      "sha256": "9c5366b50d323c154d52e063f0c74b5bba6800843b6f0303df13eacbb5e23f95"
+    },
+    {
+      "path": "wp-e-reduction-20260912/native/five-long-dedup-page-1-0.png",
+      "bytes": 134706,
+      "sha256": "d30f48e74ea1eee1344266ddf3225c5a2bb19bde4964ac53640da66768d1c2b8"
+    },
+    {
+      "path": "wp-e-reduction-20260912/native/five-long-dedup-page-1.json",
+      "bytes": 377,
+      "sha256": "64e5ba827fc1ad4161a3ef85444f95710d40039b28f3593f2160332ac04d221f"
+    },
+    {
+      "path": "wp-e-reduction-20260912/native/five-long-dedup-page-2-0.png",
+      "bytes": 97045,
+      "sha256": "032393ea6264ef58c029d1ac3db47fdd600111817b295bfad4ef3ba10dd1dacb"
+    },
+    {
+      "path": "wp-e-reduction-20260912/native/five-long-dedup-page-2.json",
+      "bytes": 388,
+      "sha256": "bf2bea29ade0cbd124a1098ce6353f6f40f3cfc830d878e2111bc2d744cf7b6f"
+    },
+    {
+      "path": "wp-e-reduction-20260912/native/six-saturday-long-dedup-page-1-0.png",
+      "bytes": 134352,
+      "sha256": "b123e8aec1514ad07472a2cfbdb060b1bbb94a06a22c05cc22e14947355581c4"
+    },
+    {
+      "path": "wp-e-reduction-20260912/native/six-saturday-long-dedup-page-1.json",
+      "bytes": 385,
+      "sha256": "09bcf328390bdf0dec67183e0f0aa9072add5a81d8344466a59e55f595bdde1b"
+    },
+    {
+      "path": "wp-e-reduction-20260912/native/six-saturday-long-dedup-page-2-0.png",
+      "bytes": 97254,
+      "sha256": "ec453f15d29f6db2f18f78b6ed1a8a58bc0301f41de324b5635019ed66bf1180"
+    },
+    {
+      "path": "wp-e-reduction-20260912/native/six-saturday-long-dedup-page-2.json",
+      "bytes": 385,
+      "sha256": "1b3742a99687b675a5e0ce94344d1498972c76f1226be0867ed29de49b44b270"
+    },
+    {
+      "path": "wp-e-reduction-20260912/native/six-sunday-long-dedup-page-1-0.png",
+      "bytes": 135903,
+      "sha256": "6f051018bf61f81b320a6e8869fcc8bfa47bbfa8f62cf6cf5e2482f5a5cdbe40"
+    },
+    {
+      "path": "wp-e-reduction-20260912/native/six-sunday-long-dedup-page-1.json",
+      "bytes": 383,
+      "sha256": "5ea6911404ce81999fe77b9cf8234fe4b6af502911fe3fc91a5be6fa1936a44d"
+    },
+    {
+      "path": "wp-e-reduction-20260912/native/six-sunday-long-dedup-page-2-0.png",
+      "bytes": 97298,
+      "sha256": "d755956721b88e4a496d5c648ae38acae1014d233b83237c115f2d1812f08be8"
+    },
+    {
+      "path": "wp-e-reduction-20260912/native/six-sunday-long-dedup-page-2.json",
+      "bytes": 394,
+      "sha256": "e2c9873ea47ab0faf7f60065a9a781c904fc51cb7c75b998ad0848a003495008"
+    },
+    {
+      "path": "wp-e-reduction-20260912/native-recheck.json",
+      "bytes": 4522,
+      "sha256": "30ace69cd01325d5b03a496b54afb535b4f6bccc3618023a0a17c07fe36e13e2"
+    },
+    {
+      "path": "wp-e-reduction-20260912/prepare_review.py",
+      "bytes": 5396,
+      "sha256": "0570ef49586ced96c9261f0c8f6a5a3ef801d19f694bc51daabb02cb43de709e"
+    },
+    {
+      "path": "wp-e-reduction-20260912/proposal-review.json",
+      "bytes": 45236,
+      "sha256": "b703b99294288e01eeea21be5691638aa4f1bc9fab34d3a30f9ba9197b0951bf"
+    },
+    {
+      "path": "wp-e-reduction-20260912/proposal-review.md",
+      "bytes": 37598,
+      "sha256": "bd48b1ecc52802770bacfa79e14757a8a46d3fee6685d07127b87f189d673fef"
+    },
+    {
+      "path": "wp-e-reduction-20260912/save_accepted.py",
+      "bytes": 2807,
+      "sha256": "defa4607d9a72f91a59875ae4a92aece06c2a2dcf37faa56be56ca8f72b21c28"
+    },
+    {
+      "path": "wp-e-reduction-20260912/six-saturday-long.proposed-manual.body.json",
+      "bytes": 8007,
+      "sha256": "17021078fe73682149b85e215f7276dfaac96a86d9a5cc452c7ba761f4ad5683"
+    },
+    {
+      "path": "wp-e-reduction-20260912/six-sunday-long.proposed-manual.body.json",
+      "bytes": 8119,
+      "sha256": "ca52d772d2d7cbef69e5a651850eb1257e32929b7db8c6bc8f3c2fdf0e00f8f8"
+    }
+  ]
+}

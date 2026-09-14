@@ -1,3 +1,24 @@
+> 本轮周计划云端交付的唯一当前入口：[交付记录](specs/weekly-plan-authoring/evidence/WP-E-cloud-delivery-20260914.md)。下方阶段状态与授权均保留为历史快照。
+
+> 2026-09-14 逐组确认更新：用户已接受本周重点 `focus.0–2` 三条提案，其余23字段待确认；未执行整份页面采用或保存。用户已授权推送当前交付分支，不创建PR或合并。精确范围见[确认记录](specs/weekly-plan-authoring/evidence/WP-E-proposal-confirmation-20260914.md)；以下2026-09-13记录保留历史时点。
+
+> 2026-09-13 WP-E阶段一本地代码与候选已冻结：普通启动的受控资格接入已完成本地双RED→GREEN；当前合成长文候选已重新从真实页面请求，等待明确采用或拒绝。普通全量1800通过/1跳过；代码SHA `2c310b7f170c8cc509e0c9ddcb8d8c0a2322c427`，十二候选已重新生成（4正常LO1页、8长文LO2页）。可恢复源码bundle从明确基线已实测恢复；Windows交接使用本地仓库分支，未push，阶段二/三NOT_RUN，正式资格未安装，WP-F未执行。精确当前证据见[本轮账本](specs/weekly-plan-authoring/evidence/WP-E-startup-Ubuntu-20260913.md)。以下前轮记录保留历史时点。
+
+> 2026-09-13 Ubuntu续作：原Quality44项已本地修复；实际1页被标题描边误判的渲染缺陷完成两库双RED→GREEN与独立复审。普通1762通过/1跳过、Foundation261、WRITE267；本地页面已验证默认拒绝、五/六列下载及来源/生成/保存/冲突；新合成长文采用待用户答复。正式资格、新SHA原生Word和外部门未关闭，WP-E仍OPEN/BLOCKED，WP-C四类历史native双RED仍UNMET，WP-F未执行。见[本轮报告](specs/weekly-plan-authoring/evidence/WP-E-Ubuntu-quality-acceptance-20260913.md)。
+
+本轮代码SHA `0b3656c919ddfe6f09db4ed0aa0732a828727a5c`。用户确认 weekplan 内容无问题，五/六列排版交由 Python，内置模板不改；本轮模板hash保持。浏览器与两库、mock与真实AI、LO与Word、默认拒绝与合成资格下载分别记账。
+> 2026-09-13：四份正常五／六列已完成历史产品 `0bded3377c01956833bcbb6cd306f9a7f5d924e1` / Microsoft365 Word2608客户端下的候选格式验收及独立复审。原始4长文和已采用4去重长文仍各2页、单页FAIL；正式released/catalog资格、应用页面与外部门未关闭，WP-C四类历史native双RED仍UNMET，WP-F未执行。 见[Ubuntu交接报告](specs/weekly-plan-authoring/WP-E-Ubuntu-handoff-20260913.md)。
+
+> 2026-09-11 WP-D 已按用户授权进入实现：日期投影、显式 v3 正文、分项生成与确认/CAS 应用闭环已接线。最终范围、代码 SHA、验证与剩余门只以[当前状态](specs/weekly-plan-authoring/current-status.md)及[WP-D 矩阵](specs/weekly-plan-authoring/WP-D-completion-contract.md)为准。下方 WP-C / WP-D 未启动措辞为历史时点，不表示当前执行状态；WP-C 四项历史过程缺口仍未满足。
+
+## 2026-09-12 WP-E 本地续作
+
+Issue #77 的填写页面、保存版本单页检查、显式缩减与导出在隔离分支实现，见 [WP-E 本地契约](specs/weekly-plan-authoring/WP-E-local-contract.md)。用户明确允许 WP-C 四类历史 RED 缺口保持 UNMET 而继续 WP-E 本地工作；不改写 177/178 raw hash 历史。Word正式资格、远端CI/云端/真实模型仍独立未关闭；WP-E不是 COMPLETE，未进入 WP-F、无发布或 Issue 回写。
+
+> 2026-09-11 WP-C完整协作实现已接入生产composition：显式映射、逐日选源、差异采用、CAS来源快照、检查/重导入及人员默认。迁移head为b153c7e9f026；最终验证及尚缺门以[当前状态](specs/weekly-plan-authoring/current-status.md)和[本轮账本](specs/weekly-plan-authoring/evidence/WP-C-complete-20260911.md)为准。下方旧阶段记录保留历史语境。
+
+> 2026-09-11 当前周计划状态见[实时核对](specs/weekly-plan-authoring/current-status.md)：WP-A 已限定关闭，WP-C 授权/事实子步已本地交付、身份基线已公开；下方旧阶段记录不作当前阻塞。
+
 # KindergartenManager 项目上下文
 
 > 状态快照：2026-09-07。当前源码与生产部署分别核验；Release、OCI 和生产闭环的精确历史事实见
@@ -229,7 +250,13 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
 
 ## 10. 当前共同下一步
 
-当前共同下一步是：
+2026-09-08 用户确认新的周计划填写需求：同班教师共同编辑一份、草稿可导出、同日重复备课提示并由用户选择、
+来源修改只提醒重新导入、AI 缩减先展示差异并确认采用。当前优先完成
+[周计划填写与班级协作](specs/weekly-plan-authoring/spec.md)及其[实施计划](specs/weekly-plan-authoring/tasks.md)，
+月计划在周计划完成后另行设计。这是需求确认与实施规划，尚未实现；旧页面读取成功不构成新需求验收。
+原 WMP-9 正式验收须待适用的新实现、权限和模板基线建立后重新安排，不能先把旧页面验收通过作为本需求完成。
+
+此前交付事项保留以下边界，新需求不使其自动完成：
 
 1. 完成本次文档修正与已有文档契约测试/开发配置的提交，核对当前提交上的文档回归和 exact-SHA
    Quality/CodeQL。未通过的检查须如实保留为阻塞项，不能借用历史 GREEN。
@@ -237,8 +264,8 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
    `specs/wmp9-production-prerequisites/tasks/WMP-9-formal-acceptance-prompt.md` 核验起始 SHA 与适用回归门后，
    在隔离云端环境验证正式业务、权限、审计和零未授权持久化，并分别完成 Windows Word 与 Linux LibreOffice
    的外部 DOCX 兼容性验收。prerequisites PASS 不等于 WMP-9 PASS，也不授权生产发布或部署。
-3. 下次发布前独立收敛仍会构建/上传桌面产物的 `release.yml`，使实现符合 ADR-0010。不得把这项工作混入
-   WMP-9 业务验收，或在 docs-only 修改中宣称工作流已停用。
+3. 2026-09-08 独立部署准备已将 `release.yml` 收敛为仅云端 Docker 发布，见 ADR-0010。
+   工作流变更仍需自身 CI、不可变镜像和现场部署证据；不构成 WMP-9 业务验收 PASS。
 4. Issue #54 的 R5 历史生产、迁移和恢复事实以 `specs/operations-r5/evidence-ledger.md` 为准。
    新部署仍须分别核验 liveness、readiness、登录、业务、备份和回滚；历史生产结果不证明当前源码已部署。
 5. 后续产品方向与依赖以 `docs/PRODUCT_DIRECTION.md` 为准；模板 CRUD、远程对象存储、统一文档中心、
@@ -255,3 +282,36 @@ Patch 持久化。当前 gate 与全部历史证据以 `specs/agent-write/tests/
 - 图谱或测试发现会改变上述事实的漂移。
 
 不要把一次本地运行、单个平台 CI、旧分支结果或 Graphify 节点数写成完整交付证据。
+
+## 2026-09-08 WP-A设计门
+
+新周计划 #77 正在独立 worktree 的 `8dcc83376577695b562529ec42adc6b48817f004` 基线上推进 WP-A。
+[ADR-0011](docs/ADR/ADR-0011-shared-weekly-authoring-and-source-snapshots.md)、迁移/日历提案与首批当前行为差距RED已建立；
+排版和独立Review结论见[WP-A账本](specs/weekly-plan-authoring/evidence/WP-A-20260908.md)。
+总门未完成，不代表 WP-B～WP-F实现、旧WMP-9正式验收、云端或双平台Office PASS。
+
+2026-09-09用户批准WP-A/WP-C门调整：依赖新共享接口的可执行业务RED移至WP-C首门，先RED再GREEN；WP-A保留契约/断言与现有差距RED，仍被真实宋体/目标Office单页证据阻塞。未实施产品，工作SHA仍8dcc83376577695b562529ec42adc6b48817f004；详见specs/weekly-plan-authoring/tasks.md及本门账本。
+
+2026-09-09字体补充：用户授权的本机/两台SSH宿主宋体安装完成；实际SimSun bundled Linux候选short/compact各1页、long各2页，独立证据复核完成。Windows Word仍缺，WP-A未完成；实际基线仍8dcc83376577695b562529ec42adc6b48817f004，详见specs/weekly-plan-authoring/evidence/WP-A-fonts-20260909.md。无产品/容器/业务库改动。
+
+### 2026-09-10 WP-C身份子步（本地，非全门通过）
+
+在隔离worktree实现最小权威学年/学期/班级/assignment、独立manager资格与session绑定管理事务；
+本地代码`00afdc878b306475508c777997956cdf4638dbef`，Alembic新增`7c91e2a4b610`派生`6a8d2c4e9f10`，
+只验一次性SQLite和专属MySQL。共享授权/根/CAS/来源仍未实现；不扩旧周/月或源写权限。
+精确证据与未执行项见隔离worktree的`specs/weekly-plan-authoring/evidence/WP-C-20260910.md`，
+下一提示词`specs/weekly-plan-authoring/WP-C-next-prompt.md`。未公开提交，无CI/云端/Office/部署结论；（截至该历史记录、客户端范围决策前）WP-A仍缺目标Office。
+
+## 2026-09-10 周计划Office范围决策
+
+用户确认Microsoft Word系列为主要格式验收客户端，LibreOffice仅备用打开、不作格式要求；空格字体无需宋体。
+WP-A最短完整五/六列Word单页可行性及原生观察已补齐，LibreOffice行距差异不再阻塞；long三份单页FAIL保留。
+实际版本/证据与限制见[Word账本](specs/weekly-plan-authoring/evidence/WP-A-Windows-20260910.md)。证据未提交、未关闭#77、未授予正式模板/产品云端资格；旧客户端规则保留历史，不外推本次范围。
+
+## 2026-09-10 WP-A 最终收口指针
+
+WP-A 实现基线、契约与最短完整 Word 五／六列单页可行性完成。三份 long 仍为两页；
+共享授权/来源、正式模板资格、缩减流程和产品/云端验收属于后续门。LibreOffice 仅备用打开，
+其格式失败及未执行 Linux 格式验证不再阻塞；空格无需宋体。历史 BLOCKED 和 Review 数字不改写。
+实际独立复审、证据持久化、closure SHA 与自身 CI 的绑定只见[收口账本](specs/weekly-plan-authoring/evidence/WP-A-closure-20260910.md)及其 #77 回写；
+提交前不预写 CI 成功，未取得适用检查成功时不宣称正式关闭。下一产品步骤仅为 WP-C-next-prompt.md 的共享授权/权威教学日事实小步，本轮未执行。
