@@ -22,6 +22,9 @@ FIELDS = (
 )
 
 
+PROJECTION_FIELDS = (*FIELDS, "morning_activity")
+
+
 class WeeklySourceRepository(SourceMappingRepository):
     async def identities(self, scope):
         q = (
@@ -136,7 +139,7 @@ class WeeklySourceRepository(SourceMappingRepository):
                 DAILY.c.user_id,
                 DAILY.c.plan_date,
                 DAILY.c.revision,
-                *(DAILY.c[n] for n in FIELDS),
+                *(DAILY.c[n] for n in PROJECTION_FIELDS),
             )
             .where(
                 DAILY.c.tenant_id == self.tenant_id,
@@ -178,7 +181,7 @@ class WeeklySourceRepository(SourceMappingRepository):
             mapping["mapping_id"],
             mapping["revision"],
             name or "",
-            *(row[n] or "" for n in FIELDS),
+            *(row[n] or "" for n in PROJECTION_FIELDS),
         )
 
     async def audit_sources(self, root, assessment, action, operation_id):

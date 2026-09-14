@@ -154,6 +154,7 @@ class AuthoringApplication(CollaborationApplication):
                             morning_summary(s.morning_talk_topic),
                             s.activity_name,
                             s.outdoor_activity,
+                            s.morning_activity,
                             s.indoor_area,
                         )
                         for s, _ in pairs
@@ -774,6 +775,8 @@ class AuthoringApplication(CollaborationApplication):
             prefix = "games." if task == "weekly_games" else "area."
             field = "outdoor_activity" if task == "weekly_games" else "indoor_area"
             source_fields = {(d.day, field) for d in body.days}
+            if task == "weekly_games":
+                source_fields |= {(d.day, "morning_activity") for d in body.days}
             refs = {
                 r
                 for p in body.paths
@@ -872,6 +875,8 @@ class AuthoringApplication(CollaborationApplication):
             if requested is None
             else requested
         )
+        if not paths and requested is None:
+            raise IdentityRejected("no_missing_content")
         if not paths or any(p not in allowed for p in paths):
             raise IdentityRejected("content_invalid")
         if not state.view.body.theme.strip():

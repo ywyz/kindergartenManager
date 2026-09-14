@@ -27,6 +27,7 @@ class SourceCandidate:
     activity_name: str
     outdoor_activity: str
     indoor_area: str
+    morning_activity: str = ""
 
 
 @dataclass(frozen=True, slots=True)

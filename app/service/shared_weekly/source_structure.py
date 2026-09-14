@@ -105,10 +105,33 @@ def _games(text: str):
             name = _name(block)
             if name:
                 details = ()
-                for following, content in sections[section_index + 1 :]:
-                    if following in ("集体游戏", "自主游戏", "游戏区域", "体能大循环"):
-                        break
-                    if following == "重点指导" and _name(content) != name:
+                following_sections = sections[section_index + 1 :]
+                # The daily page lists both game names before one focus block.
+                # Goals belong only to that explicitly named game.
+                focus_index = next(
+                    (
+                        j
+                        for j, (label, _) in enumerate(following_sections)
+                        if label in ("重点指导", "体能大循环")
+                    ),
+                    None,
+                )
+                if (
+                    focus_index is not None
+                    and following_sections[focus_index][0] == "重点指导"
+                ):
+                    if _name(following_sections[focus_index][1]) == name:
+                        following_sections = following_sections[focus_index + 1 :]
+                    else:
+                        following_sections = ()
+                for following, content in following_sections:
+                    if following in (
+                        "集体游戏",
+                        "自主游戏",
+                        "游戏区域",
+                        "体能大循环",
+                        "重点指导",
+                    ):
                         break
                     if following in ("活动目标", "目标"):
                         details = _numbered(content, "goals")
@@ -170,11 +193,17 @@ def extract_options(body: WeeklyAuthoringDraft) -> tuple[StructuredOption, ...]:
         raise IdentityRejected("content_invalid")
     result = []
     for source in body.sources:
-        if source.source_field not in ("outdoor_activity", "indoor_area"):
+        if source.source_field not in (
+            "outdoor_activity",
+            "morning_activity",
+            "indoor_area",
+        ):
             continue
         text = source.imported_value
         parsed = (
-            _games(text) if source.source_field == "outdoor_activity" else _areas(text)
+            _games(text)
+            if source.source_field in ("outdoor_activity", "morning_activity")
+            else _areas(text)
         )
         reference = reference_for(source)
         for index, (kind, name, values) in enumerate(parsed):

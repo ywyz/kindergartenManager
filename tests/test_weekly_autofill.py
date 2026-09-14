@@ -37,6 +37,7 @@ async def daily(
     day=date(2026, 9, 9),
     name="落叶",
     topic="秋天的变化。你看到了什么？",
+    morning_activity="",
 ):
     async with world[0]() as session:
         row = await session.execute(
@@ -51,6 +52,7 @@ async def daily(
                 activity_name=name,
                 morning_talk_topic=topic,
                 morning_talk_questions="为什么叶子会变黄？",
+                morning_activity=morning_activity,
                 outdoor_activity="集体游戏：《跳圈》（目标：①双脚跳跃②保持平衡③遵守规则）\n自主游戏：《玩沙》（目标：①探索沙土②使用工具③合作游戏）",
                 indoor_area="本周重点指导区域：建构区\n活动目标：\n1.合作搭建\n2.认识形状\n3.表达想法\n材料：木积木与纸盒\n指导要点：\n1.观察幼儿\n2.提供支持\n3.鼓励交流",
             )
@@ -314,3 +316,55 @@ async def test_saved_manual_clear_without_source_reference_is_preserved(world):
     reopened = await app.begin_authoring(world[2][3], saved.plan_id)
     filled = await app.autofill_owned(world[2][3], reopened.page_id, reopened.page)
     assert filled.body.value_at("area.materials") == ""
+
+
+async def test_actual_daily_morning_activity_fills_games_and_saves_source(world):
+    app, edit = await setup(world)
+    sid = await daily(world)
+    await daily(world, owner=4, morning_activity="集体游戏：其他教师游戏")
+    await daily(world, class_name="其他班", morning_activity="集体游戏：其他班游戏")
+    raw = "体能大循环：\n集体游戏：跳圈\n自主游戏：玩沙\n重点指导：玩沙\n活动目标：\n1.探索沙土\n2.使用工具\n3.合作游戏\n指导要点：\n1.观察\n2.支持\n3.鼓励"
+    async with world[0]() as session:
+        await session.execute(
+            update(DAILY)
+            .where(DAILY.c.id == sid)
+            .values(
+                revision=2,
+                morning_activity=raw,
+                outdoor_activity="游戏区域：沙水区 、 攀爬区\n重点指导：攀爬区\n活动目标：\n1.保持平衡\n2.尝试攀爬\n3.遵守规则",
+            )
+        )
+        await session.commit()
+    filled = await app.autofill_owned(world[2][3], edit.page_id, edit.page)
+    assert filled.body.value_at("games.collective.0.name") == "跳圈"
+    assert filled.body.value_at("games.autonomous.name") == "玩沙"
+    assert filled.body.value_at("games.autonomous.goals.0") == "探索沙土"
+    assert filled.body.value_at("games.collective.0.goals.0") == ""
+    snapshot = next(
+        s for s in filled.body.sources if s.source_field == "morning_activity"
+    )
+    assert snapshot.imported_value == raw
+    again = await app.autofill_owned(world[2][3], filled.page_id, filled.page)
+    assert again.body == filled.body
+    saved = await app.save_edit(world[2][3], again.page_id, again.page, uuid4())
+    reopened = await app.begin_authoring(world[2][3], saved.plan_id)
+    assert [s.value for s in reopened.body.slots] == [
+        s.value for s in filled.body.slots
+    ]
+    assert (
+        next(
+            s for s in reopened.body.sources if s.source_field == "morning_activity"
+        ).imported_value
+        == raw
+    )
+    assert (await rows(world, DAILY))[0]["morning_activity"] == raw
+
+
+def test_daily_focus_goals_belong_to_named_collective_game():
+    from app.service.shared_weekly.source_structure import _games
+
+    result = _games(
+        "体能大循环：\n集体游戏：跳圈\n自主游戏：玩沙\n重点指导：跳圈\n活动目标：\n1.双脚跳跃\n2.保持平衡\n3.遵守规则"
+    )
+    assert ("goals.0", "双脚跳跃") in result[0][2]
+    assert result[1][2] == (("name", "玩沙"),)

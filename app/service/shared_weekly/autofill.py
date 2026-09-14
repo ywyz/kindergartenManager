@@ -46,6 +46,7 @@ def fill_owned(body: WeeklyAuthoringDraft, selected, protected_empty=()):
             "morning_talk_topic",
             "activity_name",
             "outdoor_activity",
+            "morning_activity",
             "indoor_area",
         ):
             target = TargetPath(source.day, field)
@@ -54,7 +55,7 @@ def fill_owned(body: WeeklyAuthoringDraft, selected, protected_empty=()):
             raw = getattr(source, field)
             if not raw.strip():
                 continue
-            current = getattr(days[index], field)
+            current = "" if field == "morning_activity" else getattr(days[index], field)
             value = (
                 (morning_summary(raw) if field == "morning_talk_topic" else raw)
                 if field in ("morning_talk_topic", "activity_name")

@@ -68,7 +68,7 @@ def _tables(metadata):
             "mapping_id > 0 AND mapping_revision > 0", name="ck_sws_mapping"
         ),
         sa.CheckConstraint(
-            "source_field IN ('morning_talk_topic','morning_talk_questions','activity_name','outdoor_activity','indoor_area')",
+            "source_field IN ('morning_talk_topic','morning_talk_questions','activity_name','outdoor_activity','indoor_area','morning_activity')",
             name="ck_sws_source_field",
         ),
         sa.CheckConstraint(
