@@ -1,27 +1,4 @@
-FROM python:3.14.7-slim
-
-WORKDIR /app
-
-ENV KINDERGARTEN_DATA_DIR=/data
-
-# 安装系统依赖（pymysql / argon2 编译需要）
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt .
-ARG PIP_INDEX_URL=https://pypi.org/simple
-RUN pip install --no-cache-dir --index-url "${PIP_INDEX_URL}" -r requirements.txt
-
-# 仅复制运行时必要文件，排除测试、文档、开发工具
-COPY app/ app/
-COPY alembic/ alembic/
-COPY alembic.ini .
-COPY templates/ templates/
-
-# 创建导出目录（运行时生成 Word 文件）
-RUN mkdir -p exports
-
-EXPOSE 8080
-
-CMD ["python", "-m", "app.main"]
+# Compatibility rollback: preserve the deployed beta10 application and dependencies.
+# Only the reviewed migration tree changes so readiness recognizes the expanded DB.
+FROM ghcr.io/ywyz/kindergartenmanager@sha256:f4c76e24375c129e3bc0ae2b97f3a60e21f18a832e9eca49ee27d4361f9c5d34
+COPY alembic/ /app/alembic/
