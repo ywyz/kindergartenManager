@@ -15,112 +15,6 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  # ── Windows 安装包 + 便携包 ───────────────────────────────────────────────
-  build-windows:
-    name: Build Windows (Installer + ZIP)
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.14.7'
-          cache: 'pip'
-
-      - name: Install Python dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller==6.22.2
-
-      - name: Build with PyInstaller (onedir)
-        run: pyinstaller kindergartenManager.spec
-
-      - name: Install Inno Setup
-        run: choco install innosetup --yes --no-progress
-
-      - name: Extract version (strip leading v)
-        id: ver
-        shell: bash
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-
-      - name: Build Windows installer (Inno Setup)
-        shell: cmd
-        run: |
-          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" ^
-            packaging\windows\installer.iss ^
-            /DMyAppVersion=${{ steps.ver.outputs.version }}
-
-      - name: Create portable ZIP
-        shell: pwsh
-        run: |
-          Compress-Archive -Path "dist\KindergartenManager\*" `
-            -DestinationPath "dist\KindergartenManager-${{ steps.ver.outputs.version }}-windows-portable.zip"
-
-      - name: Upload Windows installer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-installer
-          path: dist/KindergartenManager-Setup-${{ steps.ver.outputs.version }}.exe
-          retention-days: 7
-
-      - name: Upload Windows portable artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-portable
-          path: dist/KindergartenManager-${{ steps.ver.outputs.version }}-windows-portable.zip
-          retention-days: 7
-
-  # ── Linux .deb + 便携包 ───────────────────────────────────────────────────
-  build-linux:
-    name: Build Linux (deb + tar.gz)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.14.7'
-          cache: 'pip'
-
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y gcc dpkg-dev
-
-      - name: Install Python dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller==6.22.2
-
-      - name: Build with PyInstaller (onedir)
-        run: pyinstaller kindergartenManager.spec
-
-      - name: Extract version (strip leading v)
-        id: ver
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-
-      - name: Build .deb package
-        run: bash packaging/debian/build-deb.sh ${{ steps.ver.outputs.version }}
-
-      - name: Create portable tar.gz
-        run: |
-          tar -czf "dist/KindergartenManager-${{ steps.ver.outputs.version }}-linux-portable.tar.gz" \
-            -C dist KindergartenManager
-
-      - name: Upload Linux deb artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-deb
-          path: dist/kindergarten-manager_${{ steps.ver.outputs.version }}_amd64.deb
-          retention-days: 7
-
-      - name: Upload Linux portable artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-portable
-          path: dist/KindergartenManager-${{ steps.ver.outputs.version }}-linux-portable.tar.gz
-          retention-days: 7
-
   # ── Docker 镜像（服务器版） ────────────────────────────────────────────────
   build-docker:
     name: Build & Push Docker Image
@@ -233,7 +127,7 @@ jobs:
   # ── 创建 GitHub Release ──────────────────────────────────────────────────
   create-release:
     name: Create GitHub Release
-    needs: [build-windows, build-linux, build-docker]
+    needs: [build-docker]
     runs-on: ubuntu-latest
     outputs:
       release_id: ${{ steps.release.outputs.id }}
@@ -243,34 +137,6 @@ jobs:
       - name: Extract version
         id: ver
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-
-      # 显式按名称下载，跳过 Docker 构建缓存（*.dockerbuild）等非发布 artifact
-      - name: Download windows-installer
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-installer
-          path: artifacts/windows-installer/
-
-      - name: Download windows-portable
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-portable
-          path: artifacts/windows-portable/
-
-      - name: Download linux-deb
-        uses: actions/download-artifact@v4
-        with:
-          name: linux-deb
-          path: artifacts/linux-deb/
-
-      - name: Download linux-portable
-        uses: actions/download-artifact@v4
-        with:
-          name: linux-portable
-          path: artifacts/linux-portable/
-
-      - name: List artifacts
-        run: find artifacts/ -type f | sort
 
       - name: Materialize OCI image descriptor
         run: |
@@ -311,10 +177,6 @@ jobs:
 
             | 平台 | 文件 | 说明 |
             |------|------|------|
-            | Windows | `KindergartenManager-Setup-${{ steps.ver.outputs.version }}.exe` | 安装向导（推荐） |
-            | Windows | `KindergartenManager-${{ steps.ver.outputs.version }}-windows-portable.zip` | 便携包（解压即用） |
-            | Ubuntu/Debian | `kindergarten-manager_${{ steps.ver.outputs.version }}_amd64.deb` | .deb 安装包（含 systemd） |
-            | Ubuntu/Linux | `KindergartenManager-${{ steps.ver.outputs.version }}-linux-portable.tar.gz` | 便携包（解压即用） |
             | Docker | `${{ needs.build-docker.outputs.image_repository }}:${{ steps.ver.outputs.version }}` | 服务器部署 |
             | Docker（不可变） | `${{ needs.build-docker.outputs.image_ref }}` | 服务器部署 |
 
@@ -334,58 +196,6 @@ jobs:
 
             `docker-image.json` 已随 release 资产发布，需与 Release body 和 tag/SHA 逐项一致；若不一致则视为发布不收敛。
 
-            ### 🪟 Windows 安装版（推荐）
-
-            1. 下载 `KindergartenManager-Setup-${{ steps.ver.outputs.version }}.exe`
-            2. 双击运行安装向导，按提示完成安装
-            3. 安装结束时不要启动应用；若已自动启动请先关闭，再在 PowerShell 中显式创建管理员（密码交互输入，不回显）：
-
-               ```powershell
-               cd "$env:ProgramFiles\KindergartenManager"
-               .\KindergartenManager.exe --init
-               ```
-
-            4. 从开始菜单或桌面快捷方式启动
-            5. 访问 http://localhost:8080/login 登录
-
-            > ⚠️ **Windows 安全提示**：首次运行可能触发 Windows Defender 警告，点击"更多信息" → "仍要运行"即可。
-
-            **零配置模式（内嵌 SQLite）**：直接安装即可使用，无需额外配置数据库。
-
-            **MySQL 模式**：请在 `%LOCALAPPDATA%\KindergartenManager\.env` 写入 `DATABASE_URL=mysql+aiomysql://...`（或等效用户数据目录变量），重启程序。
-
-            ---
-
-            ### 🐧 Ubuntu/Debian 安装版（含 systemd 自动启动）
-
-            ```bash
-            # 下载 .deb 并安装
-            sudo dpkg -i kindergarten-manager_${{ steps.ver.outputs.version }}_amd64.deb
-
-            # 首次创建管理员：停止应用，复用 systemd 的受保护配置交互初始化
-            sudo systemctl stop kindergarten-manager
-            sudo systemd-run --wait --pty --collect \
-              --property=User=kindergarten-manager \
-              --property=EnvironmentFile=/etc/kindergarten-manager/env \
-              --property=WorkingDirectory=/var/lib/kindergarten-manager \
-              /opt/kindergarten-manager/KindergartenManager --init
-            sudo systemctl start kindergarten-manager
-
-            # 登录：http://localhost:8080/login
-            ```
-
-            配置文件：`/etc/kindergarten-manager/env`（安装时自动生成随机密钥）
-
-            ```bash
-            # 查看服务状态
-            systemctl status kindergarten-manager
-
-            # 查看日志
-            journalctl -u kindergarten-manager -f
-            ```
-
-            ---
-
             ### 🐳 Docker 服务器版
 
             ```bash
@@ -401,31 +211,16 @@ jobs:
             # 填写已解析到本机的 CADDY_DOMAIN，并用密码管理器填写
             # MYSQL_ROOT_PASSWORD、MYSQL_PASSWORD，
             # 并固定 ENCRYPTION_KEY、JWT_SECRET；MySQL 密码使用十六进制随机值。
-            docker compose up -d
-
-            # 首次创建管理员（密码交互输入，不回显）。
-            # 该远程 override 只对本次 exec 生效，不得进入常驻 app 容器环境。
-            docker compose exec -e BOOTSTRAP_ADMIN_ALLOW_REMOTE=true app python -m app.jobs.bootstrap_admin --init
+            # 首次上线先按部署指南完成备份恢复验证与显式数据库迁移，再通过 deploy helper 启动。
 
             # 或直接拉取本 release 的不可变 OCI index（使用外部 MySQL）
             docker pull ${{ needs.build-docker.outputs.image_ref }}
             ```
 
-            **最简 Docker 启动（SQLite，演示用）**：
-            ```bash
-            docker run -d --name kindergarten-manager \
-              -p 127.0.0.1:8080:8080 \
-              -e ENCRYPTION_KEY="$(head -c 32 /dev/urandom | base64)" \
-              -e JWT_SECRET="$(head -c 64 /dev/urandom | base64)" \
-              -v kg-data:/data \
-              ${{ needs.build-docker.outputs.image_ref }}
-
-            docker exec -it kindergarten-manager \
-              python -m app.jobs.bootstrap_admin --init
-            ```
-
-            > 说明：该健康检查示例仅用于存活验证；数据库 readiness 的完整检查目前由
-            > [Issue #54](https://github.com/ywyz/kindergartenManager/issues/54) 负责。
+            `/api/v1/health` 只验证存活；`/api/v1/readiness` 独立验证数据库连接和 Alembic revision。
+            管理员初始化通过受控 Bootstrap job 完成；上线还需通过受保护登录、关键业务和备份恢复验收。
+            首次部署与管理员初始化的前置步骤见 [部署指南](docs/DEPLOYMENT.md) 和 [用户手册](docs/USER_MANUAL.md)。
+            系统通过云端 HTTPS 使用；Microsoft Word 和 LibreOffice 仅用于检查下载的 DOCX。
 
             ---
 
@@ -434,7 +229,7 @@ jobs:
             | 变量 | 必填 | 说明 |
             |------|------|------|
             | `CADDY_DOMAIN` | Compose 必填 | 已解析到部署主机的公网域名；Caddy 自动提供 HTTPS |
-            | `DATABASE_URL` | 否 | 留空使用内嵌 SQLite；MySQL 示例：`mysql+aiomysql://user:pass@host:3306/db` |
+            | `DATABASE_URL` | 生产必填 | MySQL 示例：`mysql+aiomysql://user:pass@host:3306/db` |
             | `ENCRYPTION_KEY` | 推荐 | AI Key 加密密钥，留空自动生成并持久化 |
             | `JWT_SECRET` | 推荐 | JWT 签名密钥，留空自动生成并持久化 |
             | `HOLIDAY_API_URL` | 否 | 节假日 API，默认 `https://timor.tech/api/holiday/info/` |
@@ -455,6 +250,10 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14.7'
 
       - name: Download docker-image descriptor
         uses: actions/download-artifact@v4

@@ -98,6 +98,7 @@ def _load_adapter():
 
 
 def _ui_session(user_id: int, *, tenant_id: int = 501, role: str = "teacher"):
+    issued_at = datetime.now(UTC)
     return TrustedUiSession(
         session_id=UUID("00000000-0000-0000-0000-000000000951"),
         tenant_id=tenant_id,
@@ -105,8 +106,8 @@ def _ui_session(user_id: int, *, tenant_id: int = 501, role: str = "teacher"):
         role=role,
         username=f"synthetic-{user_id}",
         display_name=None,
-        issued_at_utc=datetime.now(UTC) - timedelta(minutes=1),
-        expires_at_utc=datetime.now(UTC) + timedelta(hours=1),
+        issued_at_utc=issued_at,
+        expires_at_utc=issued_at + timedelta(hours=9),
     )
 
 
