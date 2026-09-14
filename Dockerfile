@@ -37,7 +37,7 @@ COPY alembic.ini .
 COPY templates/ templates/
 COPY tests/ tests/
 COPY scripts/ scripts/
-COPY pytest.ini .
+COPY pytest.ini run.py .
 COPY specs/ specs/
 RUN python -m scripts.render_environment
 CMD ["python", "-m", "pytest", "tests/", "-m", "real_render", "-q"]
