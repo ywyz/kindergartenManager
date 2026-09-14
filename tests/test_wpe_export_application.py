@@ -85,7 +85,7 @@ async def complete(world, monkeypatch):
                     d,
                     activity_name="活动名称",
                     morning_talk_topic="晨谈主题",
-                    morning_talk_questions="问题",
+                    morning_talk_questions="",
                 )
                 for d in edit.body.days
             ),

@@ -205,7 +205,6 @@ class SharedWeeklyExportApplication:
                 for field in (
                     "activity_name",
                     "morning_talk_topic",
-                    "morning_talk_questions",
                 )
             ):
                 raise IdentityRejected("required_fields_missing")
