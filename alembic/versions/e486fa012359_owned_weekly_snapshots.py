@@ -61,7 +61,8 @@ def downgrade():
             sa.text("""
         SELECT 1 FROM shared_weekly_source s
         WHERE NOT EXISTS (SELECT 1 FROM daily_plan_identity m
-          WHERE m.tenant_id=s.tenant_id AND m.daily_plan_id=s.source_id)
+          WHERE m.tenant_id=s.tenant_id AND m.daily_plan_id=s.source_id
+            AND m.mapping_id=s.mapping_id AND m.revision=s.mapping_revision)
         LIMIT 1
     """)
         )
