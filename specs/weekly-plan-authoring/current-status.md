@@ -1,3 +1,10 @@
+# 本轮云端交付：2026-09-14
+
+当前决定与执行状态统一见 [云端交付记录](evidence/WP-E-cloud-delivery-20260914.md)。
+下方内容均为历史快照；旧 Word 前置、阶段补证与授权限制不覆盖该记录中的最新用户决定。
+
+---
+
 > 最新本轮结果：五列、六列保存下载及长文超页→手动改短→保存→重检→浏览器DOCX收件已实测通过。见[浏览器证据](evidence/WP-E-browser-delivery-20260914.md)。[云端测试准备](evidence/WP-E-cloud-test-readiness-20260914.md)已核对，目标镜像和新云端业务验证尚未执行；自动缩减完善与验收延期，生产部署单独执行。以下“待浏览器实测”为此前时点。
 
 > 2026-09-14 手动缩短口径（本轮覆盖旧流程）：用户最新决定本轮由教师手动缩短超页内容，自动缩减完善与验收延期；历史候选23字段不再阻塞本轮手动编辑验证，也不声称已采用历史候选。真实单页检测、超页禁止导出、修改保存后重检保留；浏览器五/六列保存下载与长文手动编辑重检收件尚待本轮实测，不预写通过。页面通过后 Main 可提交分支推送绑定 SHA 查 CI，准备云端测试，生产部署单独执行。范围见[本轮决定](evidence/WP-E-manual-shortening-scope-20260914.md)；LibreOffice 验证与 Windows `SKIPPED_BY_USER` 口径见[LO 续作记录](evidence/WP-E-libreoffice-implementation-20260914.md)与[流程决策](evidence/WP-E-libreoffice-policy-20260914.md)。

@@ -1,3 +1,5 @@
+> 本轮周计划范围、验收决定及执行状态：[云端交付记录](../specs/weekly-plan-authoring/evidence/WP-E-cloud-delivery-20260914.md)。下方历史阶段前置不覆盖最新用户决定。
+
 > 2026-09-14 逐组确认更新：用户已接受本周重点 `focus.0–2` 三条提案，其余23字段待确认；未执行整份页面采用或保存。用户已授权推送当前交付分支，不创建PR或合并。精确范围见[确认记录](../specs/weekly-plan-authoring/evidence/WP-E-proposal-confirmation-20260914.md)；以下2026-09-13记录保留历史时点。
 
 > 2026-09-13 WP-E阶段一本地代码与候选已冻结：普通启动的受控资格接入已完成本地双RED→GREEN；当前合成长文候选已重新从真实页面请求，等待明确采用或拒绝。普通全量1800通过/1跳过；代码SHA `2c310b7f170c8cc509e0c9ddcb8d8c0a2322c427`，十二候选已重新生成（4正常LO1页、8长文LO2页）。可恢复源码bundle从明确基线已实测恢复；Windows交接使用本地仓库分支，未push，阶段二/三NOT_RUN，正式资格未安装，WP-F未执行。精确当前证据见[本轮账本](../specs/weekly-plan-authoring/evidence/WP-E-startup-Ubuntu-20260913.md)。以下前轮记录保留历史时点。
