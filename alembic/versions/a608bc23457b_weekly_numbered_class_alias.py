@@ -68,7 +68,9 @@ def downgrade():
                 "JOIN shared_weekly_version v ON v.tenant_id=s.tenant_id AND v.id=s.version_id "
                 "JOIN shared_weekly_plan p ON p.tenant_id=v.tenant_id AND p.id=v.plan_id "
                 "JOIN class_instance c ON c.tenant_id=p.tenant_id AND c.id=p.class_instance_id "
-                "WHERE d.class_name<>c.display_name LIMIT 1"
+                "WHERE d.class_name<>c.display_name "
+                "AND NOT EXISTS (SELECT 1 FROM daily_plan_identity m "
+                "WHERE m.tenant_id=s.tenant_id AND m.daily_plan_id=s.source_id) LIMIT 1"
             )
         )
         .first()

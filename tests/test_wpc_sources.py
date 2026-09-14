@@ -88,6 +88,7 @@ async def test_zero_one_all_duplicate_combinations(world, owners):
             "mapping_id",
             "mapping_revision",
             "teacher_display",
+            "morning_activity",
             "morning_talk_topic",
             "morning_talk_questions",
             "activity_name",
