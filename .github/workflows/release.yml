@@ -70,8 +70,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           provenance: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=weekly-runtime
+          cache-to: type=gha,mode=max,scope=weekly-runtime
 
       - name: Capture immutable index metadata
         id: image_metadata
