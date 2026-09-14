@@ -56,7 +56,9 @@ def configured(monkeypatch, tmp_path, *, isolated=True):
             # has no local_only setting and cannot install this material.
             return original(*args, **{**kwargs, "local_only": True})
 
-        monkeypatch.setattr(layout_authority, "LayoutAuthority", explicitly_local_authority)
+        monkeypatch.setattr(
+            layout_authority, "LayoutAuthority", explicitly_local_authority
+        )
     from app.integration.word_export import shared_weekly_word
 
     async def actual_version(*args):
@@ -100,8 +102,12 @@ async def test_partial_config_cannot_activate(monkeypatch, tmp_path, missing):
         await startup()
 
 
-@pytest.mark.parametrize("field", ["profile", "template_sha256", "released_binding", "renderer", "native"])
-async def test_trusted_hash_does_not_bypass_material_binding(monkeypatch, tmp_path, field):
+@pytest.mark.parametrize(
+    "field", ["profile", "template_sha256", "released_binding", "renderer", "native"]
+)
+async def test_trusted_hash_does_not_bypass_material_binding(
+    monkeypatch, tmp_path, field
+):
     path = configured(monkeypatch, tmp_path)
     data = json.loads(path.read_bytes())
     if field == "released_binding":
@@ -140,10 +146,19 @@ async def test_current_material_drift_revokes_started_authority(monkeypatch, tmp
 
 @pytest.mark.parametrize(
     ("key", "value"),
-    [(KEYS[1], "bad-digest"), (KEYS[2], "0"), (KEYS[2], "11,12"),
-     (KEYS[3], "0"), (KEYS[0], "relative.json")],
+    [
+        (KEYS[1], "bad-digest"),
+        (KEYS[2], "0"),
+        (KEYS[2], "11,11"),
+        (KEYS[2], "11, 12"),
+        (KEYS[2], "11,"),
+        (KEYS[3], "0"),
+        (KEYS[0], "relative.json"),
+    ],
 )
-async def test_operator_config_is_explicit_and_strict(monkeypatch, tmp_path, key, value):
+async def test_operator_config_is_explicit_and_strict(
+    monkeypatch, tmp_path, key, value
+):
     configured(monkeypatch, tmp_path)
     monkeypatch.setenv(key, value)
     with pytest.raises(LayoutAuthorityRejected, match="qualification_config_invalid"):
@@ -159,7 +174,9 @@ async def test_manifest_symlink_rejected(monkeypatch, tmp_path):
         await startup()
 
 
-async def test_actual_renderer_drift_rejects_before_services_publish(monkeypatch, tmp_path):
+async def test_actual_renderer_drift_rejects_before_services_publish(
+    monkeypatch, tmp_path
+):
     from app.integration.word_export import shared_weekly_word
 
     configured(monkeypatch, tmp_path)
@@ -193,4 +210,23 @@ async def test_explicit_local_fixture_injection_remains_isolated(monkeypatch, tm
     port = SharedWeeklyWordPort(authority)
     await composition.configure_shared_weekly_production(word_port=port)
     assert composition.get_shared_weekly_services().exporting.word_port is port
-    assert (await port.resolve_binding(11)).active_version.startswith("local-synthetic:")
+    assert (await port.resolve_binding(11)).active_version.startswith(
+        "local-synthetic:"
+    )
+
+
+async def test_startup_qualifies_only_operator_listed_tenants(monkeypatch, tmp_path):
+    configured(monkeypatch, tmp_path)
+    monkeypatch.setenv(KEYS[2], "11,12")
+    word = await startup()
+    for tenant_id in (11, 12):
+        assert (await word.resolve_binding(tenant_id)).tenant_id == tenant_id
+    with pytest.raises(LayoutAuthorityRejected, match="qualification_required"):
+        await word.resolve_binding(13)
+
+
+async def test_tenant_list_is_bounded(monkeypatch, tmp_path):
+    configured(monkeypatch, tmp_path)
+    monkeypatch.setenv(KEYS[2], ",".join(str(i) for i in range(1, 34)))
+    with pytest.raises(LayoutAuthorityRejected, match="qualification_config_invalid"):
+        await startup()

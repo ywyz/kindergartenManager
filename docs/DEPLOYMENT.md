@@ -2,6 +2,8 @@
 
 本文件聚焦生产部署收敛：Docker 镜像不可变发布、部署/回滚流程、备份与恢复边界。
 
+本轮周计划的当前用户决定与实际交付进度统一见[云端交付记录](../specs/weekly-plan-authoring/evidence/WP-E-cloud-delivery-20260914.md)。历史 Word/阶段补证要求不再作为本轮发布前置。
+
 KindergartenManager 的唯一产品交付形态是云服务器上的在线 Web 系统，参考拓扑为
 `Internet → Caddy → NiceGUI app → MySQL 8`。Windows/Linux 本地安装包和便携包不再属于生产交付；
 Microsoft Word/LibreOffice 仅作为下载 DOCX 的外部兼容性消费端。
@@ -129,10 +131,15 @@ python -m scripts.deploy \
 登录、业务或数据恢复验收。
 
 `--acceptance-runner` 由受控运维方提供，必须是当前用户所有的绝对路径普通文件、mode `0700`。helper 通过已
-打开的 fd 执行它，且仅传 `PATH`、phase、image ref 与 gate 名，不转交部署进程的数据库、密钥或其他环境。
-runner 对 login gate 必须返回唯一 `login=passed`；对 business gate 必须返回且仅返回每日计划、游戏观察、
-一对一倾听、自制教玩具、课程审议、图片/BLOB、AI 密钥解密、Word 导出、数据快照九项 `passed` 的关闭 JSON。
-空输出、单纯 `exit 0`、未知/缺失字段、ref/phase/gate 错绑或超长输出均失败关闭。
+打开的 fd 执行它，且仅传 `PATH`、phase、image ref、gate 与 acceptance profile，不转交部署进程的数据库、密钥或其他环境。
+
+周计划交付显式使用 `--acceptance-profile weekly-plan`，分别验证 login，以及 `shared_edit`、
+`concurrent_conflict`、`five_column_export`、`six_column_export`、`overflow_manual_shorten` 五项业务结果。
+兼容回滚使用 `--rollback-acceptance-profile service-recovery`，分别验证 login，以及 `home`、
+`existing_plan_read`；这些只证明旧服务恢复，不证明新版周计划已上线。默认 `legacy` 保留旧九项契约供适用的历史运维使用，
+本轮不选择它。新 profile 使用 schema 2 的严格结果，包含匹配的 `profile`；旧 legacy 保持 schema 1。
+空输出、单纯 `exit 0`、未知／缺失字段、ref／phase／gate／profile 错绑或超长输出均失败关闭。
+结果必须来自真实应用与对应镜像的验证，不能把预写 JSON 或历史 staging 结果交给 runner 冒充生产行为。
 
 > 遗留迁移说明：当前历史生产实例记录的是单平台 manifest digest。新脚本会对此失败关闭，不能直接把它
 > 当作可回滚的 OCI index。首次采用新自动化前，应在部署状态为空时显式执行一次：
@@ -229,3 +236,34 @@ liveness、readiness、登录和关键业务。四类门彼此独立，不能互
 - 生产部署入口和管理员初始化：`README.md`、`docs/USER_MANUAL.md`
 - 变更门禁与复审计划：`docs/ROADMAP.md`
 - 部署安全/发布与完整性边界：`docs/security/threat-model.md`
+
+
+## 8. 周计划渲染环境与运维输入
+
+Docker 的 renderer-base 固定 Python 镜像 digest 与签名 Debian HTTPS snapshot，安装 LibreOffice Writer、
+Poppler、fontconfig 及开放授权的 `fonts-noto-cjk`。周计划新 profile `shared-weekly-v3.noto.v1` 明确使用
+`Noto Serif CJK SC`；系统包的 OFL/copyright 随镜像保留。普通 Python 检查与 `real_render` 实际渲染检查分开，
+必要的渲染 job 缺工具、字体或单页失败均直接失败，不静默跳过。
+
+目标镜像内运行 `scripts/render_environment.py` 记录真实工具版本、fontconfig family 与文件 hash。
+镜像不安装开发机 catalog。使用 `scripts/weekly_layout_catalog.py prepare`，输入两个完整的五／六列正文 JSON
+及其 hash 和显示信息，在目标镜像产生真实 DOCX/PDF/PNG。检查实际正文、布局与页数后，用绑定 candidate hash 的
+review 执行 `seal`；它只生成 catalog，不激活应用，不代表云端业务验收。无需另设字体专项验收或 Windows 回传。
+
+只读挂载完整 catalog，使用 `docker-compose.weekly-layout.yml` 运维 overlay 提供四项启动配置：
+
+- `KM_WEEKLY_LAYOUT_MANIFEST`：容器内 `/opt/weekly-layout/manifest.json`。
+- `KM_WEEKLY_LAYOUT_SHA256`：运维独立取得的已审阅 manifest hash。
+- `KM_WEEKLY_LAYOUT_TENANT_ID`：明确授权使用该资格的租户 ID；可用逗号分隔，最多32个，无空白、重复、通配符。
+- `KM_WEEKLY_LAYOUT_ACTIVATE=1`。
+
+`KM_WEEKLY_LAYOUT_CATALOG_DIR` 是 Compose 使用的宿主绝对路径，须预先存在；overlay 不创建空目录掩盖缺失材料。
+资格只决定对应租户能否使用受控版式，不赋予教师查看／编辑其他租户或班级的权限。
+缺配置保持未启用；配置不完整、模板／材料 hash／profile／实际 LO 版本漂移拒绝启动或导出。
+`local-synthetic` 不能作为生产资格。超页必须由教师手动缩短并保存后重新检测；导出仍绑定通过检测的保存版本。
+
+
+跨迁移升级可显式提供 `--recovery-image <已在隔离数据库验证的兼容OCI index>`，仅允许与 migration receipt 一起用于 deploy。
+此镜像保留旧业务实现并携带新迁移head，不能用未经测试的旧版本替代。目标成功后记录它为可回滚镜像；
+目标失败而兼容镜像的存活、readiness、登录和恢复业务均通过时，记录实际恢复镜像并仍报告本次部署失败。
+任一恢复门失败均不更新成功状态、不自动降级schema或恢复覆盖数据。备份仍保护迁移前实际运行镜像，不能伪改为兼容镜像。

@@ -3,7 +3,8 @@
 import re
 from dataclasses import dataclass
 
-PROFILE = "shared-weekly-v3.v1"
+PROFILE = "shared-weekly-v3.noto.v1"
+FONT_FAMILY = "Noto Serif CJK SC"
 
 
 @dataclass(frozen=True, slots=True)

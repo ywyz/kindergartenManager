@@ -14,7 +14,7 @@ from app.service.shared_weekly.layout_authority import (
     LayoutAuthority,
     LayoutAuthorityRejected,
 )
-from app.service.shared_weekly.layout_contracts import PROFILE
+from app.service.shared_weekly.layout_contracts import FONT_FAMILY, PROFILE
 
 
 def catalog(tmp_path, renderer_version="synthetic-test"):
@@ -54,7 +54,7 @@ def catalog(tmp_path, renderer_version="synthetic-test"):
             "profile": PROFILE,
             "pages": 1,
             "page_observations": ["all_text_visible_no_clipping_no_overflow"],
-            "font": "SimSun",
+            "font": FONT_FAMILY,
             "font_pt": 12,
             "line_pt": 20,
             "fixed_counts": [2, 1, 3, 1, 3, 3, 3, 3, 3, 1],
@@ -122,6 +122,7 @@ async def test_evidence_tamper_revokes_current_binding(tmp_path):
             pytest.fail("corrupt evidence delivered")
 
 
+@pytest.mark.real_render
 async def test_formal_port_rejects_renderer_drift(tmp_path):
     authority = LayoutAuthority(catalog(tmp_path), local_only=True)
     binding = await authority.activate(1, "synthetic", expected=None)
@@ -129,6 +130,7 @@ async def test_formal_port_rejects_renderer_drift(tmp_path):
         await SharedWeeklyWordPort(authority).render_check(binding, None, None)
 
 
+@pytest.mark.real_render
 async def test_formal_algorithm_with_local_qualification_actual_renderer(tmp_path):
     from app.integration.word_export.shared_weekly_word import _process
     from app.service.shared_weekly.layout_contracts import WeekDisplay

@@ -8,27 +8,37 @@
 
 本轮超页由教师手动缩短，保存后实际重检，单页才允许导出；不截断、不缩字体、不伪造页数。自动缩减完善和验收延期。月计划、新 Agent 能力、桌面客户端及 Issue #77 远期范围不纳入本轮。
 
-保留租户隔离、权限、并发保护、数据、凭证、备份和必要迁移；生产数据写入的合成验收边界等待用户明确回复。
+保留租户隔离、权限、并发保护、数据、凭证、备份和必要迁移；用户已允许专用合成验收租户写入，必要时创建；不改动真实教师数据。
 
 ## 执行清单
 
 - 已完成：主仓库三项既存修改保全为外部 patch，未修改原工作树。周计划起点 `7ec372f7dfb6128720e3c99d208c8d7d938882ff`，远端 main `8dcc83376577695b562529ec42adc6b48817f004`。
 - 已完成：独立分支 `codex/wp-cloud-delivery-20260914` 集成 PR #76 的 `19eb8bfea9a941a73383a536fdec439587c39141`，合并提交 `7572532`。桌面构建退出；保留 OCI 双平台及 Release 元数据绑定。
-- 进行中：渲染镜像／字体供应／CI 拆分，周计划部署验收范围收敛。
-- 待执行：目标镜像真实资格材料及审阅、独立 MySQL 云端浏览器验收、交付 PR／CI、发布／生产备份迁移和上线验证。
+- 已实现待镜像验证：渲染镜像／开放字体供应／CI 拆分、周计划及兼容恢复验收profile、资格准备工具与只读挂载。
+- 已创建交付草稿 [PR #82](https://github.com/ywyz/kindergartenManager/pull/82)。旧head `6423fee` 的 Quality 仍因旧宋体预检失败，待本轮修复后新SHA结果。
+- BWH旧staging容器已停止，新 `kg-weekly-staging` 项目与独立数据库 `wp_cloud_20260914` 已创建；显式Alembic迁移至 `d375e9ab2148`。运行时尚未切到新周计划镜像。
+- 独立兼容回滚源码基于生产beta10，只加入新迁移树；首个双平台镜像构建成功。运行时MySQL兼容验证待执行。
+- 待执行：目标镜像实际资格材料、独立 MySQL 云端浏览器验收、交付 CI、发布／生产备份迁移和上线验证。
 
 ## 阻塞清单
 
 | 事项 | 已知事实及影响 | 已尝试动作 | 所需决定／资源 | 状态 |
 |---|---|---|---|---|
-| 字体授权 | 无已知允许 CI／容器分发的宋体来源，阻塞实际渲染供应与资格 | 读取现有 CI 与云端准备；未下载字体 | 授权来源，或允许开放授权中文宋体替代并重验 | 待用户回复 |
-| 非生产目标 | 旧 BWH staging 须保留，本轮需要独立项目与空库 | 正在只读核对容量和隔离边界 | 确认 BWH 独立新项目或指定目标 | 待用户回复 |
-| 生产合成写入 | 实际共享保存与手改验证需写入；用户禁止为测试写生产数据 | 已集中询问专用合成租户边界 | 选择允许的合成写入边界或仅只读上线验证 | 待用户回复 |
+| 字体授权 | 用户允许开放授权中文宋体替代，不另设字体版式复验 | 选用 Debian fonts-noto-cjk 的 Noto Serif CJK SC，保留 OFL | 正常目标镜像实际单页检测仍执行 | 已解决 |
+| 非生产目标 | 用户指定 BWH，明确不保留 kg-wmp9-staging | 只读核对后保全必要配置并替换旧测试项目 | 无 | 已解决 |
+| 生产合成写入 | 用户允许专用合成验收租户写入及必要创建 | 保持真实教师数据隔离 | 无 | 已解决 |
 
 ## 已有与本轮验证
 
 - 复用 [本地浏览器证据](WP-E-browser-delivery-20260914.md) 中未变源码／输入／环境对应的48项专项及2项真实 LO／SQLite结果，以及真实五／六列下载与手动缩短收件事实；这些不代表新镜像或云端验收通过。
 - 本轮集成基本检查：`tests/test_release_workflow.py`、`tests/test_python_runtime_baseline.py`、`specs/wmp9-production-prerequisites/tests/test_application_export_ui_red.py`，52 passed。解释器为主仓库 `.venv/bin/python`，cwd 为隔离交付工作树；未跑全套。
-- pi 初次使用 `coding-plan/ark-code-latest` 返回 `Connection error.`；仅该进程清除代理后诊断，不改全局配置，不声称实际路由。
+- pi 初次使用 `coding-plan/ark-code-latest` 返回 `Connection error.`；仅该进程清除代理后成功。实际成功响应的 `responseModel` 报告 `kimi-k2.7-code`，仅记录服务返回字段，未另发路由验证请求。
 
 外部任务、日志及保全材料：`/home/ywyz/code/wp-cloud-delivery-20260914/`。未取得的 CI、镜像、测试部署、生产结果不预写通过。
+
+字体来源：[Debian trixie fonts-noto-cjk](https://packages.debian.org/trixie/fonts-noto-cjk)，[Noto CJK Serif OFL](https://github.com/notofonts/noto-cjk/blob/main/Serif/LICENSE)。新生成周计划明确声明 Noto Serif CJK SC，历史 SimSun 材料保持；不冒充宋体已供应。
+
+
+用户追加确认真实上线映射：tenant 1 的现有教师 ID 2、3 共享“中四班”；学年 2026-09-01 至 2027-08-31，第一学期 2026-09-01 至 2027-01-25。只新增本轮 canonical identity 与共享assignment，不修改旧配置历史。
+
+本轮检查：pi deployment profile 基本检查72通过；Main兼容回滚影响范围7通过。周计划普通检查首轮发现两项旧字体断言及主仓库虚拟环境缺日历依赖；改正断言、使用已存在startup handoff环境（Python3.14.7 / chinesecalendar1.11.0）后，受影响45项通过。首轮其余27项startup检查已通过，未重复执行。真实渲染和云端结果另行记录。

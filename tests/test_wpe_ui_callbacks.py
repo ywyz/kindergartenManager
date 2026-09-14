@@ -520,7 +520,7 @@ async def test_rendered_teacher_page_opens_inputs_saves_and_imports(world, monke
 
     await buttons["保存草稿"]()
     for reason, expected_text in (
-        ("font_missing", "缺少宋体"),
+        ("font_missing", "缺少周计划中文字体"),
         ("renderer_missing", "缺少排版渲染器"),
         ("layout_overflow", "超过一页"),
     ):

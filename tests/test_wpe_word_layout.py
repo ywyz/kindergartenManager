@@ -87,11 +87,12 @@ def test_controlled_seed_fill_roundtrip_fixed_format(count):
         assert p.paragraph_format.line_spacing.pt == 20
         for run in p.runs:
             assert run.font.size.pt == 12
-            assert run._element.rPr.rFonts.get(qn("w:eastAsia")) == "宋体"
+            assert run._element.rPr.rFonts.get(qn("w:eastAsia")) == "Noto Serif CJK SC"
     assert sha256(SEED_PATH.read_bytes()).hexdigest() == SEED_SHA256
 
 
 @pytest.mark.parametrize("count", [5, 6])
+@pytest.mark.real_render
 async def test_real_local_render_long_fails_without_delivery(count):
     result = await SharedWeeklyWordPort().inspect_local(
         complete_body(count, long=True), WeekDisplay("小一班", "第一学期", 3)
@@ -138,6 +139,7 @@ def test_consecutive_holiday_continuation_keeps_blank_cell():
 
 
 @pytest.mark.parametrize("count", [5, 6])
+@pytest.mark.real_render
 async def test_local_short_reports_actual_render(count):
     result = await SharedWeeklyWordPort().inspect_local(
         complete_body(count), WeekDisplay("小一班", "第一学期", 3)
@@ -148,6 +150,7 @@ async def test_local_short_reports_actual_render(count):
     assert (result.data is not None) == result.fits
 
 
+@pytest.mark.real_render
 async def test_six_short_complete_content_renders_on_one_page():
     result = await SharedWeeklyWordPort().inspect_local(
         complete_body(6), WeekDisplay("小一班", "第一学期", 3)
@@ -176,6 +179,8 @@ def test_emitted_table_keeps_controlled_template_cell_borders():
             )
 
 
+@pytest.mark.real_render
+@pytest.mark.real_render
 async def test_actual_render_missing_duplicate_label_is_not_delivered(monkeypatch):
     import xml.etree.ElementTree as ET
 
@@ -205,6 +210,8 @@ async def test_actual_render_missing_duplicate_label_is_not_delivered(monkeypatc
 
 
 @pytest.mark.parametrize("axis", ["x", "y"])
+@pytest.mark.real_render
+@pytest.mark.real_render
 async def test_renderer_text_crossing_cell_edge_is_not_delivered(monkeypatch, axis):
     import xml.etree.ElementTree as ET
 
@@ -237,16 +244,26 @@ async def test_renderer_text_crossing_cell_edge_is_not_delivered(monkeypatch, ax
 
 @pytest.mark.parametrize("count", [5, 6])
 def test_reference_layout_preserves_title_and_usable_content_width(count):
-    doc = Document(BytesIO(fill_document(
-        SEED_PATH.read_bytes(), complete_body(count), WeekDisplay("小一班", "第一学期", 3)
-    )))
+    doc = Document(
+        BytesIO(
+            fill_document(
+                SEED_PATH.read_bytes(),
+                complete_body(count),
+                WeekDisplay("小一班", "第一学期", 3),
+            )
+        )
+    )
     table = doc.tables[0]
     assert doc.paragraphs[0].runs[0].font.size.pt == 16
     assert doc.paragraphs[0].alignment == 1
     assert doc.paragraphs[0].runs[0].bold is True
     assert doc.paragraphs[0].runs[0].font.cs_bold is True
     assert table.columns[0].width < table.columns[2].width
-    printable = doc.sections[0].page_width - doc.sections[0].left_margin - doc.sections[0].right_margin
+    printable = (
+        doc.sections[0].page_width
+        - doc.sections[0].left_margin
+        - doc.sections[0].right_margin
+    )
     assert abs(sum(c.width for c in table.columns) - printable) < 635 * (count + 2)
     for i in range(2, count + 2):
         assert table.cell(0, i).width == table.columns[i].width
@@ -263,14 +280,27 @@ def test_reference_layout_preserves_title_and_usable_content_width(count):
 @pytest.mark.parametrize("start", [date(2026, 9, 28), date(2026, 12, 28)])
 def test_week_dates_follow_class_and_table_header_is_weekdays_only(count, start):
     body = complete_body(count)
-    days = tuple(replace(d, day=start + timedelta(days=i)) for i, d in enumerate(body.days))
-    body = replace(body, base=replace(body.base, days=days), calendar=replace(body.calendar, columns=tuple(
-        (d.day, teaching, label)
-        for d, (_, teaching, label) in zip(days, body.calendar.columns)
-    )))
-    doc = Document(BytesIO(fill_document(
-        SEED_PATH.read_bytes(), body, WeekDisplay("中四班", "第一学期", 3)
-    )))
+    days = tuple(
+        replace(d, day=start + timedelta(days=i)) for i, d in enumerate(body.days)
+    )
+    body = replace(
+        body,
+        base=replace(body.base, days=days),
+        calendar=replace(
+            body.calendar,
+            columns=tuple(
+                (d.day, teaching, label)
+                for d, (_, teaching, label) in zip(days, body.calendar.columns)
+            ),
+        ),
+    )
+    doc = Document(
+        BytesIO(
+            fill_document(
+                SEED_PATH.read_bytes(), body, WeekDisplay("中四班", "第一学期", 3)
+            )
+        )
+    )
     first, last = days[0].day, days[-1].day
     end_year = f"{last.year}年" if last.year != first.year else ""
     expected = f"班级：中四班 第3周（{first.year}年{first.month}月{first.day}日—{end_year}{last.month}月{last.day}日）"
@@ -283,8 +313,7 @@ def test_week_dates_follow_class_and_table_header_is_weekdays_only(count, start)
 
 
 TITLE_STROKE_FIXTURE = (
-    Path(__file__).resolve().parents[1]
-    / "tests/fixtures/wpe-title-stroke-20260913.svg"
+    Path(__file__).resolve().parents[1] / "tests/fixtures/wpe-title-stroke-20260913.svg"
 )
 
 
@@ -352,9 +381,7 @@ def test_supported_closed_contour_outside_table_ending_before_z_is_accepted():
     """A supported C/Z contour outside the table may end at a point different
     from its start: Z implicitly closes the drawn subpath, and the trailing
     move-only subpath completes the contour."""
-    outside = (
-        "M 20 760 C 30 750 40 750 50 760 C 60 770 30 770 20 765 Z M 50 780"
-    )
+    outside = "M 20 760 C 30 750 40 750 50 760 C 60 770 30 770 20 765 Z M 50 780"
     svg = _frozen_svg_with_diagnostic(outside)
     vertical, horizontal = _rendered_grid(svg)
     assert len(vertical) == 8 and len(horizontal) == 10
@@ -368,10 +395,7 @@ def test_complete_move_only_subpath_outside_table_is_accepted():
 
 def test_intersecting_supported_closed_contour_is_rejected():
     """A supported C/Z contour fully inside the real table bounds is rejected."""
-    inside = (
-        "M 100 300 C 150 250 250 250 300 300 "
-        "C 350 350 150 350 100 300 Z M 300 300"
-    )
+    inside = "M 100 300 C 150 250 250 250 300 300 C 350 350 150 350 100 300 Z M 300 300"
     svg = _frozen_svg_with_diagnostic(inside)
     with pytest.raises(LayoutRejected, match="layout_geometry_invalid"):
         _rendered_grid(svg)
@@ -446,15 +470,15 @@ def test_malformed_transform_matrix_is_rejected(transform):
 
 
 @pytest.mark.parametrize("count", [5, 6])
+@pytest.mark.real_render
+@pytest.mark.real_render
 async def test_removing_a_required_border_keeps_actual_render_undelivered(
     count, monkeypatch
 ):
     from app.integration.word_export import shared_weekly_word as module
 
     original = module._process
-    straight = (
-        r"M\s+(-?[0-9.]+)\s+(-?[0-9.]+)\s+L\s+(-?[0-9.]+)\s+(-?[0-9.]+)\s*"
-    )
+    straight = r"M\s+(-?[0-9.]+)\s+(-?[0-9.]+)\s+L\s+(-?[0-9.]+)\s+(-?[0-9.]+)\s*"
 
     async def drop_one_border(*args):
         output = await original(*args)
@@ -483,11 +507,7 @@ async def test_removing_a_required_border_keeps_actual_render_undelivered(
             ]
             assert verticals
             target = max(verticals, key=lambda item: item[1])[0]
-            parent = next(
-                element
-                for element in tree.iter()
-                if target in list(element)
-            )
+            parent = next(element for element in tree.iter() if target in list(element))
             parent.remove(target)
             remaining = [
                 path
@@ -496,9 +516,7 @@ async def test_removing_a_required_border_keeps_actual_render_undelivered(
                 and path.get("stroke") is not None
                 and "C" not in path.get("d", "")
             ]
-            assert len(remaining) == count + 12, (
-                "required border path must be removed"
-            )
+            assert len(remaining) == count + 12, "required border path must be removed"
             tree.write(args[-1], encoding="utf-8", xml_declaration=True)
         return output
 

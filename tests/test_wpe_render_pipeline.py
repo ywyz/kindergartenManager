@@ -2,6 +2,8 @@
 
 from uuid import uuid4
 
+import pytest
+
 from app.integration.ai_client import weekly_authoring_client as client
 from app.integration.word_export.shared_weekly_word import (
     SharedWeeklyWordPort,
@@ -32,6 +34,7 @@ async def actual_pipeline(world, monkeypatch, tmp_path):
     return app, edit, exporting, reduction
 
 
+@pytest.mark.real_render
 async def test_saved_actual_renderer_delivery_no_new_version(
     world, monkeypatch, tmp_path
 ):
@@ -46,6 +49,7 @@ async def test_saved_actual_renderer_delivery_no_new_version(
     assert len(await rows(world, AUDIT)) == 1
 
 
+@pytest.mark.real_render
 async def test_actual_overflow_explicit_reduction_save_recheck(
     world, monkeypatch, tmp_path
 ):

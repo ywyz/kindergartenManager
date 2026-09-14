@@ -15,7 +15,11 @@ from hashlib import sha256
 from pathlib import Path
 from uuid import UUID
 
-from app.service.shared_weekly.layout_contracts import PROFILE, LayoutBinding
+from app.service.shared_weekly.layout_contracts import (
+    FONT_FAMILY,
+    PROFILE,
+    LayoutBinding,
+)
 
 
 class LayoutAuthorityRejected(ValueError):
@@ -216,7 +220,7 @@ class LayoutAuthority:
                     "profile": PROFILE,
                     "pages": 1,
                     "page_observations": ["all_text_visible_no_clipping_no_overflow"],
-                    "font": "SimSun",
+                    "font": FONT_FAMILY,
                     "font_pt": 12,
                     "line_pt": 20,
                     "fixed_counts": [2, 1, 3, 1, 3, 3, 3, 3, 3, 1],

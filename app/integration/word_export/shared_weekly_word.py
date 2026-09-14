@@ -34,6 +34,7 @@ from app.service.shared_weekly.authoring_contracts import (
 )
 from app.service.shared_weekly.layout_authority import LayoutAuthority
 from app.service.shared_weekly.layout_contracts import (
+    FONT_FAMILY,
     LayoutBinding,
     RenderedWeek,
     WeekDisplay,
@@ -147,9 +148,7 @@ def fill_document(
             cell.width = widths[i]
     table.cell(0, 0).merge(table.cell(0, 1)).text = ""
     for offset, (day, teaching, label) in enumerate(body.calendar.columns, 2):
-        table.cell(
-            0, offset
-        ).text = f"周{'一二三四五六日'[day.weekday()]}"
+        table.cell(0, offset).text = f"周{'一二三四五六日'[day.weekday()]}"
         item = body.days[offset - 2]
         table.cell(1, offset).text = (
             f"{item.morning_talk_topic}\n{item.morning_talk_questions}"
@@ -170,8 +169,11 @@ def fill_document(
         ("自主游戏：", "games.autonomous"),
     ):
         games.append(
-            label + body.value_at(prefix + ".name") + "（目标："
-            + _numbered(body, prefix + ".goals") + "）"
+            label
+            + body.value_at(prefix + ".name")
+            + "（目标："
+            + _numbered(body, prefix + ".goals")
+            + "）"
         )
     newline = "\n"
     values = [
@@ -214,13 +216,13 @@ def fill_document(
         fmt.line_spacing = Pt(20)
         fmt.keep_with_next = False
         for run in paragraph.runs:
-            run.font.name = "SimSun"
+            run.font.name = FONT_FAMILY
             run.font.size = Pt(12)
             fonts = run._element.get_or_add_rPr().find(qn("w:rFonts"))
             if fonts is None:
                 fonts = OxmlElement("w:rFonts")
                 run._element.get_or_add_rPr().append(fonts)
-            fonts.set(qn("w:eastAsia"), "宋体")
+            fonts.set(qn("w:eastAsia"), FONT_FAMILY)
     # The controlled title is 16 pt; the body remains 12 pt / fixed 20 pt.
     for run in document.paragraphs[0].runs:
         run.font.size = title_size
@@ -333,9 +335,7 @@ _STRAIGHT_LINE_COMMAND = re.compile(
 )
 _TRANSFORM_MATRIX = re.compile(r"^matrix\(([^)]+)\)")
 # SVG number lexeme: no underscores, no Python-only spellings.
-_FLOAT_LEXEME = re.compile(
-    r"-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][-+]?[0-9]+)?"
-)
+_FLOAT_LEXEME = re.compile(r"-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][-+]?[0-9]+)?")
 _CONTOUR_TOKEN = re.compile(r"([MLCZ])|([^MLCZ\s]+)")
 _CONTOUR_ARITY = {"M": 2, "L": 2, "C": 6, "Z": 0}
 _TABLE_EPSILON = 0.5
@@ -599,8 +599,8 @@ class SharedWeeklyWordPort:
                 )
             ):
                 return result(reason="renderer_missing")
-            font = (await _process("fc-match", "-f", "%{family}", "SimSun")).decode()
-            if "SimSun" not in font.split(","):
+            font = (await _process("fc-match", "-f", "%{family}", FONT_FAMILY)).decode()
+            if FONT_FAMILY not in font.strip().split(","):
                 return result(reason="font_missing")
             with tempfile.TemporaryDirectory(prefix="shared-weekly-layout-") as temp:
                 root = Path(temp)

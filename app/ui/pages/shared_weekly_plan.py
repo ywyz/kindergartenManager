@@ -32,7 +32,7 @@ DAY_LABELS = {
 LAYOUT_MESSAGES = {
     "ok": "实际单页检测通过",
     "fits": "实际单页检测通过",
-    "font_missing": "缺少宋体字体，无法检查或导出；请联系管理员配置字体。",
+    "font_missing": "缺少周计划中文字体字体，无法检查或导出；请联系管理员配置字体。",
     "renderer_missing": "缺少排版渲染器，无法检查或导出；请联系管理员配置。",
     "renderer_unavailable": "受控排版渲染器不可用，无法检查或导出。",
     "renderer_changed": "渲染器版本已变化，需要重新完成资格验证。",
@@ -41,7 +41,7 @@ LAYOUT_MESSAGES = {
     "qualification_invalid": "正式模板资格材料无效，暂不能检查或导出，请联系管理员。",
     "template_changed": "正式模板或激活版本已变化，请重新确认模板资格。",
     "template_stale": "模板版本已变化，请重新检查保存版本。",
-    "layout_overflow": "文档超过一页或发生裁切/溢出，不交付文件；请比较缩减候选或手动调整后保存重检。",
+    "layout_overflow": "文档超过一页或发生裁切/溢出，不交付文件；请手动缩短内容，保存后重新检测。",
     "layout_geometry_invalid": "实际页面几何或裁切检查失败，不交付文件。",
     "layout_invalid": "实际排版检查结果无效，不交付文件。",
     "roundtrip_failed": "模板填充回读不一致，不交付文件。",

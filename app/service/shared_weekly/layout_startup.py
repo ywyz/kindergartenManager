@@ -27,10 +27,13 @@ async def load_operator_word_port() -> SharedWeeklyWordPort:
     if all(value is None for value in values):
         return SharedWeeklyWordPort()
     manifest, expected_hash, tenant, activate = values
+    tenants = (tenant or "").split(",")
     if (
         any(not value for value in values)
         or re.fullmatch(r"[0-9a-f]{64}", expected_hash or "") is None
-        or re.fullmatch(r"[1-9][0-9]{0,17}", tenant or "") is None
+        or not 1 <= len(tenants) <= 32
+        or len(set(tenants)) != len(tenants)
+        or any(re.fullmatch(r"[1-9][0-9]{0,17}", value) is None for value in tenants)
         or activate != "1"
     ):
         raise LayoutAuthorityRejected("qualification_config_invalid")
@@ -44,7 +47,10 @@ async def load_operator_word_port() -> SharedWeeklyWordPort:
     authority = LayoutAuthority(
         {"operator-reviewed": (path, expected_hash)}, local_only=False
     )
-    binding = await authority.activate(int(tenant), "operator-reviewed", expected=None)
     port = SharedWeeklyWordPort(authority)
-    await port.verify_runtime(binding)
+    for tenant_id in tenants:
+        binding = await authority.activate(
+            int(tenant_id), "operator-reviewed", expected=None
+        )
+        await port.verify_runtime(binding)
     return port

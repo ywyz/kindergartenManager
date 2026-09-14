@@ -53,18 +53,38 @@ ACCEPTANCE_RESULT_FIELDS = {
     "gate",
     "checks",
 }
-ACCEPTANCE_CHECKS = {
-    "login": {"login"},
-    "business": {
-        "daily_plan",
-        "game_observation",
-        "one_on_one_listening",
-        "homemade_teaching",
-        "course_review",
-        "image_blob",
-        "ai_key_decryption",
-        "word_export",
-        "data_snapshot",
+ACCEPTANCE_RESULT_FIELDS_V2 = ACCEPTANCE_RESULT_FIELDS | {"profile"}
+ACCEPTANCE_PROFILES: dict[str, dict[str, Any]] = {
+    "legacy": {
+        "schema_version": 1,
+        "login": {"login"},
+        "business": {
+            "daily_plan",
+            "game_observation",
+            "one_on_one_listening",
+            "homemade_teaching",
+            "course_review",
+            "image_blob",
+            "ai_key_decryption",
+            "word_export",
+            "data_snapshot",
+        },
+    },
+    "weekly-plan": {
+        "schema_version": 2,
+        "login": {"login"},
+        "business": {
+            "shared_edit",
+            "concurrent_conflict",
+            "five_column_export",
+            "six_column_export",
+            "overflow_manual_shorten",
+        },
+    },
+    "service-recovery": {
+        "schema_version": 2,
+        "login": {"login"},
+        "business": {"home", "existing_plan_read"},
     },
 }
 
@@ -733,24 +753,50 @@ def _require_acceptance_runner(path: Path | None) -> Path:
     return path
 
 
+def _require_acceptance_profile(profile: str | None) -> str:
+    if profile is None:
+        return "legacy"
+    if (
+        not isinstance(profile, str)
+        or profile == ""
+        or profile not in ACCEPTANCE_PROFILES
+    ):
+        raise DeployError(
+            f"Unknown acceptance profile: {profile!r}; "
+            f"supported: {', '.join(sorted(ACCEPTANCE_PROFILES))}"
+        )
+    return profile
+
+
 def _validate_acceptance_result(
     payload: object,
     *,
     phase: str,
     image_ref: str,
     gate: str,
+    profile: str,
 ) -> None:
-    expected_checks = ACCEPTANCE_CHECKS.get(gate)
+    profile = _require_acceptance_profile(profile)
+    profile_config = ACCEPTANCE_PROFILES.get(profile)
+    expected_checks = profile_config.get(gate) if profile_config is not None else None
+    if expected_checks is None or not isinstance(payload, dict):
+        raise DeployError("Post-migration acceptance result is invalid")
+    expected_schema = profile_config.get("schema_version", 1)
+    expected_fields = (
+        ACCEPTANCE_RESULT_FIELDS
+        if expected_schema == 1
+        else ACCEPTANCE_RESULT_FIELDS_V2
+    )
     if (
-        expected_checks is None
-        or not isinstance(payload, dict)
-        or set(payload) != ACCEPTANCE_RESULT_FIELDS
-        or payload.get("schema_version") != 1
+        set(payload) != expected_fields
+        or payload.get("schema_version") != expected_schema
         or payload.get("status") != "passed"
         or payload.get("phase") != phase
         or payload.get("image_ref") != image_ref
         or payload.get("gate") != gate
     ):
+        raise DeployError("Post-migration acceptance result is invalid")
+    if expected_schema == 2 and payload.get("profile") != profile:
         raise DeployError("Post-migration acceptance result is invalid")
     checks = payload.get("checks")
     if (
@@ -761,13 +807,17 @@ def _validate_acceptance_result(
         raise DeployError("Post-migration acceptance result is incomplete")
 
 
-def _run_acceptance_gate(path: Path, *, phase: str, image_ref: str, gate: str) -> None:
+def _run_acceptance_gate(
+    path: Path, *, phase: str, image_ref: str, gate: str, profile: str
+) -> None:
+    profile = _require_acceptance_profile(profile)
     descriptor = _open_acceptance_runner(path)
     environment = {
         "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
         "R5_ACCEPTANCE_PHASE": phase,
         "R5_ACCEPTANCE_IMAGE": image_ref,
         "R5_ACCEPTANCE_GATE": gate,
+        "R5_ACCEPTANCE_PROFILE": profile,
     }
     try:
         try:
@@ -792,15 +842,21 @@ def _run_acceptance_gate(path: Path, *, phase: str, image_ref: str, gate: str) -
         payload = json.loads(process.stdout)
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise DeployError("Post-migration acceptance result is invalid") from exc
-    _validate_acceptance_result(payload, phase=phase, image_ref=image_ref, gate=gate)
+    _validate_acceptance_result(
+        payload, phase=phase, image_ref=image_ref, gate=gate, profile=profile
+    )
 
 
 def _run_login_and_business_acceptance(
-    path: Path, *, phase: str, image_ref: str
+    path: Path, *, phase: str, image_ref: str, profile: str
 ) -> None:
     """Run the independent login and critical-business acceptance gates."""
-    _run_acceptance_gate(path, phase=phase, image_ref=image_ref, gate="login")
-    _run_acceptance_gate(path, phase=phase, image_ref=image_ref, gate="business")
+    _run_acceptance_gate(
+        path, phase=phase, image_ref=image_ref, gate="login", profile=profile
+    )
+    _run_acceptance_gate(
+        path, phase=phase, image_ref=image_ref, gate="business", profile=profile
+    )
 
 
 def _run_post_migration_deploy(
@@ -815,6 +871,8 @@ def _run_post_migration_deploy(
     acceptance_runner = (
         None if args.dry_run else _require_acceptance_runner(args.acceptance_runner)
     )
+
+    recovery_image = getattr(args, "recovery_image", None) or current_image
 
     def start_image(image_ref: str) -> None:
         _start_image(
@@ -838,7 +896,7 @@ def _run_post_migration_deploy(
             state_file,
             service=args.service,
             current_image=args.image_ref,
-            previous_image=current_image,
+            previous_image=recovery_image,
         )
 
     result = run_post_migration_rollback(
@@ -861,14 +919,16 @@ def _run_post_migration_deploy(
             phase="target",
             image_ref=args.image_ref,
             gate="login",
+            profile=args.acceptance_profile,
         ),
         target_business=lambda: _run_acceptance_gate(
             acceptance_runner,
             phase="target",
             image_ref=args.image_ref,
             gate="business",
+            profile=args.acceptance_profile,
         ),
-        rollback_start=lambda: start_image(current_image),
+        rollback_start=lambda: start_image(recovery_image),
         rollback_liveness=lambda: _wait_for_http_gate(
             args.health_url,
             timeout_seconds=DEFAULT_HEALTH_TIMEOUT_SECONDS,
@@ -884,20 +944,38 @@ def _run_post_migration_deploy(
         rollback_login=lambda: _run_acceptance_gate(
             acceptance_runner,
             phase="rollback",
-            image_ref=current_image,
+            image_ref=recovery_image,
             gate="login",
+            profile=args.rollback_acceptance_profile,
         ),
         rollback_business=lambda: _run_acceptance_gate(
             acceptance_runner,
             phase="rollback",
-            image_ref=current_image,
+            image_ref=recovery_image,
             gate="business",
+            profile=args.rollback_acceptance_profile,
         ),
         finalize_deployment=finalize_target,
     )
     if result.status == "DEPLOYED":
         return
     if result.status == "ROLLED_BACK":
+        if recovery_image != current_image:
+            # The verified compatible image is now live; do not record the
+            # pre-migration image (which cannot pass the new schema readiness).
+            _require_post_migration_backup(
+                args.backup_evidence,
+                args.protected_image,
+                args.migration_receipt,
+                args.image_ref,
+                args.source_sha,
+            )
+            _update_service_state(
+                state_file,
+                service=args.service,
+                current_image=recovery_image,
+                previous_image=None,
+            )
         raise DeployError(
             "Post-migration target failed; old image passed all rollback gates"
         )
@@ -1001,6 +1079,7 @@ def _rollback_or_restore(
     dry_run: bool,
     acceptance_runner: Path | None = None,
     acceptance_phase: str = "rollback",
+    acceptance_profile: str = "legacy",
 ) -> None:
     try:
         _deploy_once(
@@ -1018,6 +1097,7 @@ def _rollback_or_restore(
                 acceptance_runner,
                 phase=acceptance_phase,
                 image_ref=target_image,
+                profile=acceptance_profile,
             )
         return
     except DeployError as exc:
@@ -1042,6 +1122,7 @@ def _rollback_or_restore(
                     acceptance_runner,
                     phase=acceptance_phase,
                     image_ref=restore_image,
+                    profile=acceptance_profile,
                 )
         except DeployError as restore_error:
             raise DeployError(
@@ -1089,7 +1170,20 @@ def _deploy(args: argparse.Namespace) -> None:
 
     _require_service(args.service)
     _require_distinct_probe_urls(args.health_url, args.readiness_url)
+    _require_acceptance_profile(args.acceptance_profile)
+    _require_acceptance_profile(args.rollback_acceptance_profile)
     _validate_oci_index_ref(args.image_ref, dry_run=args.dry_run)
+    recovery_image = getattr(args, "recovery_image", None)
+    if recovery_image is not None:
+        if (
+            args.migration_receipt is None
+            or not is_immutable_image_ref(recovery_image)
+            or recovery_image == args.image_ref
+        ):
+            raise DeployError(
+                "Compatible recovery image requires a post-migration deploy and a distinct immutable ref"
+            )
+        _validate_oci_index_ref(recovery_image, dry_run=args.dry_run)
     acceptance_runner = (
         None if args.dry_run else _require_acceptance_runner(args.acceptance_runner)
     )
@@ -1167,6 +1261,7 @@ def _deploy(args: argparse.Namespace) -> None:
                     acceptance_runner,
                     phase="target",
                     image_ref=args.image_ref,
+                    profile=args.acceptance_profile,
                 )
                 _update_service_state(
                     state_file,
@@ -1197,6 +1292,7 @@ def _deploy(args: argparse.Namespace) -> None:
                 acceptance_runner,
                 phase="target",
                 image_ref=deployed_image,
+                profile=args.acceptance_profile,
             )
             _update_service_state(
                 state_file,
@@ -1226,6 +1322,7 @@ def _deploy(args: argparse.Namespace) -> None:
                     acceptance_runner,
                     phase="rollback",
                     image_ref=pre_deploy_image,
+                    profile=args.rollback_acceptance_profile,
                 )
             except DeployError as restore_error:
                 raise DeployError(
@@ -1236,6 +1333,8 @@ def _deploy(args: argparse.Namespace) -> None:
 
 
 def _rollback(args: argparse.Namespace) -> None:
+    if getattr(args, "recovery_image", None) is not None:
+        raise DeployError("Recovery image is only supported for post-migration deploy")
     if any((args.migration_receipt, args.source_sha)):
         raise DeployError(
             "Post-migration deploy options are valid only for the immediate "
@@ -1252,6 +1351,7 @@ def _rollback(args: argparse.Namespace) -> None:
 
     _require_service(args.service)
     _require_distinct_probe_urls(args.health_url, args.readiness_url)
+    _require_acceptance_profile(args.rollback_acceptance_profile)
 
     project_dir = args.project_dir
     compose_file = _resolve_within_project(project_dir, args.compose_file)
@@ -1323,6 +1423,7 @@ def _rollback(args: argparse.Namespace) -> None:
                     acceptance_runner,
                     phase="rollback",
                     image_ref=target_image,
+                    profile=args.rollback_acceptance_profile,
                 )
             print(f"{args.service} already at {target_image}, no change.")
             return
@@ -1343,6 +1444,7 @@ def _rollback(args: argparse.Namespace) -> None:
             readiness_url=args.readiness_url,
             dry_run=args.dry_run,
             acceptance_runner=acceptance_runner,
+            acceptance_profile=args.rollback_acceptance_profile,
         )
         restored = target_image
 
@@ -1358,6 +1460,8 @@ def _rollback(args: argparse.Namespace) -> None:
 
 
 def _migrate_legacy(args: argparse.Namespace) -> None:
+    if getattr(args, "recovery_image", None) is not None:
+        raise DeployError("Recovery image is only supported for post-migration deploy")
     """Establish an index-only baseline from one explicitly accepted legacy ref."""
     if any((args.migration_receipt, args.source_sha, args.acceptance_runner)):
         raise DeployError(
@@ -1536,6 +1640,20 @@ def _build_parser() -> argparse.ArgumentParser:
             "Absolute owner-only executable which checks login and critical business "
             "gates for deploy target and rollback phases."
         ),
+    )
+    parser.add_argument(
+        "--acceptance-profile",
+        default="legacy",
+        help="Acceptance profile for the target image (default: legacy).",
+    )
+    parser.add_argument(
+        "--rollback-acceptance-profile",
+        default="legacy",
+        help="Acceptance profile for rollback image (default: legacy).",
+    )
+    parser.add_argument(
+        "--recovery-image",
+        help="Explicit migration-compatible recovery OCI index, only for post-migration deploy.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 

@@ -2,6 +2,8 @@
 
 from types import SimpleNamespace
 
+import pytest
+
 from app.service.shared_weekly.page_application import WeeklyPageApplication
 from app.service.shared_weekly.people_application import PeopleDefaultsApplication
 from app.ui.pages import shared_weekly_plan as page
@@ -11,6 +13,7 @@ from tests.test_wpe_render_pipeline import actual_pipeline
 world = _world
 
 
+@pytest.mark.real_render
 async def test_actual_renderer_single_page_is_reported_successfully(
     world, monkeypatch, tmp_path
 ):

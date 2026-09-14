@@ -12,6 +12,7 @@ from hashlib import sha256
 
 import pytest
 
+from app.integration.word_export import shared_weekly_word
 from app.integration.word_export.shared_weekly_word import (
     SEED_SHA256,
     _process,
@@ -19,7 +20,7 @@ from app.integration.word_export.shared_weekly_word import (
 from app.service.shared_weekly import layout_authority
 from app.service.shared_weekly import production_composition as composition
 from app.service.shared_weekly.layout_authority import LayoutAuthorityRejected
-from app.service.shared_weekly.layout_contracts import PROFILE
+from app.service.shared_weekly.layout_contracts import FONT_FAMILY, PROFILE
 from tests.test_wpe_word_authority import catalog as synthetic_catalog
 
 KEYS = (
@@ -42,6 +43,18 @@ def isolate_startup(monkeypatch):
         pytest.fail("qualification startup must not open a database session")
 
     monkeypatch.setattr(database, "AsyncSessionLocal", no_database)
+
+
+@pytest.fixture(autouse=True)
+def _mock_lo_version_for_unit_tests(request, monkeypatch):
+    """Unit tests must not spawn LibreOffice/Poppler processes."""
+    if request.node.get_closest_marker("real_render"):
+        return
+
+    async def synthetic_version(*args):
+        return b"synthetic-lo-runtime-1\n"
+
+    monkeypatch.setattr(shared_weekly_word, "_process", synthetic_version)
 
 
 async def startup():
@@ -106,7 +119,7 @@ def lo_catalog(
             "profile": PROFILE,
             "pages": 1,
             "page_observations": ["all_text_visible_no_clipping_no_overflow"],
-            "font": "SimSun",
+            "font": FONT_FAMILY,
             "font_pt": 12,
             "line_pt": 20,
             "fixed_counts": [2, 1, 3, 1, 3, 3, 3, 3, 3, 1],
@@ -182,7 +195,7 @@ def word_catalog(tmp_path, *, actual_renderer_version):
             "profile": PROFILE,
             "pages": 1,
             "page_observations": ["all_text_visible_no_clipping_no_overflow"],
-            "font": "SimSun",
+            "font": FONT_FAMILY,
             "font_pt": 12,
             "line_pt": 20,
             "fixed_counts": [2, 1, 3, 1, 3, 3, 3, 3, 3, 1],
@@ -230,6 +243,7 @@ async def actual_lo_version():
     return (await _process("libreoffice", "--version")).decode().strip()
 
 
+@pytest.mark.real_render
 async def test_ordinary_startup_activates_libreoffice_rendered(monkeypatch, tmp_path):
     version = await actual_lo_version()
     manifest, digest = lo_catalog(
@@ -293,6 +307,7 @@ async def test_libreoffice_report_client_mismatch_fail_closed(monkeypatch, tmp_p
     assert composition._services is None
 
 
+@pytest.mark.real_render
 async def test_tamper_after_activation_revokes_binding(monkeypatch, tmp_path):
     version = await actual_lo_version()
     manifest, digest = lo_catalog(
@@ -308,6 +323,7 @@ async def test_tamper_after_activation_revokes_binding(monkeypatch, tmp_path):
         await word.resolve_binding(11)
 
 
+@pytest.mark.real_render
 async def test_released_binding_drift_revokes_binding(monkeypatch, tmp_path):
     from app.integration.word_export import (
         released_weekly_monthly_word_port as released,
@@ -350,6 +366,7 @@ async def test_renderer_drift_rejects_before_publish(monkeypatch, tmp_path):
     assert composition._services is None
 
 
+@pytest.mark.real_render
 async def test_word_native_catalog_remains_accepted(monkeypatch, tmp_path):
     version = await actual_lo_version()
     manifest, digest = word_catalog(tmp_path, actual_renderer_version=version)
@@ -385,6 +402,7 @@ async def test_word_native_role_requires_word_client_prefix(tmp_path):
     "role",
     ["libreoffice-rendered", "word-native"],
 )
+@pytest.mark.real_render
 async def test_local_only_rejects_formal_roles(tmp_path, role):
     version = await actual_lo_version()
     if role == "libreoffice-rendered":
