@@ -44,6 +44,7 @@ def _install(sqlite_source, mysql_source, event_guard):
 
 def upgrade():
     _install(SQLITE_SOURCE, MYSQL_SOURCE, EVENT_GUARD)
+    _install_pointer(False)
 
 
 OLD_SQLITE_SOURCE = "NOT EXISTS (\n            SELECT 1\n              FROM shared_weekly_version v\n              JOIN shared_weekly_plan p\n                ON p.tenant_id = v.tenant_id AND p.id = v.plan_id\n             WHERE v.tenant_id = NEW.tenant_id\n               AND v.id = NEW.version_id\n               AND ((p.revision = 0 AND p.current_version IS NULL\n                     AND v.version = 1 AND v.predecessor IS NULL)\n                 OR (v.version = p.revision + 1\n                     AND v.predecessor IS p.current_version))\n        ) OR NOT EXISTS (\n            SELECT 1\n              FROM identity_mapping_event e\n              JOIN shared_weekly_version v\n                ON v.tenant_id = e.tenant_id AND v.id = NEW.version_id\n              JOIN shared_weekly_plan p\n                ON p.tenant_id = v.tenant_id AND p.id = v.plan_id\n             WHERE e.tenant_id = NEW.tenant_id\n               AND e.id = NEW.mapping_id\n               AND e.revision = NEW.mapping_revision\n               AND e.daily_plan_id = NEW.source_id\n               AND e.source_user_id = NEW.source_user_id\n               AND e.source_date = NEW.source_date\n               AND e.class_instance_id = p.class_instance_id\n               AND e.semester_id = p.semester_id\n               AND NEW.source_revision >= e.source_revision\n        ) OR NOT (\n            NEW.source_field IN ('morning_talk_topic','morning_talk_questions',\n                                 'activity_name','outdoor_activity','indoor_area')\n            AND NEW.provenance IN ('imported','manual')\n            AND NEW.target_path = '{\"day\":\"' || NEW.source_date\n                || '\",\"field\":\"' || NEW.source_field || '\"}'\n            AND EXISTS (\n                SELECT 1\n                  FROM shared_weekly_date d\n                  JOIN shared_weekly_version v\n                    ON v.tenant_id = d.tenant_id AND v.plan_id = d.plan_id\n                 WHERE v.tenant_id = NEW.tenant_id\n                   AND v.id = NEW.version_id\n                   AND d.day_date = NEW.source_date\n            )\n        ) OR NOT (\n            EXISTS (\n                SELECT 1\n                  FROM shared_weekly_version v\n                  JOIN shared_weekly_source prior_source\n                    ON prior_source.tenant_id = v.tenant_id\n                   AND prior_source.version_id = v.predecessor\n                   AND prior_source.target_path = NEW.target_path\n                   AND prior_source.source_id = NEW.source_id\n                   AND prior_source.source_user_id = NEW.source_user_id\n                   AND prior_source.source_date = NEW.source_date\n                   AND prior_source.source_revision = NEW.source_revision\n                   AND prior_source.mapping_id = NEW.mapping_id\n                   AND prior_source.mapping_revision = NEW.mapping_revision\n                   AND prior_source.source_field = NEW.source_field\n                   AND prior_source.imported_value = NEW.imported_value\n                   AND prior_source.imported_hash = NEW.imported_hash\n                 WHERE v.tenant_id = NEW.tenant_id\n                   AND v.id = NEW.version_id\n            )\n            OR EXISTS (\n                SELECT 1\n                  FROM daily_plan d\n                  JOIN daily_plan_identity m\n                    ON m.tenant_id = NEW.tenant_id\n                   AND m.daily_plan_id = NEW.source_id\n                 WHERE d.tenant_id = NEW.tenant_id\n                   AND d.id = NEW.source_id\n                   AND d.user_id = NEW.source_user_id\n                   AND d.plan_date = NEW.source_date\n                   AND d.revision = NEW.source_revision\n                   AND m.source_user_id = NEW.source_user_id\n                   AND m.source_date = NEW.source_date\n                   AND m.mapping_id = NEW.mapping_id\n                   AND m.revision = NEW.mapping_revision\n                   AND CASE NEW.source_field\n                         WHEN 'morning_talk_topic' THEN COALESCE(d.morning_talk_topic, '')\n                         WHEN 'morning_talk_questions' THEN COALESCE(d.morning_talk_questions, '')\n                         WHEN 'activity_name' THEN COALESCE(d.activity_name, '')\n                         WHEN 'outdoor_activity' THEN COALESCE(d.outdoor_activity, '')\n                         WHEN 'indoor_area' THEN COALESCE(d.indoor_area, '')\n                       END = NEW.imported_value\n            )\n        )"
@@ -69,3 +70,22 @@ def downgrade():
     if has_personal:
         raise RuntimeError("personal_snapshot_downgrade_requires_verified_restore")
     _install(OLD_SQLITE_SOURCE, OLD_MYSQL_SOURCE, OLD_EVENT_GUARD)
+    _install_pointer(True)
+
+
+def _install_pointer(legacy):
+    condition = "NOT EXISTS (SELECT 1 FROM identity_mapping_event e WHERE e.tenant_id=NEW.tenant_id AND e.id=NEW.mapping_id AND e.daily_plan_id=NEW.daily_plan_id AND e.source_user_id=NEW.source_user_id AND e.source_date=NEW.source_date AND e.class_instance_id=NEW.class_instance_id AND e.semester_id=NEW.semester_id AND e.revision=NEW.revision)"
+    condition += (
+        " OR NEW.revision != 1"
+        if legacy
+        else " OR EXISTS (SELECT 1 FROM identity_mapping_event later WHERE later.tenant_id=NEW.tenant_id AND later.daily_plan_id=NEW.daily_plan_id AND later.revision>NEW.revision)"
+    )
+    op.execute("DROP TRIGGER IF EXISTS mapping_pointer_insert")
+    if op.get_bind().dialect.name == "sqlite":
+        op.execute(
+            f"CREATE TRIGGER mapping_pointer_insert BEFORE INSERT ON daily_plan_identity WHEN {condition} BEGIN SELECT RAISE(ABORT, 'mapping_conflict'); END"
+        )
+    else:
+        op.execute(
+            f"CREATE TRIGGER mapping_pointer_insert BEFORE INSERT ON daily_plan_identity FOR EACH ROW BEGIN IF {condition} THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='mapping_conflict'; END IF; END"
+        )
