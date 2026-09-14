@@ -18,7 +18,11 @@ def test_docker_image_pins_reviewed_runtime():
 
     assert "FROM ghcr.io/ywyz/kindergartenmanager@sha256:f4c76e24375c129e3bc0ae2b97f3a60e21f18a832e9eca49ee27d4361f9c5d34" in dockerfile
     assert "COPY alembic/ /app/alembic/" in dockerfile
-    assert "COPY app/" not in dockerfile
+    assert {line for line in dockerfile.splitlines() if line.startswith("COPY ")} == {
+        "COPY alembic/ /app/alembic/",
+        "COPY app/core/config.py /app/app/core/config.py",
+        "COPY app/ui/pages/login.py /app/app/ui/pages/login.py",
+    }
     assert "pip install" not in dockerfile
 
 
