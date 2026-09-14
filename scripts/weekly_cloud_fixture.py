@@ -35,7 +35,7 @@ from typing import Any
 from uuid import uuid4
 
 TARGET_DATABASE = "wp_cloud_20260914"
-EXPECTED_ALEMBIC_HEAD = "d375e9ab2148"
+EXPECTED_ALEMBIC_HEAD = "e486fa012359"
 # Keep the dedicated cloud fixture on the reviewed qualification tenant used
 # by the existing local seed.  Production mode always requires an explicit
 # caller-supplied tenant and never reuses this value implicitly.
@@ -286,9 +286,7 @@ async def _preflight_database(engine, *, tenant_id: int, production: bool) -> No
                 and name not in allowed_reference_seeds
             )
         ) + (
-            (EXPORT_AUDIT,)
-            if EXPORT_AUDIT.name not in allowed_reference_seeds
-            else ()
+            (EXPORT_AUDIT,) if EXPORT_AUDIT.name not in allowed_reference_seeds else ()
         )
         # The normal BWH target must be a new business database.  In the
         # explicit production mode, only the selected tenant must be empty;

@@ -126,6 +126,81 @@ class AuthoringApplication(CollaborationApplication):
         self._running = {}
         self._prompts = {}
         self._reduction = None
+        self._owned_conflicts = {}
+        self._protected_empty = {}
+
+    async def _source_identities(self, repo, scope, actor):
+        mapped = await repo.identities(scope)
+        owned = await repo.owned_identities(scope, actor.user_id)
+        return tuple(sorted((*mapped, *owned), key=lambda r: r["daily_plan_id"]))
+
+    async def autofill_owned(self, expected, page_id, page, source_ids=()):
+        """Opening reads only the current teacher's records, never writes plans."""
+        from app.service.shared_weekly.autofill import fill_owned, morning_summary
+
+        async with self._editing(expected, page_id, page) as state:
+            async with self.source_transaction(expected, state.view.target) as context:
+                wanted = {
+                    m["daily_plan_id"]
+                    for m in context[7]
+                    if m["source_user_id"] == expected.user_id
+                }
+                visible, bindings = await self._visible(context, wanted)
+                chosen, chosen_bindings, conflicts = [], [], []
+                for day in context[5].facts.teaching_days:
+                    pairs = [(s, b) for s, b in zip(visible, bindings) if s.day == day]
+                    signatures = {
+                        (
+                            morning_summary(s.morning_talk_topic),
+                            s.activity_name,
+                            s.outdoor_activity,
+                            s.indoor_area,
+                        )
+                        for s, _ in pairs
+                    }
+                    if len(signatures) > 1:
+                        explicit = [
+                            (s, b) for s, b in pairs if s.source_id in source_ids
+                        ]
+                        if len(explicit) != 1:
+                            conflicts.append((day, tuple(s for s, _ in pairs)))
+                            continue
+                        pairs = explicit
+                    if pairs:
+                        source, binding = pairs[
+                            0
+                        ]  # Identical content is equivalent; revision is per row.
+                        chosen.append(source)
+                        chosen_bindings.append(binding)
+                if any(i not in {s.source_id for s in chosen} for i in source_ids):
+                    raise IdentityRejected("source_unavailable")
+                body = fill_owned(
+                    state.view.body, chosen, self._protected_empty.get(page_id, ())
+                )
+                await context[2].audit_sources(
+                    context[4], context[5], "source_read", str(uuid4())
+                )
+            pending = {s.day: (s, b) for s, b in zip(state.pending, state.bindings)}
+            for s, b in zip(chosen, chosen_bindings):
+                pending[s.day] = (s, b)
+            ordered = tuple(pending[d] for d in sorted(pending))
+            result = (
+                self._store_page(
+                    expected,
+                    state,
+                    body,
+                    tuple(s for s, _ in ordered),
+                    tuple(b for _, b in ordered),
+                )
+                if body != state.view.body
+                else state.view
+            )
+            self._owned_conflicts[page_id] = tuple(conflicts)
+            return result
+
+    def owned_conflicts(self, expected, page_id):
+        self._page(expected, page_id)
+        return self._owned_conflicts.get(page_id, ())
 
     def _page(self, expected, page_id, page=None):
         if type(page_id) is not str:
@@ -146,6 +221,12 @@ class AuthoringApplication(CollaborationApplication):
         now = monotonic()
         live = {k for k, v in self._pages._items.items() if v.expires > now}
         self._prompts = {k: v for k, v in self._prompts.items() if k in live}
+        self._owned_conflicts = {
+            k: v for k, v in self._owned_conflicts.items() if k in live
+        }
+        self._protected_empty = {
+            k: v for k, v in self._protected_empty.items() if k in live
+        }
         for store in (self._generated, self._structure, self._imports):
             store._items = {
                 k: v
@@ -209,6 +290,24 @@ class AuthoringApplication(CollaborationApplication):
             self._pages._items[key], value=EditorState(view, (), ())
         )
         self._prompts[key] = ()
+        # Existing v3 blanks may represent an intentional manual deletion.
+        # The historical format has no separate touched flag: preserve these
+        # conservatively instead of treating them as a new empty worksheet.
+        self._protected_empty[key] = (
+            {
+                p
+                for p in body.paths
+                if not body.slot_at(p).value.strip()
+                and body.slot_at(p).provenance == "manual"
+            }
+            | {
+                f"days.{d.day}.activity_name"
+                for d in body.days
+                if not d.activity_name.strip()
+            }
+            if type(loaded.body) is WeeklyAuthoringDraft
+            else set()
+        )
         return view
 
     async def check_authoring_sources(
@@ -396,6 +495,15 @@ class AuthoringApplication(CollaborationApplication):
             )
             self._validate_mask(body, display)
             await self._check(expected, state)
+            self._protected_empty.setdefault(page_id, set()).update(
+                f"days.{d.day}.{field}"
+                for d in values.days
+                for field in ("morning_talk_topic", "activity_name")
+                if not getattr(d, field).strip()
+                and getattr(
+                    next(old for old in state.view.body.days if old.day == d.day), field
+                ).strip()
+            )
             return self._store_page(expected, state, body)
 
     async def update_slots(
@@ -430,6 +538,9 @@ class AuthoringApplication(CollaborationApplication):
             )
             self._validate_mask(body, display)
             await self._check(expected, state)
+            self._protected_empty.setdefault(page_id, set()).update(
+                c.path for c in changes if not c.value.strip()
+            )
             return self._store_page(expected, state, body)
 
     async def propose_import(
@@ -454,6 +565,15 @@ class AuthoringApplication(CollaborationApplication):
                             TargetPath(source.day, field),
                             getattr(source, field),
                         )
+                        raw = new
+                        if field == "morning_talk_topic":
+                            from app.service.shared_weekly.autofill import (
+                                morning_summary,
+                            )
+
+                            new = morning_summary(raw)
+                        elif field == "morning_talk_questions":
+                            new = ""
                         old = sources.get(path)
                         differences.append(
                             FieldDifference(
@@ -473,10 +593,10 @@ class AuthoringApplication(CollaborationApplication):
                             source.mapping_revision,
                             field,
                             path,
-                            new,
+                            raw,
+                            value_hash(raw),
                             value_hash(new),
-                            value_hash(new),
-                            "imported",
+                            "imported" if new == raw else "manual",
                         )
                 base = replace(
                     state.view.body.base,
@@ -589,7 +709,7 @@ class AuthoringApplication(CollaborationApplication):
                 }
                 if (
                     option is None
-                    or choice.target_group not in allowed[option.kind]
+                    or choice.target_group not in allowed.get(option.kind, ())
                     or choice.target_group in groups
                     or choice.option_id in chosen
                 ):
@@ -640,6 +760,7 @@ class AuthoringApplication(CollaborationApplication):
             for p in body.paths
             if p.startswith(prefixes[task])
             and (task != "weekly_area" or p != "area.materials")
+            and (task != "weekly_morning_talk" or p.endswith(".morning_talk_topic"))
         )
 
     async def _dependencies(self, expected, state, task, paths):
@@ -651,6 +772,8 @@ class AuthoringApplication(CollaborationApplication):
             source_fields = {(d, "activity_name") for d in requested_days}
         elif task in ("weekly_games", "weekly_area", "weekly_materials"):
             prefix = "games." if task == "weekly_games" else "area."
+            field = "outdoor_activity" if task == "weekly_games" else "indoor_area"
+            source_fields = {(d.day, field) for d in body.days}
             refs = {
                 r
                 for p in body.paths
@@ -768,20 +891,6 @@ class AuthoringApplication(CollaborationApplication):
             and not state.view.body.value_at("area.name").strip()
         ):
             raise IdentityRejected("required_area_name")
-        if task in ("weekly_games", "weekly_area"):
-            prefix = "games." if task == "weekly_games" else "area."
-            options = tuple(
-                o
-                for o in extract_options(state.view.body)
-                if (o.kind != "area") == (task == "weekly_games")
-            )
-            named = any(
-                state.view.body.value_at(p).strip()
-                for p in state.view.body.paths
-                if p.startswith(prefix) and p.endswith(".name")
-            )
-            if options and not named:
-                raise IdentityRejected("source_selection_required")
         selected, refs = await self._dependencies(expected, state, task, paths)
         stamp, prompt, config = await self._check(
             expected, state, selected, task, configuration=True
@@ -798,6 +907,15 @@ class AuthoringApplication(CollaborationApplication):
             ]
         elif task in ("weekly_games", "weekly_area", "weekly_materials"):
             prefix = "games." if task == "weekly_games" else "area."
+            context["available"] = [
+                {
+                    "kind": option.kind,
+                    "name": option.name,
+                    "fields": dict(option.values),
+                }
+                for option in extract_options(state.view.body)
+                if (option.kind != "area") == (task == "weekly_games")
+            ]
             context["confirmed"] = {
                 p: state.view.body.value_at(p)
                 for p in state.view.body.paths
@@ -826,6 +944,18 @@ class AuthoringApplication(CollaborationApplication):
             # Final authorization completes before opening the network call: zero DB lock while awaiting.
             await self._check(expected, state, selected, task, stamp)
             result = await weekly_authoring_client.generate(prompt, payload, config)
+            if (
+                task == "weekly_morning_talk"
+                and isinstance(result, dict)
+                and isinstance(result.get("values"), dict)
+            ):
+                from app.service.shared_weekly.autofill import morning_summary
+
+                if any(
+                    not isinstance(v, str) or morning_summary(v) != v.strip()
+                    for v in result["values"].values()
+                ):
+                    raise IdentityRejected("ai_invalid")
             if self._running.get(page_id) != (expected, nonce):
                 raise IdentityRejected("candidate_cancelled")
             await self._check(expected, state, selected, task, stamp)
@@ -937,7 +1067,119 @@ class AuthoringApplication(CollaborationApplication):
                 )
             ):
                 raise IdentityRejected("content_invalid")
+        state = await self._bind_personal_snapshots(roots, root, assessment, state)
         return await super()._save_state(roots, root, assessment, state, op)
+
+    async def _bind_personal_snapshots(self, roots, root, assessment, state):
+        """Explicit save seals provenance, without making personal daily rows shared.
+
+        Only immutable mapping events are added. The shared daily mapping table
+        is not written, and the source row is never modified.
+        """
+        from sqlalchemy import insert, select
+
+        from app.repository.source_mapping_repository import EVENT, MAPPING
+        from app.service.shared_weekly.root_contracts import canonical
+
+        body = state.view.body
+        replacements = {}
+        for pending in state.pending:
+            if pending.user_id != assessment.stamp.user_id:
+                continue
+            mapping = (
+                await roots.session.execute(
+                    select(MAPPING).where(
+                        MAPPING.c.tenant_id == roots.tenant_id,
+                        MAPPING.c.daily_plan_id == pending.source_id,
+                    )
+                )
+            ).first()
+            if mapping is not None:
+                continue
+            snapshots = [
+                s
+                for s in body.sources
+                if s.source_id == pending.source_id and s.revision == pending.revision
+            ]
+            if not snapshots:
+                continue
+            event = (
+                await roots.session.execute(
+                    select(EVENT).where(
+                        EVENT.c.tenant_id == roots.tenant_id,
+                        EVENT.c.id == pending.mapping_id,
+                        EVENT.c.revision == pending.mapping_revision,
+                        EVENT.c.daily_plan_id == pending.source_id,
+                        EVENT.c.source_user_id == pending.user_id,
+                        EVENT.c.source_date == pending.day,
+                        EVENT.c.class_instance_id == root["class_instance_id"],
+                        EVENT.c.semester_id == root["semester_id"],
+                    )
+                )
+            ).first()
+            if event is not None:
+                continue
+            parent = (
+                (
+                    await roots.session.execute(
+                        select(EVENT)
+                        .where(
+                            EVENT.c.tenant_id == roots.tenant_id,
+                            EVENT.c.daily_plan_id == pending.source_id,
+                        )
+                        .order_by(EVENT.c.revision.desc())
+                        .limit(1)
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+            event_revision = parent["revision"] + 1 if parent else 1
+            result = await roots.session.execute(
+                insert(EVENT).values(
+                    tenant_id=roots.tenant_id,
+                    daily_plan_id=pending.source_id,
+                    source_user_id=pending.user_id,
+                    source_date=pending.day,
+                    source_revision=pending.revision,
+                    class_instance_id=root["class_instance_id"],
+                    semester_id=root["semester_id"],
+                    revision=event_revision,
+                    previous_id=parent["id"] if parent else None,
+                    actor_id=assessment.stamp.user_id,
+                    session_hash=assessment.stamp.session_hash,
+                    binding_hash=value_hash(
+                        canonical(
+                            {
+                                "purpose": "owned-weekly-snapshot",
+                                "plan": root["id"],
+                                "source": pending.source_id,
+                                "revision": pending.revision,
+                            }
+                        )
+                    ),
+                    operation_id=str(uuid4()),
+                )
+            )
+            for source in snapshots:
+                replacements[reference_for(source)] = replace(
+                    source,
+                    mapping_id=result.inserted_primary_key[0],
+                    mapping_revision=event_revision,
+                )
+        if not replacements:
+            return state
+        refs = {old: reference_for(new) for old, new in replacements.items()}
+        base = replace(
+            body.base,
+            sources=tuple(replacements.get(reference_for(s), s) for s in body.sources),
+        )
+        slots = tuple(
+            replace(slot, references=tuple(refs.get(r, r) for r in slot.references))
+            for slot in body.slots
+        )
+        body = replace(body, base=base, slots=slots)
+        return replace(state, view=replace(state.view, body=body))
 
     async def save_edit(
         self,

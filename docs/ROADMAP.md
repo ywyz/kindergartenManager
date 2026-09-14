@@ -1,3 +1,5 @@
+> 2026-09-14 每周工作计划新要求：本人每日计划自动补空、受管提示词、整格编辑及导出内检查，以[本轮契约](../specs/weekly-plan-authoring/autofill-20260914.md)为准。本次已授权完整发布部署；下方旧交互与旧授权仅为历史。部署结果须以本轮实际交付证据为准。
+
 > 本轮周计划范围、验收决定及执行状态：[云端交付记录](../specs/weekly-plan-authoring/evidence/WP-E-cloud-delivery-20260914.md)。下方历史阶段前置不覆盖最新用户决定。
 
 > 2026-09-14 逐组确认更新：用户已接受本周重点 `focus.0–2` 三条提案，其余23字段待确认；未执行整份页面采用或保存。用户已授权推送当前交付分支，不创建PR或合并。精确范围见[确认记录](../specs/weekly-plan-authoring/evidence/WP-E-proposal-confirmation-20260914.md)；以下2026-09-13记录保留历史时点。

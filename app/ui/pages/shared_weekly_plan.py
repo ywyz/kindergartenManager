@@ -1,12 +1,12 @@
 # ruff: noqa: BLE001 - UI failures are sanitized and retain the current editor
 """Teacher weekly authoring page. All buttons use session-bound applications."""
 
-from datetime import date
+from datetime import date, datetime, timedelta
 from uuid import uuid4
 
 from nicegui import ui
 
-from app.service.shared_weekly.authoring_application import SlotChange, StructureChoice
+from app.service.shared_weekly.authoring_application import SlotChange
 from app.service.shared_weekly.authoring_contracts import (
     AREA_TITLE,
     OUTDOOR_TITLE,
@@ -22,11 +22,18 @@ from app.ui.components.app_shell import render_shell
 
 DAY_LABELS = {
     "morning_talk_topic": "晨谈主题",
-    "morning_talk_questions": "晨谈问题",
     "activity_name": "集体活动名称（缺失请手填）",
-    "outdoor_activity": "户外来源原文",
-    "indoor_area": "区域来源原文",
 }
+
+# These fields remain in the persisted collaboration schema for historical
+# plans.  They are deliberately carried through a save without exposing them
+# as teacher-facing weekly-plan inputs.  Outdoor/area source material is
+# projected into the final structured slots by the authoring application.
+_HIDDEN_DAY_FIELDS = (
+    "morning_talk_questions",
+    "outdoor_activity",
+    "indoor_area",
+)
 
 
 LAYOUT_MESSAGES = {
@@ -41,17 +48,20 @@ LAYOUT_MESSAGES = {
     "qualification_invalid": "正式模板资格材料无效，暂不能检查或导出，请联系管理员。",
     "template_changed": "正式模板或激活版本已变化，请重新确认模板资格。",
     "template_stale": "模板版本已变化，请重新检查保存版本。",
-    "layout_overflow": "文档超过一页或发生裁切/溢出，不交付文件；请手动缩短内容，保存后重新检测。",
+    "layout_overflow": "文档超过一页或发生裁切/溢出，未交付文件；请调整内容并保存后再次导出。",
     "layout_geometry_invalid": "实际页面几何或裁切检查失败，不交付文件。",
     "layout_invalid": "实际排版检查结果无效，不交付文件。",
     "roundtrip_failed": "模板填充回读不一致，不交付文件。",
     "schema_invalid": "正文结构不符合周计划固定栏目要求，请检查后保存。",
     "required_fields_missing": "必需内容或人员尚未填写完整；草稿仍可保存，补齐后才能导出。",
-    "reduction_manual_required": "当前正文没有可安全应用的缩减规则，请手动调整、保存后重新检查。",
-    "reduction_limit": "本轮已用完两次缩减候选，请保留正文并手动调整后重新检查。",
-    "reduction_facts_changed": "缩减候选未满足事实保护规则，已拒绝，正文保持。",
-    "reduction_check_required": "请先检查保存版本；仅实际超页结果可生成缩减候选。",
-    "candidate_cancelled": "操作已取消，正文保持，未交付文件。",
+    "candidate_cancelled": "操作已失效，正文保持。",
+    "candidate_busy": "已有操作正在进行，请稍候。",
+    "ai_timeout": "AI 生成超时，正文保持；请稍后重试。",
+    "ai_unavailable": "AI 服务暂不可用，正文保持；请稍后重试。",
+    "ai_invalid": "AI 返回内容无法使用，正文保持；请稍后重试。",
+    "config_invalid": "当前 AI 配置不可用，请检查设置。",
+    "prompt_stale": "提示词已变化，请重新生成缺失内容。",
+    "source_unavailable": "本人每日计划来源已变化或不可用，正文保持。",
 }
 
 
@@ -81,6 +91,128 @@ def slot_label(path: str | TargetPath) -> str:
     )
 
 
+def _default_week_range(choice, today: date | None = None) -> tuple[date, date]:
+    """Choose the current in-semester teaching week for the date controls."""
+    today = datetime.now().astimezone().date() if today is None else today
+    if today < choice.start or today > choice.end:
+        today = choice.start
+    monday = today - timedelta(days=today.weekday())
+    friday = monday + timedelta(days=4)
+    start = max(monday, choice.start)
+    end = min(friday, choice.end)
+    # A semester can begin/end mid-week.  Both values must still identify the
+    # same canonical week for CalendarApplication.resolve_week.
+    if start > end or (start - timedelta(days=start.weekday())) != (
+        end - timedelta(days=end.weekday())
+    ):
+        return today, today
+    return start, end
+
+
+def _format_labeled_cell(labels: tuple[str, ...], values: tuple[str, ...]) -> str:
+    return "\n".join(f"{label}：{value}" for label, value in zip(labels, values))
+
+
+def _parse_labeled_cell(
+    value: object, labels: tuple[str, ...]
+) -> tuple[str, ...] | None:
+    """Parse a complete content cell while retaining multiline section text."""
+    if type(value) is not str:
+        return None
+    # A label at the beginning of a line is the delimiter.  Reject repeated
+    # delimiters so a teacher's multiline content is never silently split into
+    # a different field; the existing cell remains available for correction.
+    if value.count(labels[0] + "：") != 1 or any(
+        value.count("\n" + label + "：") != 1 for label in labels[1:]
+    ):
+        return None
+    cursor = 0
+    result = []
+    for index, label in enumerate(labels):
+        marker = label + "："
+        if not value.startswith(marker, cursor):
+            return None
+        cursor += len(marker)
+        if index + 1 < len(labels):
+            next_marker = "\n" + labels[index + 1] + "："
+            boundary = value.find(next_marker, cursor)
+            if boundary < 0:
+                return None
+            result.append(value[cursor:boundary])
+            cursor = boundary + 1
+        else:
+            result.append(value[cursor:])
+    return tuple(result)
+
+
+_GAME_LABELS = ("游戏名称", "目标1", "目标2", "目标3")
+_AREA_LABELS = (
+    "重点指导区域",
+    "目标1",
+    "目标2",
+    "目标3",
+    "材料",
+    "指导1",
+    "指导2",
+    "指导3",
+)
+_HABIT_LABELS = tuple(
+    label for index in range(1, 4) for label in (f"习惯{index}名称", f"习惯{index}内容")
+)
+
+
+def _format_game_cell(body, prefix: str) -> str:
+    return _format_labeled_cell(
+        _GAME_LABELS,
+        tuple(
+            body.value_at(prefix + suffix)
+            for suffix in (".name", ".goals.0", ".goals.1", ".goals.2")
+        ),
+    )
+
+
+def _parse_game_cell(value: object) -> tuple[str, ...] | None:
+    return _parse_labeled_cell(value, _GAME_LABELS)
+
+
+def _format_area_cell(body) -> str:
+    return _format_labeled_cell(
+        _AREA_LABELS,
+        tuple(
+            body.value_at(path)
+            for path in (
+                "area.name",
+                "area.goals.0",
+                "area.goals.1",
+                "area.goals.2",
+                "area.materials",
+                "area.guidance.0",
+                "area.guidance.1",
+                "area.guidance.2",
+            )
+        ),
+    )
+
+
+def _parse_area_cell(value: object) -> tuple[str, ...] | None:
+    return _parse_labeled_cell(value, _AREA_LABELS)
+
+
+def _format_habits_cell(body) -> str:
+    return _format_labeled_cell(
+        _HABIT_LABELS,
+        tuple(
+            body.value_at(f"habits.{index}.{field}")
+            for index in range(3)
+            for field in ("name", "content")
+        ),
+    )
+
+
+def _parse_habits_cell(value: object) -> tuple[str, ...] | None:
+    return _parse_labeled_cell(value, _HABIT_LABELS)
+
+
 class WeeklyEditor:
     """Actual page callback state, with no implicit adoption or persistence."""
 
@@ -91,8 +223,10 @@ class WeeklyEditor:
         self.ui_revision = 0
         self.unknown = None
         self.check = None
+        self.source_changes = ()
+        self.conflicts = ()
         self.proposal = None
-        self.proposal_kind = None
+        self._generation_owner = None
 
     def presentation_stamp(self):
         return self.ui_revision, self.dirty, self.edit, self.unknown
@@ -100,6 +234,21 @@ class WeeklyEditor:
     def require_same_presentation(self, stamp):
         if self.presentation_stamp() != stamp:
             raise ValueError("page_stale")
+
+    @property
+    def generation_busy(self) -> bool:
+        return self._generation_owner is not None
+
+    def begin_generation(self):
+        if self.generation_busy or self.proposal is not None:
+            raise ValueError("candidate_busy")
+        owner = object()
+        self._generation_owner = owner
+        return owner
+
+    def end_generation(self, owner) -> None:
+        if self._generation_owner is owner:
+            self._generation_owner = None
 
     async def live(self):
         presentation = self.presentation_stamp()
@@ -127,6 +276,60 @@ class WeeklyEditor:
         self.require_same_presentation(presentation)
         fresh = await author.begin_authoring(self.expected, result.plan.plan_id)
         self._replace_navigation(presentation, fresh)
+        had_saved_sources = bool(fresh.body.sources)
+        navigation = self.presentation_stamp()
+        # Source reads happen only after a page ticket has been acquired.  The
+        # service fills empty fields from this teacher's own daily records and
+        # returns a new page stamp when the in-memory body changes; nothing is
+        # persisted by opening the week.
+        filled = await author.autofill_owned(
+            self.expected, self.edit.page_id, self.edit.page
+        )
+        self.require_same_presentation(navigation)
+        self.dirty = filled.body != self.edit.body
+        self.edit = filled
+        self.check = None
+        self.conflicts = author.owned_conflicts(self.expected, self.edit.page_id)
+        # A saved plan can retain source snapshots from a previous authoring
+        # session.  Show only changed/unavailable references inline; there is
+        # no persistent "check sources" teacher action.
+        self.source_changes = ()
+        if had_saved_sources:
+            source_check_presentation = self.presentation_stamp()
+            try:
+                checks = await author.check_authoring_sources(
+                    self.expected, result.plan.plan_id
+                )
+            except Exception as exc:
+                if str(exc) != "content_invalid":
+                    raise
+                checks = ()
+            self.require_same_presentation(source_check_presentation)
+            self.source_changes = tuple(x for x in checks if x.status != "unchanged")
+        return self.edit
+
+    async def resolve_conflicts(self, source_ids, flush=None):
+        """Apply an explicit choice only for days with real source conflicts."""
+        await self.live()
+        if not source_ids:
+            raise ValueError("source_selection_required")
+        if flush is not None:
+            await flush()
+        before = self.edit.body
+        result = await self.services.authoring.autofill_owned(
+            self.expected,
+            self.edit.page_id,
+            self.edit.page,
+            source_ids=tuple(source_ids),
+        )
+        await self.live()
+        self.edit = result
+        self.dirty = self.dirty or result.body != before
+        self.check = None
+        self.conflicts = self.services.authoring.owned_conflicts(
+            self.expected, self.edit.page_id
+        )
+        self.ui_revision += 1
         return self.edit
 
     async def manual(self, values, slots):
@@ -187,16 +390,6 @@ class WeeklyEditor:
         scope, operation = self.unknown
         return await self.services.authoring.reconcile(self.expected, scope, operation)
 
-    async def reload(self):
-        presentation = self.presentation_stamp()
-        await self.live()
-        if self.unknown:
-            raise ValueError("commit_unknown")
-        fresh = await self.services.authoring.begin_authoring(
-            self.expected, self.edit.target.plan.plan_id
-        )
-        self._replace_navigation(presentation, fresh)
-
     def _replace_navigation(self, presentation, fresh):
         try:
             self.require_same_presentation(presentation)
@@ -206,45 +399,41 @@ class WeeklyEditor:
             self.services.authoring.discard_edit(self.expected, fresh.page_id)
             raise
         self.edit, self.dirty, self.check = fresh, False, None
+        self.source_changes = ()
+        self.conflicts = ()
         self.proposal = None
 
-    async def generate(self, task, paths=()):
+    async def generate(self, task, *, owner=None):
         await self.live()
+        owns_generation = owner is None
+        if owns_generation:
+            owner = self.begin_generation()
+        elif self._generation_owner is not owner:
+            raise ValueError("candidate_busy")
         stamp = self.presentation_stamp()
         edit = self.edit
-        if paths:
-            result = await self.services.authoring.regenerate(
-                self.expected, edit.page_id, edit.page, task, tuple(paths)
-            )
-        else:
+        try:
             result = await self.services.authoring.generate_missing(
                 self.expected, edit.page_id, edit.page, task
             )
-        await self.live()
-        try:
-            self.require_same_presentation(stamp)
-        except ValueError:
-            self.services.authoring.cancel_generated(self.expected, result.candidate_id)
-            raise
-        self.proposal, self.proposal_kind = result, "generated"
-        return result
+            await self.live()
+            try:
+                self.require_same_presentation(stamp)
+            except ValueError:
+                self.services.authoring.cancel_generated(
+                    self.expected, result.candidate_id
+                )
+                raise
+            self.proposal = result
+            return result
+        finally:
+            if owns_generation:
+                self.end_generation(owner)
 
     async def adopt(self):
         await self.live()
         revision = self.ui_revision
-        target = (
-            self.services.reduction
-            if self.proposal_kind == "reduction"
-            else self.services.authoring
-        )
-        method = (
-            target.adopt
-            if self.proposal_kind == "reduction"
-            else target.adopt_candidate
-            if self.proposal_kind == "import"
-            else target.adopt_generated
-        )
-        self.edit = await method(
+        self.edit = await self.services.authoring.adopt_generated(
             self.expected, self.proposal.candidate_id, self.edit.page, confirmed=True
         )
         self.dirty, self.check, self.proposal = True, None, None
@@ -254,18 +443,9 @@ class WeeklyEditor:
     async def reject(self):
         await self.live()
         if self.proposal is not None:
-            if self.proposal_kind == "reduction":
-                self.services.reduction.cancel(
-                    self.expected, self.proposal.candidate_id
-                )
-            elif self.proposal_kind == "import":
-                self.services.authoring.cancel_candidate(
-                    self.expected, self.proposal.candidate_id
-                )
-            else:
-                self.services.authoring.cancel_generated(
-                    self.expected, self.proposal.candidate_id
-                )
+            self.services.authoring.cancel_generated(
+                self.expected, self.proposal.candidate_id
+            )
             self.proposal = None
 
     async def check_saved(self):
@@ -288,8 +468,14 @@ class WeeklyEditor:
 
     async def export(self):
         await self.live()
-        if self.dirty or self.unknown or self.check is None or not self.check.fits:
-            raise ValueError("check_required")
+        if self.dirty or self.unknown:
+            raise ValueError("save_required")
+        # Layout qualification is an export prerequisite, but remains an
+        # internal step so teachers do not have to manage a separate check
+        # button or stale check ticket.
+        await self.check_saved()
+        if self.check is None or not self.check.fits:
+            raise ValueError(self.check.reason if self.check else "check_required")
         stamp = self.presentation_stamp()
         download = await self.services.exporting.export_saved(
             self.expected, self.check.check_id
@@ -311,7 +497,7 @@ async def shared_weekly_plan_page():
 
 async def _weekly_content(expected):
     ui.label("幼儿园每周工作计划表").classes("text-2xl font-bold")
-    ui.label("同班教师共享 · 修改后请保存；下载前检测保存版本的实际单页排版。")
+    ui.label("同班教师共享 · 选择班级和教学周后自动补填本人每日计划；修改后请保存。")
     try:
         services = get_shared_weekly_services()
         choices = await services.page.choices(expected)
@@ -323,20 +509,30 @@ async def _weekly_content(expected):
         return
     editor = WeeklyEditor(services, expected)
     notice = ui.label("").classes("text-orange-800 whitespace-pre-wrap")
+    default_start, default_end = _default_week_range(choices[0])
+
+    def choice_changed(_event=None):
+        choice = choices[int(choice_input.value)]
+        start, end = _default_week_range(choice)
+        start_input.value = start.isoformat()
+        end_input.value = end.isoformat()
+
     choice_input = ui.select(
         {i: f"{c.class_name} · {c.start}—{c.end}" for i, c in enumerate(choices)},
         value=0,
         label="授权班级与学期",
+        on_change=choice_changed,
     ).classes("w-full")
     with ui.row():
-        start_input = ui.input("起始日期", value=choices[0].start.isoformat()).props(
+        start_input = ui.input("起始日期", value=default_start.isoformat()).props(
             "type=date"
         )
-        end_input = ui.input("结束日期", value=choices[0].start.isoformat()).props(
+        end_input = ui.input("结束日期", value=default_end.isoformat()).props(
             "type=date"
         )
     host = ui.column().classes("w-full")
     fields, slot_fields = {}, {}
+    game_fields, area_field, habits_field = {}, {}, None
     header_fields = {}
 
     async def guard(action):
@@ -347,15 +543,19 @@ async def _weekly_content(expected):
                 "required_theme": "请先填写主题名称。",
                 "required_activity_name": "集体活动名称缺失，请手填后再生成晨谈。",
                 "required_area_name": "请先确认重点区域名称。",
-                "source_selection_required": "请先选择每日来源中的游戏或区域结构。",
-                "check_required": "请先检测已保存版本，检测通过后才能导出。",
+                "source_selection_required": "游戏或区域结构无法自动确定，请先在对应内容格填写名称。",
+                "check_required": "当前内容尚未满足导出条件，请补齐必填栏目。",
                 "commit_unknown": "保存结果未知，请只读对账，勿重试提交。",
                 "save_required": "请先保存当前修改。",
-                "unsaved_changes": "存在未保存修改，请保存或明确放弃后重载。",
-                "plan_conflict": "同班教师已保存新版本，请保留当前内容并重载比较。",
+                "unsaved_changes": "存在未保存修改，请先保存后切换计划。",
+                "plan_conflict": "同班教师已保存新版本，请保留当前内容并重新打开计划比较。",
                 "calendar_unavailable": "教学日历不可用。",
                 "source_unavailable": "来源已变化或不可用，正文保持。",
                 "page_stale": "候选或页面已过期，正文保持。",
+                "games_format_invalid": "游戏整格格式无法识别，正文保持；请保留游戏名称和三行目标标签。",
+                "area_format_invalid": "区域游戏整格格式无法识别，正文保持；请保留区域、目标、材料和指导标签。",
+                "habits_format_invalid": "生活习惯整格格式无法识别，正文保持；请保留三组习惯名称和具体内容标签。",
+                "morning_topic_required": "晨谈只能填写主题或简要陈述，不能填写问题或问答过程。",
             }
             reasons.update(LAYOUT_MESSAGES)
             notice.text = reasons.get(
@@ -372,10 +572,49 @@ async def _weekly_content(expected):
     async def flush():
         days = tuple(
             CollaborationDay(
-                day.day, *(fields[(day.day, key)].value for key in DAY_LABELS)
+                day.day,
+                fields[(day.day, "morning_talk_topic")].value,
+                day.morning_talk_questions,
+                fields[(day.day, "activity_name")].value,
+                day.outdoor_activity,
+                day.indoor_area,
             )
             for day in editor.edit.body.days
         )
+        values = {path: widget.value for path, widget in slot_fields.items()}
+        for prefix, widget in game_fields.items():
+            parsed = _parse_game_cell(widget.value)
+            if parsed is None:
+                raise ValueError("games_format_invalid")
+            for suffix, value in zip(
+                (".name", ".goals.0", ".goals.1", ".goals.2"), parsed
+            ):
+                values[prefix + suffix] = value
+        parsed_area = _parse_area_cell(area_field.value)
+        if parsed_area is None:
+            raise ValueError("area_format_invalid")
+        for path, value in zip(
+            (
+                "area.name",
+                "area.goals.0",
+                "area.goals.1",
+                "area.goals.2",
+                "area.materials",
+                "area.guidance.0",
+                "area.guidance.1",
+                "area.guidance.2",
+            ),
+            parsed_area,
+        ):
+            values[path] = value
+        parsed_habits = _parse_habits_cell(habits_field.value)
+        if parsed_habits is None:
+            raise ValueError("habits_format_invalid")
+        for index, (name, content) in enumerate(
+            zip(parsed_habits[::2], parsed_habits[1::2])
+        ):
+            values[f"habits.{index}.name"] = name
+            values[f"habits.{index}.content"] = content
         await editor.manual(
             ManualWeekEdit(
                 header_fields["theme"].value,
@@ -389,7 +628,7 @@ async def _weekly_content(expected):
                 ),
                 days,
             ),
-            {p: w.value for p, w in slot_fields.items()},
+            values,
         )
 
     async def proposal_dialog():
@@ -397,30 +636,13 @@ async def _weekly_content(expected):
         with ui.dialog() as dialog, ui.card().classes("w-full max-w-4xl"):
             ui.label("逐项比较；采用只改当前页面，仍需保存")
             for difference in proposal.differences:
-                ui.label(
-                    slot_label(
-                        getattr(
-                            difference,
-                            "path",
-                            getattr(difference, "target_path", ""),
-                        )
-                    )
-                )
+                ui.label(slot_label(difference.path))
                 ui.label("当前：" + difference.current_value).classes(
                     "whitespace-pre-wrap"
                 )
-                if hasattr(difference, "imported_value"):
-                    ui.label(
-                        "上次导入：" + (difference.imported_value or "（无）")
-                    ).classes("whitespace-pre-wrap")
-                ui.label(
-                    "候选："
-                    + getattr(
-                        difference,
-                        "candidate_value",
-                        getattr(difference, "source_value", ""),
-                    )
-                ).classes("whitespace-pre-wrap")
+                ui.label("候选：" + difference.candidate_value).classes(
+                    "whitespace-pre-wrap"
+                )
 
             async def adopt():
                 await flush()
@@ -437,6 +659,7 @@ async def _weekly_content(expected):
         dialog.props("persistent").open()
 
     async def render():
+        nonlocal area_field, habits_field
         presentation = editor.presentation_stamp()
         title, theme, display, people = await services.authoring.header(
             expected, editor.edit.page_id, editor.edit.page
@@ -448,6 +671,56 @@ async def _weekly_content(expected):
         host.clear()
         fields.clear()
         slot_fields.clear()
+        game_fields.clear()
+        area_field = None
+        habits_field = None
+
+        def slot_widget(path, label=None):
+            widget = (
+                ui.textarea(
+                    label or slot_label(path),
+                    value=editor.edit.body.slot_at(path).value,
+                    on_change=mark_dirty,
+                )
+                .classes("w-full")
+                .props("autogrow")
+            )
+            slot_fields[path] = widget
+            return widget
+
+        async def conflict_picker():
+            if not editor.conflicts:
+                return
+            with ui.card().classes("w-full gap-3 border border-orange-300"):
+                ui.label("发现同一天有多份本人每日计划，请选择后自动补填").classes(
+                    "text-lg font-semibold text-orange-800"
+                )
+                selectors = []
+                for day, candidates in editor.conflicts:
+                    ui.label(f"{day} 的本人每日计划")
+                    options = {
+                        source.source_id: (
+                            f"{source.teacher_display} · "
+                            f"{source.activity_name or '活动名称待手填'} · "
+                            f"{source.morning_talk_topic or '晨谈待填写'}"
+                        )
+                        for source in candidates
+                    }
+                    selectors.append(
+                        ui.select(options, label="选择一份来源").classes("w-full")
+                    )
+
+                async def apply_choices():
+                    selected = tuple(
+                        widget.value for widget in selectors if widget.value is not None
+                    )
+                    if len(selected) != len(selectors):
+                        raise ValueError("source_selection_required")
+                    await editor.resolve_conflicts(selected, flush=flush)
+                    await render()
+
+                ui.button("应用选择并自动补填", on_click=lambda: guard(apply_choices))
+
         with host:
             ui.label(
                 f"{display.class_name} · {display.semester_display} · 第{display.week_number}周 · {theme}"
@@ -502,31 +775,74 @@ async def _weekly_content(expected):
                             if not mask.teaching:
                                 widget.disable()
                             fields[(day.day, key)] = widget
-            for section, heading in (
-                ("games", OUTDOOR_TITLE),
-                ("area", AREA_TITLE),
-                ("focus", "本周重点"),
-                ("environment", "环境创设"),
-                ("habits", "生活习惯"),
-                ("home", "家园共育"),
-            ):
-                with ui.card().classes("w-full gap-3"):
-                    ui.label(heading).classes("text-lg font-semibold")
-                    for path in SLOT_PATHS:
-                        if path.split(".")[0] != section:
-                            continue
-                        slot_fields[path] = (
+            if editor.source_changes:
+                ui.label(
+                    "来源提示：已保存的本人每日计划来源发生变化或暂不可用；当前正文已保留。"
+                ).classes("text-orange-800 whitespace-pre-wrap")
+            await conflict_picker()
+
+            with ui.card().classes("w-full gap-3"):
+                ui.label(OUTDOOR_TITLE).classes("text-lg font-semibold")
+                for prefix, heading in (
+                    ("games.collective.0", "集体游戏 1"),
+                    ("games.collective.1", "集体游戏 2"),
+                    ("games.autonomous", "自主游戏"),
+                ):
+                    with ui.card().classes("w-full gap-2 border"):
+                        ui.label(heading).classes("font-semibold")
+                        game_fields[prefix] = (
                             ui.textarea(
-                                slot_label(path),
-                                value=editor.edit.body.slot_at(path).value,
+                                heading,
+                                value=_format_game_cell(editor.edit.body, prefix),
                                 on_change=mark_dirty,
                             )
                             .classes("w-full")
                             .props("autogrow")
                         )
+
             with ui.card().classes("w-full gap-3"):
-                ui.label("来源、生成与保存导出").classes("text-lg font-semibold")
-                await action_buttons(display)
+                ui.label("区域游戏").classes("text-lg font-semibold")
+                ui.label(AREA_TITLE).classes("text-sm text-gray-600")
+                area_field = (
+                    ui.textarea(
+                        "区域游戏完整内容",
+                        value=_format_area_cell(editor.edit.body),
+                        on_change=mark_dirty,
+                    )
+                    .classes("w-full")
+                    .props("autogrow")
+                )
+
+            for section, heading in (
+                ("focus", "本周重点"),
+                ("environment", "环境创设"),
+            ):
+                with ui.card().classes("w-full gap-3"):
+                    ui.label(heading).classes("text-lg font-semibold")
+                    for i in range(3):
+                        slot_widget(f"{section}.{i}", f"{heading} {i + 1}")
+
+            with ui.card().classes("w-full gap-3"):
+                ui.label("生活习惯").classes("text-lg font-semibold")
+                ui.label(
+                    "整格包含卫生、午餐、午睡等习惯的名称和具体内容，请保留标签。"
+                ).classes("text-sm text-gray-600")
+                habits_field = (
+                    ui.textarea(
+                        "生活习惯完整内容",
+                        value=_format_habits_cell(editor.edit.body),
+                        on_change=mark_dirty,
+                    )
+                    .classes("w-full")
+                    .props("autogrow")
+                )
+
+            with ui.card().classes("w-full gap-3"):
+                ui.label("家园共育").classes("text-lg font-semibold")
+                slot_widget("home", "家园共育")
+            with ui.card().classes("w-full gap-3"):
+                ui.label("AI 补全、保存与导出").classes("text-lg font-semibold")
+                await action_buttons()
             with ui.expansion("A4 比例阅读预览（不代表 Word 页数）").classes("w-full"):  # noqa: SIM117
                 with (
                     ui.column()
@@ -543,9 +859,6 @@ async def _weekly_content(expected):
                             with ui.column().classes("flex-1 min-w-0 border p-1"):
                                 ui.label(f"{day.day:%m/%d}")
                                 ui.label(day.morning_talk_topic).classes(
-                                    "whitespace-pre-wrap break-words"
-                                )
-                                ui.label(day.morning_talk_questions).classes(
                                     "whitespace-pre-wrap break-words"
                                 )
                                 ui.label(day.activity_name).classes(
@@ -569,227 +882,54 @@ async def _weekly_content(expected):
                                         + editor.edit.body.slot_at(path).value
                                     ).classes("whitespace-pre-wrap break-words")
 
-    async def action_buttons(display):
-        async def source_check():
-            await editor.live()
-            await flush()
-            result = await services.authoring.check_authoring_sources(
-                expected, editor.edit.target.plan.plan_id
-            )
-            statuses = {
-                "unchanged": "未变化",
-                "changed": "已变化，请比较后重新导入",
-                "unavailable": "已不可用",
-            }
-            notice.text = "来源检查：" + (
-                "；".join(
-                    f"{x.reference.target.day} {DAY_LABELS.get(x.reference.target.field, x.reference.target.field)}：{statuses[x.status]}"
-                    for x in result
-                )
-                or "没有已保存的来源"
-            )
-
-        async def sources():
-            await editor.live()
-            await flush()
-            listed = await services.authoring.list_sources(expected, editor.edit.target)
-            with ui.dialog() as dialog, ui.card().classes("w-full max-w-3xl"):
-                selectors = []
-                for day in listed.days:
-                    ui.label(f"{day.day} {day.message or '请显式选择来源'}")
-                    options = {
-                        s.source_id: f"{s.teacher_display} · {s.activity_name or '活动名称待手填'} · {s.morning_talk_topic}"
-                        for s in day.candidates
-                    }
-                    selectors.append(
-                        ui.select(options, label="每日来源（可留空）").classes("w-full")
-                    )
-                    for source in day.candidates:
-                        ui.label(
-                            f"{source.teacher_display}：{source.morning_talk_questions}\n{source.outdoor_activity}\n{source.indoor_area}"
-                        ).classes("whitespace-pre-wrap")
-
-                async def propose():
-                    await editor.live()
-                    selected = await services.authoring.select_sources(
-                        expected,
-                        listed.list_id,
-                        tuple(w.value for w in selectors if w.value is not None),
-                    )
-                    editor.proposal = await services.authoring.propose_import(
-                        expected,
-                        editor.edit.page_id,
-                        editor.edit.page,
-                        selected.selection_id,
-                    )
-                    editor.proposal_kind = "import"
-                    dialog.close()
-                    await proposal_dialog()
-
-                ui.button("比较导入差异", on_click=lambda: guard(propose))
-                ui.button("取消", on_click=dialog.close)
-            dialog.open()
-
-        async def structure():
-            await editor.live()
-            await flush()
-            listed = await services.authoring.list_structure(
-                expected, editor.edit.page_id, editor.edit.page
-            )
-            with ui.dialog() as dialog, ui.card():
-                widgets = []
-                for group in (
-                    "games.collective.0",
-                    "games.collective.1",
-                    "games.autonomous",
-                    "area",
-                ):
-                    widgets.append(
-                        (
-                            group,
-                            ui.select(
-                                {
-                                    o.option_id: f"{o.reference.target.day} · {o.name} · "
-                                    + "；".join(
-                                        slot_label(k) + "：" + v for k, v in o.values
-                                    )
-                                    for o in listed.options
-                                    if o.kind
-                                    == (
-                                        "area"
-                                        if group == "area"
-                                        else "autonomous"
-                                        if group == "games.autonomous"
-                                        else "collective"
-                                    )
-                                },
-                                label=slot_label(group),
-                            ),
-                        )
-                    )
-
-                async def propose():
-                    await editor.live()
-                    editor.proposal = await services.authoring.propose_structure(
-                        expected,
-                        listed.list_id,
-                        editor.edit.page,
-                        tuple(
-                            StructureChoice(w.value, group)
-                            for group, w in widgets
-                            if w.value is not None
-                        ),
-                    )
-                    editor.proposal_kind = "generated"
-                    dialog.close()
-                    await proposal_dialog()
-
-                ui.button("比较选定结构", on_click=lambda: guard(propose))
-                ui.button("取消", on_click=dialog.close)
-            dialog.open()
-
-        ui.button("检查来源变化", on_click=lambda: guard(source_check))
-        ui.button("选择每日来源 / 处理重复备课", on_click=lambda: guard(sources))
-        ui.button("选择游戏与区域结构", on_click=lambda: guard(structure))
+    async def action_buttons():
         task = ui.select(
-            {k: v for k, v in WEEKLY_LABELS.items() if k != "weekly_reduction"},
+            dict(WEEKLY_LABELS),
             value="weekly_focus",
             label="生成栏目",
         )
-        paths = ui.select(
-            {p: slot_label(p) for p in SLOT_PATHS}
-            | {
-                f"days.{d.day}.{field}": f"{d.day} {DAY_LABELS[field]}"
-                for d in editor.edit.body.days
-                if d.day in display.facts.teaching_days
-                for field in ("morning_talk_topic", "morning_talk_questions")
-            },
-            multiple=True,
-            label="重新生成的字段（仅同一栏目）",
-        ).classes("w-full")
+        generation_owner = [None]
+        generation_button = None
 
-        async def generate(selected=False):
+        async def generate():
+            nonlocal generation_button
             await editor.live()
-            if selected and not paths.value:
-                notice.text = "请先选择需要重新生成的字段。"
-                return
-            await flush()
-            await editor.generate(
-                task.value, tuple(paths.value or ()) if selected else ()
-            )
-            await proposal_dialog()
+            if editor.generation_busy or editor.proposal is not None:
+                raise ValueError("candidate_busy")
+            owner = editor.begin_generation()
+            generation_owner[0] = owner
+            if generation_button is not None:
+                generation_button.props("loading")
+            try:
+                await flush()
+                await editor.generate(task.value, owner=owner)
+                await proposal_dialog()
+            finally:
+                editor.end_generation(owner)
+                if generation_owner[0] is owner:
+                    generation_owner[0] = None
+                    if generation_button is not None:
+                        generation_button.props(remove="loading")
 
-        async def cancel_generation():
-            await editor.live()
-            services.authoring.cancel_generation(expected, editor.edit.page_id)
-            services.reduction.cancel_generation(expected, editor.edit.page_id)
-            services.exporting.cancel_check(expected, editor.edit.page_id)
-            editor.check = None
-            notice.text = "已取消生成，正文保持。"
-
-        ui.button("生成缺失内容", on_click=lambda: guard(generate))
-        ui.button("重新生成选定字段", on_click=lambda: guard(lambda: generate(True)))
-        ui.button("取消生成", on_click=lambda: guard(cancel_generation))
+        generation_button = ui.button(
+            "AI 补全缺失内容", on_click=lambda: guard(generate)
+        )
+        if editor.generation_busy:
+            generation_button.props("loading")
 
         async def save():
             await flush()
             await editor.save()
             await render()
-            notice.text = "草稿已保存。"
-
-        async def reload():
-            with ui.dialog() as dialog, ui.card():
-                ui.label("重载会放弃当前未保存修改，是否继续？")
-
-                async def confirmed():
-                    await editor.reload()
-                    dialog.close()
-                    await render()
-
-                ui.button("明确放弃并重载", on_click=lambda: guard(confirmed))
-                ui.button("保留", on_click=dialog.close)
-            dialog.open()
-
-        async def reconcile():
-            result = await editor.reconcile()
-            notice.text = "只读对账：" + (
-                "已找到原操作保存记录；请重新进入页面读取。"
-                if result
-                else "未找到原操作记录；未重试、未写入。"
-            )
-
-        async def check():
-            result = await editor.check_saved()
-            notice.text = f"单页检测：{LAYOUT_MESSAGES.get(result.reason, '实际排版检查未通过，不交付文件。')}；页数：{result.pages}"
+            notice.text = "已保存。"
 
         async def export():
             download = await editor.export()
             ui.download(download.data, filename=download.filename)
+            notice.text = "已完成排版检查并导出 Word。"
 
-        async def reduce():
-            await editor.live()
-            if editor.dirty or editor.check is None:
-                raise ValueError("save_required")
-            stamp = editor.presentation_stamp()
-            proposal = await services.reduction.propose(
-                expected, editor.check.check_id, editor.edit.page_id, editor.edit.page
-            )
-            await editor.live()
-            try:
-                editor.require_same_presentation(stamp)
-            except ValueError:
-                services.reduction.cancel(expected, proposal.candidate_id)
-                raise
-            editor.proposal = proposal
-            editor.proposal_kind = "reduction"
-            await proposal_dialog()
-
-        ui.button("保存草稿", on_click=lambda: guard(save))
-        ui.button("重载保存版本", on_click=lambda: guard(reload))
-        ui.button("保存结果未知：只读对账", on_click=lambda: guard(reconcile))
-        ui.button("检测保存版本的单页排版", on_click=lambda: guard(check))
-        ui.button("生成篇幅缩减候选（最多两轮）", on_click=lambda: guard(reduce))
-        ui.button("导出已检查的 DOCX", on_click=lambda: guard(export))
+        ui.button("保存", on_click=lambda: guard(save))
+        ui.button("导出 Word", on_click=lambda: guard(export))
 
     async def open_week():
         await editor.open(

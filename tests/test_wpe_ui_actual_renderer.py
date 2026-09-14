@@ -17,17 +17,26 @@ world = _world
 async def test_actual_renderer_single_page_is_reported_successfully(
     world, monkeypatch, tmp_path
 ):
-    author, edit, exporting, reduction = await actual_pipeline(
+    author, edit, exporting, _reduction = await actual_pipeline(
         world, monkeypatch, tmp_path
     )
     services = SimpleNamespace(
         authoring=author,
         exporting=exporting,
-        reduction=reduction,
         page=WeeklyPageApplication(world[0], lambda: world[1][3]),
         people=PeopleDefaultsApplication(world[0], lambda: world[1][3]),
     )
-    widgets, labels, buttons = {}, [], {}
+    widgets, labels, buttons, downloads = {}, [], {}, []
+    checks = []
+
+    original_check_saved = exporting.check_saved
+
+    async def capture_check(*args, **kwargs):
+        result = await original_check_saved(*args, **kwargs)
+        checks.append(result)
+        return result
+
+    monkeypatch.setattr(exporting, "check_saved", capture_check)
 
     class Widget:
         def __init__(self, *args, **kwargs):
@@ -57,6 +66,12 @@ async def test_actual_renderer_single_page_is_reported_successfully(
             pass
 
         def disable(self):
+            pass
+
+        def open(self):
+            return self
+
+        def close(self):
             pass
 
     def button(label, on_click):
@@ -94,20 +109,18 @@ async def test_actual_renderer_single_page_is_reported_successfully(
                 )
             },
             button=button,
+            download=lambda data, filename: downloads.append((data, filename)),
         ),
     )
     await page.shared_weekly_plan_page()
     widgets["起始日期"].value = edit.body.days[0].day.isoformat()
     widgets["结束日期"].value = edit.body.days[-1].day.isoformat()
     await buttons["打开 / 新建本周共享计划"]()
-    await buttons["检测保存版本的单页排版"]()
+    await buttons["保存"]()
+    await buttons["导出 Word"]()
     # Require actual WordPort protocol success before checking the UI's interpretation.
-    results = tuple(
-        ticket.value.rendered for ticket in exporting._checks._items.values()
-    )
-    assert len(results) == 1 and results[0].fits and results[0].pages == 1, results
-    assert results[0].reason == "fits"
-    assert any("实际单页检测通过" in widget.text for widget in labels), [
-        w.text for w in labels if "单页检测：" in w.text
-    ]
+    assert len(checks) == 1 and checks[0].fits and checks[0].pages == 1, checks
+    assert checks[0].reason == "fits"
+    assert downloads and downloads[0][0].startswith(b"PK")
+    assert any("完成排版检查并导出 Word" in widget.text for widget in labels)
     assert not any("实际排版检查未通过" in widget.text for widget in labels)

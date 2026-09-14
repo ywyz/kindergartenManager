@@ -85,7 +85,8 @@ def _inline_goals(text: str):
 
 def _games(text: str):
     result = []
-    for heading, block in _sections(text):
+    sections = _sections(text)
+    for section_index, (heading, block) in enumerate(sections):
         if heading not in ("集体游戏", "自主游戏"):
             continue
         kind = "collective" if heading == "集体游戏" else "autonomous"
@@ -103,7 +104,20 @@ def _games(text: str):
         else:
             name = _name(block)
             if name:
-                result.append((kind, name, (("name", name),)))
+                details = ()
+                for following, content in sections[section_index + 1 :]:
+                    if following in ("集体游戏", "自主游戏", "游戏区域", "体能大循环"):
+                        break
+                    if following == "重点指导" and _name(content) != name:
+                        break
+                    if following in ("活动目标", "目标"):
+                        details = _numbered(content, "goals")
+                        break
+                result.append((kind, name, (("name", name),) + details))
+    # The daily page also uses area-based outdoor plans. Preserve their named
+    # content for reuse without inventing a collective/autonomous classification.
+    if not result:
+        result.extend(("outdoor", name, values) for _, name, values in _areas(text))
     return tuple(result)
 
 
@@ -117,6 +131,13 @@ def _areas(text: str):
         names = tuple(n for part in parts if (n := _name(part)))
         if len(names) != len(parts):
             continue
+        if len(names) > 1:
+            focus = next(
+                (body for label, body in sections[i + 1 :] if label == "重点指导"), ""
+            )
+            focused = _name(focus)
+            if focused in names:
+                names = (focused,)
         values = ()
         # Several names share no implicit ownership of the following goals.
         if len(names) == 1:
@@ -127,6 +148,13 @@ def _areas(text: str):
                     break
                 if following in ("活动目标", "目标"):
                     values += _numbered(body, "goals")
+                elif (
+                    following == "材料"
+                    and body.strip()
+                    and len(body.strip()) <= 400
+                    and len(body.strip().encode()) <= 1600
+                ):
+                    values += (("materials", body.strip()),)
                 elif following in ("指导要点", "指导建议", "指导"):
                     values += _numbered(body, "guidance")
             if len({k for k, _ in values}) != len(values):

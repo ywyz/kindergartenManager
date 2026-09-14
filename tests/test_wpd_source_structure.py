@@ -66,7 +66,7 @@ def test_explicit_multiple_games_and_individual_goals_are_exact_substrings():
     assert len({c.option_id for c in choices}) == 3
 
 
-def test_single_area_goals_guidance_but_never_materials():
+def test_single_area_goals_guidance_and_existing_materials():
     text = "本周重点指导区域：建构区\n目标：\n1.合作搭建\n2.认识形状\n3.表达想法\n材料：木积木与纸盒\n指导要点：\n1.观察幼儿\n2.提供支持\n3.鼓励交流"
     (choice,) = extract_options(body(text, "indoor_area"))
     assert choice.kind == "area" and choice.name == "建构区"
@@ -75,6 +75,7 @@ def test_single_area_goals_guidance_but_never_materials():
         "goals.0": "合作搭建",
         "goals.1": "认识形状",
         "goals.2": "表达想法",
+        "materials": "木积木与纸盒",
         "guidance.0": "观察幼儿",
         "guidance.1": "提供支持",
         "guidance.2": "鼓励交流",

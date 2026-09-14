@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.repository.prompt_repository import get_active_prompt
 from app.service.academic_identity.contracts import IdentityRejected
 
-DEFAULT_VERSION = "weekly-authoring.prompt.v1"
+DEFAULT_VERSION = "weekly-authoring.prompt.v2"
 WEEKLY_LABELS = {
     "weekly_morning_talk": "周计划晨谈",
     "weekly_games": "周计划整周游戏",
@@ -19,7 +19,6 @@ WEEKLY_LABELS = {
     "weekly_environment": "周计划环境创设",
     "weekly_habits": "周计划生活习惯",
     "weekly_home": "周计划家园共育",
-    "weekly_reduction": "周计划篇幅缩减",
 }
 SCHEMA_INSTRUCTION = (
     '仅返回 JSON {"values": {"请求中的字段路径": "字符串"}}。'
@@ -49,13 +48,13 @@ REDUCTION_SCHEMA = (
     "不得修改表头、标题、名称、日期、数量、假期格、字体或行距。"
 )
 _TASK_RULES = {
-    "weekly_morning_talk": "按确认主题、独立活动名称与日期生成晨谈。",
+    "weekly_morning_talk": "按已有主题、独立活动名称与教学日期，仅生成晨间谈话主题或简要陈述内容。禁止问题设计、提问列表、疑问句、问答过程；不得仅删除问号而保留问题。",
     "weekly_games": "户外为体能大循环；整周两个集体游戏、一个自主游戏，每项三个目标。仅补全请求项。",
     "weekly_area": "固定标题1.户外游戏 2.区域游戏 3.专用室；一个重点区、三个目标、材料、三条指导。仅补全请求项。",
     "weekly_materials": "为确认的重点区和目标补充适龄、安全且可操作的材料。",
     "weekly_focus": "本周重点共三条，仅生成请求中的空项或明确选定项。",
     "weekly_environment": "环境创设共三条，仅生成请求中的空项或明确选定项。",
-    "weekly_habits": "生活习惯共三条，每条为习惯名：内容。",
+    "weekly_habits": "生活习惯按卫生、午餐、午睡三段填写，每段为习惯名：具体内容，仅补全请求中的缺项。",
     "weekly_home": "家园共育为一个简短段落。",
 }
 DEFAULT_PROMPTS = {

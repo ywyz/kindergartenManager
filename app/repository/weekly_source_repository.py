@@ -5,6 +5,7 @@ from sqlalchemy import insert, select
 from app.core.models.user import User
 from app.repository.source_mapping_repository import (
     DAILY,
+    EVENT,
     MAPPING,
     SourceMappingRepository,
 )
@@ -42,6 +43,92 @@ class WeeklySourceRepository(SourceMappingRepository):
         )
         return tuple((await self.session.execute(q)).mappings())
 
+    async def owned_identities(self, scope, user_id):
+        """Unmapped personal rows stay personal; no identity mapping is written.
+
+        A legacy label is usable only when it names one canonical class in this
+        semester. Existing mappings, including mappings to another class, win.
+        """
+        from app.core.models.academic_identity import TABLES
+
+        classes, semesters = TABLES["class_instance"], TABLES["class_semester"]
+        eligible = (
+            select(classes.c.id, classes.c.display_name, classes.c.grade)
+            .join(
+                semesters,
+                (semesters.c.tenant_id == classes.c.tenant_id)
+                & (semesters.c.class_instance_id == classes.c.id),
+            )
+            .where(
+                classes.c.tenant_id == self.tenant_id,
+                semesters.c.semester_id == scope.semester_id,
+            )
+        )
+        rows = (await self.session.execute(eligible)).mappings().all()
+        target = next((r for r in rows if r["id"] == scope.class_instance_id), None)
+        if (
+            target is None
+            or sum(
+                (r["display_name"], r["grade"])
+                == (target["display_name"], target["grade"])
+                for r in rows
+            )
+            != 1
+        ):
+            return ()
+        from datetime import timedelta
+
+        query = (
+            select(DAILY.c.id, DAILY.c.plan_date, DAILY.c.revision)
+            .where(
+                DAILY.c.tenant_id == self.tenant_id,
+                DAILY.c.user_id == user_id,
+                DAILY.c.class_name == target["display_name"],
+                DAILY.c.grade == target["grade"],
+                DAILY.c.plan_date >= scope.anchor_monday - timedelta(days=1),
+                DAILY.c.plan_date <= scope.anchor_monday + timedelta(days=5),
+                ~select(MAPPING.c.daily_plan_id)
+                .where(
+                    MAPPING.c.tenant_id == self.tenant_id,
+                    MAPPING.c.daily_plan_id == DAILY.c.id,
+                )
+                .exists(),
+            )
+            .order_by(DAILY.c.id)
+        )
+        events = (
+            (
+                await self.session.execute(
+                    select(EVENT)
+                    .where(
+                        EVENT.c.tenant_id == self.tenant_id,
+                        EVENT.c.source_user_id == user_id,
+                        EVENT.c.class_instance_id == scope.class_instance_id,
+                        EVENT.c.semester_id == scope.semester_id,
+                    )
+                    .order_by(EVENT.c.id)
+                )
+            )
+            .mappings()
+            .all()
+        )
+        latest = {e["daily_plan_id"]: e for e in events}
+        return tuple(
+            {
+                "tenant_id": self.tenant_id,
+                "daily_plan_id": r.id,
+                "source_user_id": user_id,
+                "source_date": r.plan_date,
+                "class_instance_id": scope.class_instance_id,
+                "semester_id": scope.semester_id,
+                "mapping_id": latest[r.id]["id"] if r.id in latest else r.id,
+                "revision": latest[r.id]["revision"] if r.id in latest else r.revision,
+                "owned_class_name": target["display_name"],
+                "owned_grade": target["grade"],
+            }
+            for r in (await self.session.execute(query))
+        )
+
     async def project(self, mapping):
         q = (
             select(
@@ -57,6 +144,18 @@ class WeeklySourceRepository(SourceMappingRepository):
             )
             .with_for_update()
         )
+        if "owned_class_name" in mapping:
+            q = q.where(
+                DAILY.c.class_name == mapping["owned_class_name"],
+                DAILY.c.grade == mapping["owned_grade"],
+                DAILY.c.user_id == mapping["source_user_id"],
+                ~select(MAPPING.c.daily_plan_id)
+                .where(
+                    MAPPING.c.tenant_id == self.tenant_id,
+                    MAPPING.c.daily_plan_id == DAILY.c.id,
+                )
+                .exists(),
+            )
         row = (await self.session.execute(q)).mappings().one_or_none()
         if row is None or (row["user_id"], row["plan_date"]) != (
             mapping["source_user_id"],

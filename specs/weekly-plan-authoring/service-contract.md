@@ -1,3 +1,5 @@
+> 当前产品依据：2026-09-14 [本人自动填写与页面精简](autofill-20260914.md) 覆盖本文中冲突的来源选择、晨谈问题、材料强制生成及显式缩减交互。下方阶段记录保留历史，不表示本次已验收或上线。
+
 # 2026-09-11 WP-D 当前真实服务入口
 
 `shared_weekly/production_composition.py` 的 `composition.authoring` 为 `AuthoringApplication`。当前方法包括 `begin_authoring`／`begin_edit`、`header`、`calendar_changes`、`check_authoring_sources`、`update_edit`／`update_slots`、`propose_import`、`list_structure`／`propose_structure`、`generate_missing`／`regenerate`、`adopt_generated` 和 `save_edit`。这些是应用入口；下方 WP-A 拟定名称保留历史，不当作额外承诺。

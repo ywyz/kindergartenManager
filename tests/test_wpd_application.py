@@ -121,7 +121,7 @@ async def test_missing_daily_name_zero_ai_then_manual_name_and_morning(
     p = await app.generate_missing(
         world[2][3], edit.page_id, edit.page, "weekly_morning_talk"
     )
-    assert len(p.differences) == 10
+    assert len(p.differences) == 5
     edit = await app.adopt_generated(
         world[2][3], p.candidate_id, edit.page, confirmed=True
     )
