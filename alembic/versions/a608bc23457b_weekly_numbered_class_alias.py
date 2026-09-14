@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import sqlalchemy as sa
+
 from alembic import op, util
 
 revision = "a608bc23457b"

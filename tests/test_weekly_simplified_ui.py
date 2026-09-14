@@ -4,6 +4,8 @@ import asyncio
 from datetime import date
 from types import SimpleNamespace
 
+import pytest
+
 from app.integration.ai_client import weekly_authoring_client as ai
 from app.service.shared_weekly.page_application import WeeklyPageApplication
 from app.service.shared_weekly.people_application import PeopleDefaultsApplication
@@ -122,7 +124,7 @@ def _patch_ui(monkeypatch):
 
 
 async def _rendered_page(world, monkeypatch):
-    author, edit, _unused, _calls = await ready(world, monkeypatch)
+    author, edit, _ids, calls = await ready(world, monkeypatch)
     exporter = _Exporter()
     services = SimpleNamespace(
         authoring=author,
@@ -149,7 +151,16 @@ async def _rendered_page(world, monkeypatch):
     widgets["起始日期"][-1].value = edit.body.days[0].day.isoformat()
     widgets["结束日期"][-1].value = edit.body.days[-1].day.isoformat()
     await buttons["打开 / 新建本周共享计划"]()
-    return author, edit, exporter, widgets, labels, buttons, downloads
+    return (
+        author,
+        edit,
+        exporter,
+        widgets,
+        labels,
+        buttons,
+        downloads,
+        calls,
+    )
 
 
 async def test_simplified_weekly_flow_autofills_and_exports_inside_flow(
@@ -163,6 +174,7 @@ async def test_simplified_weekly_flow_autofills_and_exports_inside_flow(
         labels,
         buttons,
         downloads,
+        _calls,
     ) = await _rendered_page(world, monkeypatch)
 
     current_views = [ticket.value.view for ticket in author._pages._items.values()]
@@ -174,6 +186,7 @@ async def test_simplified_weekly_flow_autofills_and_exports_inside_flow(
 
     assert "AI 补全缺失内容" in buttons
     assert "保存" in buttons and "导出 Word" in buttons
+    assert "生成栏目" not in widgets
     for removed in (
         "检查来源变化",
         "选择游戏与区域结构",
@@ -255,6 +268,7 @@ async def test_simplified_generation_discards_late_result_after_edit(
         _labels,
         buttons,
         _downloads,
+        _calls,
     ) = await _rendered_page(world, monkeypatch)
     # Leave one summary slot empty so the user-triggered generation reaches AI.
     focus = widgets["本周重点 1"][-1]
@@ -267,7 +281,7 @@ async def test_simplified_generation_discards_late_result_after_edit(
     async def delayed(_prompt, _payload, _config):
         started.set()
         await release.wait()
-        return {"values": {"focus.0": "迟到候选"}}
+        return {"values": {p: "迟到候选" + p for p in _payload["fields"]}}
 
     monkeypatch.setattr(ai, "generate", delayed)
     pending = asyncio.create_task(buttons["AI 补全缺失内容"]())
@@ -280,3 +294,140 @@ async def test_simplified_generation_discards_late_result_after_edit(
     release.set()
     await pending
     assert not author._generated._items
+    assert any("正文保持" in widget.text for widget in _labels)
+
+
+async def test_one_click_fills_all_missing_retained_tasks_in_sequence(
+    world, monkeypatch
+):
+    (
+        author,
+        original,
+        _exporter,
+        widgets,
+        labels,
+        buttons,
+        _downloads,
+        calls,
+    ) = await _rendered_page(world, monkeypatch)
+    # A manually kept value must survive the whole all-missing sequence.
+    focus = widgets["本周重点 1"][-1]
+    focus.value = "手填重点"
+    if focus.on_change:
+        focus.on_change()
+
+    # A single click completes the whole sequence: no per-task confirmation.
+    await buttons["AI 补全缺失内容"]()
+
+    # The complete morning-talk section raises no_missing_content and is the
+    # only skip reason; every other task was generated and adopted directly.
+    assert [payload["task"] for payload in calls] == [
+        "weekly_games",
+        "weekly_area",
+        "weekly_materials",
+        "weekly_focus",
+        "weekly_environment",
+        "weekly_habits",
+        "weekly_home",
+    ]
+
+    current = next(
+        view
+        for view in (ticket.value.view for ticket in author._pages._items.values())
+        if view.page_id != original.page_id
+    )
+    body = current.body
+    assert body.value_at("focus.0") == "手填重点"
+    assert body.value_at("games.collective.0.name") == "内容games.collective.0.name"
+    assert body.value_at("area.materials") == "内容area.materials"
+    assert body.value_at("home") == "内容home"
+    assert (
+        next(d for d in body.days if d.day == date(2026, 9, 9)).activity_name == "活动"
+    )
+    assert not author._generated._items
+    assert any("已补全可生成内容" in widget.text for widget in labels)
+    assert "明确采用" not in buttons
+
+
+async def test_stale_user_edit_stops_remaining_tasks_and_keeps_completed(
+    world, monkeypatch
+):
+    (
+        author,
+        original,
+        _exporter,
+        widgets,
+        labels,
+        buttons,
+        _downloads,
+        _calls,
+    ) = await _rendered_page(world, monkeypatch)
+
+    index = {"n": 0}
+    blocked, release = asyncio.Event(), asyncio.Event()
+
+    async def staged(_prompt, payload, _config):
+        index["n"] += 1
+        if index["n"] == 2:
+            blocked.set()
+            await release.wait()
+        return {"values": {p: "内容" + p for p in payload["fields"]}}
+
+    monkeypatch.setattr(ai, "generate", staged)
+    pending = asyncio.create_task(buttons["AI 补全缺失内容"]())
+    # The first weekly task (weekly_games) was adopted; the second
+    # (weekly_area) generation is still in flight.
+    await asyncio.wait_for(blocked.wait(), 3)
+    focus = widgets["本周重点 1"][-1]
+    focus.value = "用户手填"
+    if focus.on_change:
+        focus.on_change()
+    release.set()
+    await pending
+
+    current = next(
+        view
+        for view in (ticket.value.view for ticket in author._pages._items.values())
+        if view.page_id != original.page_id
+    )
+    body = current.body
+    # Already completed tasks are retained...
+    assert body.value_at("games.collective.0.name") == "内容games.collective.0.name"
+    # ...manual edits win over the stale in-flight candidate, which never applies.
+    assert focus.value == "用户手填"
+    assert body.value_at("area.materials") == ""
+    assert not author._generated._items
+    assert any(
+        "本次补全已停止" in widget.text and "正文保持" in widget.text
+        for widget in labels
+    )
+
+
+async def test_late_adoption_cannot_replace_a_new_week(monkeypatch):
+    started, release = asyncio.Event(), asyncio.Event()
+    actor = SimpleNamespace(user_id=3)
+    old = SimpleNamespace(page="old", page_id="old-week")
+    fresh = SimpleNamespace(page="new", page_id="new-week")
+
+    async def live(expected):
+        return expected
+
+    async def delayed(*args, **kwargs):
+        started.set()
+        await release.wait()
+        return old
+
+    monkeypatch.setattr(page, "require_bound_ui_session", live)
+    editor = page.WeeklyEditor(
+        SimpleNamespace(authoring=SimpleNamespace(adopt_generated=delayed)), actor
+    )
+    editor.edit = old
+    editor.proposal = SimpleNamespace(candidate_id="old-candidate")
+    pending = asyncio.create_task(editor.adopt())
+    await started.wait()
+    editor.edit = fresh
+    editor.ui_revision += 1
+    release.set()
+    with pytest.raises(ValueError, match="page_stale"):
+        await pending
+    assert editor.edit is fresh
