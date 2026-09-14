@@ -32,7 +32,7 @@ def test_export_migration_empty_roundtrip_and_single_head(migration_db):
     assert "shared_weekly_export_audit" not in sa.inspect(engine).get_table_names()
     command.upgrade(config, "head")
     heads = ScriptDirectory.from_config(config).get_heads()
-    assert heads == ["d375e9ab2148"]
+    assert heads == ["e486fa012359"]
     with engine.connect() as connection:
         assert (
             connection.execute(
