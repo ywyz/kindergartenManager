@@ -1,5 +1,6 @@
 """可信 UI 会话登录页（路由：/login）。"""
 
+from fastapi import HTTPException
 from nicegui import app, ui
 
 from app.core.config import settings
@@ -13,8 +14,27 @@ from app.ui.auth_context import TrustedUiSession, resolve_current_ui_session
 logger = get_logger(__name__)
 
 
+def _login_tenant(requested: int | None) -> int:
+    allowed = {settings.BOOTSTRAP_ADMIN_TENANT_ID}
+    configured = settings.UI_LOGIN_TENANT_IDS
+    if configured:
+        parts = configured.split(",")
+        if len(parts) > 32 or any(
+            not part.isascii() or not part.isdecimal() or int(part) <= 0
+            for part in parts
+        ):
+            raise HTTPException(503, "Login tenant configuration unavailable")
+        allowed.update(map(int, parts))
+    tenant = settings.BOOTSTRAP_ADMIN_TENANT_ID if requested is None else requested
+    if type(tenant) is not int or tenant not in allowed:
+        raise HTTPException(404, "Login unavailable")
+    return tenant
+
+
 async def _load_login_page_state(
     token: str | None,
+    *,
+    tenant_id: int | None = None,
 ) -> tuple[TrustedUiSession | None, bool, bool]:
     """返回 current/admin-ready/database-available；DB 失败时清除旧 token。"""
     try:
@@ -22,9 +42,9 @@ async def _load_login_page_state(
             current = await resolve_current_ui_session(session, token)
             admin_ready = await has_active_sys_admin(
                 session,
-                tenant_id=settings.BOOTSTRAP_ADMIN_TENANT_ID,
+                tenant_id=_login_tenant(tenant_id),
             )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - redact database/authentication errors
         logger.error(
             "login_page_session_validation_failed error_type=%s",
             type(exc).__name__,
@@ -36,9 +56,12 @@ async def _load_login_page_state(
 
 
 @ui.page("/login")
-async def login_page() -> None:
+async def login_page(tenant_id: int | None = None) -> None:
+    selected_tenant = _login_tenant(tenant_id)
     token = app.storage.user.get("token")
-    current, admin_ready, database_available = await _load_login_page_state(token)
+    current, admin_ready, database_available = await _load_login_page_state(
+        token, tenant_id=selected_tenant
+    )
     if current is not None:
         ui.navigate.to("/home")
         return
@@ -101,7 +124,7 @@ async def login_page() -> None:
                 async with AsyncSessionLocal() as session:
                     token_value = await login(
                         session,
-                        tenant_id=settings.BOOTSTRAP_ADMIN_TENANT_ID,
+                        tenant_id=selected_tenant,
                         username=username,
                         password=password,
                     )
@@ -118,7 +141,7 @@ async def login_page() -> None:
                     "用户名或密码错误、账号不可用；旧单用户安装请先运行管理员初始化命令重设密码"
                 )
                 error_label.classes(remove="hidden")
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - redact database/authentication errors
                 if not login_attempt_is_current(generation, owned_token):
                     return
                 logger.warning(
