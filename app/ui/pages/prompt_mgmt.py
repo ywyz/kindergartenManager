@@ -8,6 +8,7 @@
 - area_game：区域游戏
 - outdoor_game：户外游戏
 - daily_reflection：一日活动反思
+- weekly_*：每周工作计划各分项
 
 功能：
 - 查看并编辑当前激活提示词
@@ -56,7 +57,6 @@ from app.repository.prompt_repository import (
 )
 from app.service.shared_weekly.prompt_contracts import (
     DEFAULT_PROMPTS,
-    REDUCTION_SCHEMA,
     SCHEMA_INSTRUCTION,
     WEEKLY_LABELS,
 )
@@ -191,7 +191,6 @@ _TASK_SCHEMA: dict[str, str] = {
 }
 
 _TASK_SCHEMA.update({task: SCHEMA_INSTRUCTION for task in WEEKLY_LABELS})
-_TASK_SCHEMA["weekly_reduction"] = REDUCTION_SCHEMA
 
 # 测试区输入框提示文字
 _TEST_PLACEHOLDER: dict[str, str] = {
@@ -239,7 +238,7 @@ async def prompt_mgmt_page() -> None:
             tab_one_on_one_listening = ui.tab("一对一倾听")
             tab_homemade_teaching = ui.tab("自制教玩具")
             tab_course_review_activity = ui.tab("课程审议")
-            weekly_tabs = {task: ui.tab(label) for task, label in WEEKLY_LABELS.items()}
+            weekly_tab = ui.tab("每周工作计划")
 
         with ui.tab_panels(tabs, value=tab_split).classes("w-full"):
             with ui.tab_panel(tab_split):
@@ -281,9 +280,14 @@ async def prompt_mgmt_page() -> None:
                     ui_session, require_live_session, "course_review_activity"
                 )
 
-            for task, tab in weekly_tabs.items():
-                with ui.tab_panel(tab):
-                    await _build_task_panel(ui_session, require_live_session, task)
+            with ui.tab_panel(weekly_tab):
+                ui.label("每周工作计划").classes("text-lg font-semibold text-blue-700")
+                ui.label(
+                    "以下分项共用周计划生成链路；保存或回滚后，下一次生成会读取当前激活版本。"
+                ).classes("text-sm text-gray-500")
+                with ui.expansion("周计划分项提示词", value=True).classes("w-full"):
+                    for task in WEEKLY_LABELS:
+                        await _build_task_panel(ui_session, require_live_session, task)
 
 
 async def _build_task_panel(
@@ -437,7 +441,7 @@ async def _build_task_panel(
     # ── 在线测试 ──────────────────────────────────────────────────────────────
     if task_type in WEEKLY_LABELS:
         ui.label(
-            "周计划提示词请在已授权的周计划撰写操作中测试；需确认来源并按固定结构生成候选。保存或回滚提示词会使待采用候选失效。"
+            "周计划提示词请在已授权的周计划撰写操作中测试；系统会按当前激活版本补全缺失栏目。保存或回滚提示词会使待采用候选失效。"
         )
 
     with ui.expansion("🧪 测试提示词效果", icon="science").classes(

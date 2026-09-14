@@ -44,6 +44,9 @@ class WeeklySourceApplication(SharedWeeklyApplication):
         self._lists = CandidateStore()
         self._selections = CandidateStore()
 
+    async def _source_identities(self, repo, scope, actor):
+        return await repo.identities(scope)
+
     async def _pre_sources(self, expected, plan_id):
         async with self._identity._factory() as session:
             actor = await resolve_current_ui_session(
@@ -54,9 +57,9 @@ class WeeklySourceApplication(SharedWeeklyApplication):
             roots = SharedWeeklyRepository(session, actor.tenant_id)
             root = await roots.root(plan_id)
             scope = roots.scope(root)
-            identities = await WeeklySourceRepository(
-                session, actor.tenant_id
-            ).identities(scope)
+            identities = await self._source_identities(
+                WeeklySourceRepository(session, actor.tenant_id), scope, actor
+            )
         return scope, identities
 
     @asynccontextmanager
@@ -73,7 +76,7 @@ class WeeklySourceApplication(SharedWeeklyApplication):
             assignments = await sources.lock_scopes(
                 identity, [(scope.class_instance_id, scope.semester_id)]
             )
-            after = await sources.identities(scope)
+            after = await self._source_identities(sources, scope, actor)
             if after != before:
                 if not checking:
                     raise IdentityRejected("source_unavailable")

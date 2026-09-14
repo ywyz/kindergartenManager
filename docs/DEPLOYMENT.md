@@ -261,7 +261,7 @@ review 执行 `seal`；它只生成 catalog，不激活应用，不代表云端�
 `KM_WEEKLY_LAYOUT_CATALOG_DIR` 是 Compose 使用的宿主绝对路径，须预先存在；overlay 不创建空目录掩盖缺失材料。
 资格只决定对应租户能否使用受控版式，不赋予教师查看／编辑其他租户或班级的权限。
 缺配置保持未启用；配置不完整、模板／材料 hash／profile／实际 LO 版本漂移拒绝启动或导出。
-`local-synthetic` 不能作为生产资格。超页必须由教师手动缩短并保存后重新检测；导出仍绑定通过检测的保存版本。
+`local-synthetic` 不能作为生产资格。单页检查在导出流程内完成；超页保留正文并提示教师调整、保存后再次导出，不提供单独检测或篇幅缩减按钮，也不自动删改正文。导出仍绑定通过检测的保存版本。
 
 
 跨迁移升级可显式提供 `--recovery-image <已在隔离数据库验证的兼容OCI index>`，仅允许与 migration receipt 一起用于 deploy。

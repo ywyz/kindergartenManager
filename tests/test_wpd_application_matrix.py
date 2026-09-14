@@ -43,7 +43,7 @@ async def test_closed_candidate_id_rejects_without_consuming_valid_candidate(
 @pytest.mark.parametrize(
     "task,count",
     [
-        ("weekly_morning_talk", 10),
+        ("weekly_morning_talk", 5),
         ("weekly_games", 12),
         ("weekly_area", 7),
         ("weekly_materials", 1),
@@ -229,9 +229,9 @@ async def test_multiple_source_options_require_explicit_choice_and_ai_only_fills
     edit = await adopt(world, app, edit, ids[0])
     daily_before = await rows(world, DAILY)
     task = "weekly_games" if kind == "games" else "weekly_area"
-    with pytest.raises(IdentityRejected, match="source_selection_required"):
-        await app.generate_missing(actor, edit.page_id, edit.page, task)
-    assert calls == []
+    missing = await app.generate_missing(actor, edit.page_id, edit.page, task)
+    assert calls[-1]["context"]["available"]
+    app.cancel_generated(actor, missing.candidate_id)
     assert app._page(actor, edit.page_id).view == edit
     listed = await app.list_structure(actor, edit.page_id, edit.page)
     assert len(listed.options) == 2

@@ -66,13 +66,20 @@ def _complete(body):
         )
     ):
         raise LayoutRejected("required_fields_missing")
+    from app.service.shared_weekly.autofill import morning_summary
+
     for day, teaching, label in body.calendar.columns:
         item = next(d for d in body.days if d.day == day)
+        if (
+            teaching
+            and morning_summary(item.morning_talk_topic)
+            != item.morning_talk_topic.strip()
+        ):
+            raise LayoutRejected("morning_topic_required")
         if teaching and any(
             not getattr(item, field).strip()
             for field in (
                 "morning_talk_topic",
-                "morning_talk_questions",
                 "activity_name",
             )
         ):
@@ -150,11 +157,7 @@ def fill_document(
     for offset, (day, teaching, label) in enumerate(body.calendar.columns, 2):
         table.cell(0, offset).text = f"周{'一二三四五六日'[day.weekday()]}"
         item = body.days[offset - 2]
-        table.cell(1, offset).text = (
-            f"{item.morning_talk_topic}\n{item.morning_talk_questions}"
-            if teaching
-            else label
-        )
+        table.cell(1, offset).text = item.morning_talk_topic if teaching else label
         table.cell(2, offset).text = item.activity_name if teaching else ""
     table.cell(1, 0).merge(table.cell(2, 0)).text = "学习\n活动"
     table.cell(1, 1).text = "晨间\n谈话"

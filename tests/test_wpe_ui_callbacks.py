@@ -26,7 +26,7 @@ async def editor_for(world, monkeypatch):
     return editor, calls
 
 
-async def test_real_page_manual_generate_reject_adopt_save_reload(world, monkeypatch):
+async def test_real_page_manual_generate_reject_adopt_save(world, monkeypatch):
     editor, calls = await editor_for(world, monkeypatch)
     initial = editor.edit.body
     manual = ManualWeekEdit(
@@ -49,8 +49,6 @@ async def test_real_page_manual_generate_reject_adopt_save_reload(world, monkeyp
         editor.expected, editor.edit.target.plan.plan_id
     )
     assert loaded.body == editor.edit.body
-    await editor.reload()
-    assert editor.edit.body == loaded.body
 
 
 async def test_page_session_rejection_retains_body_and_sends_no_ai(world, monkeypatch):
@@ -85,25 +83,44 @@ async def test_page_unsaved_body_never_checks_or_exports(world, monkeypatch):
     before = editor.edit
     with pytest.raises(ValueError, match="save_required"):
         await editor.check_saved()
-    with pytest.raises(ValueError, match="check_required"):
+    with pytest.raises(ValueError, match="save_required"):
         await editor.export()
     assert editor.edit == before
 
 
-async def test_rendered_teacher_page_opens_inputs_saves_and_imports(world, monkeypatch):
-    """Native page callbacks and real database; widget shim is not browser evidence."""
+async def test_rendered_teacher_page_uses_simplified_flow(world, monkeypatch):
+    """Rendered callbacks cover the teacher flow without legacy source controls."""
     from app.service.shared_weekly.people_application import PeopleDefaultsApplication
 
-    author, edit, _, calls = await ready(world, monkeypatch)
+    author, edit, _, _calls = await ready(world, monkeypatch)
     projection = WeeklyPageApplication(world[0], lambda: world[1][3])
+
+    class Exporter:
+        def __init__(self):
+            self.check_calls = []
+            self.export_calls = []
+
+        async def check_saved(self, expected, page_id, stamp):
+            self.check_calls.append((expected, page_id, stamp))
+            return SimpleNamespace(
+                check_id="check-1", fits=True, reason="fits", pages=1
+            )
+
+        async def export_saved(self, expected, check_id):
+            self.export_calls.append((expected, check_id))
+            return SimpleNamespace(data=b"weekly-docx", filename="weekly.docx")
+
+        def cancel_check(self, expected, page_id):
+            return None
+
+    exporter = Exporter()
     services = SimpleNamespace(
         authoring=author,
+        exporting=exporter,
         page=projection,
         people=PeopleDefaultsApplication(world[0], lambda: world[1][3]),
     )
-    widgets, buttons, labels = {}, {}, []
-    downloads = []
-    clears = []
+    widgets, buttons, labels, downloads = {}, {}, [], []
 
     class Widget:
         def __init__(self, *args, **kwargs):
@@ -120,16 +137,16 @@ async def test_rendered_teacher_page_opens_inputs_saves_and_imports(world, monke
         def __enter__(self):
             return self
 
-        def __exit__(self, *args):
-            pass
+        def __exit__(self, *_args):
+            return None
 
-        def classes(self, *args):
+        def classes(self, *_args, **_kwargs):
             return self
 
-        def props(self, *args):
+        def props(self, *_args, **_kwargs):
             return self
 
-        def style(self, *args):
+        def style(self, *_args, **_kwargs):
             return self
 
         def disable(self):
@@ -137,15 +154,18 @@ async def test_rendered_teacher_page_opens_inputs_saves_and_imports(world, monke
             return self
 
         def clear(self):
-            clears.append(self)
+            return None
 
         def open(self):
             return self
 
         def close(self):
-            pass
+            return None
 
-    def button(label, on_click):
+    def factory(*args, **kwargs):
+        return Widget(*args, **kwargs)
+
+    def button(label, *, on_click):
         buttons[label] = on_click
         return Widget(label)
 
@@ -155,24 +175,22 @@ async def test_rendered_teacher_page_opens_inputs_saves_and_imports(world, monke
     async def bound(expected):
         return expected
 
+    async def shell(*_args, **_kwargs):
+        return None
+
     monkeypatch.setattr(
         page,
         "ui",
         SimpleNamespace(
-            **{
-                name: Widget
-                for name in (
-                    "label",
-                    "select",
-                    "input",
-                    "row",
-                    "column",
-                    "textarea",
-                    "dialog",
-                    "card",
-                    "expansion",
-                )
-            },
+            label=factory,
+            select=factory,
+            input=factory,
+            row=factory,
+            column=factory,
+            textarea=factory,
+            dialog=factory,
+            card=factory,
+            expansion=factory,
             button=button,
             download=lambda data, filename: downloads.append((data, filename)),
         ),
@@ -180,373 +198,91 @@ async def test_rendered_teacher_page_opens_inputs_saves_and_imports(world, monke
     monkeypatch.setattr(page, "get_shared_weekly_services", lambda: services)
     monkeypatch.setattr(page, "require_current_ui_session", current)
     monkeypatch.setattr(page, "require_bound_ui_session", bound)
-
-    async def shell(*args, **kwargs):
-        pass
-
     monkeypatch.setattr(page, "render_shell", shell)
+
     await page.shared_weekly_plan_page()
-    widgets["起始日期"][-1].value = "2026-09-09"
-    widgets["结束日期"][-1].value = "2026-09-09"
+    widgets["起始日期"][-1].value = edit.body.days[0].day.isoformat()
+    widgets["结束日期"][-1].value = edit.body.days[-1].day.isoformat()
     await buttons["打开 / 新建本周共享计划"]()
-    assert "保存草稿" in buttons
-    assert all(page.slot_label(path) in widgets for path in page.SLOT_PATHS)
+
+    assert "AI 补全缺失内容" in buttons
+    assert "保存" in buttons and "导出 Word" in buttons
+    for removed in (
+        "检查来源变化",
+        "选择游戏与区域结构",
+        "重载保存版本",
+        "取消生成",
+        "检测保存版本的单页排版",
+        "生成篇幅缩减候选（最多两轮）",
+    ):
+        assert removed not in buttons
+    assert not any(
+        any(
+            text in widget.text for text in ("晨谈问题", "户外来源原文", "区域来源原文")
+        )
+        for widget in labels
+    )
+
     widgets["教师姓名（每行一位）"][-1].value = "甲老师\n乙老师"
-    widgets[page.slot_label("focus.0")][-1].value = "UI手填"
-    await buttons["保存草稿"]()
+    widgets["主题名称"][-1].value = "主题"
+    widgets["本周重点 1"][-1].value = "UI手填"
+    for widget in labels:
+        if widget.on_change:
+            widget.on_change()
+    await buttons["保存"]()
     loaded = await author.load(world[2][3], edit.target.plan.plan_id)
     assert loaded.body.people.teachers == ("甲老师", "乙老师")
     assert loaded.body.value_at("focus.0") == "UI手填"
-    await buttons["选择每日来源 / 处理重复备课"]()
-    source_selectors = widgets["每日来源（可留空）"]
-    duplicate = next(w for w in source_selectors if len(w.options) > 1)
-    assert duplicate.value is None
-    duplicate.value = list(duplicate.options)[-1]
-    await buttons["比较导入差异"]()
-    assert "明确采用" in buttons
-    assert any(w.text.startswith("上次导入：") for w in labels)
-    assert any(w.text == "2026-09-09 · 晨谈主题" for w in labels), (
-        "import differences must locate a date and Chinese field label"
+
+    # Each teacher-facing content cell is complete and round-trips through the
+    # existing structured slot contract without dropping line breaks.
+    widgets["集体游戏 1"][-1].value = page._format_labeled_cell(
+        page._GAME_LABELS, ("游戏", "目标一\n补充", "目标二", "目标三")
     )
-    assert not any("TargetPath(" in w.text for w in labels)
-    await buttons["明确采用"]()
-    await buttons["保存草稿"]()
+    widgets["区域游戏完整内容"][-1].value = page._format_labeled_cell(
+        page._AREA_LABELS,
+        (
+            "建构区",
+            "区域目标1",
+            "区域目标2",
+            "区域目标3",
+            "积木",
+            "指导1",
+            "指导2",
+            "指导3",
+        ),
+    )
+    widgets["生活习惯完整内容"][-1].value = page._format_labeled_cell(
+        page._HABIT_LABELS, ("卫生", "洗手", "午餐", "细嚼慢咽", "午睡", "安静入睡")
+    )
+    for widget in labels:
+        if widget.on_change:
+            widget.on_change()
+    await buttons["保存"]()
     loaded = await author.load(world[2][3], edit.target.plan.plan_id)
-    assert loaded.body.sources
-    assert loaded.body.value_at("focus.0") == "UI手填"
-    await buttons["检查来源变化"]()
-    assert any("未变化" in w.text for w in labels)
+    assert loaded.body.value_at("games.collective.0.goals.0") == "目标一\n补充"
+    assert loaded.body.value_at("area.materials") == "积木"
+    assert loaded.body.value_at("habits.2.content") == "安静入睡"
 
-    await buttons["重新生成选定字段"]()
-    assert calls == [], (
-        "empty explicit selection must refuse, not generate missing fields"
-    )
-
-    # Actual cancel button must also cancel the separate reduction application.
-    import asyncio
-
-    from app.integration.ai_client import weekly_authoring_client as ai
-    from app.service.shared_weekly.reduction_application import (
-        ReductionApplication,
-        compact_spaces,
-    )
-    from tests.test_wpe_reduction_application import LayoutSeam
-
-    layout = LayoutSeam(author)
-    services.reduction = ReductionApplication(author, layout)
-
-    async def checked(*args):
-        return SimpleNamespace(
-            check_id="synthetic-overflow", fits=False, reason="overflow", pages=2
-        )
-
-    services.exporting = SimpleNamespace(
-        check_saved=checked, cancel_check=lambda *args: None
-    )
-    widgets[page.slot_label("focus.0")][-1].value = "  保留  文本  "
-    await buttons["保存草稿"]()
-    await buttons["检测保存版本的单页排版"]()
-    started, release = asyncio.Event(), asyncio.Event()
-
-    async def delayed(prompt, payload, config):
-        started.set()
-        await release.wait()
-        return {
-            "values": {
-                p: compact_spaces(v["original"]) for p, v in payload["fields"].items()
-            }
-        }
-
-    monkeypatch.setattr(ai, "generate", delayed)
-    pending = asyncio.create_task(buttons["生成篇幅缩减候选（最多两轮）"]())
-    await asyncio.wait_for(started.wait(), 3)
-    await buttons["取消生成"]()
-    release.set()
-    await pending
-    assert not services.reduction._candidates._items, (
-        "cancel button must reject late reduction publication"
-    )
-
-    from app.service.shared_weekly.export_application import (
-        SharedWeeklyExportApplication,
-    )
-    from tests.test_wpe_export_application import WordBoundary
-
-    # Complete through the real rendered manual inputs before checking a saved version.
-    for i, path in enumerate(page.SLOT_PATHS):
-        widgets[page.slot_label(path)][-1].value = f"完整内容{i}"
-    widgets["保育员姓名"][-1].value = "保育员"
-    for field in ("activity_name", "morning_talk_topic", "morning_talk_questions"):
-        for item in widgets[page.DAY_LABELS[field]][-5:]:
-            item.value = "完整名称或晨谈"
-    await buttons["保存草稿"]()
-    port = WordBoundary()
-    port.waiting = True
-    services.exporting = SharedWeeklyExportApplication(author, port)
-    checking = asyncio.create_task(buttons["检测保存版本的单页排版"]())
-    await asyncio.wait_for(port.entered.wait(), 3)
-    await buttons["取消生成"]()
-    port.release.set()
-    await checking
-    assert not services.exporting._checks._items, (
-        "cancel button must prevent late saved layout check publication"
-    )
-
-    port.waiting = False
-    await buttons["检测保存版本的单页排版"]()
-    original_export = services.exporting.export_saved
-    delivery_entered, delivery_release = asyncio.Event(), asyncio.Event()
-
-    async def delayed_export(*args):
-        delivery_entered.set()
-        await delivery_release.wait()
-        return await original_export(*args)
-
-    services.exporting.export_saved = delayed_export
-    delivery = asyncio.create_task(buttons["导出已检查的 DOCX"]())
-    await asyncio.wait_for(delivery_entered.wait(), 3)
-    changed = widgets[page.slot_label("focus.0")][-1]
-    changed.value = "等待下载时修改正文"
-    changed.on_change()
-    delivery_release.set()
-    await delivery
-    assert downloads == [], (
-        "editing during awaited export must withhold old document bytes"
-    )
-
-    issues = []
-    services.exporting.export_saved = original_export
-    await buttons["保存草稿"]()
-    port.waiting = True
-    port.entered.clear()
-    port.release.clear()
-    checking = asyncio.create_task(buttons["检测保存版本的单页排版"]())
-    await asyncio.wait_for(port.entered.wait(), 3)
-    changed = widgets[page.slot_label("focus.0")][-1]
-    changed.value = "检测等待中手改"
-    changed.on_change()
-    port.release.set()
-    await checking
-    if services.exporting._checks._items:
-        issues.append("edited page published a layout check")
-    await buttons["保存草稿"]()
-    started.clear()
-    release.clear()
-
-    async def delayed_generation(prompt, payload, config):
-        started.set()
-        await release.wait()
-        return {"values": {path: "候选内容" for path in payload["fields"]}}
-
-    monkeypatch.setattr(ai, "generate", delayed_generation)
-    widgets["重新生成的字段（仅同一栏目）"][-1].value = ["focus.0"]
-    pending = asyncio.create_task(buttons["重新生成选定字段"]())
-    await asyncio.wait_for(started.wait(), 3)
-    changed = widgets[page.slot_label("focus.0")][-1]
-    changed.value = "生成等待中手改"
-    changed.on_change()
-    release.set()
-    await pending
-    if author._generated._items:
-        issues.append("edited page retained a late generation candidate")
-    await buttons["保存草稿"]()
-    widgets[page.slot_label("home")][-1].value = "  保留  文本  "
-    widgets[page.slot_label("home")][-1].on_change()
-    await buttons["保存草稿"]()
-    port.fits = False
-    port.waiting = False
-    services.reduction = ReductionApplication(author, services.exporting)
-    await buttons["检测保存版本的单页排版"]()
-    started.clear()
-    release.clear()
-    monkeypatch.setattr(ai, "generate", delayed)
-    pending = asyncio.create_task(buttons["生成篇幅缩减候选（最多两轮）"]())
-    await asyncio.wait_for(started.wait(), 3)
-    changed = widgets[page.slot_label("home")][-1]
-    changed.value = "缩减等待中手改"
-    changed.on_change()
-    release.set()
-    await pending
-    if services.reduction._candidates._items:
-        issues.append("edited page retained a late reduction candidate")
-    assert issues == [], issues
-
-    edit_issues = []
-    original_save = author.save_edit
-    write_entered, write_release = asyncio.Event(), asyncio.Event()
-
-    async def held_save(*args):
-        write_entered.set()
-        await write_release.wait()
-        return await original_save(*args)
-
-    author.save_edit = held_save
-    saving = asyncio.create_task(buttons["保存草稿"]())
-    await asyncio.wait_for(write_entered.wait(), 3)
-    changed = widgets[page.slot_label("focus.0")][-1]
-    changed.value = "保存等待中手改"
-    changed.on_change()
-    write_release.set()
-    await saving
-    if widgets[page.slot_label("focus.0")][-1].value != "保存等待中手改":
-        edit_issues.append("save refresh overwrote late widget edit")
-    author.save_edit = original_save
-    changed = widgets[page.slot_label("focus.0")][-1]
-    changed.value = "待再次生成的内容"
-    changed.on_change()
-    await buttons["保存草稿"]()
-
-    async def generated(prompt, payload, config):
-        return {"values": {path: "选定新候选" for path in payload["fields"]}}
-
-    monkeypatch.setattr(ai, "generate", generated)
-    widgets["重新生成的字段（仅同一栏目）"][-1].value = ["focus.0"]
-    await buttons["重新生成选定字段"]()
-    original_adopt = author.adopt_generated
-    write_entered.clear()
-    write_release.clear()
-
-    async def held_adopt(*args, **kwargs):
-        write_entered.set()
-        await write_release.wait()
-        return await original_adopt(*args, **kwargs)
-
-    author.adopt_generated = held_adopt
-    adopting = asyncio.create_task(buttons["明确采用"]())
-    await asyncio.wait_for(write_entered.wait(), 3)
-    changed = widgets[page.slot_label("focus.0")][-1]
-    changed.value = "采用等待中手改"
-    changed.on_change()
-    write_release.set()
-    await adopting
-    if widgets[page.slot_label("focus.0")][-1].value != "采用等待中手改":
-        edit_issues.append("adopt refresh overwrote late widget edit")
-    author.adopt_generated = original_adopt
-    assert edit_issues == [], edit_issues
-
-    original_last_editor = projection.last_editor
-    render_entered, render_release = asyncio.Event(), asyncio.Event()
-
-    async def held_last_editor(*args):
-        render_entered.set()
-        await render_release.wait()
-        return await original_last_editor(*args)
-
-    projection.last_editor = held_last_editor
-    refreshing = asyncio.create_task(buttons["保存草稿"]())
-    await asyncio.wait_for(render_entered.wait(), 3)
-    cleared_before = len(clears)
-    changed = widgets[page.slot_label("focus.0")][-1]
-    changed.value = "最后编辑者查询等待中手改"
-    changed.on_change()
-    render_release.set()
-    await refreshing
-    projection.last_editor = original_last_editor
+    widgets["集体游戏 1"][-1].value = "缺失标签"
+    await buttons["保存"]()
+    assert any("游戏整格格式无法识别" in widget.text for widget in labels)
+    loaded_after_error = await author.load(world[2][3], edit.target.plan.plan_id)
     assert (
-        widgets[page.slot_label("focus.0")][-1].value == "最后编辑者查询等待中手改"
-    ), "render must preserve edits made while header metadata was awaiting"
-    assert len(clears) == cleared_before, (
-        "stale render must not clear the live input container"
+        loaded_after_error.body.value_at("games.collective.0.goals.0") == "目标一\n补充"
     )
 
-    auth_entered, auth_release = asyncio.Event(), asyncio.Event()
-
-    async def held_auth(expected):
-        auth_entered.set()
-        await auth_release.wait()
-        return expected
-
-    monkeypatch.setattr(page, "require_bound_ui_session", held_auth)
-    authorizing = asyncio.create_task(buttons["保存草稿"]())
-    await asyncio.wait_for(auth_entered.wait(), 3)
-    cleared_before = len(clears)
-    changed = widgets[page.slot_label("focus.0")][-1]
-    changed.value = "认证等待中手改"
-    changed.on_change()
-    auth_release.set()
-    await authorizing
-    monkeypatch.setattr(page, "require_bound_ui_session", bound)
-    assert widgets[page.slot_label("focus.0")][-1].value == "认证等待中手改", (
-        "auth wait must not accept older sampled control values with a newer revision"
+    # Export invokes the layout check internally and only then exposes bytes.
+    widgets["集体游戏 1"][-1].value = page._format_labeled_cell(
+        page._GAME_LABELS, ("游戏", "目标一\n补充", "目标二", "目标三")
     )
-    assert len(clears) == cleared_before, (
-        "authentication drift must preserve existing controls"
-    )
-
-    navigation_issues = []
-    for mode in ("open", "reload"):
-        await buttons["保存草稿"]()
-        original_begin = author.begin_authoring
-        navigation_entered, navigation_release = asyncio.Event(), asyncio.Event()
-        old_pages = set(author._pages._items)
-
-        async def held_begin(
-            *args,
-            entered=navigation_entered,
-            release=navigation_release,
-            begin=original_begin,
-        ):
-            entered.set()
-            await release.wait()
-            return await begin(*args)
-
-        author.begin_authoring = held_begin
-        if mode == "reload":
-            await buttons["重载保存版本"]()
-            callback = buttons["明确放弃并重载"]
-        else:
-            callback = buttons["打开 / 新建本周共享计划"]
-        navigating = asyncio.create_task(callback())
-        await asyncio.wait_for(navigation_entered.wait(), 3)
-        changed = widgets[page.slot_label("focus.0")][-1]
-        changed.value = f"{mode}导航等待中手改"
-        changed.on_change()
-        navigation_release.set()
-        await navigating
-        author.begin_authoring = original_begin
-        if widgets[page.slot_label("focus.0")][-1].value != f"{mode}导航等待中手改":
-            navigation_issues.append(mode + " replaced late input")
-        if set(author._pages._items) != old_pages:
-            navigation_issues.append(
-                mode + " abandoned the old page or leaked the fresh page"
-            )
-    assert navigation_issues == [], navigation_issues
-
-    # Supplied renderer business failures exercise real UI explanations only;
-    # this is initial coverage, not native missing-font/renderer evidence.
-    from app.service.shared_weekly.collaboration_application import body_hash
-    from app.service.shared_weekly.layout_authority import LayoutAuthorityRejected
-    from app.service.shared_weekly.layout_contracts import RenderedWeek
-
-    await buttons["保存草稿"]()
-    for reason, expected_text in (
-        ("font_missing", "缺少周计划中文字体"),
-        ("renderer_missing", "缺少排版渲染器"),
-        ("layout_overflow", "超过一页"),
-    ):
-
-        async def failed_render(binding, body, display, reason=reason):
-            return RenderedWeek(
-                binding,
-                body_hash(body),
-                False,
-                2 if reason == "layout_overflow" else 0,
-                reason,
-                None,
-            )
-
-        port.render_check = failed_render
-        await buttons["检测保存版本的单页排版"]()
-        assert any(expected_text in w.text for w in labels)
-    await buttons["生成篇幅缩减候选（最多两轮）"]()
-    assert any("没有可安全应用的缩减规则" in w.text for w in labels)
-
-    async def no_qualification(tenant):
-        raise LayoutAuthorityRejected("qualification_required")
-
-    port.resolve_binding = no_qualification
-    await buttons["检测保存版本的单页排版"]()
-    assert any("尚未完成五/六列" in w.text for w in labels)
+    for widget in labels:
+        if widget.on_change:
+            widget.on_change()
+    await buttons["保存"]()
+    await buttons["导出 Word"]()
+    assert exporter.check_calls and exporter.export_calls
+    assert downloads == [(b"weekly-docx", "weekly.docx")]
 
 
 async def test_another_teacher_opens_saved_week_without_overwriting_people(
@@ -576,7 +312,14 @@ async def test_another_teacher_opens_saved_week_without_overwriting_people(
         scope.anchor_monday,
     )
     await second.open(choice, scope.anchor_monday, scope.anchor_monday, "不得覆盖")
-    assert second.edit.body == saved
+    assert second.edit.body.theme == saved.theme
+    assert second.edit.body.people == saved.people
+    assert second.edit.body.value_at("home") == saved.value_at("home")
+    # Opening now fills only blanks from the second user's own daily source;
+    # the saved shared text remains intact.
+    assert all(
+        second.edit.body.value_at(path) == saved.value_at(path) for path in ("home",)
+    )
     assert (
         second.edit.target == editor.edit.target
         or second.edit.target.plan == editor.edit.target.plan

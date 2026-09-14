@@ -132,7 +132,26 @@ class SourceMappingRepository:
     ):
         if await self.operation(operation_id):
             raise IdentityRejected("operation_replayed")
-        revision = previous["revision"] + 1 if previous else 1
+        parent = previous
+        if parent is None:
+            event = (
+                (
+                    await self.session.execute(
+                        select(EVENT)
+                        .where(
+                            EVENT.c.tenant_id == self.tenant_id,
+                            EVENT.c.daily_plan_id == source["id"],
+                        )
+                        .order_by(EVENT.c.revision.desc())
+                        .limit(1)
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+            if event is not None:
+                parent = {"revision": event["revision"], "mapping_id": event["id"]}
+        revision = parent["revision"] + 1 if parent else 1
         result = await self.session.execute(
             insert(EVENT).values(
                 tenant_id=self.tenant_id,
@@ -143,7 +162,7 @@ class SourceMappingRepository:
                 class_instance_id=target.class_instance_id,
                 semester_id=target.semester_id,
                 revision=revision,
-                previous_id=previous["mapping_id"] if previous else None,
+                previous_id=parent["mapping_id"] if parent else None,
                 actor_id=actor.user_id,
                 session_hash=session_hash,
                 binding_hash=binding_hash,
