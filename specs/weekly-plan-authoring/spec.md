@@ -1,3 +1,7 @@
+> 2026-09-14 手动缩短口径（本轮覆盖旧流程）：超页由教师手动缩短，自动缩减完善与验收延期；历史候选23字段不再阻塞本轮手动编辑验证，也不声称已采用历史候选。真实单页检测、超页禁止导出、修改保存后重检保留；浏览器五/六列保存下载与长文手动编辑重检收件尚待本轮实测，不预写通过。页面通过后 Main 可提交分支推送绑定 SHA 查 CI，准备云端测试，生产部署单独执行。范围见[本轮决定](evidence/WP-E-manual-shortening-scope-20260914.md)；下方 2.6 自动缩减条款按历史时点保留。
+
+> 2026-09-14 当前口径：用户授权跳过本轮 Windows 原生验证，使用 LibreOffice 并继续 WP-E 本地收尾；Windows 状态为 `SKIPPED_BY_USER`，不再阻塞本轮推进。当前执行见[LO 续作记录](evidence/WP-E-libreoffice-implementation-20260914.md)，授权见[流程决策](evidence/WP-E-libreoffice-policy-20260914.md)。下方 Word 主客户端/阶段二必需项按历史时点保留，不覆盖本次授权。
+
 > 2026-09-11 WP-C完整协作路径已实现；[关闭矩阵](WP-C-completion-contract.md)、[本轮证据](evidence/WP-C-complete-20260911.md)与[当前状态](current-status.md)说明实际覆盖和未完成门。历史阶段描述不代表当前实现缺项。
 
 > 当前入口（2026-09-11本地交付）：[状态与证据边界](current-status.md)；[WP-C本轮证据](evidence/WP-C-complete-20260911.md)。下方阶段快照按记录时点解释。

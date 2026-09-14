@@ -1,3 +1,11 @@
+> 最新本轮结果：五列、六列保存下载及长文超页→手动改短→保存→重检→浏览器DOCX收件已实测通过。见[浏览器证据](evidence/WP-E-browser-delivery-20260914.md)。[云端测试准备](evidence/WP-E-cloud-test-readiness-20260914.md)已核对，目标镜像和新云端业务验证尚未执行；自动缩减完善与验收延期，生产部署单独执行。以下“待浏览器实测”为此前时点。
+
+> 2026-09-14 手动缩短口径（本轮覆盖旧流程）：用户最新决定本轮由教师手动缩短超页内容，自动缩减完善与验收延期；历史候选23字段不再阻塞本轮手动编辑验证，也不声称已采用历史候选。真实单页检测、超页禁止导出、修改保存后重检保留；浏览器五/六列保存下载与长文手动编辑重检收件尚待本轮实测，不预写通过。页面通过后 Main 可提交分支推送绑定 SHA 查 CI，准备云端测试，生产部署单独执行。范围见[本轮决定](evidence/WP-E-manual-shortening-scope-20260914.md)；LibreOffice 验证与 Windows `SKIPPED_BY_USER` 口径见[LO 续作记录](evidence/WP-E-libreoffice-implementation-20260914.md)与[流程决策](evidence/WP-E-libreoffice-policy-20260914.md)。
+
+> 本轮本地结果：LibreOffice 正式 role 适配已实现，48 项专项测试 + 2 项真实 LO/SQLite 集成验证通过；已审阅 LO catalog 在隔离进程普通启动演练成功。旧长文内容采用仍待23字段决定，整体 WP-E OPEN；未部署。详见[本轮证据](evidence/WP-E-libreoffice-implementation-20260914.md)。
+
+> 2026-09-14 当前口径：用户授权跳过本轮 Windows 原生验证，使用 LibreOffice 并继续 WP-E 本地收尾；Windows 状态为 `SKIPPED_BY_USER`，不再阻塞本轮推进。当前执行见[LO 续作记录](evidence/WP-E-libreoffice-implementation-20260914.md)，授权见[流程决策](evidence/WP-E-libreoffice-policy-20260914.md)。下方 Word 主客户端/阶段二必需项按历史时点保留，不覆盖本次授权。
+
 > 2026-09-14 逐组确认更新：用户已接受本周重点 `focus.0–2` 三条提案，其余23字段待确认；未执行整份页面采用或保存。用户已授权推送当前交付分支，不创建PR或合并。精确范围见[确认记录](evidence/WP-E-proposal-confirmation-20260914.md)；以下2026-09-13记录保留历史时点。
 
 > 2026-09-13 WP-E阶段一本地代码与候选已冻结：普通启动的受控资格接入已完成本地双RED→GREEN；当前合成长文候选已重新从真实页面请求，等待明确采用或拒绝。普通全量1800通过/1跳过；代码SHA `2c310b7f170c8cc509e0c9ddcb8d8c0a2322c427`，十二候选已重新生成（4正常LO1页、8长文LO2页）。可恢复源码bundle从明确基线已实测恢复；Windows交接使用本地仓库分支，未push，阶段二/三NOT_RUN，正式资格未安装，WP-F未执行。精确当前证据见[本轮账本](evidence/WP-E-startup-Ubuntu-20260913.md)。以下前轮记录保留历史时点。

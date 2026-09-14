@@ -137,7 +137,7 @@ class LayoutAuthority:
 
             if data["role"] != (
                 "local-synthetic" if self.local_only else "word-native"
-            ):
+            ) and not (not self.local_only and data["role"] == "libreoffice-rendered"):
                 _reject()
             for field in ("renderer", "client"):
                 if (
@@ -149,10 +149,19 @@ class LayoutAuthority:
                     )
                 ):
                     _reject()
-            if not self.local_only and not data["client"]["product"].startswith(
-                "Microsoft Word"
-            ):
-                _reject()
+            if not self.local_only and data["role"] == "word-native":
+                if not data["client"]["product"].startswith("Microsoft Word"):
+                    _reject()
+            elif not self.local_only and data["role"] == "libreoffice-rendered":
+                # Non-local LO qualification requires an explicit LibreOffice
+                # client, identical client and renderer identity, and a real
+                # renderer product/version; no prefix inference.
+                if data["client"]["product"] != "LibreOffice":
+                    _reject()
+                if data["client"] != data["renderer"]:
+                    _reject()
+                if data["renderer"]["product"] != "LibreOffice":
+                    _reject()
             fixtures = data["fixtures"]
             if (
                 type(fixtures) is not list
