@@ -65,6 +65,41 @@ LAYOUT_MESSAGES = {
 }
 
 
+# One-click generation walks all managed weekly prompts in dependency
+# order; a task whose retained content is already complete is skipped.
+ALL_WEEKLY_TASKS = (
+    "weekly_morning_talk",
+    "weekly_games",
+    "weekly_area",
+    "weekly_materials",
+    "weekly_focus",
+    "weekly_environment",
+    "weekly_habits",
+    "weekly_home",
+)
+
+
+ACTION_MESSAGES = {
+    "required_theme": "请先填写主题名称。",
+    "required_activity_name": "集体活动名称缺失，请手填后再生成晨谈。",
+    "required_area_name": "请先确认重点区域名称。",
+    "source_selection_required": "游戏或区域结构无法自动确定，请先在对应内容格填写名称。",
+    "check_required": "当前内容尚未满足导出条件，请补齐必填栏目。",
+    "commit_unknown": "保存结果未知，请只读对账，勿重试提交。",
+    "save_required": "请先保存当前修改。",
+    "unsaved_changes": "存在未保存修改，请先保存后切换计划。",
+    "plan_conflict": "同班教师已保存新版本，请保留当前内容并重新打开计划比较。",
+    "calendar_unavailable": "教学日历不可用。",
+    "source_unavailable": "来源已变化或不可用，正文保持。",
+    "page_stale": "候选或页面已过期，正文保持。",
+    "games_format_invalid": "游戏整格格式无法识别，正文保持；请保留游戏名称和三行目标标签。",
+    "area_format_invalid": "区域游戏整格格式无法识别，正文保持；请保留区域、目标、材料和指导标签。",
+    "habits_format_invalid": "生活习惯整格格式无法识别，正文保持；请保留三组习惯名称和具体内容标签。",
+    "morning_topic_required": "晨谈只能填写主题或简要陈述，不能填写问题或问答过程。",
+    **LAYOUT_MESSAGES,
+}
+
+
 def slot_label(path: str | TargetPath) -> str:
     if type(path) is TargetPath:
         return f"{path.day} · {DAY_LABELS[path.field]}"
@@ -416,10 +451,10 @@ class WeeklyEditor:
             result = await self.services.authoring.generate_missing(
                 self.expected, edit.page_id, edit.page, task
             )
-            await self.live()
             try:
+                await self.live()
                 self.require_same_presentation(stamp)
-            except ValueError:
+            except Exception:
                 self.services.authoring.cancel_generated(
                     self.expected, result.candidate_id
                 )
@@ -432,13 +467,13 @@ class WeeklyEditor:
 
     async def adopt(self):
         await self.live()
-        revision = self.ui_revision
-        self.edit = await self.services.authoring.adopt_generated(
+        stamp = self.presentation_stamp()
+        result = await self.services.authoring.adopt_generated(
             self.expected, self.proposal.candidate_id, self.edit.page, confirmed=True
         )
+        self.require_same_presentation(stamp)
+        self.edit = result
         self.dirty, self.check, self.proposal = True, None, None
-        if self.ui_revision != revision:
-            raise ValueError("page_stale")
 
     async def reject(self):
         await self.live()
@@ -539,26 +574,7 @@ async def _weekly_content(expected):
         try:
             await action()
         except Exception as exc:
-            reasons = {
-                "required_theme": "请先填写主题名称。",
-                "required_activity_name": "集体活动名称缺失，请手填后再生成晨谈。",
-                "required_area_name": "请先确认重点区域名称。",
-                "source_selection_required": "游戏或区域结构无法自动确定，请先在对应内容格填写名称。",
-                "check_required": "当前内容尚未满足导出条件，请补齐必填栏目。",
-                "commit_unknown": "保存结果未知，请只读对账，勿重试提交。",
-                "save_required": "请先保存当前修改。",
-                "unsaved_changes": "存在未保存修改，请先保存后切换计划。",
-                "plan_conflict": "同班教师已保存新版本，请保留当前内容并重新打开计划比较。",
-                "calendar_unavailable": "教学日历不可用。",
-                "source_unavailable": "来源已变化或不可用，正文保持。",
-                "page_stale": "候选或页面已过期，正文保持。",
-                "games_format_invalid": "游戏整格格式无法识别，正文保持；请保留游戏名称和三行目标标签。",
-                "area_format_invalid": "区域游戏整格格式无法识别，正文保持；请保留区域、目标、材料和指导标签。",
-                "habits_format_invalid": "生活习惯整格格式无法识别，正文保持；请保留三组习惯名称和具体内容标签。",
-                "morning_topic_required": "晨谈只能填写主题或简要陈述，不能填写问题或问答过程。",
-            }
-            reasons.update(LAYOUT_MESSAGES)
-            notice.text = reasons.get(
+            notice.text = ACTION_MESSAGES.get(
                 str(exc),
                 "操作被拒绝或已失效，当前正文保留。请检查授权、来源、必填项与当前版本。",
             )
@@ -631,32 +647,98 @@ async def _weekly_content(expected):
             values,
         )
 
-    async def proposal_dialog():
-        proposal = editor.proposal
-        with ui.dialog() as dialog, ui.card().classes("w-full max-w-4xl"):
-            ui.label("逐项比较；采用只改当前页面，仍需保存")
-            for difference in proposal.differences:
-                ui.label(slot_label(difference.path))
-                ui.label("当前：" + difference.current_value).classes(
-                    "whitespace-pre-wrap"
-                )
-                ui.label("候选：" + difference.candidate_value).classes(
-                    "whitespace-pre-wrap"
-                )
+    generation_button = None
 
-            async def adopt():
-                await flush()
-                await editor.adopt()
-                dialog.close()
-                await render()
+    async def fill_sequence(remaining):
+        """One click completes every missing weekly task without per-task review.
 
-            async def reject():
-                await editor.reject()
-                dialog.close()
+        The click itself authorizes applying missing-only candidates: each
+        task is generated then adopted immediately, in memory only. Adoption
+        never touches saved or manually filled cells, and nothing is saved.
+        Any user edit or navigation invalidates the presentation stamp, the
+        remaining tasks stop, and late results are discarded before adoption.
+        """
+        await editor.live()
+        if editor.generation_busy or editor.proposal is not None:
+            raise ValueError("candidate_busy")
+        owner = editor.begin_generation()
+        if generation_button is not None:
+            generation_button.props("loading")
+        filled = 0
+        missing_requirements = []
+        try:
+            await flush()
+            stamp = editor.presentation_stamp()
+            while remaining:
+                task, remaining = remaining[0], remaining[1:]
+                try:
+                    editor.require_same_presentation(stamp)
+                    notice.text = "正在补全：" + WEEKLY_LABELS[task] + "……"
+                    await editor.generate(task, owner=owner)
+                    editor.require_same_presentation(stamp)
+                    await editor.adopt()
+                    stamp = editor.presentation_stamp()
+                    await render()
+                    editor.require_same_presentation(stamp)
+                    filled += 1
+                except Exception as exc:
+                    if str(exc) in (
+                        "no_missing_content",
+                        "required_activity_name",
+                        "required_area_name",
+                    ):
+                        try:
+                            editor.require_same_presentation(stamp)
+                        except ValueError as stale:
+                            exc = stale
+                        else:
+                            if str(exc) != "no_missing_content":
+                                missing_requirements.append(ACTION_MESSAGES[str(exc)])
+                            continue
+                    remaining_incomplete = (
+                        "已补全的栏目已保留，其余栏目未完成；请核对后稍后重试或手填。"
+                    )
+                    if str(exc) in (
+                        "page_stale",
+                        "candidate_cancelled",
+                        "session_invalid",
+                    ):
+                        notice.text = (
+                            "检测到您的修改或页面跳转，本次补全已停止，正文保持；"
+                            + remaining_incomplete
+                        )
+                    else:
+                        notice.text = (
+                            ACTION_MESSAGES.get(
+                                str(exc),
+                                "操作被拒绝或已失效，当前正文保留。",
+                            )
+                            + "\n"
+                            + remaining_incomplete
+                        )
+                    if editor.proposal is not None:
+                        editor.services.authoring.cancel_generated(
+                            editor.expected, editor.proposal.candidate_id
+                        )
+                        editor.proposal = None
+                    return
+            notice.text = (
+                "已补全可生成内容；请核对并保存。"
+                if filled
+                else "没有可生成的缺失内容。"
+            ) + (
+                "仍需填写：" + "；".join(missing_requirements)
+                if missing_requirements
+                else ""
+            )
+        finally:
+            if editor._generation_owner is owner:
+                editor.end_generation(owner)
+                if generation_button is not None:
+                    generation_button.props(remove="loading")
 
-            ui.button("明确采用", on_click=lambda: guard(adopt))
-            ui.button("拒绝，保留原文", on_click=lambda: guard(reject))
-        dialog.props("persistent").open()
+    async def fill_missing_all():
+        await fill_sequence(tuple(ALL_WEEKLY_TASKS))
 
     async def render():
         nonlocal area_field, habits_field
@@ -883,39 +965,7 @@ async def _weekly_content(expected):
                                     ).classes("whitespace-pre-wrap break-words")
 
     async def action_buttons():
-        task = ui.select(
-            dict(WEEKLY_LABELS),
-            value="weekly_focus",
-            label="生成栏目",
-        )
-        generation_owner = [None]
-        generation_button = None
-
-        async def generate():
-            nonlocal generation_button
-            await editor.live()
-            if editor.generation_busy or editor.proposal is not None:
-                raise ValueError("candidate_busy")
-            owner = editor.begin_generation()
-            generation_owner[0] = owner
-            if generation_button is not None:
-                generation_button.props("loading")
-            try:
-                await flush()
-                await editor.generate(task.value, owner=owner)
-                await proposal_dialog()
-            finally:
-                editor.end_generation(owner)
-                if generation_owner[0] is owner:
-                    generation_owner[0] = None
-                    if generation_button is not None:
-                        generation_button.props(remove="loading")
-
-        generation_button = ui.button(
-            "AI 补全缺失内容", on_click=lambda: guard(generate)
-        )
-        if editor.generation_busy:
-            generation_button.props("loading")
+        nonlocal generation_button
 
         async def save():
             await flush()
@@ -928,8 +978,14 @@ async def _weekly_content(expected):
             ui.download(download.data, filename=download.filename)
             notice.text = "已完成排版检查并导出 Word。"
 
-        ui.button("保存", on_click=lambda: guard(save))
-        ui.button("导出 Word", on_click=lambda: guard(export))
+        with ui.row().classes("w-full flex-wrap items-start gap-2"):
+            generation_button = ui.button(
+                "AI 补全缺失内容", on_click=lambda: guard(fill_missing_all)
+            )
+            ui.button("保存", on_click=lambda: guard(save))
+            ui.button("导出 Word", on_click=lambda: guard(export))
+        if editor.generation_busy:
+            generation_button.props("loading")
 
     async def open_week():
         await editor.open(

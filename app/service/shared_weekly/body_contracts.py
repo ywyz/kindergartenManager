@@ -24,7 +24,7 @@ LEGACY_SCHEMA = "weekly-theme.v1"
 MAX_TEXT_BYTES = 16_384
 MAX_DAYS = 6
 MIN_DAYS = 5
-MAX_SOURCES = MAX_DAYS * 5
+MAX_SOURCES = MAX_DAYS * 6
 FIELD_NAMES = (
     "morning_talk_topic",
     "morning_talk_questions",
@@ -33,6 +33,8 @@ FIELD_NAMES = (
     "indoor_area",
 )
 FIELD_SET = frozenset(FIELD_NAMES)
+# Source-only snapshot: final game cells hold extracted values, never this raw text.
+SOURCE_FIELD_SET = FIELD_SET | {"morning_activity"}
 PROVENANCE_NAMES = ("imported", "manual")
 PROVENANCE_SET = frozenset(PROVENANCE_NAMES)
 _HASH_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -126,7 +128,7 @@ class TargetPath:
 
     def __post_init__(self) -> None:
         _date(self.day)
-        if type(self.field) is not str or self.field not in FIELD_SET:
+        if type(self.field) is not str or self.field not in SOURCE_FIELD_SET:
             _reject()
 
     def serialize(self) -> str:
@@ -221,7 +223,7 @@ class SourceSnapshot:
         _positive_int(revision)
         _positive_int(mapping_id)
         _positive_int(mapping_revision)
-        if type(source_field) is not str or source_field not in FIELD_SET:
+        if type(source_field) is not str or source_field not in SOURCE_FIELD_SET:
             _reject()
         if type(target) is not TargetPath:
             _reject()
@@ -370,13 +372,19 @@ class WeeklyCollaborationDraft:
             _reject()
         for item in self.days:
             if item.day == target.day:
-                return item.value(target.field)
+                return (
+                    ""
+                    if target.field == "morning_activity"
+                    else item.value(target.field)
+                )
         _reject()
 
     def with_value(self, target: TargetPath, value: str) -> WeeklyCollaborationDraft:
         if type(target) is not TargetPath:
             _reject()
         _text(value)
+        if target.field not in FIELD_SET:
+            _reject()
         found = False
         updated: list[CollaborationDay] = []
         for item in self.days:

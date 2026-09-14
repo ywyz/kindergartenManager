@@ -50,7 +50,7 @@ def body_hash(body: WeeklyCollaborationDraft) -> str:
 def field_value(body: WeeklyCollaborationDraft, path: TargetPath) -> str:
     for day in body.days:
         if day.day == path.day:
-            return getattr(day, path.field)
+            return "" if path.field == "morning_activity" else getattr(day, path.field)
     raise IdentityRejected("content_invalid")
 
 
