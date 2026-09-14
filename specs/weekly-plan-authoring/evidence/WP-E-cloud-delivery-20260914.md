@@ -15,11 +15,12 @@
 - 已完成：主仓库三项既存修改保全为外部 patch，未修改原工作树。周计划起点 `7ec372f7dfb6128720e3c99d208c8d7d938882ff`，远端 main `8dcc83376577695b562529ec42adc6b48817f004`。
 - 已完成：独立分支 `codex/wp-cloud-delivery-20260914` 集成 PR #76 的 `19eb8bfea9a941a73383a536fdec439587c39141`，合并提交 `7572532`。桌面构建退出；保留 OCI 双平台及 Release 元数据绑定。
 - 已完成渲染镜像、开放字体供应与 CI 拆分；`1107547` 的 Real LibreOffice rendering CI 已通过。BWH 镜像内实际生成五／六列单页 DOCX/PDF，Main 已核对页面，资格 manifest SHA256 为 `20199d5fce4b48f735c7dff97ca06b87e18e2b3bdbb501d95509ba368d5f91f5`。
-- 已创建交付草稿 [PR #82](https://github.com/ywyz/kindergartenManager/pull/82)。`1107547` 普通 CI 为 1833 passed / 7 failed；失败已定位为单元测试主机探针与新 fixture 空库判断，修复后需取得新 SHA 的完整 Quality。
-- BWH旧staging容器已停止，新 `kg-weekly-staging` 项目与独立数据库 `wp_cloud_20260914` 已创建；显式Alembic迁移至 `d375e9ab2148`。已启动新周计划候选镜像；登录／业务结果仍待实际验证。
-- 独立兼容回滚源码基于生产 beta10，加入新迁移树及同一受限合成租户登录入口；双平台镜像构建成功。运行时MySQL兼容验证待执行。
-- 待执行：独立 MySQL 云端业务与浏览器验收、完整交付 CI、发布／生产备份迁移和上线验证。
-- 镜像追踪：`2d5960194174595853a6b186214cd099e6e4c5cd` → OCI index `sha256:9e3f512a4a533dbc732b78e4aab5a4c80fb00cbecd34e45fd1d37af1d3743930`（资格材料生成）；`11075478872bb43f3bb5b9aa3929db0d28f7b2b0` → `sha256:7e20f1eb1dd96ebfe6715629d4a23af526d06ba99c108dcd7e453e8c9fbe1e6c`（BWH应用候选）。两者渲染代码／工具供应相同；后者新增受限合成租户登录入口及测试入口文件。
+- 已创建交付 [PR #82](https://github.com/ywyz/kindergartenManager/pull/82)。候选 `ce276d71c0cb0de9d1843bfa1354045019d7fbe1` 的 Quality [34839981563](https://github.com/ywyz/kindergartenManager/actions/runs/34839981563)（普通检查及真实 LibreOffice）、CodeQL 全部通过；此前 1107547 的 7 项失败已修复，历史日志保留。
+- BWH `https://staging-manager.ywyz.tech` 的 `kg-weekly-staging` / 独立 MySQL `wp_cloud_20260914` 已显式迁移至 `d375e9ab2148`。真实应用合成教师甲／乙登录、共享保存和可见性、旧版本 `plan_conflict` 拒绝、重载后正常保存通过。
+- BWH 实际浏览器五列、六列保存／单页检查／DOCX 收件通过。长文实际 3 页拒绝导出；教师手动缩短 26 项、保存、重新检测实际 1 页后收到 DOCX。外部收件证据 `browser-bwh/{five,six,manual-shorten}-receipt.json` 与原始 DOCX 保存，不以服务 bytes 代替浏览器收件。
+- 兼容回滚 `885835282c450c954dc89cee33ace2f3cb050de1` → OCI index `sha256:56964bb110dad97b56cde85d8cb759d025a977488eb59f35badd16a3e6cefb6f`。基于生产 beta10，仅新增迁移树与受限合成租户登录入口；Quality 34838959795 通过，BWH 在新 schema 上实际启动、readiness、教师登录首页及既存每日计划列表读取通过。该检查未写计划数据。
+- 待执行：Release、生产一致性备份及隔离恢复验证、显式迁移、获授权的班级共享设置、生产切换与实际业务验收。
+- 镜像追踪：`2d5960194174595853a6b186214cd099e6e4c5cd` → OCI index `sha256:9e3f512a4a533dbc732b78e4aab5a4c80fb00cbecd34e45fd1d37af1d3743930`（资格材料）；`11075478872bb43f3bb5b9aa3929db0d28f7b2b0` → `sha256:7e20f1eb1dd96ebfe6715629d4a23af526d06ba99c108dcd7e453e8c9fbe1e6c`（BWH 实际业务及收件）；`ce276d71c0cb0de9d1843bfa1354045019d7fbe1` → `sha256:e7fe27eee7c6a699d421990b4bb12a5f75601ef824f7900cd0fa434f78d7474a`（最终候选）。1107547 至 ce276d7 的 app、Dockerfile、docker、templates、requirements.txt 无差异，复用该业务／渲染证据；变更的 fixture 与部署 helper 已有对应检查。
 
 ## 阻塞清单
 
