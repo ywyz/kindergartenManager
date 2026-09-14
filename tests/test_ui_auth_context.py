@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
 import inspect
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock
 from uuid import UUID, uuid4
@@ -255,7 +255,7 @@ async def test_resolve_current_ui_session_rejects_token_without_auth_epoch(
         hashed_password=hash_password("Pass1234!"),
         role=UserRole.teacher,
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     token = jwt.encode(
         {
             "sub": str(user.id),
@@ -278,7 +278,7 @@ async def test_resolve_current_ui_session_rechecks_expiry_after_user_lookup(
     """直接 resolver 也不能返回在数据库等待期间过期的 actor。"""
     from app.ui import auth_context as module
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     session_id = uuid4()
     payload = {
         "tenant_id": 3,
@@ -313,7 +313,7 @@ async def test_daily_plan_agent_actor_comes_from_the_verified_ui_session(
 ) -> None:
     from app.ui.pages import daily_plan as module
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     trusted_session = TrustedUiSession(
         session_id=uuid4(),
         tenant_id=19,
@@ -409,7 +409,7 @@ async def test_require_current_ui_session_discards_a_result_after_token_changes(
         async def __aexit__(self, exc_type, exc, traceback):
             return False
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     resolved = TrustedUiSession(
         session_id=uuid4(),
         tenant_id=1,
@@ -461,7 +461,7 @@ async def test_require_current_ui_session_rechecks_expiry_after_database_await(
         async def __aexit__(self, exc_type, exc, traceback):
             return False
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     resolved = TrustedUiSession(
         session_id=uuid4(),
         tenant_id=1,
@@ -537,7 +537,7 @@ async def test_old_login_page_load_does_not_clear_a_new_token(
     storage = {"token": "old-login-token"}
     fake_ui = _FakeLoginUi()
 
-    async def load_state(token):
+    async def load_state(token, **kwargs):
         assert token == "old-login-token"
         storage["token"] = "new-login-token"
         return None, True, True
@@ -602,7 +602,7 @@ async def test_login_submit_uses_the_click_time_credentials(
     fake_ui = _FakeLoginUi()
     observed: list[tuple[str, str]] = []
 
-    async def load_state(_token):
+    async def load_state(_token, **kwargs):
         return None, True, True
 
     async def authenticate(_session, *, tenant_id, username, password):
@@ -650,7 +650,7 @@ async def test_login_submit_is_single_flight_across_click_and_enter(
     fake_ui = _FakeLoginUi()
     observed: list[str] = []
 
-    async def load_state(_token):
+    async def load_state(_token, **kwargs):
         return None, True, True
 
     async def authenticate(_session, *, tenant_id, username, password):
@@ -703,7 +703,7 @@ async def test_late_login_success_does_not_replace_a_new_session_or_finish_old_u
     storage: dict[str, str] = {}
     fake_ui = _FakeLoginUi()
 
-    async def load_state(_token):
+    async def load_state(_token, **kwargs):
         return None, True, True
 
     async def authenticate(_session, *, tenant_id, username, password):
@@ -754,7 +754,7 @@ async def test_late_login_failure_does_not_write_over_a_new_session(
     storage: dict[str, str] = {}
     fake_ui = _FakeLoginUi()
 
-    async def load_state(_token):
+    async def load_state(_token, **kwargs):
         return None, True, True
 
     async def authenticate(_session, *, tenant_id, username, password):
@@ -797,7 +797,7 @@ async def test_bound_ui_session_rejects_an_old_page_after_a_new_login(
 ) -> None:
     from app.ui import auth_context as module
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     old_session = TrustedUiSession(
         session_id=uuid4(),
         tenant_id=1,

@@ -20,11 +20,11 @@ from io import StringIO
 from pathlib import Path
 from typing import Any
 
+from dotenv import dotenv_values
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_settings.sources import DotEnvSettingsSource
 from pydantic_settings.sources.utils import parse_env_vars
-from dotenv import dotenv_values
 
 from app.core import env_writer
 from app.core.paths import app_data_dir
@@ -305,13 +305,13 @@ def _create_posix_file(path: Path, payload: bytes) -> None:
         _write_all(fd, payload)
         os.fsync(fd)
         completed = True
-    except BaseException as exc:
+    except BaseException as exc:  # noqa: BLE001 - preserve cleanup before re-raising
         failure = exc
     finally:
         if not completed and identity is None and fd is not None:
             try:
                 identity = _regular_fd_identity(fd, path)
-            except BaseException:
+            except BaseException:  # noqa: BLE001 - fail closed on unsafe secret cleanup
                 cleanup_failure = True
         if fd is not None:
             try:
@@ -465,6 +465,8 @@ class Settings(BaseSettings):
     # ── 管理员初始化引导 ─────────────────────────────────────────────────────
     BOOTSTRAP_ADMIN_ENABLED: bool = False
     BOOTSTRAP_ADMIN_TENANT_ID: int = 1
+    # Optional explicit extra UI login tenants; the default tenant is retained.
+    UI_LOGIN_TENANT_IDS: str = ""
     BOOTSTRAP_ADMIN_USERNAME: str = "sysadmin"
     BOOTSTRAP_ADMIN_PASSWORD: str = ""
     BOOTSTRAP_ADMIN_ALLOW_REMOTE: bool = False
