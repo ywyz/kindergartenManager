@@ -138,6 +138,7 @@ python -m scripts.deploy \
 兼容回滚使用 `--rollback-acceptance-profile service-recovery`，分别验证 login，以及 `home`、
 `existing_plan_read`；这些只证明旧服务恢复，不证明新版周计划已上线。默认 `legacy` 保留旧九项契约供适用的历史运维使用，
 本轮不选择它。新 profile 使用 schema 2 的严格结果，包含匹配的 `profile`；旧 legacy 保持 schema 1。
+周计划 business 门允许最多 1800 秒完成教师手动编辑与真实浏览器收件，其余门保持 300 秒；超时仍失败并进入回滚。
 空输出、单纯 `exit 0`、未知／缺失字段、ref／phase／gate／profile 错绑或超长输出均失败关闭。
 结果必须来自真实应用与对应镜像的验证，不能把预写 JSON 或历史 staging 结果交给 runner 冒充生产行为。
 

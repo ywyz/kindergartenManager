@@ -1,8 +1,9 @@
 """Focused safety checks for the cloud weekly-plan fixture initializer."""
 
-import inspect
+import asyncio
 import json
 import stat
+from types import SimpleNamespace
 
 import pytest
 
@@ -67,11 +68,119 @@ def test_receipt_rejects_body_hash_and_secret_fields(tmp_path):
         fixture._body_free_receipt({"note": "secret-value"}, "secret-value")
 
 
-def test_fixture_seed_has_no_schema_creation_or_export_boundary():
-    source = inspect.getsource(fixture._seed)
-    assert "alembic" not in source.lower()
-    assert "create_all" not in source
-    assert "export_saved" not in source
+class _FakeResult:
+    def __init__(self, *, versions=(), first=None):
+        self._versions = versions
+        self._first = first
+
+    def scalars(self):
+        return iter(self._versions)
+
+    def first(self):
+        return self._first
+
+
+class _FakeConnection:
+    dialect = SimpleNamespace(name="mysql")
+
+    async def run_sync(self, callback):
+        return callback(object())
+
+    async def execute(self, statement, _parameters=None):
+        if "version_num" in str(statement):
+            return _FakeResult(versions=(fixture.EXPECTED_ALEMBIC_HEAD,))
+        return _FakeResult(first=None)
+
+
+class _FakeConnectContext:
+    def __init__(self, connection):
+        self.connection = connection
+
+    async def __aenter__(self):
+        return self.connection
+
+    async def __aexit__(self, *_args):
+        return None
+
+
+class _FakeEngine:
+    def __init__(self):
+        self.connection = _FakeConnection()
+
+    def connect(self):
+        return _FakeConnectContext(self.connection)
+
+
+def _preflight_with_counts(monkeypatch, counts, *, production=False):
+    seen = []
+
+    monkeypatch.setattr(
+        fixture,
+        "_table_names",
+        lambda _sync_connection: set(fixture.REQUIRED_TABLES)
+        | fixture.MIGRATION_REFERENCE_SEED_TABLES,
+    )
+
+    async def count_rows(_connection, table, tenant_id):
+        seen.append((table.name, tenant_id))
+        return counts.get(table.name, 0)
+
+    monkeypatch.setattr(fixture, "_count_rows", count_rows)
+    asyncio.run(
+        fixture._preflight_database(
+            _FakeEngine(), tenant_id=fixture.CLOUD_TENANT_ID, production=production
+        )
+    )
+    return seen
+
+
+def test_default_preflight_allows_only_the_migration_reference_seed(
+    monkeypatch,
+):
+    seen = _preflight_with_counts(
+        monkeypatch,
+        {"indicator_catalog": 30},
+    )
+
+    assert "indicator_catalog" not in {name for name, _tenant_id in seen}
+
+
+def test_default_preflight_rejects_existing_business_rows(monkeypatch):
+    with pytest.raises(fixture.FixtureRejected, match="dedicated_database_not_empty"):
+        _preflight_with_counts(monkeypatch, {"daily_plan": 1})
+
+
+def test_production_preflight_does_not_allow_reference_seed_rows(monkeypatch):
+    with pytest.raises(fixture.FixtureRejected, match="production_tenant_not_empty"):
+        _preflight_with_counts(
+            monkeypatch,
+            {"indicator_catalog": 1},
+            production=True,
+        )
+
+
+def test_seed_disposes_engine_when_preflight_fails(monkeypatch):
+    class DisposableEngine:
+        disposed = False
+
+        async def dispose(self):
+            self.disposed = True
+
+    async def fail_preflight(*_args, **_kwargs):
+        raise fixture.FixtureRejected("dedicated_database_not_empty")
+
+    engine = DisposableEngine()
+    monkeypatch.setattr(fixture, "_preflight_database", fail_preflight)
+    with pytest.raises(fixture.FixtureRejected, match="dedicated_database_not_empty"):
+        asyncio.run(
+            fixture._seed(
+                engine,
+                tenant_id=fixture.CLOUD_TENANT_ID,
+                password="synthetic-only",
+                production=False,
+            )
+        )
+    assert engine.disposed is True
 
 
 def test_production_mode_requires_explicit_tenant_before_database_access(

@@ -826,7 +826,11 @@ def _run_acceptance_gate(
                 check=False,
                 text=False,
                 capture_output=True,
-                timeout=DEFAULT_COMMAND_TIMEOUT_SECONDS,
+                timeout=(
+                    1800
+                    if profile == "weekly-plan" and gate == "business"
+                    else DEFAULT_COMMAND_TIMEOUT_SECONDS
+                ),
                 env=environment,
                 pass_fds=(descriptor,),
             )

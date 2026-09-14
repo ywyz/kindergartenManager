@@ -100,6 +100,13 @@ REQUIRED_TABLES = frozenset(
     }
 )
 
+# The latest Alembic chain seeds this immutable reference catalog for the
+# listening module.  It is present in a newly migrated database before the
+# fixture runs, but is not user or weekly-plan data.  This allowlist is used
+# only by the dedicated non-production database preflight; production tenant
+# checks remain strictly empty for every tenant-bearing table.
+MIGRATION_REFERENCE_SEED_TABLES = frozenset({"indicator_catalog"})
+
 
 class FixtureRejected(RuntimeError):
     """A body-free, fail-closed fixture rejection."""
@@ -267,11 +274,22 @@ async def _preflight_database(engine, *, tenant_id: int, production: bool) -> No
         if versions != (EXPECTED_ALEMBIC_HEAD,):
             _reject("schema_revision_mismatch")
 
+        allowed_reference_seeds = (
+            frozenset() if production else MIGRATION_REFERENCE_SEED_TABLES
+        )
         tenant_tables = tuple(
             table
             for name, table in Base.metadata.tables.items()
-            if name in names and "tenant_id" in table.c
-        ) + (EXPORT_AUDIT,)
+            if (
+                name in names
+                and "tenant_id" in table.c
+                and name not in allowed_reference_seeds
+            )
+        ) + (
+            (EXPORT_AUDIT,)
+            if EXPORT_AUDIT.name not in allowed_reference_seeds
+            else ()
+        )
         # The normal BWH target must be a new business database.  In the
         # explicit production mode, only the selected tenant must be empty;
         # every other tenant is left alone and is never inspected for writes.
@@ -380,9 +398,16 @@ async def _seed(
 ) -> dict[str, Any]:
     """Seed the cloud fixture using the real public identity/authoring seams."""
 
-    if type(password) is not str or not password:
-        _reject("password_invalid")
-    await _preflight_database(engine, tenant_id=tenant_id, production=production)
+    try:
+        if type(password) is not str or not password:
+            _reject("password_invalid")
+        await _preflight_database(engine, tenant_id=tenant_id, production=production)
+    except BaseException:
+        # `_preflight_database` runs before the normal session lifecycle try
+        # block.  Dispose here as well so a rejected remote connection cannot
+        # outlive the event loop.
+        await engine.dispose()
+        raise
 
     from dataclasses import replace
 

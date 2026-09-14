@@ -66,6 +66,16 @@ def configured(monkeypatch, tmp_path, *, isolated=True):
         return b"synthetic-runtime\n"
 
     monkeypatch.setattr(shared_weekly_word, "_process", actual_version)
+    # This unit fixture models an installed synthetic version without requiring
+    # a host binary. Actual render tests retain the real executable probe.
+    original_which = shared_weekly_word.shutil.which
+    monkeypatch.setattr(
+        shared_weekly_word.shutil,
+        "which",
+        lambda name: (
+            "/synthetic/libreoffice" if name == "libreoffice" else original_which(name)
+        ),
+    )
     return path
 
 

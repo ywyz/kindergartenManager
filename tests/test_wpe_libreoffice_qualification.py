@@ -55,6 +55,16 @@ def _mock_lo_version_for_unit_tests(request, monkeypatch):
         return b"synthetic-lo-runtime-1\n"
 
     monkeypatch.setattr(shared_weekly_word, "_process", synthetic_version)
+    # This unit fixture models an installed synthetic version without requiring
+    # a host binary. Actual render tests retain the real executable probe.
+    original_which = shared_weekly_word.shutil.which
+    monkeypatch.setattr(
+        shared_weekly_word.shutil,
+        "which",
+        lambda name: (
+            "/synthetic/libreoffice" if name == "libreoffice" else original_which(name)
+        ),
+    )
 
 
 async def startup():
