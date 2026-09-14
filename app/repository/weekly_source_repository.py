@@ -1,5 +1,7 @@
 """Narrow teaching projection, invoked only after exact-day authorization."""
 
+import re
+
 from sqlalchemy import insert, select
 
 from app.core.models.user import User
@@ -23,6 +25,26 @@ FIELDS = (
 
 
 PROJECTION_FIELDS = (*FIELDS, "morning_activity")
+
+
+def class_label_key(name: str, grade: str) -> str:
+    """Normalize only numbered class labels with their exact matching grade.
+
+    Legacy daily settings split 中班 + 四班; authoritative identity may store
+    中四班. Arbitrary named classes and cross-grade labels are never aliased.
+    """
+    prefix = {"小班": "小", "中班": "中", "大班": "大"}.get(grade)
+    if prefix and re.fullmatch(prefix + r"[一二三四五六七八九十百零〇两0-9]+班", name):
+        return name[1:]
+    return name
+
+
+def class_label_aliases(name: str, grade: str) -> tuple[str, ...]:
+    key = class_label_key(name, grade)
+    prefix = {"小班": "小", "中班": "中", "大班": "大"}.get(grade)
+    if prefix and re.fullmatch(r"[一二三四五六七八九十百零〇两0-9]+班", key):
+        return (key, prefix + key)
+    return (name,)
 
 
 class WeeklySourceRepository(SourceMappingRepository):
@@ -72,8 +94,11 @@ class WeeklySourceRepository(SourceMappingRepository):
         if (
             target is None
             or sum(
-                (r["display_name"], r["grade"])
-                == (target["display_name"], target["grade"])
+                (class_label_key(r["display_name"], r["grade"]), r["grade"])
+                == (
+                    class_label_key(target["display_name"], target["grade"]),
+                    target["grade"],
+                )
                 for r in rows
             )
             != 1
@@ -86,7 +111,9 @@ class WeeklySourceRepository(SourceMappingRepository):
             .where(
                 DAILY.c.tenant_id == self.tenant_id,
                 DAILY.c.user_id == user_id,
-                DAILY.c.class_name == target["display_name"],
+                DAILY.c.class_name.in_(
+                    class_label_aliases(target["display_name"], target["grade"])
+                ),
                 DAILY.c.grade == target["grade"],
                 DAILY.c.plan_date >= scope.anchor_monday - timedelta(days=1),
                 DAILY.c.plan_date <= scope.anchor_monday + timedelta(days=5),
@@ -149,7 +176,11 @@ class WeeklySourceRepository(SourceMappingRepository):
         )
         if "owned_class_name" in mapping:
             q = q.where(
-                DAILY.c.class_name == mapping["owned_class_name"],
+                DAILY.c.class_name.in_(
+                    class_label_aliases(
+                        mapping["owned_class_name"], mapping["owned_grade"]
+                    )
+                ),
                 DAILY.c.grade == mapping["owned_grade"],
                 DAILY.c.user_id == mapping["source_user_id"],
                 ~select(MAPPING.c.daily_plan_id)

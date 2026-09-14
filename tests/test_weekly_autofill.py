@@ -368,3 +368,87 @@ def test_daily_focus_goals_belong_to_named_collective_game():
     )
     assert ("goals.0", "双脚跳跃") in result[0][2]
     assert result[1][2] == (("name", "玩沙"),)
+
+
+async def test_source_migration_preserves_existing_saved_snapshots(world):
+    import asyncio
+
+    from alembic.config import Config
+
+    from alembic import command
+    from app.core.models.weekly_sources import TABLES
+
+    app, edit = await setup(world)
+    await daily(world)
+    edit = await app.autofill_owned(world[2][3], edit.page_id, edit.page)
+    await app.save_edit(world[2][3], edit.page_id, edit.page, uuid4())
+    before = await rows(world, TABLES["shared_weekly_source"])
+    assert before
+    await asyncio.to_thread(command.downgrade, Config("alembic.ini"), "e486fa012359")
+    await asyncio.to_thread(command.upgrade, Config("alembic.ini"), "head")
+    assert await rows(world, TABLES["shared_weekly_source"]) == before
+
+
+async def test_grade_prefixed_class_label_matches_legacy_daily_name(world):
+    from app.core.models.academic_identity import TABLES
+
+    app, edit = await setup(world)
+    async with world[0]() as session:
+        c = TABLES["class_instance"]
+        await session.execute(
+            update(c)
+            .where(
+                c.c.tenant_id == 11,
+                c.c.id == edit.target.authorization.scope.class_instance_id,
+            )
+            .values(display_name="中四班", revision=c.c.revision + 1)
+        )
+        await session.commit()
+    # Class revision changes require opening a fresh authorized editor.
+    edit = await app.begin_authoring(world[2][3], edit.target.plan.plan_id)
+    sid = await daily(world, class_name="四班", morning_activity="集体游戏：跳圈")
+    await daily(
+        world, owner=4, class_name="四班", morning_activity="集体游戏：其他教师"
+    )
+    await daily(world, class_name="五班", morning_activity="集体游戏：其他班级")
+    filled = await app.autofill_owned(world[2][3], edit.page_id, edit.page)
+    assert {s.source_id for s in filled.body.sources} == {sid}
+    assert filled.body.value_at("games.collective.0.name") == "跳圈"
+    saved = await app.save_edit(world[2][3], filled.page_id, filled.page, uuid4())
+    reopened = await app.begin_authoring(world[2][3], saved.plan_id)
+    assert reopened.body.value_at("games.collective.0.name") == "跳圈"
+
+
+def test_class_label_aliases_are_bounded_and_grade_specific():
+    from app.repository.weekly_source_repository import class_label_aliases
+
+    assert class_label_aliases("中四班", "中班") == ("四班", "中四班")
+    assert class_label_aliases("四班", "中班") == ("四班", "中四班")
+    assert class_label_aliases("中山班", "中班") == ("中山班",)
+    assert class_label_aliases("大四班", "中班") == ("大四班",)
+
+
+async def test_ambiguous_numbered_class_alias_does_not_import(world):
+    from sqlalchemy import select
+
+    from app.core.models.academic_identity import TABLES
+    from app.service.academic_identity.contracts import ClassInput
+
+    app, edit = await setup(world)
+    scope = edit.target.authorization.scope
+    async with world[0]() as session:
+        c = TABLES["class_instance"]
+        year_id = (
+            await session.execute(
+                select(c.c.academic_year_id).where(
+                    c.c.tenant_id == 11, c.c.id == scope.class_instance_id
+                )
+            )
+        ).scalar_one()
+    await world[3][2].create_class(
+        world[2][2], ClassInput(year_id, scope.semester_id, "中四班", "中班")
+    )
+    await daily(world, class_name="四班", morning_activity="集体游戏：跳圈")
+    filled = await app.autofill_owned(world[2][3], edit.page_id, edit.page)
+    assert not filled.body.sources
+    assert filled.body.value_at("games.collective.0.name") == ""
