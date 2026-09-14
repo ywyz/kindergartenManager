@@ -298,7 +298,7 @@ async def test_morning_generation_rechecks_exact_imported_name_baseline(
         world, monkeypatch, waiting=boundary == "waiting", sourced=True
     )
     actor = world[2][3]
-    path = "days.2026-09-09.morning_talk_questions"
+    path = "days.2026-09-09.morning_talk_topic"
     task = asyncio.create_task(
         app.regenerate(actor, edit.page_id, edit.page, "weekly_morning_talk", (path,))
     )
