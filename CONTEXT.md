@@ -1,6 +1,8 @@
+> 2026-09-15 当前基线收敛：本次审计源码基线为 `e1269d187017fabcf7bec0761f6a67023cb80437`，对应 tag `v3.4.0-beta14`，OCI index digest `sha256:60ed5b4aa146757e6dc0cdadf9875199763f5542bb9502763b8ae6c0067c9895`（平台 `linux/amd64`、`linux/arm64`）。生产 `manager.ywyz.tech` 于 2026-09-15 经验证 liveness、readiness 正常；本次登录与 bug 业务验收尚未完成；Issue #71、#72、#80、#81 仍为 OPEN，本次验证不是 bug 修复验收。下方 2026-09-14 及更早记录保留历史时点。
+>
 > 2026-09-14 每周工作计划新要求：本人每日计划自动补空、受管提示词、整格编辑及导出内检查，以[本轮契约](specs/weekly-plan-authoring/autofill-20260914.md)为准。本次已授权完整发布部署；下方旧交互与旧授权仅为历史。部署结果须以本轮实际交付证据为准。
 
-> 本轮周计划云端交付的唯一当前入口：[交付记录](specs/weekly-plan-authoring/evidence/WP-E-cloud-delivery-20260914.md)。下方阶段状态与授权均保留为历史快照。
+> 周计划当前入口：[状态与证据](specs/weekly-plan-authoring/current-status.md)；[beta11 交付记录](specs/weekly-plan-authoring/evidence/WP-E-cloud-delivery-20260914.md)保留历史范围。
 
 > 2026-09-14 逐组确认更新：用户已接受本周重点 `focus.0–2` 三条提案，其余23字段待确认；未执行整份页面采用或保存。用户已授权推送当前交付分支，不创建PR或合并。精确范围见[确认记录](specs/weekly-plan-authoring/evidence/WP-E-proposal-confirmation-20260914.md)；以下2026-09-13记录保留历史时点。
 
@@ -108,12 +110,12 @@ UI 登录用户与 API 的租户服务主体仍是两个不同边界，不得混
 
 - 开发/自动测试数据库：隔离 SQLite `kindergarten.db`。
 - 云端生产数据库：通过 `DATABASE_URL` 使用 MySQL 8。
-- Schema 变更：只允许 Alembic；当前迁移 head 为 `3c9f4b2a7d1e`，其 parent 为 `2b7f3d5e9c8a`。
-  `3c9f4b2a7d1e` 增加 WMP-9 production prerequisites 的六张聚合、版本、周日、月栏目、scope grant 和 audit 表。
-  其中
+- Schema 变更：只允许 Alembic；当前迁移 head 为 `a608bc23457b`，直接前驱为 `f597ab12346a`；完整链以 `alembic/versions/` 为准。
+  `3c9f4b2a7d1e` 增加 WMP-9 production prerequisites 的六张聚合、版本、周日、月栏目、scope grant 和 audit 表；
+  后续迁移追加共享周来源、人员默认、编辑提示词、导出审计、缩减提示词、所有者快照、晨间活动来源、编号班级别名等。
   `b7d9e1f3a5c2` 增加 `daily_plan.revision`，`c1a8e4f6b2d9` 修复 SQLite `user.id` 必须使用精确
   `INTEGER PRIMARY KEY` 才能自动生成 ID 的兼容性缺陷；`e5f7a9c2d4b6` 增加 W006 的两张 append-only
-  evidence 表及 SQLite/MySQL UPDATE/DELETE 拒绝 trigger；新 head 为 `user` 增加正整数 `auth_epoch`，
+  evidence 表及 SQLite/MySQL UPDATE/DELETE 拒绝 trigger；基线 `2b7f3d5e9c8a` 为 `user` 增加正整数 `auth_epoch`，
   使任何密码变更都能撤销旧 UI token。MySQL `user.id` 仍为 `BIGINT AUTO_INCREMENT`。
 - 应用与 Bootstrap 启动不执行 Alembic。schema 变更只允许由 `app.jobs.migrate_database` 显式执行，且必须先消费绑定当前受保护镜像、未过期、artifact hash 可复算并已完成隔离恢复验证的 owner-only 备份证据；见 ADR-0007。
 - AI Key 使用 Fernet 在应用层加密；明文只能短暂存在于内存，不得写日志或文档。
@@ -121,7 +123,7 @@ UI 登录用户与 API 的租户服务主体仍是两个不同边界，不得混
 - Docker/OCI 是当前产品发布路径。PyInstaller、Windows/Linux portable 与 Debian 桌面式打包属于遗留资产，
   不再进入产品发布或人工安装验收。
 
-## 6. 当前模块状态
+## 6. 历史模块检查快照（2026-09-07）
 
 | 模块 | 当前代码 | 历史自动证据 | 历史人工证据 | 当前说明 |
 |---|---|---|---|---|
@@ -132,13 +134,15 @@ UI 登录用户与 API 的租户服务主体仍是两个不同边界，不得混
 | 课程审议 | 已实现 | 2026-06-28 曾记录 529 passed | 主流程通过 | `main` 的最新提交记录了该验收 |
 | 对外只读 API | 已实现 | 本审查基线全量回归覆盖 API auth/routes | 未记录外部调用方验收 | 面向未来其他系统集成；生产应启用 HMAC 并轮换 Key |
 
-上表只区分“当前代码存在”“本审查基线自动证据”与“历史人工证据”。本次全量回归和全新 SQLite 迁移只证明
+上表按原审查时点保留，不能用来断言本次各模块全部通过或阻塞。上表只区分“当前代码存在”“本审查基线自动证据”与“历史人工证据”。本次全量回归和全新 SQLite 迁移只证明
 开发/隔离环境，不替代云端 HTTPS/浏览器、MySQL、真实 AI 或 Word/LibreOffice 文档兼容性人工验收。
 
 ## 7. 分支与仓库状态
 
-- 当前分支为 `main`；WMP-9 prerequisites 的实现门已在 `72d759f…` 通过，证据账本位于
-  `f07971d…`。本次 docs-only 变更的最终提交 SHA 尚未形成，提交后必须单独回读并记录。
+- 本次核对的远端 `main` 基线为 `e1269d187017fabcf7bec0761f6a67023cb80437`，对应 tag `v3.4.0-beta14`，
+  OCI index digest `sha256:60ed5b4aa146757e6dc0cdadf9875199763f5542bb9502763b8ae6c0067c9895`。
+  WMP-9 prerequisites 的历史实现门已在 `72d759f…` 通过，证据账本位于 `f07971d…`；
+  本次基线验证及后续 docs-only 变更的最终提交 SHA 仍需单独回读并记录。
 - Agent WRITE 当前能力仅为每日计划当前页面、单一 Patch、用户显式确认后的应用服务层 WRITE；
   Provider/Tool 能力面仍恰好为四个 READ + 两个 DRAFT。当前 W007 的精确本地交付状态、Review 轮次、
   SHA 与测试证据仅以 `specs/agent-write/tests/README.md` 为准；Issue #52 仅在对应门回写后作为外部证据；

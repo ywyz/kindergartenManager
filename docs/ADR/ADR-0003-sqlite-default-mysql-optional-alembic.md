@@ -14,11 +14,11 @@
 - 云端生产配置使用 MySQL 8。显式的 `KINDERGARTEN_DATA_DIR` 仍可用于隔离测试数据根目录。
 - 所有 schema 变更通过 Alembic；禁止依赖 `create_all()`。
 - 迁移必须同时考虑 SQLite batch/类型差异和 MySQL enum/BLOB 行为。
-- 当前工作树 head 是 `3c9f4b2a7d1e`；head 变化只由新 revision 产生。`e5f7a9c2d4b6` 的前序
+- 当前工作树 head 是 `a608bc23457b`（2026-09-15，前序 `f597ab12346a`）；head 变化只由新 revision 产生。`e5f7a9c2d4b6` 的前序
   `c1a8e4f6b2d9` 只在 SQLite 将历史迁移错误创建的 `user.id BIGINT PRIMARY KEY` 重建为可自动生成
   ID 的 `INTEGER PRIMARY KEY`；`e5f7a9c2d4b6` 为 SQLite/MySQL 增加且仅增加两张 Agent WRITE evidence
   表和各自的 UPDATE/DELETE 拒绝 trigger；`2b7f3d5e9c8a` 为 `user` 增加正整数 `auth_epoch`，用于密码
-  变更后撤销旧 UI token；当前 `3c9f4b2a7d1e` 再增加周/月计划生产先决条件的六张表及其约束/trigger。
+  变更后撤销旧 UI token；历史 revision `3c9f4b2a7d1e` 增加周/月计划生产先决条件的六张表及其约束/trigger。
 - 应用与 Bootstrap 管理员任务不得执行启动迁移；schema 变更只能由
   `app.jobs.migrate_database` 这个显式、备份证据门保护的任务执行。应用通过 readiness 检查实际 revision，
   不兼容时 fail-closed。

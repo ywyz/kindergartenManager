@@ -1,3 +1,4 @@
+# ruff: noqa: SIM117 - nested contexts preserve the existing UI layout
 """游戏观察记录页面（路由：/game-observation）。
 
 功能：
@@ -110,6 +111,8 @@ async def game_observation_page() -> None:
         "observation_id": None,  # 保存后的记录 ID
         "generation": 0,
         "upload_generation": 0,
+        "upload_pending": False,
+        "upload_error": False,
     }
 
     with ui.column().classes("w-full max-w-3xl mx-auto p-6 gap-4"):
@@ -146,7 +149,7 @@ async def game_observation_page() -> None:
                 obs_date_input = ui.input(
                     label="观察日期",
                     placeholder="YYYY-MM-DD",
-                    value=str(date.today()),
+                    value=str(date.today()),  # noqa: DTZ011 - preserve the existing local observation date
                 ).classes("flex-1 min-w-40")
                 time_range_input = ui.input(
                     label="起止时间",
@@ -204,22 +207,7 @@ async def game_observation_page() -> None:
                 upload_generation: int,
                 image_count: int,
             ) -> None:
-                if not await _require_bound_session():
-                    return
-                if (
-                    generation != state["generation"]
-                    or upload_generation != state["upload_generation"]
-                ):
-                    return
-                if not files:
-                    return
-                if image_count + len(files) > 3:
-                    show_error("最多只能上传 3 张图片")
-                    return
-
-                batch_data: list[bytes] = []
-                for file in files:
-                    data = await file.read()
+                try:
                     if not await _require_bound_session():
                         return
                     if (
@@ -227,22 +215,56 @@ async def game_observation_page() -> None:
                         or upload_generation != state["upload_generation"]
                     ):
                         return
-                    batch_data.append(data)
+                    if not files:
+                        return
+                    if image_count + len(files) > 3:
+                        show_error("最多只能上传 3 张图片")
+                        return
 
-                state["images"].extend(batch_data)
-                state["compressed_images"] = []
-                state["observation_id"] = None
-                state["generation"] += 1
-                image_count_label.set_text(f"已上传：{len(state['images'])} 张")
-                with preview_row:
-                    for data in batch_data:
-                        ui.image(
-                            f"data:image/jpeg;base64,{__import__('base64').b64encode(data).decode()}"
-                        ).classes("w-24 h-24 object-cover rounded border")
+                    batch_data: list[bytes] = []
+                    try:
+                        for file in files:
+                            data = await file.read()
+                            if not await _require_bound_session():
+                                return
+                            if (
+                                generation != state["generation"]
+                                or upload_generation != state["upload_generation"]
+                            ):
+                                return
+                            batch_data.append(data)
+                    except Exception:  # noqa: BLE001 - sanitize failures at the authenticated UI boundary
+                        if not await _require_bound_session():
+                            return
+                        if (
+                            generation != state["generation"]
+                            or upload_generation != state["upload_generation"]
+                        ):
+                            return
+                        state["upload_error"] = True
+                        show_error("照片读取失败，请重新上传后再生成")
+                        return
+
+                    state["images"].extend(batch_data)
+                    state["compressed_images"] = []
+                    state["observation_id"] = None
+                    state["generation"] += 1
+                    image_count_label.set_text(f"已上传：{len(state['images'])} 张")
+                    with preview_row:
+                        for data in batch_data:
+                            ui.image(
+                                f"data:image/jpeg;base64,{__import__('base64').b64encode(data).decode()}"
+                            ).classes("w-24 h-24 object-cover rounded border")
+                finally:
+                    # A superseded callback cannot clear the newer upload's state.
+                    if upload_generation == state["upload_generation"]:
+                        state["upload_pending"] = False
 
             def trigger_upload(e) -> object:
                 files = tuple(e.files)
                 state["upload_generation"] += 1
+                state["upload_pending"] = True
+                state["upload_error"] = False
                 return handle_upload(
                     files,
                     state["generation"],
@@ -330,11 +352,25 @@ async def game_observation_page() -> None:
             generation: int,
             images: tuple[bytes, ...],
             ctx: dict,
+            upload_generation: int,
+            upload_pending: bool,
+            upload_error: bool,
         ) -> None:
             if not await _require_bound_session():
                 action_guard.release("generate", action_owner)
                 return
-            if generation != state["generation"]:
+            if (
+                generation != state["generation"]
+                or upload_generation != state["upload_generation"]
+            ):
+                action_guard.release("generate", action_owner)
+                return
+            if upload_pending:
+                show_info("照片正在处理中，请等待已上传数量更新后再生成")
+                action_guard.release("generate", action_owner)
+                return
+            if upload_error:
+                show_error("照片读取失败，请重新上传后再生成")
                 action_guard.release("generate", action_owner)
                 return
             generate_btn.props("loading=true")
@@ -357,7 +393,10 @@ async def game_observation_page() -> None:
                     )
                 if not await _require_bound_session():
                     return
-                if generation != state["generation"]:
+                if (
+                    generation != state["generation"]
+                    or upload_generation != state["upload_generation"]
+                ):
                     return
                 goal_area.value = result.get("observation_goal", "")
                 record_area.value = result.get("observation_record", "")
@@ -370,19 +409,28 @@ async def game_observation_page() -> None:
             except ConfigError:
                 if not await _require_bound_session():
                     return
-                if generation != state["generation"]:
+                if (
+                    generation != state["generation"]
+                    or upload_generation != state["upload_generation"]
+                ):
                     return
                 show_error("AI 配置不可用，请检查模型配置")
             except (AiCallError, AiParseError):
                 if not await _require_bound_session():
                     return
-                if generation != state["generation"]:
+                if (
+                    generation != state["generation"]
+                    or upload_generation != state["upload_generation"]
+                ):
                     return
                 show_error("AI 调用或解析失败，请稍后重试")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - sanitize failures at the authenticated UI boundary
                 if not await _require_bound_session():
                     return
-                if generation != state["generation"]:
+                if (
+                    generation != state["generation"]
+                    or upload_generation != state["upload_generation"]
+                ):
                     return
                 logger.error("生成观察记录失败 error_type=%s", type(e).__name__)
                 show_error(f"生成失败：{type(e).__name__}")
@@ -410,6 +458,9 @@ async def game_observation_page() -> None:
                     "child_names": payload["child_names"],
                     "child_age": payload["child_age"],
                 },
+                state["upload_generation"],
+                state["upload_pending"],
+                state["upload_error"],
             )
 
         generate_btn.on("click", trigger_generate)
@@ -433,7 +484,7 @@ async def game_observation_page() -> None:
                     "user_id": user_id,
                     "obs_date": date.fromisoformat(payload["obs_date"])
                     if payload["obs_date"]
-                    else date.today(),
+                    else date.today(),  # noqa: DTZ011 - preserve the existing local observation date
                     "time_range": payload["time_range"] or None,
                     "big_env": payload["big_env"],
                     "game_area": payload["game_area"] or None,
@@ -464,7 +515,7 @@ async def game_observation_page() -> None:
                 state["observation_id"] = obs_id
                 show_success(f"保存成功（记录 ID：{obs_id}）")
                 await trigger_refresh_history()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - sanitize failures at the authenticated UI boundary
                 if not await _require_bound_session():
                     return
                 if generation != state["generation"]:
@@ -515,7 +566,7 @@ async def game_observation_page() -> None:
                     user_id=user_id,
                     grade=grade_val,
                     class_name=class_name_val,
-                    obs_date=obs["obs_date"] or str(date.today()),
+                    obs_date=obs["obs_date"] or str(date.today()),  # noqa: DTZ011 - preserve the existing local observation date
                 )
 
                 async with AsyncSessionLocal() as session:
@@ -543,7 +594,7 @@ async def game_observation_page() -> None:
                     observation_id=observation_id,
                 )
                 show_success(f"导出成功：{file_name}")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - sanitize failures at the authenticated UI boundary
                 if not await _require_bound_session():
                     return
                 if generation != state["generation"]:
@@ -665,7 +716,7 @@ async def game_observation_page() -> None:
                                                 str(r.obs_date),
                                             )
                                             ui.download(doc_bytes, fname)
-                                        except Exception as ex:
+                                        except Exception as ex:  # noqa: BLE001 - sanitize failures at the authenticated UI boundary
                                             if not await _require_bound_session():
                                                 return
                                             show_error(
@@ -714,7 +765,7 @@ async def game_observation_page() -> None:
                                                             observation_id=r.id,
                                                         )
                                                 await trigger_refresh_history()
-                                            except Exception as ex:
+                                            except Exception as ex:  # noqa: BLE001 - sanitize failures at the authenticated UI boundary
                                                 if not await _require_bound_session():
                                                     return
                                                 show_error(
@@ -724,7 +775,7 @@ async def game_observation_page() -> None:
                                     ui.button(
                                         "删除", icon="delete", on_click=_delete
                                     ).props("size=sm flat").classes("text-red-500")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - sanitize failures at the authenticated UI boundary
                 if not await _require_bound_session():
                     return
                 if not _history_is_current(generation):

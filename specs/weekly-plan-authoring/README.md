@@ -1,3 +1,9 @@
+# 周计划文档入口
+
+当前源码、线上核对与需求边界见[当前状态](current-status.md)；现行填写交互见[本人自动填写与页面精简](autofill-20260914.md)。下方 Windows 交接及分阶段提示词是历史材料，不是当前执行入口。当前文档兼容性按真实 LibreOffice 验证，不新增 Windows 前置。
+
+## 历史交接索引
+
 > 2026-09-13 WP-E阶段一后继：[当前证据](evidence/WP-E-startup-Ubuntu-20260913.md)与[Windows新交接](WP-E-Windows-startup-handoff-20260913.md)。新工作仅本地提交，未push；从交接bundle获取代码，不将下方历史远端分支当作本轮已发布。阶段二/三NOT_RUN，WP-F未执行。
 
 > 2026-09-11 WP-D 已按用户授权进入实现：日期投影、显式 v3 正文、分项生成与确认/CAS 应用闭环已接线。最终范围、代码 SHA、验证与剩余门只以[当前状态](current-status.md)及[WP-D 矩阵](WP-D-completion-contract.md)为准。下方 WP-C / WP-D 未启动措辞为历史时点，不表示当前执行状态；WP-C 四项历史过程缺口仍未满足。
