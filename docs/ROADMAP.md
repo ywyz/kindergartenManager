@@ -1,3 +1,5 @@
+> 2026-09-15 当前基线收敛：本次审计源码基线为 `e1269d187017fabcf7bec0761f6a67023cb80437`，对应 tag `v3.4.0-beta14`，OCI index digest `sha256:60ed5b4aa146757e6dc0cdadf9875199763f5542bb9502763b8ae6c0067c9895`（平台 `linux/amd64`、`linux/arm64`）。生产 `manager.ywyz.tech` 于 2026-09-15 经验证 liveness、readiness 正常；本次登录与 bug 业务验收尚未完成；Issue #71、#72、#80、#81 仍为 OPEN，本次验证不是 bug 修复验收。2026-09-14 云端交付记录对应 `v3.4.0-beta11`；beta14 在 beta11 基础上追加合并 PR #84–#86。下方历史阶段前置保留为历史时点。
+>
 > 2026-09-14 每周工作计划新要求：本人每日计划自动补空、受管提示词、整格编辑及导出内检查，以[本轮契约](../specs/weekly-plan-authoring/autofill-20260914.md)为准。本次已授权完整发布部署；下方旧交互与旧授权仅为历史。部署结果须以本轮实际交付证据为准。
 
 > 本轮周计划范围、验收决定及执行状态：[云端交付记录](../specs/weekly-plan-authoring/evidence/WP-E-cloud-delivery-20260914.md)。下方历史阶段前置不覆盖最新用户决定。
@@ -298,12 +300,13 @@ RED/GREEN/Review/precheck SHA、计数和 node hash 统一记录在 `specs/agent
 
 ## 10. R5：发布与运维复核
 
-状态：`R5-P 生产闭环完成；evidence closure commit 的独立 Review 与 exact-SHA Quality 待固定`。
+状态：`R5-P 生产闭环完成；v3.4.0-beta14 已发布且存活及数据库就绪检查通过（本次登录和业务验收未完成），Issue #71、#72、#80、#81 仍为 OPEN，不视为 bug 修复验收`。
 
-当前发布基线为 `v3.4.0-beta9@f4687f05e8fdca5d22f5921922ec5c77a4d28bea`，Quality run
-`33607674505` 与 Release Build `33607924279` 均为精确 source SHA success。生产使用 immutable OCI index
-`sha256:bfa93aebe5ea617a62c98e095e5cd18c5573dbd10a3fca936aeb753e66545bfe`，仅含
-`linux/amd64`、`linux/arm64`；Release 已发布且保持 prerelease。
+当前发布基线为 `v3.4.0-beta14@e1269d187017fabcf7bec0761f6a67023cb80437`，Quality run
+`34906786865` 与 Release Build `34906786819` 均为精确 source SHA success。生产使用 immutable OCI index
+`sha256:60ed5b4aa146757e6dc0cdadf9875199763f5542bb9502763b8ae6c0067c9895`，仅含
+`linux/amd64`、`linux/arm64`；Release 于 2026-09-14 23:28 UTC（北京时间 2026-09-15）发布且保持 prerelease。
+2026-09-15 生产 `manager.ywyz.tech` 验证 liveness、readiness 正常；本次登录与 bug 业务验收尚未完成。
 
 2026-08-31 已在 `manager.ywyz.tech` 完成 Bootstrap 管理员密码文件漂移恢复、标准轮换、旧凭据拒绝、旧会话
 失效和最终凭据重登 `/home`。受保护密码文件路径与操作边界记录于 `docs/DEPLOYMENT.md`；密码值不进入仓库。
@@ -321,10 +324,11 @@ RED/GREEN/Review/precheck SHA、计数和 node hash 统一记录在 `specs/agent
 - `scripts/deploy.py` 的不可变部署与回滚操作（dry-run、串行锁、rollback）。
 - 独立 Issue #54 的 `/api/v1/readiness` 双门与 R5-R backup→restore→evidence 保持各自历史结论；R5-R
   `tested_code_sha=b329bf6cf4bbf5518390644b24908ce29bd16894` 不因 R5-P 改写。R5-P 的隔离
-  migration→target failure→old-image rollback 继续绑定 `340d23d…`。2026-09-02 生产另行完成 fresh backup、
-  beta9 target-business 故障注入后 beta5 回切、回切完整验收和最终 beta9 部署；最终 app/MySQL healthy、未暂停，
-  liveness/readiness、登录、五模块、图片、AI key、Word 与数据快照均 PASS。六类证据及互不替代规则只见
-  `specs/operations-r5/evidence-ledger.md`；closure commit SHA 只能在提交后回读并由自身 Quality 固定。
+  migration→target failure→old-image rollback 继续绑定 `340d23d…`。2026-09-02 beta9 生产闭环及
+  2026-09-14/15 beta14 生产验证分别记录：beta9 曾完成 fresh backup、beta9 target-business 故障注入后 beta5 回切、
+  回切完整验收和最终 beta9 部署，app/MySQL healthy、未暂停，liveness/readiness、登录、五模块、图片、AI key、Word
+  与数据快照均 PASS；beta14 于 2026-09-15 验证 liveness、readiness 正常；本次登录与 bug 业务验收尚未完成，并确认 Issue #71、#72、#80、#81 仍为 OPEN。
+  六类证据及互不替代规则只见 `specs/operations-r5/evidence-ledger.md`；closure commit SHA 只能在提交后回读并由自身 Quality 固定。
 
 近期运维子计划（2026-09-06 新增）：
 
@@ -342,7 +346,7 @@ RED/GREEN/Review/precheck SHA、计数和 node hash 统一记录在 `specs/agent
 2026-09-08 产品需求更新：优先实现[周计划填写与班级协作](../specs/weekly-plan-authoring/spec.md)。
 用户已确认同班共享、草稿导出、重复备课人工选取、来源快照、多教师姓名以及缩减确认；
 需要每日活动名称、权威班级成员、日历、提示词、五／六列单页导出的配套改动。
-目前仅形成[实施顺序与验收矩阵](../specs/weekly-plan-authoring/tasks.md)，不代表这些能力已落地。
+已按[现行填写契约](../specs/weekly-plan-authoring/autofill-20260914.md)交付阶段性能力；[实施矩阵](../specs/weekly-plan-authoring/tasks.md)中的历史阶段不代表当前全部完成或未实现。
 月计划新需求后置；原 WMP-9 的旧产品矩阵不能代替新周计划验收。
 班级身份依赖与 Issue #75 方向对齐，但不据此声称该 Issue 的完整历史／升班范围已实现。
 

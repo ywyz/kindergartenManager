@@ -1,3 +1,5 @@
+> 2026-09-15 核对：当前源码迁移 head 为 `a608bc23457b`，现行周计划交互与部署状态见[周计划当前状态](../../specs/weekly-plan-authoring/current-status.md)。以下各日期补充保留历史结构和设计依据；旧 head、显式取源/采用交互及“后续实现”描述不代表当前状态。本文未改变数据库或授权契约。
+
 # 2026-09-11 WP-D 当前数据契约补充
 
 新共享周正文通过显式编辑转换使用 `weekly-authoring.v3`，外层根、不可变版本、来源审计与双 CAS 仍走 WP-C 路径；旧 v1/v2 规范解析、hash 和历史 operation 不被后台改写。v3 不是新业务表：它在版本正文内冻结 `budget_version=weekly-authoring-budget.v1`、固定标题、日历规则／标签指纹及每列教学掩码、固定 slot、来源 references 和 `archive`。

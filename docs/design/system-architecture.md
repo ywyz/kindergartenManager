@@ -1,3 +1,5 @@
+> 2026-09-15 核对：当前源码迁移 head 为 `a608bc23457b`，现行周计划交互与部署状态见[周计划当前状态](../../specs/weekly-plan-authoring/current-status.md)。以下各日期补充保留历史结构和设计依据；旧 head、显式取源/采用交互及“后续实现”描述不代表当前状态。本文未改变数据库或授权契约。
+
 # 2026-09-11 WP-D 应用层实现补充
 
 当前 `app/service/shared_weekly/production_composition.py` 暴露 `composition.authoring`，由 `AuthoringApplication` 复用 WP-C 的身份、共享根、双 CAS、映射与来源服务。`CalendarApplication.resolve_week` 在取源／AI 前规范完整五／六列；`display_from_facts` 在已有授权事务中投影标签，不新建连接。每日页面单独注入 `get_daily_week_number` 到 DatePanel，保留其他调用方的旧日期行为；个人学期只参与展示，不授予共享权限。
@@ -6,7 +8,7 @@
 
 普通手工编辑保留已存来源历史；本次新取源和 AI 依赖重新授权并绑定精确基线。手工历史的保留不等于旧源仍可重新读取。v3 固定结构、archive 和预算见[数据模型](data-model.md)；prompt 枚举迁移唯一 head 为 `c264d8fa1037`。完整填写 UI、模板资格、单页与正式导出属于 WP-E，云端／Word 外部门属于后续授权。
 
-以上为当前代码契约，未宣称整门通过。最终 SHA、验证、review 与未满足门见[WP-D 矩阵](../../specs/weekly-plan-authoring/WP-D-completion-contract.md)、[证据](../../specs/weekly-plan-authoring/evidence/WP-D-20260911.md)及[当前状态](../../specs/weekly-plan-authoring/current-status.md)。以下各日期基线、迁移 head 和阶段状态按历史保留。
+以上为 2026-09-11 的代码契约，未宣称整门通过。最终 SHA、验证、review 与未满足门见[WP-D 矩阵](../../specs/weekly-plan-authoring/WP-D-completion-contract.md)、[证据](../../specs/weekly-plan-authoring/evidence/WP-D-20260911.md)及[当前状态](../../specs/weekly-plan-authoring/current-status.md)。以下各日期基线、迁移 head 和阶段状态按历史保留。
 
 ---
 

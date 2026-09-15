@@ -4,6 +4,9 @@ KindergartenManager 是一个部署在云服务器上的在线幼儿园教学管
 Python 3.14.7 / NiceGUI 模块化单体，生产参考拓扑使用 Caddy、主应用和 MySQL 8；系统支持文本/视觉 AI、
 固定 Word 模板导出，以及按租户隔离的只读 REST API。
 
+> 当前基线（2026-09-15）：本次审计源码基线 `e1269d187017fabcf7bec0761f6a67023cb80437`，tag `v3.4.0-beta14`，
+> 生产 `manager.ywyz.tech` liveness/readiness 验证正常；本次登录与 bug 业务验收尚未完成；Issue #71、#72、#80、#81 仍为 OPEN。
+>
 > 当前产品交付边界：只提供云端在线 Web 系统，不再把 Windows/Linux 安装包或便携包作为独立产品。
 > UI 使用系统账号、JWT 与 RBAC，并按 tenant/user 隔离；匿名注册不挂载，空库不会自动创建默认管理员。
 > 生产必须使用 HTTPS、强密码、网络访问控制、MySQL、备份恢复和不可变镜像门禁。
@@ -73,7 +76,7 @@ post-migration acceptance 参数见 [部署指南](docs/DEPLOYMENT.md)。
 
 统一在 `/settings` 配置学期、班级、教师和 AI 接口。旧 `/setup` 只保留为跳转到 `/settings` 的兼容入口。
 
-当前 Web 框架安全基线为 NiceGUI 3.16.0 + FastAPI 0.141.1 + Starlette 1.6.0。
+当前 Web 框架安全基线为 NiceGUI 3.16.0 + FastAPI 0.141.1 + Starlette（由已锁定的上游依赖约束解析，实际版本须按构建环境核对）。
 其他 Dependabot 相关 Python 依赖下限、官方来源和验证方法见
 [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md)。
 
@@ -86,9 +89,10 @@ post-migration acceptance 参数见 [部署指南](docs/DEPLOYMENT.md)。
   --protected-image no-running-image
 ```
 
-当前工作树 Alembic head：`3c9f4b2a7d1e`。前序 `2b7f3d5e9c8a` 为用户增加正整数
-`auth_epoch`；当前 head 增加 WMP-9 production prerequisites 的六张表及其约束。改密或管理员重置会原子
-递增 `auth_epoch`，从而使此前签发的 UI token 失效。
+当前工作树 Alembic head：`a608bc23457b`；迁移链自 `2b7f3d5e9c8a` → `3c9f4b2a7d1e` 起，
+后续追加共享周来源、人员默认、编辑提示词、导出审计、缩减提示词、所有者快照、晨间活动来源、编号班级别名等迁移。
+基线 `2b7f3d5e9c8a` 为用户增加正整数 `auth_epoch`；`3c9f4b2a7d1e` 增加 WMP-9 production prerequisites
+的六张表及其约束。改密或管理员重置会原子递增 `auth_epoch`，从而使此前签发的 UI token 失效。
 
 仓库历史曾记录多次通过结果，但这些数字属于对应旧 SHA。本 README 不把历史数字当作当前验证；交付时应记录本次命令、SHA、平台和结果。
 
