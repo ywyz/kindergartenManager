@@ -28,3 +28,9 @@ OpenCode 实现导航与主题，pi 审查 issue 并提供上传初稿；连接�
 - Edge 扩展 file chooser 设置文件返回 Not allowed；已说明需启用 Allow access to file URLs，合成图片尚未由浏览器上传。
 - #80 的实际操作/完整提示与 #81 的预览/触发按钮仍待用户补充。
 - 不修改真实教师正文、不增加 Agent 能力、不重构。生产切换仍需不可变镜像、有效备份恢复证据及独立登录/业务门；候选通过前不切流量。
+
+## 远程检查发现的文档遗漏
+
+`198e8bb8ed775d87d131e6e6d45fcb4caf3fe9c6` 的 Quality push run `34937578934`：1902 passed、1 skipped、21 deselected，唯一失败是既有文档测试硬编码旧 head `3c9f4b2a7d1e`；未进入 Foundation 步骤。真实 LibreOffice job 通过，CodeQL 通过。将该既有检查改为读取 Alembic 实际唯一 head 后，同时更正开发指南、手工检查入口、ADR 当前指针与历史索引的遗漏。保留旧 revision 的历史含义，不将旧验收升级为新结果。本地该文档契约组 16 项通过。
+
+候选镜像 run `34937701417` 首次因 Debian ARM64 包下载连接中断而失败，已对同 SHA 重试；尚无可部署结果，不修改依赖快照或降低构建门。后续新 SHA 的 CI 和 Release 仍需单独核对。

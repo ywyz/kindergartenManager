@@ -21,7 +21,7 @@ Word：Microsoft Word / LibreOffice / 未执行
 
 ## 2. 启动与迁移
 
-- [ ] 全新数据目录启动，迁移到当前 head `3c9f4b2a7d1e`，确认两张 Agent WRITE evidence 表、WMP-9
+- [ ] 全新数据目录启动，通过受支持迁移任务迁移到当前 head `a608bc23457b`，确认两张 Agent WRITE evidence 表、WMP-9
   production prerequisites 的六张表及不可变 trigger 存在，且 `user.auth_epoch` 默认 1、非空、拒绝非正数。
 - [ ] 空库不自动创建固定管理员；在应用主机显式 bootstrap 后才能登录。
 - [ ] `/` 跳转 `/login`；未登录不能进入 `/home`、`/settings` 等业务页，匿名 `/register` 不挂载。

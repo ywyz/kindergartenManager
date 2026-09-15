@@ -3,7 +3,18 @@
 import re
 from pathlib import Path
 
+from alembic.config import Config
+from alembic.script import ScriptDirectory
+
 _ROOT = Path(__file__).parents[1]
+
+
+def _current_migration_head() -> str:
+    head = ScriptDirectory.from_config(
+        Config(str(_ROOT / "alembic.ini"))
+    ).get_current_head()
+    assert head is not None
+    return head
 
 
 def test_system_architecture_does_not_claim_raw_exception_logging() -> None:
@@ -97,7 +108,7 @@ def test_readme_matches_current_login_agent_and_deployment_boundaries() -> None:
     assert "没有有效登录保护" not in readme
     assert "受控 AI Agent（尚未实现）" not in readme
     assert "创建固定的默认管理员记录" not in readme
-    assert "当前工作树 Alembic head：`3c9f4b2a7d1e`" in readme
+    assert f"当前工作树 Alembic head：`{_current_migration_head()}`" in readme
     assert "python -m app.jobs.bootstrap_admin --init" in readme
     assert "4 个 READ Tool、2 个 DRAFT Tool" in readme
     assert "Provider WRITE" in readme
@@ -146,7 +157,7 @@ def test_sqlite_environment_comment_names_the_application_data_directory() -> No
 
 def test_current_migration_head_is_consistent_across_operator_docs() -> None:
     """Developer and manual migration checks must reach every current table/trigger."""
-    expected_head = "`3c9f4b2a7d1e`"
+    expected_head = f"`{_current_migration_head()}`"
     missing = [
         relative_path
         for relative_path in (

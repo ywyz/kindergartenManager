@@ -92,8 +92,8 @@ API 身份独立：`X-Api-Key` 映射到 tenant；配置 `API_SIGNING_SECRET` �
 
 ## 5. 数据库与迁移
 
-当前工作树 Alembic head：`3c9f4b2a7d1e`。前序 `e5f7a9c2d4b6` 创建 W006 的两张 append-only
-evidence 表及 SQLite/MySQL 不可变 trigger，`2b7f3d5e9c8a` 为 `user` 增加正整数 `auth_epoch`；当前 head
+当前工作树 Alembic head：`a608bc23457b`（2026-09-15；前序 `f597ab12346a`）。前序 `e5f7a9c2d4b6` 创建 W006 的两张 append-only
+evidence 表及 SQLite/MySQL 不可变 trigger，`2b7f3d5e9c8a` 为 `user` 增加正整数 `auth_epoch`；历史 revision `3c9f4b2a7d1e`
 增加 WMP-9 production prerequisites 的六张表及其约束。
 人工迁移验收不得停在任一前序 revision。
 

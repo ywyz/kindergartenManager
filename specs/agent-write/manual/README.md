@@ -89,7 +89,7 @@ mock 每份 DRAFT 仍恰有两个串行 Provider 请求；issue/apply/reconcile�
 
 本节下列 `current` 序列和 W008 结论是历史验收快照。该快照保留原文的“当前工作树 Alembic head：`2b7f3d5e9c8a`”
 状态，仅用于复现当时的固定 SHA；当前工作树唯一 Alembic head 已为
-`3c9f4b2a7d1e`，新增 WMP-9 production prerequisites 的六张表及其约束。需要验证当前迁移时，
+`a608bc23457b`（2026-09-15；前序 `f597ab12346a`）；历史 `3c9f4b2a7d1e` 新增 WMP-9 production prerequisites 的六张表及其约束。需要验证当前迁移时，
 应以当前 checkout 的 `alembic heads` 和对应 release/验收账本为准。
 
 不得使用仓库 Compose 的持久 volume。只使用一次性、固定名称、loopback 端口与 tmpfs；启动前先确认同名

@@ -15,7 +15,9 @@
 
 > **历史文档说明（2026-09-02）**：本文按开发阶段累积，包含已被后续可信登录恢复取代的单用户描述和旧迁移/测试数字。当前架构事实见 [`../CONTEXT.md`](../CONTEXT.md)、[`../docs/design/system-architecture.md`](../docs/design/system-architecture.md)、[`../docs/design/data-model.md`](../docs/design/data-model.md) 和 [`../docs/ADR/README.md`](../docs/ADR/README.md)。受控 Agent 的 F003-F009 已固定 GREEN；当前可信 UI session 与 W005/W006 逐次确认 WRITE 边界见 [`../docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md`](../docs/ADR/ADR-0006-trusted-ui-session-and-confirmed-agent-write.md) 和 [`../specs/agent-write/spec.md`](../specs/agent-write/spec.md)。R5-R 的 `tested_code_sha=b329bf6cf4bbf5518390644b24908ce29bd16894` 保持 `LOCAL_GREEN` 历史结论；R5-P 已在 `v3.4.0-beta9@f4687f05e8fdca5d22f5921922ec5c77a4d28bea` 完成 Release/OCI 与生产故障回切、最终部署验收，精确证据只见 [`../specs/operations-r5/evidence-ledger.md`](../specs/operations-r5/evidence-ledger.md)。closure commit 仍须独立 reviewer 与自身 exact-SHA Quality，不授权跳过任何既有门禁。当前 Alembic head 为 `2b7f3d5e9c8a`；其前序 `e5f7a9c2d4b6` 是 W006 evidence schema revision。
 >
-> 当前工作树指针（2026-09-07）：Alembic head 为 `3c9f4b2a7d1e`；`2b7f3d5e9c8a` 为 token 撤销
+> 当前工作树指针（2026-09-15）：Alembic head 为 `a608bc23457b`，前序为 `f597ab12346a`；当前发布与实现状态见 `../CONTEXT.md`。
+>
+> 历史工作树指针（2026-09-07）：Alembic head 为 `3c9f4b2a7d1e`；`2b7f3d5e9c8a` 为 token 撤销
 > `auth_epoch` revision，`3c9f4b2a7d1e` 为后续周/月计划生产先决条件 revision。
 
 ## 1. 历史阶段记录
