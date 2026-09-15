@@ -23,7 +23,6 @@ from app.service.agent.composition import (
 )
 from app.ui.daily_plan_target import UiActionOriginCancelled
 
-
 AGENT_ACTION_LABELS = ("运行", "取消", "丢弃建议")
 AGENT_FIXED_NOTICE = "仅生成建议，不会保存或修改当前计划。"
 AGENT_CONFIRMATION_NOTICE = (
@@ -49,10 +48,21 @@ _ERROR_COPY = {
     "agent.plan_not_found": "所选日期尚无已保存计划，无法建立只读上下文。",
     "agent.scope_required": "请先选择日期。",
     "agent.timeout": "模型响应超时，请稍后重试。",
-    "agent.tool_failed": "只读工具执行失败，本次结果未采用。",
+    "agent.tool_failed": "工具处理失败，本次结果未采用。",
     "agent.tool_not_allowed": "模型请求了未授权工具，本次结果已拒绝。",
-    "agent.tool_schema_invalid": "模型工具参数不符合关闭契约，本次结果已拒绝。",
+    "agent.tool_schema_invalid": "模型工具参数或结果格式不符合要求，本次结果已拒绝。请缩小请求范围后重试；持续失败时请提供下方错误码。",
+    "agent.provider_failed": "模型服务未返回可用结果，请稍后重试；持续失败时请检查模型配置。",
+    "agent.patch_invalid": "模型建议与当前计划不匹配，本次建议未采用。请重新加载计划后重试。",
+    "agent.limit_exceeded": "本次请求超过处理上限，请缩小请求范围后重试。",
+    "agent.response_too_large": "模型返回内容过长，请缩小请求范围后重试。",
 }
+
+
+def agent_error_message(error_code: object) -> str:
+    """Render only local allowlisted diagnostics, never raw provider failures."""
+    if type(error_code) is not str or error_code not in _ERROR_COPY:
+        return "本次运行失败，未显示或保存任何建议。错误码：agent.unknown"
+    return f"{_ERROR_COPY[error_code]} 错误码：{error_code}"
 
 
 class AgentPatchActions(Protocol):
@@ -216,7 +226,7 @@ class DailyPlanAgentPanel:
             try:
                 lifecycle_origin = patch_actions.capture_lifecycle_origin()
                 caller_owns_origin = lifecycle_origin is not None
-            except BaseException:
+            except BaseException:  # noqa: BLE001 - lifecycle cleanup must also drain cancellation
                 origin_capture_failed = True
                 lifecycle_origin = asyncio.current_task()
                 if lifecycle_origin is not None:
@@ -224,7 +234,7 @@ class DailyPlanAgentPanel:
                         caller_owns_origin = patch_actions.owns_lifecycle_origin(
                             lifecycle_origin,
                         )
-                    except BaseException:
+                    except BaseException:  # noqa: BLE001 - lifecycle cleanup must also drain cancellation
                         origin_validation_failed = True
                         caller_owns_origin = False
 
@@ -290,7 +300,7 @@ class DailyPlanAgentPanel:
                         caller_cancelled = error
                     elif cleanup_failure is None:
                         cleanup_failure = "cancelled"
-                except BaseException:
+                except BaseException:  # noqa: BLE001 - lifecycle cleanup must also drain cancellation
                     cleanup_failure = "failed"
             result, cancelled = await self._observe_lifecycle_task(task)
             if caller_cancelled is None:
@@ -359,7 +369,7 @@ class DailyPlanAgentPanel:
             except asyncio.CancelledError:
                 if failure is None:
                     failure = "cancelled"
-            except BaseException:
+            except BaseException:  # noqa: BLE001 - lifecycle cleanup must also drain cancellation
                 failure = "failed"
 
         snapshot: AgentPanelSnapshot | None = None
@@ -371,7 +381,7 @@ class DailyPlanAgentPanel:
         except asyncio.CancelledError:
             if failure is None:
                 failure = "cancelled"
-        except BaseException:
+        except BaseException:  # noqa: BLE001 - lifecycle cleanup must also drain cancellation
             failure = "failed"
 
         return _AgentLifecycleResult(
@@ -406,7 +416,7 @@ class DailyPlanAgentPanel:
                 failure="cancelled",
                 origin_cancelled=False,
             )
-        except BaseException:
+        except BaseException:  # noqa: BLE001 - lifecycle cleanup must also drain cancellation
             result = _AgentLifecycleResult(
                 snapshot=None,
                 failure="failed",
@@ -507,12 +517,9 @@ class DailyPlanAgentPanel:
         self._result_container.clear()
         with self._result_container:
             if snapshot.error_code is not None:
-                ui.label(
-                    _ERROR_COPY.get(
-                        snapshot.error_code,
-                        "本次运行失败，未显示或保存任何建议。",
-                    )
-                ).classes("text-sm text-red-600")
+                ui.label(agent_error_message(snapshot.error_code)).classes(
+                    "text-sm text-red-600"
+                )
             if snapshot.assistant_content:
                 with ui.card().classes("w-full bg-blue-50"):
                     ui.label("模型建议").classes("text-sm font-semibold")

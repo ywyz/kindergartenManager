@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -29,6 +30,7 @@ from app.ui.theme import (
     THEME_STORAGE_KEY,
     build_theme_apply_script,
     build_theme_bootstrap_script,
+    build_theme_storage_reader_script,
     normalize_theme_mode,
 )
 
@@ -43,6 +45,7 @@ __all__ = (
     "app_shell",
     "build_theme_apply_script",
     "build_theme_bootstrap_script",
+    "build_theme_storage_reader_script",
     "get_display_name",
     "get_menu_items",
     "normalize_theme_mode",
@@ -58,6 +61,7 @@ _ALL_MENU_ITEMS: list[dict] = [
         "group": "教学管理",
         "key": "daily-plan",
         "label": "每日活动计划",
+        "description": "教案拆分 · 活动生成 · 导出",
         "icon": "edit_calendar",
         "route": "/daily-plan",
         "roles": None,
@@ -66,6 +70,7 @@ _ALL_MENU_ITEMS: list[dict] = [
         "group": "教学管理",
         "key": "weekly-plan",
         "label": "每周工作计划",
+        "description": "同班共享 · 填写生成 · 单页导出",
         "icon": "calendar_view_week",
         "route": "/weekly-plan",
         "roles": {"teacher", "teaching_admin"},
@@ -74,6 +79,7 @@ _ALL_MENU_ITEMS: list[dict] = [
         "group": "教学管理",
         "key": "game-observation",
         "label": "游戏观察记录",
+        "description": "拍照 · AI 分析 · 导出报告",
         "icon": "videocam",
         "route": "/game-observation",
         "roles": None,
@@ -82,6 +88,7 @@ _ALL_MENU_ITEMS: list[dict] = [
         "group": "教学管理",
         "key": "one-on-one-listening",
         "label": "一对一倾听",
+        "description": "倾听记录 · 观察 · 跟进",
         "icon": "hearing",
         "route": "/one-on-one-listening",
         "roles": None,
@@ -90,6 +97,7 @@ _ALL_MENU_ITEMS: list[dict] = [
         "group": "教学管理",
         "key": "homemade-teaching",
         "label": "自制教玩具",
+        "description": "AI 生成 · 保存 · 导出",
         "icon": "extension",
         "route": "/homemade-teaching",
         "roles": None,
@@ -98,6 +106,7 @@ _ALL_MENU_ITEMS: list[dict] = [
         "group": "教学管理",
         "key": "course-review-activity",
         "label": "课程审议",
+        "description": "教案拆分 · 审议调整 · 导出",
         "icon": "fact_check",
         "route": "/course-review-activity",
         "roles": None,
@@ -107,6 +116,7 @@ _ALL_MENU_ITEMS: list[dict] = [
         "group": "配置中心",
         "key": "settings",
         "label": "学期班级配置",
+        "description": "学期 · 班级 · 幼儿信息",
         "icon": "settings",
         "route": "/settings",
         "roles": None,
@@ -115,14 +125,17 @@ _ALL_MENU_ITEMS: list[dict] = [
         "group": "配置中心",
         "key": "prompts",
         "label": "AI 提示词管理",
+        "description": "AI 提示词模板管理",
         "icon": "tune",
         "route": "/prompts",
         "roles": None,
     },
+    # 账号
     {
         "group": "账号",
         "key": "profile",
         "label": "个人资料",
+        "description": "账号信息 · 密码管理",
         "icon": "person",
         "route": "/profile",
         "roles": None,
@@ -131,6 +144,7 @@ _ALL_MENU_ITEMS: list[dict] = [
         "group": "账号",
         "key": "user-admin",
         "label": "账号管理",
+        "description": "系统账号管理",
         "icon": "manage_accounts",
         "route": "/user-admin",
         "roles": {"sys_admin"},
@@ -182,7 +196,7 @@ def get_display_name(user: dict) -> str:
     return str(user.get("username", ""))
 
 
-def _render_shell_chrome(user: dict, active: str) -> None:
+async def _render_shell_chrome(user: dict, active: str) -> None:
     """Render the shared header, theme controls, drawer, and theme bootstrap."""
     role: str = user.get("role", "teacher")
     display_name: str = get_display_name(user)
@@ -201,25 +215,33 @@ def _render_shell_chrome(user: dict, active: str) -> None:
 
     theme_buttons: dict[str, Any] = {}
 
+    def _apply_theme_state(mode: str) -> None:
+        """Update the server-side dark-mode element and control aria state."""
+        if mode == THEME_NIGHT:
+            dark_mode.enable()
+        else:
+            dark_mode.disable()
+        for option, button in theme_buttons.items():
+            button.props(f"aria-pressed={'true' if option == mode else 'false'}")
+
     def set_theme(mode: str) -> None:
         """Apply a validated mode immediately and persist only that enum."""
         normalized = normalize_theme_mode(mode)
         if normalized != mode:
             return
-        if normalized == THEME_NIGHT:
-            dark_mode.enable()
-        else:
-            dark_mode.disable()
-        for option, button in theme_buttons.items():
-            button.props(f"aria-pressed={'true' if option == normalized else 'false'}")
+        _apply_theme_state(normalized)
         ui.run_javascript(build_theme_apply_script(normalized))
 
     # ── 顶栏 ────────────────────────────────────────────────────────────────
-    with ui.header().classes("theme-header text-white items-center px-4 gap-2"):
+    with ui.header().classes(
+        "theme-header text-white items-center px-4 gap-2 flex-wrap"
+    ):
         ui.button(icon="menu", on_click=lambda: drawer.toggle()).props(
             "flat round dense"
         ).classes("text-white")
-        ui.label("幼儿园教学管理系统").classes("text-lg font-bold flex-1")
+        ui.label("幼儿园教学管理系统").classes(
+            "text-lg font-bold flex-1 min-w-48 whitespace-nowrap"
+        )
         ui.label(display_name).classes("theme-user text-sm text-blue-100")
         with (
             ui.row()
@@ -247,6 +269,15 @@ def _render_shell_chrome(user: dict, active: str) -> None:
         ui.button(icon="logout", on_click=_logout).props("flat round dense").classes(
             "text-white"
         )
+
+    # 从浏览器本地存储同步服务器状态，使后续 socket 更新不会覆盖用户主题。
+    try:
+        stored_value = ui.run_javascript(build_theme_storage_reader_script())
+        if inspect.isawaitable(stored_value):
+            stored_value = await stored_value
+    except (TimeoutError, RuntimeError):
+        stored_value = None
+    _apply_theme_state(normalize_theme_mode(stored_value))
 
     # ── 左侧抽屉 ────────────────────────────────────────────────────────────
     with ui.left_drawer(value=True, bordered=True).classes(
@@ -279,10 +310,10 @@ def _render_shell_chrome(user: dict, active: str) -> None:
 @asynccontextmanager
 async def app_shell(user: dict, active: str) -> AsyncIterator[None]:
     """统一布局：左侧分组菜单、顶栏和全局主题控件。"""
-    _render_shell_chrome(user, active)
+    await _render_shell_chrome(user, active)
     yield
 
 
 async def render_shell(user: dict, active: str) -> None:
     """渲染与 :func:`app_shell` 完全一致的 shell。"""
-    _render_shell_chrome(user, active)
+    await _render_shell_chrome(user, active)

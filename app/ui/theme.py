@@ -12,7 +12,6 @@ from __future__ import annotations
 import json
 from typing import Literal
 
-
 ThemeMode = Literal["day", "night"]
 
 THEME_DAY = "day"
@@ -55,6 +54,23 @@ def build_theme_bootstrap_script() -> str:
   if (typeof setDark === "function") {{
     setDark(mode === "night");
   }}
+
+  if (!window.__kindergartenThemeStorageListener) {{
+    window.addEventListener("storage", (event) => {{
+      if (event.key !== storageKey) return;
+      let newMode = event.newValue;
+      if (newMode !== "night") newMode = "day";
+      document.body.dataset.themeMode = newMode;
+      document.documentElement.style.colorScheme = newMode === "night" ? "dark" : "light";
+      document.querySelectorAll("[data-theme-option]").forEach((option) => {{
+        option.setAttribute("aria-pressed", option.dataset.themeOption === newMode ? "true" : "false");
+      }});
+      if (typeof setDark === "function") {{
+        setDark(newMode === "night");
+      }}
+    }});
+    window.__kindergartenThemeStorageListener = true;
+  }}
 }})();
 """
 
@@ -83,6 +99,29 @@ def build_theme_apply_script(mode: str) -> str:
     setDark(mode === "night");
   }}
 }})();
+"""
+
+
+def build_theme_storage_reader_script() -> str:
+    """Build a script that reads the validated browser-local theme enum.
+
+    The result is returned to the server so ``ui.dark_mode`` stays synchronized
+    with the actual browser preference across reloads, navigation and storage
+    events.
+    """
+    storage_key = json.dumps(THEME_STORAGE_KEY)
+    return f"""
+(() => {{
+  const storageKey = {storage_key};
+  try {{
+    const stored = window.localStorage.getItem(storageKey);
+    if (stored === "night") return "night";
+    if (stored !== "day") window.localStorage.setItem(storageKey, "day");
+    return "day";
+  }} catch (_storageError) {{
+    return "day";
+  }}
+}})()
 """
 
 

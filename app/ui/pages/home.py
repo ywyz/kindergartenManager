@@ -9,7 +9,19 @@ from nicegui import ui
 from app.core.database import AsyncSessionLocal
 from app.repository.class_repository import get_class_config
 from app.ui.auth_context import require_bound_ui_session, require_current_ui_session
-from app.ui.components.app_shell import app_shell, get_display_name
+from app.ui.components.app_shell import app_shell, get_display_name, get_menu_items
+
+
+def _home_card_items(role: str) -> list[dict]:
+    """返回首页应渲染的卡片项，与侧边栏菜单使用同一投影。
+
+    Args:
+        role: 用户角色。
+
+    Returns:
+        含 key/label/icon/route/group/description 的字典列表。
+    """
+    return get_menu_items(role)
 
 
 @ui.page("/home")
@@ -43,93 +55,34 @@ async def home_page() -> None:
             )
             ui.label(f"当前班级：{class_info}").classes("text-gray-500 -mt-4")
 
-            # 快捷入口卡片
-            ui.label("快捷入口").classes(
-                "text-sm font-semibold text-gray-400 uppercase tracking-wide"
-            )
-            with ui.row().classes("w-full gap-4 flex-wrap"):
-                if ui_session.role in {"teacher", "teaching_admin"}:
-                    with (
-                        ui.card()
-                        .classes(
-                            "flex-1 min-w-48 cursor-pointer hover:shadow-md transition-shadow"
-                        )
-                        .on("click", lambda: ui.navigate.to("/weekly-plan"))
-                    ):
-                        with ui.row().classes("items-center gap-3"):
-                            ui.icon("calendar_view_week").classes(
-                                "text-3xl text-blue-600"
-                            )
-                            with ui.column().classes("gap-0"):
-                                ui.label("每周工作计划").classes(
-                                    "font-semibold text-gray-800"
-                                )
-                                ui.label("同班共享 · 填写生成 · 单页导出").classes(
-                                    "text-xs text-gray-400"
-                                )
+            # 快捷入口卡片：与侧边栏使用同一菜单投影，按分组响应式排列。
+            menu_items = _home_card_items(ui_session.role)
+            groups: dict[str, list[dict]] = {}
+            for item in menu_items:
+                groups.setdefault(item["group"], []).append(item)
 
-                with (
-                    ui.card()
-                    .classes(
-                        "flex-1 min-w-48 cursor-pointer hover:shadow-md transition-shadow"
-                    )
-                    .on("click", lambda: ui.navigate.to("/daily-plan"))
-                ):
-                    with ui.row().classes("items-center gap-3"):
-                        ui.icon("edit_calendar").classes("text-3xl text-blue-600")
-                        with ui.column().classes("gap-0"):
-                            ui.label("每日活动计划").classes(
-                                "font-semibold text-gray-800"
+            for group_name, group_items in groups.items():
+                ui.label(group_name).classes(
+                    "text-sm font-semibold text-gray-400 uppercase tracking-wide"
+                )
+                with ui.row().classes("w-full gap-4 flex-wrap"):
+                    for item in group_items:
+                        with (
+                            ui.card()
+                            .classes(
+                                "flex-1 min-w-48 cursor-pointer hover:shadow-md transition-shadow"
                             )
-                            ui.label("教案拆分 · 活动生成 · 导出").classes(
-                                "text-xs text-gray-400"
+                            .on(
+                                "click",
+                                lambda route=item["route"]: ui.navigate.to(route),
                             )
-
-                with (
-                    ui.card()
-                    .classes(
-                        "flex-1 min-w-48 cursor-pointer hover:shadow-md transition-shadow"
-                    )
-                    .on("click", lambda: ui.navigate.to("/game-observation"))
-                ):
-                    with ui.row().classes("items-center gap-3"):
-                        ui.icon("videocam").classes("text-3xl text-green-600")
-                        with ui.column().classes("gap-0"):
-                            ui.label("游戏观察记录").classes(
-                                "font-semibold text-gray-800"
-                            )
-                            ui.label("拍照 · AI 分析 · 导出报告").classes(
-                                "text-xs text-gray-400"
-                            )
-
-                with (
-                    ui.card()
-                    .classes(
-                        "flex-1 min-w-48 cursor-pointer hover:shadow-md transition-shadow"
-                    )
-                    .on("click", lambda: ui.navigate.to("/homemade-teaching"))
-                ):
-                    with ui.row().classes("items-center gap-3"):
-                        ui.icon("extension").classes("text-3xl text-orange-600")
-                        with ui.column().classes("gap-0"):
-                            ui.label("自制教玩具").classes(
-                                "font-semibold text-gray-800"
-                            )
-                            ui.label("AI 生成 · 保存 · 导出").classes(
-                                "text-xs text-gray-400"
-                            )
-
-                with (
-                    ui.card()
-                    .classes(
-                        "flex-1 min-w-48 cursor-pointer hover:shadow-md transition-shadow"
-                    )
-                    .on("click", lambda: ui.navigate.to("/course-review-activity"))
-                ):
-                    with ui.row().classes("items-center gap-3"):
-                        ui.icon("fact_check").classes("text-3xl text-teal-600")
-                        with ui.column().classes("gap-0"):
-                            ui.label("课程审议").classes("font-semibold text-gray-800")
-                            ui.label("教案拆分 · 审议调整 · 导出").classes(
-                                "text-xs text-gray-400"
-                            )
+                        ):
+                            with ui.row().classes("items-center gap-3"):
+                                ui.icon(item["icon"]).classes("text-3xl text-blue-600")
+                                with ui.column().classes("gap-0"):
+                                    ui.label(item["label"]).classes(
+                                        "font-semibold text-gray-800"
+                                    )
+                                    ui.label(item.get("description", "")).classes(
+                                        "text-xs text-gray-400"
+                                    )

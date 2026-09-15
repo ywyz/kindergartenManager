@@ -15,6 +15,20 @@ import pytest
 import app.ui.components.app_shell as app_shell_module
 
 
+async def _co(value: str) -> str:
+    return value
+
+
+class _AwaitableValue:
+    """Awaitable double that does not warn when it is never awaited."""
+
+    def __init__(self, value: str) -> None:
+        self.value = value
+
+    def __await__(self):
+        return _co(self.value).__await__()
+
+
 class _FakeElement:
     """Minimal NiceGUI element double for shell component tests."""
 
@@ -62,6 +76,7 @@ class _FakeUi:
         self.scripts: list[str] = []
         self.css: list[str] = []
         self.dark: _FakeDarkMode | None = None
+        self.storage_value: str = "day"
 
     def add_css(self, content: str) -> None:
         self.css.append(content)
@@ -70,8 +85,9 @@ class _FakeUi:
         self.dark = _FakeDarkMode(value)
         return self.dark
 
-    def run_javascript(self, script: str) -> None:
+    def run_javascript(self, script: str):
         self.scripts.append(script)
+        return _AwaitableValue(self.storage_value)
 
     def header(self) -> _FakeElement:
         return _FakeElement()
@@ -241,22 +257,33 @@ def test_theme_scripts_are_not_parameterized_by_user_identity() -> None:
 
 
 def test_theme_controls_are_explicitly_connected_to_mode_scripts() -> None:
-    """shell 源码必须包含两项控件、即时 setter 与 bootstrap。"""
+    """shell 源码必须包含两项控件、即时 setter、bootstrap 与 storage 同步。"""
     source = inspect.getsource(app_shell_module)
     assert "THEME_DAY_LABEL" in source
     assert "THEME_NIGHT_LABEL" in source
     assert "build_theme_apply_script" in source
     assert "build_theme_bootstrap_script" in source
+    assert "build_theme_storage_reader_script" in source
     assert "ui.dark_mode" in source
     assert "ui.run_javascript" in source
 
 
-def test_shared_shell_renderer_updates_theme_controls_immediately(monkeypatch) -> None:
+def test_theme_bootstrap_listens_for_cross_tab_storage_changes() -> None:
+    """bootstrap 脚本必须监听 storage 事件以同步其他标签页的偏好。"""
+    script = app_shell_module.build_theme_bootstrap_script()
+    assert "addEventListener" in script
+    assert "storage" in script
+    assert "__kindergartenThemeStorageListener" in script
+
+
+async def test_shared_shell_renderer_updates_theme_controls_immediately(
+    monkeypatch,
+) -> None:
     """Fake UI verifies both controls update the official dark-mode element."""
     fake_ui = _FakeUi()
     monkeypatch.setattr(app_shell_module, "ui", fake_ui)
 
-    app_shell_module._render_shell_chrome(
+    await app_shell_module._render_shell_chrome(
         {"role": "teacher", "display_name": "脱敏用户"},
         active="daily-plan",
     )
@@ -264,7 +291,8 @@ def test_shared_shell_renderer_updates_theme_controls_immediately(monkeypatch) -
     assert fake_ui.dark is not None
     assert fake_ui.dark.value is False
     assert fake_ui.css == [app_shell_module.THEME_CSS]
-    assert fake_ui.scripts == [app_shell_module.build_theme_bootstrap_script()]
+    assert fake_ui.scripts[0] == app_shell_module.build_theme_bootstrap_script()
+    assert app_shell_module.build_theme_storage_reader_script() in fake_ui.scripts
 
     day = next(button for button in fake_ui.buttons if button.text == "白天模式")
     night = next(button for button in fake_ui.buttons if button.text == "夜间模式")
@@ -280,6 +308,58 @@ def test_shared_shell_renderer_updates_theme_controls_immediately(monkeypatch) -
     day.on_click()
     assert fake_ui.dark.value is False
     assert fake_ui.scripts[-1] == app_shell_module.build_theme_apply_script("day")
+
+
+async def test_shell_syncs_dark_mode_from_browser_storage_on_render(
+    monkeypatch,
+) -> None:
+    """Server-side dark_mode value must follow the stored browser preference."""
+    fake_ui = _FakeUi()
+    fake_ui.storage_value = "night"
+    monkeypatch.setattr(app_shell_module, "ui", fake_ui)
+
+    await app_shell_module._render_shell_chrome(
+        {"role": "teacher", "display_name": "脱敏用户"},
+        active="daily-plan",
+    )
+
+    assert fake_ui.dark is not None
+    assert fake_ui.dark.value is True
+    night = next(button for button in fake_ui.buttons if button.text == "夜间模式")
+    day = next(button for button in fake_ui.buttons if button.text == "白天模式")
+    assert "aria-pressed=true" in night.props_calls
+    assert "aria-pressed=false" in day.props_calls
+
+
+async def test_shell_defaults_to_day_for_invalid_or_missing_storage(
+    monkeypatch,
+) -> None:
+    """Missing or invalid browser storage must leave dark mode disabled."""
+    fake_ui = _FakeUi()
+    fake_ui.storage_value = "invalid"
+    monkeypatch.setattr(app_shell_module, "ui", fake_ui)
+
+    await app_shell_module._render_shell_chrome(
+        {"role": "teacher", "display_name": "脱敏用户"},
+        active="daily-plan",
+    )
+
+    assert fake_ui.dark is not None
+    assert fake_ui.dark.value is False
+
+
+async def test_re_render_does_not_reset_stored_night_mode(monkeypatch) -> None:
+    """Simulate a save-triggered component refresh: night mode must survive."""
+    fake_ui = _FakeUi()
+    fake_ui.storage_value = "night"
+    monkeypatch.setattr(app_shell_module, "ui", fake_ui)
+
+    for _ in range(2):
+        await app_shell_module._render_shell_chrome(
+            {"role": "teacher", "display_name": "脱敏用户"},
+            active="daily-plan",
+        )
+        assert fake_ui.dark.value is True
 
 
 def test_browser_acceptance_evidence_covers_the_required_visual_matrix() -> None:
