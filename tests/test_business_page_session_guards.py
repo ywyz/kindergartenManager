@@ -702,6 +702,43 @@ def test_game_result_revalidates_session_and_generation_before_writeback(
     assert work_index < generation_index < writeback_index
 
 
+def test_game_ai_result_writeback_is_visible_and_does_not_self_invalidate() -> None:
+    page_path = "app/ui/pages/game_observation.py"
+    page_source = (_ROOT / page_path).read_text(encoding="utf-8")
+    generate_source = _normalized_function_source(page_path, "do_generate")
+    invalidate_source = ast.unparse(_sync_functions(_parse(page_path))["_invalidate_form"])
+
+    result_index = generate_source.index("result = await generate_observation_content(")
+    stale_index = generate_source.index(
+        "generation != state['generation']", result_index
+    )
+    warning_index = generate_source.index(
+        "表单或照片在生成期间发生变化，本次结果未回填，请重新点击生成",
+        stale_index,
+    )
+    first_writeback_index = generate_source.index("goal_area.value =", result_index)
+
+    assert result_index < stale_index < warning_index < first_writeback_index
+    assert "game_observation_ai_result_discarded reason=input_changed" in generate_source
+    assert '"applying_generated_result": False' in page_source
+    assert "if state['applying_generated_result']:\n        return" in invalidate_source
+
+    suppress_index = generate_source.index(
+        "state['applying_generated_result'] = True", result_index
+    )
+    restore_index = generate_source.index(
+        "state['applying_generated_result'] = False", suppress_index
+    )
+    last_writeback_index = generate_source.index("strategy_area.value =", result_index)
+    generation_advance_index = generate_source.index(
+        "state['generation'] += 1", last_writeback_index
+    )
+
+    assert suppress_index < first_writeback_index
+    assert last_writeback_index < generation_advance_index < restore_index
+    assert "finally:\n            state['applying_generated_result'] = False" in generate_source
+
+
 @pytest.mark.parametrize(
     ("relative_path", "callback", "awaited_work", "writeback"),
     [

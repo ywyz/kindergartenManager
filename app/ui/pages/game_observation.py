@@ -113,6 +113,7 @@ async def game_observation_page() -> None:
         "upload_generation": 0,
         "upload_pending": False,
         "upload_error": False,
+        "applying_generated_result": False,
     }
 
     with ui.column().classes("w-full max-w-3xl mx-auto p-6 gap-4"):
@@ -298,6 +299,8 @@ async def game_observation_page() -> None:
             )
 
         def _invalidate_form(*_event_args: object) -> None:
+            if state["applying_generated_result"]:
+                return
             state["generation"] += 1
             state["observation_id"] = None
 
@@ -397,14 +400,24 @@ async def game_observation_page() -> None:
                     generation != state["generation"]
                     or upload_generation != state["upload_generation"]
                 ):
+                    logger.info(
+                        "game_observation_ai_result_discarded reason=input_changed"
+                    )
+                    show_error(
+                        "表单或照片在生成期间发生变化，本次结果未回填，请重新点击生成"
+                    )
                     return
-                goal_area.value = result.get("observation_goal", "")
-                record_area.value = result.get("observation_record", "")
-                eval_area.value = result.get("evaluation_analysis", "")
-                strategy_area.value = result.get("support_strategy", "")
-                state["compressed_images"] = result.get("compressed_images", [])
-                state["observation_id"] = None
-                state["generation"] += 1
+                state["applying_generated_result"] = True
+                try:
+                    goal_area.value = result.get("observation_goal", "")
+                    record_area.value = result.get("observation_record", "")
+                    eval_area.value = result.get("evaluation_analysis", "")
+                    strategy_area.value = result.get("support_strategy", "")
+                    state["compressed_images"] = result.get("compressed_images", [])
+                    state["observation_id"] = None
+                    state["generation"] += 1
+                finally:
+                    state["applying_generated_result"] = False
                 show_success("生成成功，请检查并编辑后保存")
             except ConfigError:
                 if not await _require_bound_session():
