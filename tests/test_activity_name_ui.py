@@ -4,6 +4,7 @@ This is headless handler evidence, not browser or Office acceptance.
 """
 
 import ast
+import asyncio
 import os
 from contextlib import asynccontextmanager
 from datetime import date
@@ -41,6 +42,14 @@ def handlers(session):
         for n in ast.walk(tree)
         if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name in names
     ]
+    # Lift trusted page closures into this isolated shared widget scope.
+    for node in nodes:
+        node.body = [
+            ast.Global(names=statement.names)
+            if isinstance(statement, ast.Nonlocal)
+            else statement
+            for statement in node.body
+        ]
     module = ast.Module(
         body=[
             ast.ImportFrom(
@@ -89,6 +98,9 @@ def handlers(session):
         get_daily_plan_by_date=get_daily_plan_by_date,
         _require_live_session=AsyncMock(return_value=object()),
         split_operations=SimpleNamespace(owns=lambda _: True),
+        asyncio=asyncio,
+        page_client=SimpleNamespace(is_deleted=False),
+        split_task=None,
     )
 
     @asynccontextmanager

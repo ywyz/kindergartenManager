@@ -3,17 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
-from nicegui import app, ui
+from nicegui import app, context, ui
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import decode_access_token
 from app.core.database import AsyncSessionLocal
 from app.core.logging import get_logger
 from app.repository.user_repository import get_user_by_id
-
 
 logger = get_logger(__name__)
 
@@ -44,8 +43,15 @@ class TrustedUiSession:
 
 def _reject_ui_session(token: object, redirect_to: str) -> None:
     """只清除本轮校验的 token，避免旧请求擦除较新的登录。"""
-    if app.storage.user.get("token") == token:
-        app.storage.user.clear()
+    if context.client.is_deleted:
+        return
+    try:
+        storage = app.storage.user
+    except (AssertionError, RuntimeError):
+        logger.warning("ui_session_storage_unavailable")
+    else:
+        if storage.get("token") == token:
+            storage.clear()
     ui.navigate.to(redirect_to)
 
 
@@ -78,7 +84,7 @@ def _utc_timestamp(value: object) -> datetime | None:
     if type(value) not in {int, float}:
         return None
     try:
-        expires_at = datetime.fromtimestamp(value, tz=timezone.utc)
+        expires_at = datetime.fromtimestamp(value, tz=UTC)
     except (OverflowError, OSError, ValueError):
         return None
     return expires_at
@@ -93,7 +99,7 @@ async def resolve_current_ui_session(
         return None
     try:
         payload = decode_access_token(token)
-    except Exception:
+    except Exception:  # noqa: BLE001 - untrusted tokens fail closed at the auth boundary
         return None
 
     tenant_id = _positive_int(payload.get("tenant_id"))
@@ -114,7 +120,7 @@ async def resolve_current_ui_session(
         return None
 
     user = await get_user_by_id(session, tenant_id=tenant_id, user_id=user_id)
-    if user is None or not user.is_active or datetime.now(timezone.utc) >= expires_at:
+    if user is None or not user.is_active or datetime.now(UTC) >= expires_at:
         return None
 
     if user.auth_epoch != token_auth_epoch:
@@ -138,22 +144,40 @@ async def require_current_ui_session(
     allowed_roles: set[str] | None = None,
 ) -> TrustedUiSession | None:
     """解析当前浏览器会话；无效、停用或越权时 fail-closed 跳转。"""
-    token = app.storage.user.get("token")
+    if context.client.is_deleted:
+        return None
+    try:
+        token = app.storage.user.get("token")
+    except (AssertionError, RuntimeError):
+        logger.warning("ui_session_storage_unavailable")
+        if context.client.has_socket_connection:
+            ui.navigate.to(redirect_to)
+        return None
     try:
         async with AsyncSessionLocal() as session:
             current = await resolve_current_ui_session(session, token)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - DB/auth failures are sanitized and fail closed
         logger.error(
             "ui_session_validation_failed error_type=%s",
             type(exc).__name__,
         )
-        _reject_ui_session(token, redirect_to)
+        if not context.client.is_deleted:
+            _reject_ui_session(token, redirect_to)
         return None
 
+    if context.client.is_deleted:
+        return None
+    try:
+        current_token = app.storage.user.get("token")
+    except (AssertionError, RuntimeError):
+        logger.warning("ui_session_storage_unavailable")
+        if context.client.has_socket_connection:
+            ui.navigate.to(redirect_to)
+        return None
     if (
-        app.storage.user.get("token") != token
+        current_token != token
         or current is None
-        or datetime.now(timezone.utc) >= current.expires_at_utc
+        or datetime.now(UTC) >= current.expires_at_utc
     ):
         _reject_ui_session(token, redirect_to)
         return None

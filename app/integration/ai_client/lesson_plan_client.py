@@ -100,6 +100,8 @@ async def split_lesson_plan(
         api_key=api_key,
         model_name=model_name,
         _client=_client,
+        request_timeout=180.0,
+        retry_attempts=1,
     )
 
     # Five-field custom prompts remain usable without changing stored versions.

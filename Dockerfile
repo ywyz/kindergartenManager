@@ -42,7 +42,7 @@ COPY specs/ specs/
 RUN python -m scripts.render_environment
 CMD ["python", "-m", "pytest", "tests/", "-m", "real_render", "-q"]
 
-# Default published target contains application and explicit operations tools only.
+# Full rebuild target contains application and explicit operations tools only.
 FROM python-deps AS production
 COPY app/ app/
 COPY alembic/ alembic/
@@ -52,3 +52,13 @@ COPY scripts/render_environment.py scripts/weekly_layout_catalog.py scripts/week
 RUN mkdir -p exports && python -m scripts.render_environment
 EXPOSE 8080
 CMD ["python", "-m", "app.main"]
+
+# Default hotfix image keeps the exact production dependency and renderer
+# baseline on both architectures; only the six verified source files change.
+FROM ghcr.io/ywyz/kindergartenmanager@sha256:792eee66a96b0dd62a1f2e57a70ddcaf738b019cf323ec4e1cdb87a29e1e2e56 AS production-hotfix
+COPY app/main.py app/main.py
+COPY app/ui/auth_context.py app/ui/auth_context.py
+COPY app/ui/pages/daily_plan.py app/ui/pages/daily_plan.py
+COPY app/integration/ai_client/base.py app/integration/ai_client/base.py
+COPY app/integration/ai_client/lesson_plan_client.py app/integration/ai_client/lesson_plan_client.py
+COPY app/integration/ai_client/adapt_client.py app/integration/ai_client/adapt_client.py

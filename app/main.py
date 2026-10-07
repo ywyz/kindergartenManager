@@ -88,6 +88,7 @@ def main() -> None:
         title="幼儿园教学管理系统",
         storage_secret=settings.JWT_SECRET,  # 用于加密 app.storage.user
         reload=False,
+        reconnect_timeout=120.0,
         show=_show_browser,
         favicon="📚",
     )

@@ -13,7 +13,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import TypedDict
 
-from nicegui import ui
+from nicegui import context, ui
 from sqlalchemy.orm.exc import StaleDataError
 
 from app.core.audit import log_audit
@@ -86,6 +86,7 @@ class _DailyPlanSavePayload(TypedDict):
 
 @ui.page("/daily-plan")
 async def daily_plan_page() -> None:
+    page_client = context.client
     ui_session = await require_current_ui_session()
     if ui_session is None:
         return
@@ -100,6 +101,8 @@ async def daily_plan_page() -> None:
     )
 
     async def _require_live_session():
+        if page_client.is_deleted:
+            return None
         return await require_bound_ui_session(ui_session)
 
     async def _authorize_agent_operation() -> bool:
@@ -329,11 +332,19 @@ async def daily_plan_page() -> None:
             raw_text_area.on_value_change(form_generation.advance)
 
             split_msg = ui.label("").classes("text-sm mt-1")
+            split_task: asyncio.Task | None = None
+
+            def _cancel_deleted_page_split() -> None:
+                if split_task is not None:
+                    split_task.cancel()
+
+            page_client.on_delete(_cancel_deleted_page_split)
 
             async def _do_split(
                 owner: object,
                 frozen: tuple[DailyPlanUiTarget | None, str, str],
             ) -> None:
+                nonlocal split_task
                 target, raw, grade = frozen
                 if await _require_live_session() is None:
                     return
@@ -351,7 +362,8 @@ async def daily_plan_page() -> None:
 
                 split_btn.props("loading")
                 split_msg.classes(remove="text-green-600 text-red-500 text-orange-500")
-                split_msg.text = "AI 拆分中，请稍候……"
+                split_msg.text = "AI 正在拆分并适配教案，请保持当前页面，最长约 6 分钟……"
+                split_task = asyncio.current_task()
 
                 try:
                     async with AsyncSessionLocal() as session:
@@ -365,6 +377,8 @@ async def daily_plan_page() -> None:
                     if await _require_live_session() is None:
                         return
                     if not _is_current_plan_target(target):
+                        split_msg.classes(add="text-orange-500")
+                        split_msg.text = "⚠ 日期或表单已变化，本次结果未回填，请重新拆分"
                         return
 
                     # 回填表单
@@ -396,13 +410,17 @@ async def daily_plan_page() -> None:
                         return
                     split_msg.classes(add="text-red-500")
                     split_msg.text = "⚠ AI 配置不可用，请前往【设置】检查模型配置"
-                except AiCallError:
+                except AiCallError as exc:
                     if await _require_live_session() is None:
                         return
                     if not _is_current_plan_target(target):
                         return
                     split_msg.classes(add="text-red-500")
-                    split_msg.text = "❌ AI 接口调用失败，请检查配置或稍后重试"
+                    split_msg.text = (
+                        "❌ AI 响应超时，本次未回填，请稍后重试或在设置中更换响应更快的模型"
+                        if str(exc) == "AI 请求超时"
+                        else "❌ AI 接口调用失败，请检查配置或稍后重试"
+                    )
                 except AiParseError:
                     if await _require_live_session() is None:
                         return
@@ -418,8 +436,10 @@ async def daily_plan_page() -> None:
                     split_msg.classes(add="text-red-500")
                     split_msg.text = f"❌ 拆分过程发生未知错误：{type(e).__name__}"
                 finally:
+                    split_task = None
                     if (
-                        await _require_live_session() is not None
+                        not page_client.is_deleted
+                        and await _require_live_session() is not None
                         and split_operations.owns(owner)
                     ):
                         split_btn.props(remove="loading")

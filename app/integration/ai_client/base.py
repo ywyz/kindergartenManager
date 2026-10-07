@@ -24,10 +24,10 @@ logger = get_logger(__name__)
 _JSON_INSTRUCTION = "\n\n请严格按照要求的 JSON 格式输出，不要输出任何其他内容。"
 
 
-def _make_retry_decorator():
+def _make_retry_decorator(attempts: int = 3):
     """构造 tenacity 重试装饰器：最多 3 次，指数退避 2s → 4s → 8s。"""
     return retry(
-        stop=stop_after_attempt(3),
+        stop=stop_after_attempt(attempts),
         wait=wait_exponential(multiplier=1, min=2, max=8),
         reraise=True,
     )
@@ -41,6 +41,8 @@ async def call_ai(
     response_schema: dict | None = None,
     *,
     _client: httpx.AsyncClient | None = None,
+    request_timeout: float = 60.0,
+    retry_attempts: int = 3,
 ) -> dict:
     """发送 Chat Completions 请求，返回解析后的 dict。
 
@@ -51,6 +53,8 @@ async def call_ai(
         model_name: 模型名称（如 gpt-4o-mini、deepseek-chat）。
         response_schema: 期望的 JSON schema（当前仅用于文档约束，不传给 API）。
         _client: 可选的 httpx 客户端（用于测试 Mock，生产环境留空）。
+        request_timeout: 读取等待秒数；拆分/适配可使用更长等待。
+        retry_attempts: 调用次数上限；拆分/适配只调用一次。
 
     Returns:
         解析后的 dict（AI 返回的 JSON 内容）。
@@ -73,7 +77,9 @@ async def call_ai(
     async def _do_request(client: httpx.AsyncClient) -> dict:
         try:
             response = await client.post(
-                url, headers=headers, json=payload, timeout=60.0
+                url, headers=headers, json=payload,
+                timeout=(60.0 if request_timeout == 60.0 else
+                         httpx.Timeout(request_timeout, connect=10.0, write=30.0, pool=10.0)),
             )
         except httpx.TimeoutException as exc:
             raise AiCallError("AI 请求超时") from exc
@@ -114,7 +120,7 @@ async def call_ai(
         return result
 
     # 使用带重试的内层函数
-    @_make_retry_decorator()
+    @(_make_retry_decorator() if retry_attempts == 3 else _make_retry_decorator(retry_attempts))
     async def _request_with_retry(client: httpx.AsyncClient) -> dict:
         return await _do_request(client)
 
