@@ -348,6 +348,10 @@ async def test_daily_plan_agent_actor_comes_from_the_verified_ui_session(
         raise _ActorObserved
 
     monkeypatch.setattr(module, "require_current_ui_session", require_session)
+    monkeypatch.setattr(
+        module, "context",
+        SimpleNamespace(client=SimpleNamespace(is_deleted=False)),
+    )
     monkeypatch.setattr(module, "create_daily_plan_agent_controller", create_controller)
 
     with pytest.raises(_ActorObserved):
