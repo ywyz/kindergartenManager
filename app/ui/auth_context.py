@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from uuid import UUID
 
 from nicegui import app, context, ui
@@ -84,7 +84,7 @@ def _utc_timestamp(value: object) -> datetime | None:
     if type(value) not in {int, float}:
         return None
     try:
-        expires_at = datetime.fromtimestamp(value, tz=timezone.utc)
+        expires_at = datetime.fromtimestamp(value, tz=UTC)
     except (OverflowError, OSError, ValueError):
         return None
     return expires_at
@@ -120,7 +120,7 @@ async def resolve_current_ui_session(
         return None
 
     user = await get_user_by_id(session, tenant_id=tenant_id, user_id=user_id)
-    if user is None or not user.is_active or datetime.now(timezone.utc) >= expires_at:
+    if user is None or not user.is_active or datetime.now(UTC) >= expires_at:
         return None
 
     if user.auth_epoch != token_auth_epoch:
@@ -177,7 +177,7 @@ async def require_current_ui_session(
     if (
         current_token != token
         or current is None
-        or datetime.now(timezone.utc) >= current.expires_at_utc
+        or datetime.now(UTC) >= current.expires_at_utc
     ):
         _reject_ui_session(token, redirect_to)
         return None
