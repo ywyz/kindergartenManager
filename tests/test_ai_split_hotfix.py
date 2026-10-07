@@ -60,7 +60,7 @@ def split_handler(process):
     }
     for name in ("split_msg", "split_btn", "name_input", "goal_area", "prep_area", "key_area", "difficult_area", "adapted_area", "original_area"):
         env[name] = Element()
-    exec(compile(module, "daily_plan_callback", "exec"), env)
+    exec(compile(module, "daily_plan_callback", "exec"), env)  # noqa: S102 - execute fixed repository AST, never user input
     return env
 
 
@@ -122,7 +122,7 @@ async def test_page_delete_callback_cancels_inflight_split():
     module = ast.fix_missing_locations(ast.Module(body=[function], type_ignores=[]))
     task = asyncio.create_task(asyncio.sleep(30))
     env = {"split_task": task}
-    exec(compile(module, "page_delete_callback", "exec"), env)
+    exec(compile(module, "page_delete_callback", "exec"), env)  # noqa: S102 - fixed repository AST with isolated seams
     env["_cancel_deleted_page_split"]()
     with pytest.raises(asyncio.CancelledError):
         await task

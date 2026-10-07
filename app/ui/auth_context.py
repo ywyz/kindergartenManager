@@ -14,7 +14,6 @@ from app.core.database import AsyncSessionLocal
 from app.core.logging import get_logger
 from app.repository.user_repository import get_user_by_id
 
-
 logger = get_logger(__name__)
 
 
@@ -100,7 +99,7 @@ async def resolve_current_ui_session(
         return None
     try:
         payload = decode_access_token(token)
-    except Exception:
+    except Exception:  # noqa: BLE001 - untrusted tokens fail closed at the auth boundary
         return None
 
     tenant_id = _positive_int(payload.get("tenant_id"))
@@ -157,7 +156,7 @@ async def require_current_ui_session(
     try:
         async with AsyncSessionLocal() as session:
             current = await resolve_current_ui_session(session, token)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - DB/auth failures are sanitized and fail closed
         logger.error(
             "ui_session_validation_failed error_type=%s",
             type(exc).__name__,
