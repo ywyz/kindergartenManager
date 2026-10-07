@@ -18,6 +18,17 @@ from app.service.agent.contracts import TrustedActor
 from app.ui.auth_context import TrustedUiSession
 
 
+@pytest.fixture(autouse=True)
+def live_ui_client_context(monkeypatch):
+    """These auth tests run outside NiceGUI's event loop with a live UI seam."""
+    from app.ui import auth_context
+
+    monkeypatch.setattr(
+        auth_context, "context",
+        SimpleNamespace(client=SimpleNamespace(is_deleted=False, has_socket_connection=True)),
+    )
+
+
 class _FakeUiElement:
     def __init__(self, *, value=None) -> None:
         self.value = value

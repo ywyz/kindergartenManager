@@ -105,6 +105,8 @@ async def adapt_activity_process(
         api_key=api_key,
         model_name=model_name,
         _client=_client,
+        request_timeout=180.0,
+        retry_attempts=1,
     )
 
     if "adapted_process" not in result:
