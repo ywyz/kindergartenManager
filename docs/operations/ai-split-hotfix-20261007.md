@@ -16,6 +16,11 @@ client in cleanup. Missing user storage fails closed without an assertion.
 Provider failures use local safe messages; stale target results are discarded
 with an explicit explanation, preserving existing date/version/form guards.
 
+The default hotfix Docker target derives from the exact existing dual-platform
+production index and copies only the six changed application files. The
+renderer test/full rebuild targets remain available. This avoids resolving
+new runtime dependencies during the repair.
+
 No schema, saved teacher configuration, prompt versions, or provider key is
 changed. No background task system or automatic draft save is introduced.
 An explicit reload/navigation or disconnect lasting beyond the reconnect
@@ -24,8 +29,8 @@ time out, but the current page reports the failure and enables another try.
 
 Isolated verification uses the exact production dependencies, no production
 volumes and no network. The new 14 regressions and the existing AI client,
-lesson client/service, UI session and daily target tests pass: 70 tests in
-15.62 seconds. The UI session tests explicitly supply a live client context
+lesson client/service, UI session, daily target and daily date tests pass:
+75 tests in 15.48 seconds. The UI session tests explicitly supply a live client context
 because they execute outside NiceGUI's UI event loop. Earlier verification
 found six test-seam incompatibilities; these were corrected before release.
 This does not replace a real teacher/browser/provider acceptance run.
